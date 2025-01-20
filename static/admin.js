@@ -7,7 +7,6 @@ const activeUsers = document.getElementById('active-users');
 const averageResponseTime = document.getElementById('average-response-time');
 const percentSuccess = document.getElementById('percent-success');
 const registeredUsers = document.getElementById('registered-users');
-const downloadCount = document.getElementById('download-count');
 // Tables
 const referringSites = document.getElementById('referring-sites');
 const popularRoutes = document.getElementById('popular-routes');
@@ -45,7 +44,6 @@ function getActiveUsers(requests) {
 }
 
 const stripPrefix = (s, prefix) => s.startsWith(prefix) ? s.slice(prefix.length) : s;
-const isDownloadLog = (d) => /\/entry\/\d+\/(?:bulk|download)/.test(d.path || "");
 
 function getAverageResponseTime(requests) {
   let responseTimes = requests.map(data => data.latency * 1000.0);
@@ -58,7 +56,7 @@ const isSpanSuccess = (data) => {
 }
 
 const spanToUserData = (data) => {
-  return { user_id: data.user_id, success: isSpanSuccess(data), url: logToUrl(data), download: isDownloadLog(data) };
+  return { user_id: data.user_id, success: isSpanSuccess(data), url: logToUrl(data) };
 }
 
 function getSuccessRate(requests) {
@@ -200,7 +198,7 @@ function getPopularApiRoutes(requests) {
 
 function getTopApiUsers(requests) {
   let counter = requests.map(spanToUserData)
-    .filter(data => data.user_id != null && data.url !== null && (data.download || data.url.pathname.startsWith('/api/')))
+    .filter(data => data.user_id != null && data.url !== null && data.url.pathname.startsWith('/api/'))
     .reduce((count, data) => {
       let key = data.user_id;
       if (count.hasOwnProperty(key)) {
@@ -265,7 +263,6 @@ function updateGraphs() {
   activeUsers.textContent = getActiveUsers(requests);
   averageResponseTime.textContent = `${getAverageResponseTime(requests)} ms`;
   percentSuccess.textContent = getSuccessRate(requests).toLocaleString(undefined, { style: 'percent', minimumFractionDigits: 2 });
-  downloadCount.textContent = requests.filter(isDownloadLog).length.toLocaleString();
   getReferringSites(requests);
   getPopularRoutes(requests);
   getPopularApiRoutes(requests);
