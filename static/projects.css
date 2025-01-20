@@ -26,7 +26,7 @@ h1 {
 }
 
 /* Media query for small screens */
-@media (max-width: 600px) {
+@media (max-width: 480px) {
     .github-card {
         width: 90%; /* Take up most of the width on small screens */
     }
