@@ -1,7 +1,5 @@
 use crate::{
-    cached::BodyCache,
     flash::Flashes,
-    headers::{AcceptEncoding},
     models::{Account},
     filters
 };
@@ -10,7 +8,7 @@ use axum::{
     extract::{State},
     response::IntoResponse,
     routing::get,
-    Extension, Router,
+    Router,
 };
 use crate::{AppState};
 
@@ -35,15 +33,12 @@ async fn index(
     State(state): State<AppState>,
     account: Option<Account>,
     flashes: Flashes,
-    encoding: AcceptEncoding,
-    Extension(cacher): Extension<BodyCache>,
 ) -> impl IntoResponse {
-    let template = IndexTemplate {
+    IndexTemplate {
         account,
         flashes,
         url: state.config().canonical_url()
-    };
-    cacher.cache_template("index", template, encoding, false).await
+    }
 }
 
 #[derive(Template)]
@@ -58,15 +53,12 @@ async fn projects(
     State(state): State<AppState>,
     account: Option<Account>,
     flashes: Flashes,
-    encoding: AcceptEncoding,
-    Extension(cacher): Extension<BodyCache>,
 ) -> impl IntoResponse {
-    let template = ProjectsTemplate {
+    ProjectsTemplate {
         account,
         flashes,
         url: state.config().url_to("/projects"),
-    };
-    cacher.cache_template("projects", template, encoding, false).await
+    }
 }
 
 #[derive(Template)]

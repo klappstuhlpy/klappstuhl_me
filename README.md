@@ -1,7 +1,7 @@
 # Klappstuhl.me
 
 Klappstuhl.me is my personal website that features a public image hosting service.
-This Website is partly based on [Rapptz's jimaku](https://github.com/Rapptz/jimaku)
+This Website is partly based on [Rapptz's klappstuhl_me](https://github.com/Rapptz/klappstuhl_me)
 
 
 # Install
@@ -16,9 +16,9 @@ In order to create an admin account, run the `admin` subcommand.
 
 Configuration is done using a JSON file. The location of the configuration file depends on the operating system:
 
-- Linux: `$XDG_CONFIG_HOME/jimaku/config.json` or `$HOME/.config/jimaku/config.json`
-- macOS: `$HOME/Library/Application Support/jimaku/config.json`
-- Windows: `%AppData%/jimaku/config.json`
+- Linux: `$XDG_CONFIG_HOME/klappstuhl_me/config.json` or `$HOME/.config/klappstuhl_me/config.json`
+- macOS: `$HOME/Library/Application Support/klappstuhl_me/config.json`
+- Windows: `%AppData%/klappstuhl_me/config.json`
 
 The documentation for the actual configuration options is documented in the [source code](src/config.rs).
 
