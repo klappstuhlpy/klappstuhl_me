@@ -1,0 +1,35 @@
+.dark-mode {
+  --scalar-background-1: #091624;
+  --scalar-border-color: #132f4d;
+  --scalar-background-2: #0d2039;
+  --scalar-color-accent: #c4a058;
+  --scalar-color-1: #e0e0e0;
+  --scalar-button-1-color: #e0e0e0;
+  --scalar-background-3: #091729;
+  --scalar-button-1: rgb(47,96,164);
+  --scalar-button-1-hover: rgba(47, 96, 164, 0.9);
+  --scalar-color-2: #c3c3c3;
+  --scalar-sidebar-background-1: var(--scalar-background-1);
+  --scalar-sidebar-color-1: var(--scalar-color-1);
+  --scalar-sidebar-color-2: var(--scalar-color-2);
+  --scalar-sidebar-border-color: var(--scalar-border-color);
+  --scalar-sidebar-item-hover-background: var(--scalar-background-2);
+  --scalar-sidebar-item-hover-color: currentColor;
+  --scalar-sidebar-item-active-background: var(--scalar-background-2);
+  --scalar-sidebar-color-active: var(--scalar-color-1);
+  --scalar-sidebar-search-background: transparent;
+  --scalar-sidebar-search-border-color: var(--scalar-border-color);
+  --scalar-color-3: #afafaf;
+}
+
+.scalar-api-client__item__options {
+  display: none;
+}
+
+.darklight-reference-promo {
+  display: none !important;
+}
+
+.darklight-reference > button.darklight {
+  padding-bottom: 18px;
+}

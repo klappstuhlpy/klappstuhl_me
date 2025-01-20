@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link href="/static/projects.css" rel="stylesheet">
+
+<meta property="og:url" content="{{ url }}">
+<meta property="og:title" content="Projects | Klappstuhl.me">
+{% endblock %}
+
+{% block body %}
+<h1>My Projects</h1>
+
+{% for flash in flashes %}
+{{ flash.html()|safe }}
+{% endfor %}
+
+<section class="project-container">
+    <div class="github-card" data-github="klappstuhlpy/percy" data-width="400" data-height="155" data-theme="default"></div>
+    <div class="github-card" data-github="klappstuhlpy/robohashira" data-width="400" data-height="155" data-theme="default"></div>
+    <div class="github-card" data-github="klappstuhlpy/klappstuhl_me" data-width="400" data-height="155" data-theme="default"></div>
+</section>
+
+{% endblock %}
+
+{% block body_end %}
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+{% endblock %}

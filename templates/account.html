@@ -1,0 +1,159 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/auth.css" type="text/css"/>
+<link rel="stylesheet" href="/static/image_list.css" type="text/css"/>
+{% endblock %}
+
+{% block title %}
+My Account | Klappstuhl_me
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/auth.js"></script>
+<script src="/static/files.js"></script>
+{% endblock %}
+
+{% block body %}
+{% let account = account.as_ref().unwrap() %}
+<div class="account-info">
+    <h2 class="account-name">{{ user.name }}</h2>
+    <div class="badges">
+        {% if user.flags.is_admin() -%}
+        <span class="badge branding" title="User is an administrator">Admin</span>
+        <a class="history" href="/logs?account_id={{ user.id }}">
+            <img alt="History icon" src="/static/img/history.svg" width="24px" height="24px">
+        </a>
+        <a class="admin-panel" href="/admin">
+            <img alt="Admin panel icon" src="/static/img/admin.svg" width="24px" height="24px">
+        </a>
+        {% endif -%}
+    </div>
+</div>
+<div class="commands">
+    <div class="command-buttons left">
+        {% if account.id == user.id %}
+        <button class="button" id="change-password">Change Password</button>
+        {% endif %}
+    </div>
+</div>
+{% if account.id == user.id %}
+<form id="api-section">
+    <h3>Developer Access</h3>
+    <p>Please check the <a href="/api/docs">documentation</a> to learn how to use the API.</p>
+    <div class="form-container">
+        {% match api_key %}
+        {% when Some with (api) %}
+        <label for="api-key">API Key</label>
+        <div class="form-field">
+            <pre id="api-key">{{ api }}</pre>
+        </div>
+        <div class="commands">
+            <div class="command-buttons left">
+                <button type="button" id="copy-api-key" class="button primary">Copy</button>
+                <button type="submit" name="new" value="false" class="button danger">Regenerate</button>
+            </div>
+        </div>
+        {% when None %}
+        <p>In order to use the API, you must have an API token.</p>
+        <div class="commands">
+            <div class="command-buttons left">
+                <button type="submit" name="new" value="true" class="button primary">Generate</button>
+            </div>
+        </div>
+        {% endmatch %}
+    </div>
+</form>
+{% endif %}
+{% if current_session.is_some() || !sessions.is_empty() %}
+<section id="session-section">
+    <h3>Sessions</h3>
+    <p>
+        These are all the sessions that are currently logged in with your account. You can log out of each one
+        individually or revoke all of them.
+    </p>
+    <p>
+        If you see an entry you don't recognize, log out that session and change your password immediately.
+    </p>
+    {% match current_session %}
+    {% when Some with (session) %}
+    <h4>Current Session</h4>
+    <div class="sessions">
+        <div class="session">
+            <div class="info">
+                <span class="description">{{ session.label() }}</span>
+                <span class="created" title="{{ session.created_at|isoformat }}"
+                      data-timestamp="{{ session.created_at.unix_timestamp() }}">{{ session.created_at|isoformat }}</span>
+            </div>
+            <a class="invalidate button danger outline" href="/logout">Logout</a>
+        </div>
+    </div>
+    {% when None %}
+    {% endmatch %}
+    {% if !sessions.is_empty() %}
+    <h4>Other Sessions</h4>
+    <div class="sessions">
+        {% for session in sessions %}
+        <div class="session">
+            <div class="info">
+                <span class="description">{{ session.label() }}</span>
+                <span class="created" title="{{ session.created_at|isoformat }}"
+                      data-timestamp="{{ session.created_at.unix_timestamp() }}">{{ session.created_at|isoformat }}</span>
+            </div>
+            <button class="invalidate button danger outline"
+                    data-token="{{ session.signed(key)|as_ref|maybe_display }}">Logout
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    <a class="button danger outline" href="/logout/all">Logout All Sessions</a>
+    {% endif %}
+</section>
+{% endif %}
+{% if !entries.is_empty() %}
+<h3>Uploaded Images</h3>
+<div class="files" data-columns="2">
+    <div class="table-headers">
+        <span class="table-header sorting-ascending" data-sort-by="name">Name</span>
+        <span class="table-header" data-sort-by="uploaded-at">Date</span>
+    </div>
+    {% for entry in entries %}
+    <div class="entry">
+        <a href="/gallery/{{ entry.id }}.{{ entry.ext() }}" class="table-data file-name" target="_blank">{{ entry.id }}.{{ entry.ext() }}</a>
+        <span class="table-data file-modified" title="{{ entry.uploaded_at|isoformat }}">{{ entry.uploaded_at|isoformat }}</span>
+
+        <!-- Preview container (hidden by default) -->
+        <div class="image-preview" style="display:none;">
+            <img id="preview-image" src='{{ "/gallery/{{ entry.id }}.{{ entry.ext() }}"|canonical_url }}' alt="Image preview" />
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+<dialog id="change-password-modal">
+    <form autocomplete="off" method="POST" action="/account/change_password">
+        <h1>Change Password</h1>
+        <div class="form-container">
+            <label for="old-password">Current Password</label>
+            <div class="password-container form-field">
+                <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="old_password"
+                       id="old-password" type="password">
+                <span class="password-icon"><img alt="Password visibility icon" src="/static/img/visibility.svg"
+                                                 width="24px" height="24px"/></span>
+            </div>
+            <label for="new-password">New Password</label>
+            <div class="password-container form-field">
+                <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="new_password"
+                       id="new-password" type="password">
+                <span class="password-icon"><img alt="Password visibility icon" src="/static/img/visibility.svg"
+                                                 width="24px" height="24px"/></span>
+            </div>
+            <input type="hidden" id="session-description" name="session_description" value="">
+        </div>
+        <footer>
+            <button id="confirm" class="button primary">Done</button>
+            <button class="button" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/help.css" type="text/css">
+<meta property="og:url" content='{{ "/help"|canonical_url }}'>
+<meta property="og:title" content="Klappstuhl_me: Help">
+{% endblock %}
+
+{% block title %}
+Help | Klappstuhl.me
+{% endblock %}
+
+{% block sidebar %}
+<section class="sidebar grid-item">
+  <h3>Table of Contents</h3>
+  <ul>
+    <li>
+      <a href="#using-the-site">Using the Site</a>
+      <ul>
+        <li><a href="#account-management">Account Management</a></li>
+        <li><a href="#changing-settings">Settings</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#upload-guidelines">Upload Guidelines</a>
+      <ul>
+        <li><a href="#file-types">Supported File Types</a></li>
+        <li><a href="#deleting-files">Deleting Files</a></li>
+      </ul>
+    </li>
+  </ul>
+</section>
+{% endblock %}
+
+{% block body %}
+<div id="content">
+  <h1 id="using-the-site">Using the Site</h1>
+  <p>
+    This section details how to use the site. If you need any more help please don't hesitate to <a href="/contact">contact us</a>.
+  </p>
+  <h2 id="account-management">Account Management</h2>
+  <p>
+    You can change your password by clicking on your username on the navbar, when logged on.
+    Once your password is changed, you will be logged out of all logged on sessions.
+  </p>
+  <p>
+    There is currently no way to delete an account. <a href="/contact">Contact the administrators</a> if needed.
+  </p>
+  <h2 id="changing-settings">Settings</h2>
+  <p>
+    By accessing the cog icon on the navbar you can change your settings such as displayed language.
+  </p>
+  <h1 id="upload-guidelines">Upload Guidelines</h1>
+  <p>
+    In order to maintain a clean and navigable site, it is imperative that things uploaded meet a specific criteria.
+  </p>
+  <h2 id="what-to-upload">What to upload?</h2>
+  <p>
+    Users are prohibited from uploading pornographic, explicit, offensive, or illegal content and must ensure all images comply with copyright laws.
+    Otherwise those images will be removed and the access to this site will be rovoked for the uploader.
+  </p>
+  <h2 id="file-types">Supported File Types</h2>
+  <p>
+    The following file types are supported:
+  </p>
+  <p>
+    <ul>
+      <li><code>.apng</code></li>
+      <li><code>.png</code></li>
+      <li><code>.jpg</code></li>
+      <li><code>.jpeg</code></li>
+      <li><code>.gif</code></li>
+      <li><code>.avif</code></li>
+    </ul>
+  <p>
+    Images you upload need to be of one of those file types, otherwise your upload will get rejected.
+  </p>
+  <h2 id="deleting-files">Deleting Files</h2>
+  <p>
+    You can only delete the images you've uploaded yourself. To see how this works, visit the <a href="/api/docs">API Documentation</a>.
+  </p>
+</div>
+{% endblock %}
+

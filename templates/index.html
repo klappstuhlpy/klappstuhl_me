@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link href="/static/index.css" rel="stylesheet">
+
+<meta property="og:url" content="{{ url }}">
+<meta property="og:title" content="Home | Klappstuhl.me">
+{% endblock %}
+
+{% block body %}
+{% for flash in flashes %}
+{{ flash.html()|safe }}
+{% endfor %}
+
+<section class="centered-text">
+    <div class="container">
+        <h1>/klappstuhl.me</h1>
+        <p class="lead">
+            Hey there, I'm
+            <a href="https://github.com/klappstuhlpy"
+            >Klappstuhl</a>
+            , a student from Germany.
+        </p>
+    </div>
+    <div class="github-link-container">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+             stroke="currentColor"
+             aria-hidden="true" height="32" class="right-full mr-2 text-teal-500 md:absolute">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <a href="https://github.com/klappstuhlpy" class="github-link"><span
+                class="github-text font-weight-bold">GitHub</span>
+            <svg class="redirect-svg" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15">
+                <path fill="currentColor"
+                      d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0, 0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path>
+                <polygon fill="currentColor"
+                         points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8, 14.9 62.8,22.9 71.5,22.9"></polygon>
+            </svg>
+        </a>
+    </div>
+</section>
+
+<div class="text-block">
+    <h1 class="text-title">My Skills</h1>
+    <p>I joined the developer world back in ~2019; that's when I first started to learn Python, my first programming
+        language.
+        I'm currently a student in Germany, and I'm learning Python, Java, HTML, CSS, and JavaScript.</p>
+    <p>I've done projects like Minecraft plugins and small websites.</p>
+    <p>I learned object-oriented programming through experimenting with the Discord API Wrapper for Python "discord.py".
+        Since then, I have improved my skills in Python and decided to start learning new programming languages, like
+        Java.</p>
+
+    <p class="splitter overflow-hidden whitespace-nowrap">
+        ========================================================================================================================================================================================================================================================================================================================================================================================================================================================================
+    </p>
+
+    <h1 class="text-title">About Me</h1>
+    <p>Known as Klappstuhl on the Internet, I'm currently a 16-year-old student from Germany.
+        At around ~2019, I started to catch an interest in programming; this was brought to me through the
+        fascination of Discord.
+        A chat platform with the possibility to bring in your own ideas by programming your own bots and giving
+        them a unique style.</p>
+    <p>I love programming, and I'm always interested in new challenges and projects to face.</p>
+    <p>My inspiration is never limited to one thing; I'm always open to new things, and I'm always trying to learn new
+        things.</p>
+</div>
+
+{% endblock %}

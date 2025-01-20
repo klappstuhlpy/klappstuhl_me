@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/audit.css" type="text/css"/>
+{% endblock %}
+
+{% block title %}
+Audit Logs | Klappstuhl_me
+{% endblock %}
+
+{% block body %}
+<h1>Audit Logs</h1>
+<svg id="loading" class="spinner" viewBox="0 0 50 50" aria-label="Loading...">
+    <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+</svg>
+<div id="audit-log-entries" class="hidden"></div>
+<div class="center">
+    <button class="hidden" id="load-more">Load more</button>
+</div>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/fuzzysort.min.js"></script>
+<script src="/static/audit.js"></script>
+{% endblock %}

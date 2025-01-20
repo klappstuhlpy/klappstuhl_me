@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Klappstuhl.me{% endblock %}</title>
+    <link rel="manifest" href="/static/site.webmanifest">
+    <meta name="theme-color" content="#c4a058">
+    <meta property="og:site_name" content="Klappstuhl.me">
+    <meta property="og:type" content="website"/>
+    <meta property="og:image" content="https://cdn.klappstuhl.me/gallery/lDiEcmUFjo.png"/>
+    <link rel="stylesheet" href="/static/base.css" type="text/css"/>
+    {% block css %}{% endblock %}
+</head>
+<body>
+<div class="grid">
+    <header class="grid-item">
+        <nav class="main-navigation">
+            <a class="nav-item branding" href="/">Klappstuhl.me</a>
+            <div class="nav-item mobile-only">
+                <input id="hamburger-toggle" type="checkbox" aria-label="Open menu"/>
+                <label class="hamburger-menu" aria-hidden="true" for="hamburger-toggle"><span></span></label>
+            </div>
+            <div class="hamburger-menu-container">
+                {% block index_nav %}
+                <a class="nav-item" href="/projects">Projects</a>
+                {% endblock %}
+                <span class="not-mobile nav-item spacer"></span>
+                {% match account %}
+                {% when Some with (account) %}
+                <a class="nav-item account" href="/account">{{ account.name }}</a>
+                {% when None %}
+                <a class="nav-item account" href="/login">Login</a>
+                {% endmatch %}
+                <hr class="mobile-only">
+                <a class="nav-item with-icon" aria-label="Help" href="/help">
+                    <svg class="not-mobile" height="24" viewBox="0 -960 960 960" width="24" role="img">
+                        <path fill="#e0e0e0"
+                              d="M478-240q21 0 35.5-14.5T528-290q0-21-14.5-35.5T478-340q-21 0-35.5 14.5T428-290q0 21 14.5 35.5T478-240Zm-36-154h74q0-33 7.5-52t42.5-52q26-26 41-49.5t15-56.5q0-56-41-86t-97-30q-57 0-92.5 30T342-618l66 26q5-18 22.5-39t53.5-21q32 0 48 17.5t16 38.5q0 20-12 37.5T506-526q-44 39-54 59t-10 73Zm38 314q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/>
+                    </svg>
+                    <span class="mobile-only">Help</span>
+                </a>
+            </div>
+        </nav>
+    </header>
+    {% block sidebar %}{% endblock %}
+    <main class="grid-item">
+        {% block body %}{% endblock %}
+    </main>
+    <footer class="grid-item">
+        <div class="copyright">
+            <a>© 2025 Klappstuhl65 | Website based on </a><a class="footer-link" href="https://github.com/Rapptz/jimaku">Rapptz/jimaku</a>
+        </div>
+        {% block footer %}{% endblock %}
+    </footer>
+</div>
+<script src="/static/base.js"></script>
+{% block body_end %}
+{% endblock %}
+</body>
+</html>

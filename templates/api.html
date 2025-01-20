@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API | Klappstuhl_me</title>
+    <link rel="manifest" href="/static/site.webmanifest">
+    <meta name="theme-color" content="#c4a058">
+    <meta property="og:site_name" content="Klappstuhl_me">
+    <meta property="og:url" content='{{ "/api/docs"|canonical_url }}'>
+    <meta property="og:title" content="Klappstuhl_me: API Documentation">
+    <link rel="stylesheet" href="/static/api.css" type="text/css"/>
+</head>
+<body>
+<script id="api-reference" data-url="/api/openapi.json"></script>
+<script>
+    /* This file is licensed under AGPL-3.0 */
+    var configuration = {
+        theme: 'default',
+        isEditable: false,
+        darkMode: true,
+        authentication: {
+            apiKey: {
+                token: '{{ api_key }}'
+            }
+        }
+    }
+
+    var apiReference = document.getElementById('api-reference')
+    apiReference.dataset.configuration = JSON.stringify(configuration)
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+<script src="/static/api.js"></script>
+</body>
+</html>

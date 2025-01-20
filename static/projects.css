@@ -1,0 +1,25 @@
+body {
+    box-sizing: border-box;
+    color: white;
+}
+
+h1 {
+    border-bottom: 1px solid var(--dividers);
+    padding-bottom: 1rem;
+    margin-bottom: 4rem;
+}
+
+.project-container {
+    display: flex;
+    justify-content: center;  /* Center horizontally */
+    align-items: flex-start;  /* Align items at the top */
+    gap: 20px;  /* Adds padding between the cards */
+    height: 100vh;  /* Full height of the viewport */
+    width: 100%;  /* Full width of the browser window */
+    padding-top: 20px;  /* Optional: Adds a little space from the top */
+}
+
+.github-card {
+    width: 400px;
+    height: 155px;
+}
