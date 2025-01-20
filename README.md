@@ -1,7 +1,7 @@
 # Klappstuhl.me
 
 Klappstuhl.me is my personal website that features a public image hosting service.
-This Website is partly based on [Rapptz's klappstuhl_me](https://github.com/Rapptz/klappstuhl_me)
+This Website is partly based on [Rapptz's klappstuhl_me](https://github.com/Rapptz/jimaku)
 
 
 # Install
