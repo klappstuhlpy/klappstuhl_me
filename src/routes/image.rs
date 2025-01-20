@@ -19,7 +19,6 @@ use serde::Serialize;
 use std::fs::{create_dir_all, read, remove_file};
 use std::io::Write;
 use std::path::PathBuf;
-use askama::filters::format;
 use tokio::task::JoinSet;
 use utoipa::ToSchema;
 use crate::audit::FileOperation;
@@ -115,6 +114,7 @@ pub struct UploadResult {
     links: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl UploadResult {
     pub fn is_success(&self) -> bool {
         self.total > 0 && self.errors == 0 && self.skipped == 0
@@ -138,6 +138,7 @@ pub struct DeleteResult {
     pub failed: bool,
 }
 
+#[allow(dead_code)]
 impl DeleteResult {
     pub fn is_success(&self) -> bool {
         !self.failed
@@ -307,6 +308,7 @@ pub async fn delete_image(
 
 #[derive(Template)]
 #[template(path = "image.html")]
+#[allow(dead_code)]
 struct EntryTemplate {
     account: Option<Account>,
     entry: ImageEntry,

@@ -19,7 +19,6 @@ mod image;
 mod api;
 
 pub use api::{copy_api_token, ApiToken};
-use crate::models::{ProjectEntry, ProjectList};
 
 #[derive(Template)]
 #[template(path = "index.html")]
