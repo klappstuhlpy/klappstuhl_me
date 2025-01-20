@@ -11,15 +11,23 @@ h1 {
 
 .project-container {
     display: flex;
-    justify-content: center;  /* Center horizontally */
-    align-items: flex-start;  /* Align items at the top */
-    gap: 20px;  /* Adds padding between the cards */
-    height: 100vh;  /* Full height of the viewport */
-    width: 100%;  /* Full width of the browser window */
-    padding-top: 20px;  /* Optional: Adds a little space from the top */
+    flex-wrap: wrap; /* Allow items to wrap on smaller screens */
+    justify-content: center; /* Center items horizontally */
+    gap: 20px; /* Space between the cards */
+    padding: 20px; /* Add padding around the container */
 }
 
 .github-card {
-    width: 400px;
-    height: 155px;
+    width: 100%; /* Full width by default */
+    max-width: 400px; /* Limit the maximum width */
+    height: 155px; /* Fixed height for consistency */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Optional: Add a subtle shadow */
+    border-radius: 8px; /* Optional: Rounded corners */
+}
+
+/* Media query for small screens */
+@media (max-width: 600px) {
+    .github-card {
+        width: 90%; /* Take up most of the width on small screens */
+    }
 }

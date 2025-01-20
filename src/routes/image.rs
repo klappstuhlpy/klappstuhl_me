@@ -155,7 +155,7 @@ pub async fn raw_upload_file(
     api: bool,
 ) -> Result<UploadResult, ApiError> {
     let Ok(processed) = process_files(multipart).await else {
-        return Err(ApiError::new("Internal error when processing files").with_code(ApiErrorCode::ServerError));
+        return Err(ApiError::new("Internal error when processing files").with_code(ApiErrorCode::BadRequest));
     };
 
     if processed.files.is_empty() {

@@ -36,7 +36,9 @@
     }
 
     .splitter {
-        padding: 3rem 0;
-        color: rgba(30,41,59,.5);
+        height: 1px;
+        margin: 3rem 0;
+        background: linear-gradient(to right, rgba(30,41,59,.5), rgba(30,41,59,0));
+        border: none;
     }
 }
