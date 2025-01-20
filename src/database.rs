@@ -7,7 +7,7 @@ use std::{
 
 use crossbeam_channel::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 /// A trait that all table-like types must meet.
 pub trait Table: Sized {
@@ -113,7 +113,7 @@ impl DatabaseBuilder {
         let (result_sender, mut result_receiver) = mpsc::channel(self.max_connections);
         let (sender, receiver) = crossbeam_channel::unbounded();
 
-        debug!(
+        info!(
             "creating a threaded connection pool with {} maximum connections to {}",
             self.max_connections,
             self.path.display()
@@ -139,7 +139,7 @@ impl DatabaseBuilder {
         // when opening a SQLite connection
         while let Some(result) = result_receiver.recv().await {
             if let Err(e) = result {
-                debug!("received error while waiting for connection pool to initialise");
+                error!("received error while waiting for connection pool to initialise");
                 return Err(e);
             }
         }
@@ -374,7 +374,7 @@ impl Worker {
             let mut connection = match rusqlite::Connection::open(path) {
                 Ok(c) => c,
                 Err(e) => {
-                    trace!("database connection worker {} received an error ({})", id, &e);
+                    error!("database connection worker {} received an error ({})", id, &e);
                     let _ = result_sender.blocking_send(Err(e));
                     return;
                 }
@@ -384,7 +384,7 @@ impl Worker {
 
             if let Some(f) = init {
                 if let Err(e) = f(&mut connection) {
-                    trace!(
+                    error!(
                         "database connection worker {} received an error ({}) during init",
                         id,
                         &e
