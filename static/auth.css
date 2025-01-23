@@ -3,7 +3,8 @@
   justify-content: center;
   flex-direction: column;
   align-items: center;
-  margin-top: 5rem;
+  margin-top: 20rem;
+  color: var(--branding);
 }
 
 .login-container > .alert {
@@ -11,29 +12,30 @@
 }
 
 .login-header {
-  padding: 0.75rem;
-  border: 1px solid var(--box-border);
-  background-color: var(--box);
-  width: 20rem;
+  padding: 1.25rem;
+  border: 1px solid var(--box-shade);
+  background-color: var(--login-background);
+  width: 25rem;
   text-align: center;
   border-bottom: none;
-  border-top-left-radius: 0.25rem;
-  border-top-right-radius: 0.25rem;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
 }
 
 #login-form {
   display: flex;
   flex-direction: column;
-  padding: 1.25rem;
-  border: 1px solid var(--box-border);
-  background-color: var(--box);
-  border-bottom-left-radius: 0.25rem;
-  border-bottom-right-radius: 0.25rem;
-  width: 20rem;
+  padding: 2.5rem;
+  border: 1px solid var(--box-shade);
+  background-color: var(--login-background);
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+  width: 25rem;
+  box-shadow: 0 15px 15px var(--login-background);
 }
 
 #login-form > .form-field:last-child {
-  margin-top: 0.5rem;
+  margin-top: 1.5rem;
 }
 
 .account-info {
@@ -53,12 +55,13 @@
 .password-container {
   display: flex;
   align-items: center;
+  padding: 0.25rem;
 }
 
 .password-container > input {
   width: 100%;
-  border-top-right-radius: 0px;
-  border-bottom-right-radius: 0px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .password-container > .password-icon {
@@ -67,8 +70,8 @@
   display: flex;
   align-items: center;
   cursor: pointer;
-  border-top-right-radius: 0.25rem;
-  border-bottom-right-radius: 0.25rem;
+  border-top-right-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
   background-color: var(--form-input-background);
   border: 2px solid var(--form-input-border);
   border-left: none;

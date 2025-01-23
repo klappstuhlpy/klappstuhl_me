@@ -14,7 +14,7 @@ Login | Klappstuhl_me
 
 {% block body %}
 <div class="login-container">
-    <div class="login-header">Welcome back</div>
+    <div class="login-header">Welcome back!</div>
     <form id="login-form" method="POST" action="/account/authenticate">
         {% for flash in flashes %}
         {{ flash.html()|safe }}

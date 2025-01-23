@@ -7,6 +7,7 @@
 :root {
     --foreground: #e0e0e0;
     --background: #010718;
+    --background-lighter: #020f25;
     --text-muted: #9e9e9e;
     --button-text: #e0e0e0;
     --header: #08162d;
@@ -27,8 +28,8 @@
     --close-button-bg: rgba(0, 0, 0, 0.2);
     --close-button-text: #e0e0e0;
     --close-button-bg-hover: rgba(0, 0, 0, 0.3);
-    --box: #0d2039;
-    --box-shade: #091729;
+    --box: #00173d;
+    --box-shade: #131b28;
     --box-border: #132f4d;
     --accent: #fff;
     --dividers: #132f4d;
@@ -39,12 +40,14 @@
     --nav-link: #e0e0e0;
     --nav-link-hover: #2966b5;
 
-    --default-button-rgb: 39,56,81;
-    --primary-button-rgb: 47,96,164;
-    --danger-button-rgb: 164,57,47;
+    --default-button-rgb: 15,80,42;
+    --primary-button-rgb: 0,111,220;
+    --danger-button-rgb: 192,52,39;
     --link-text: #6841f3;
     --link-text-dimmed: #5033b9;
     --link-hover-text: #7b64d0;
+
+    --login-background: rgba(0,0,0,.2);
 
     --table-text: var(--foreground);
     --table-background: var(--background);
@@ -211,7 +214,8 @@ input[type="radio"] {
 }
 
 .form-container > .form-field {
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
+    margin-bottom: 0.75rem;
 }
 
 .button-container {
@@ -635,7 +639,7 @@ a.admin-panel:hover {
 }
 
 dialog {
-    background-color: var(--box);
+    background-color: var(--header);
     color: var(--foreground);
     border: none;
     border-radius: 0.5rem;
@@ -644,18 +648,19 @@ dialog {
 
 dialog > form {
     margin: auto;
-    background-color: var(--box);
+    background-color: var(--header);
     border-radius: 0.5rem;
-    min-width: 300px;
-    max-width: 25rem;
+    min-width: 400px;
+    max-width: 30rem;
 }
 
 dialog .form-container {
     padding: 1rem;
+    color: var(--branding);
 }
 
 dialog > form > h1 {
-    border-bottom: 1px solid var(--box-border);
+    border-bottom: 1px solid var(--background);
     padding: 1.25rem 1.25rem 0.25rem;
     font-size: 1.5rem;
 }
@@ -665,8 +670,8 @@ dialog > form > footer {
     flex-direction: row-reverse;
     justify-content: flex-start;
     gap: 0.75rem;
-    padding: 0.75rem;
-    background-color: var(--box-shade);
+    padding: 1rem;
+    background-color: var(--background-lighter);
     margin-top: auto;
 }
 
