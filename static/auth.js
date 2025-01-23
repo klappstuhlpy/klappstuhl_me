@@ -89,35 +89,3 @@ document.querySelector('#api-section button[type=submit][name="new"]')?.addEvent
     showAlert({level: 'success', content: 'Successfully regenerated API key.'})
   }
 })
-
-// Image preview handling
-
-document.addEventListener('DOMContentLoaded', function() {
-  // Get all the links with class 'file-name'
-  const links = document.querySelectorAll('.file-name');
-
-  links.forEach(link => {
-    // Add event listeners for mouseover and mouseout
-    link.addEventListener('mouseover', function() {
-      showPreview(this);
-    });
-
-    link.addEventListener('mouseout', function() {
-      hidePreview();
-    });
-  });
-});
-
-function showPreview(linkElement) {
-  const previewContainer = linkElement.closest('.entry').querySelector('.image-preview');
-  const previewImage = previewContainer.querySelector('img');
-
-  // Modify the URL if needed to point to an image
-  previewImage.src = linkElement.href;
-  previewContainer.style.display = 'block';
-}
-
-function hidePreview() {
-  const previewContainer = document.querySelector('.image-preview');
-  previewContainer.style.display = 'none';
-}

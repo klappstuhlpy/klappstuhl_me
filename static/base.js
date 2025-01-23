@@ -95,14 +95,32 @@ function debounced(func, timeout = 300) {
             func.apply(this, args)
         }, timeout)
     }
-};
+}
 
 function formatRelative(seconds) {
-    const dt = Math.round(seconds - (Date.now() / 1000));
+    // Ensure 'seconds' is a valid finite number
+    if (!Number.isFinite(seconds)) {
+        throw new Error("Invalid input: 'seconds' must be a finite number, not " + seconds);
+    }
+
+    // Calculate the relative time difference in seconds
+    const dt = Math.round(seconds - Date.now() / 1000);
+
+    // Define cutoff points and units
     const cutoffs = [60, 3600, 86400, 86400 * 7, 86400 * 28, 86400 * 365, Infinity];
     const units = ['second', 'minute', 'hour', 'day', 'week', 'month', 'year'];
+
+    // Find the appropriate unit
     const index = cutoffs.findIndex(v => v > Math.abs(dt));
-    const divisor = index ? cutoffs[index - 1] : 1;
+    if (index === -1) {
+        throw new Error("Failed to calculate relative time.");
+    }
+
+    // Avoid division by zero
+    const divisor = index > 0 ? cutoffs[index - 1] : 1;
+
+    // Format the relative time
+    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
     return rtf.format(Math.floor(dt / divisor), units[index]);
 }
 
@@ -157,7 +175,7 @@ function detectBrowser(ua) {
     if(/trident/i.test(match[1])) {
         return 'Internet Explorer';
     }
-    if(match[1] == 'Chrome') {
+    if(match[1] === 'Chrome') {
         let inner = userAgent.match(/\b(OPR|Edge)\/(\d+)/);
         if(inner !== null) {
             return inner[1].replace('OPR', 'Opera');
@@ -208,3 +226,6 @@ async function callApi(url, options, alertHook, blob = false) {
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+const initialSortBy = 'name';
+const initialSortOrder = 'ascending';

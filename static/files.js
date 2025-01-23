@@ -1,5 +1,7 @@
 /* This file is licensed under AGPL-3.0 */
 const filterElement = document.getElementById('search-files');
+const escapedRegex = /[-\/\\^$*+?.()|[\]{}]/g;
+const escapeRegex = (e) => e.replace(escapedRegex, '\\$&');
 const MIN_SCORE = -1500;
 
 function __score(haystack, query) {
@@ -12,18 +14,28 @@ function __normalizeString(s) {
 }
 
 const changeModifiedToRelative = () => {
-  document.querySelectorAll('.file-modified').forEach(node => {
-    let lastModified = node.parentElement.dataset.lastModified;
-    if(/^[0-9]+$/.test(lastModified)) {
-      const seconds = parseInt(lastModified, 10);
+  document.querySelectorAll('.file-uploaded').forEach(node => {
+    let uploadedAt = node.parentElement.dataset.uploadedAt;
+
+    if (/^[0-9]+$/.test(uploadedAt)) {
+      // If it's a numeric timestamp, parse it as seconds
+      const seconds = parseInt(uploadedAt, 10);
       node.textContent = formatRelative(seconds);
-    } else{
-      const date = Date.parse(lastModified);
-      node.parentElement.dataset.lastModified = date;
-      node.textContent = formatRelative(date / 1000);
+    } else {
+      // Try parsing it as a date string
+      const date = Date.parse(uploadedAt);
+
+      if (!isNaN(date)) {
+        // Update dataset to store timestamp and format it
+        node.parentElement.dataset.uploadedAt = date;
+        node.textContent = formatRelative(date / 1000);
+      } else {
+        // Handle invalid date strings gracefully
+        console.warn(`Invalid date: ${uploadedAt}`);
+      }
     }
   });
-}
+};
 
 const parseEntryObjects = () => {
   document.querySelectorAll('.entry[data-extra]').forEach(el => {
@@ -37,6 +49,65 @@ const parseEntryObjects = () => {
     delete el.dataset.extra;
   });
 };
+
+class TableSorter {
+  constructor(parent) {
+    this.parent = parent;
+    this.parent?.querySelectorAll('.table-header[data-sort-by]').forEach(el => {
+      el.addEventListener('click', e => this.sortBy(e, el.dataset.sortBy))
+    });
+    if(this.parent) {
+      let isAscending = initialSortOrder.value === 'ascending';
+      this.innerSortBy(`data-${initialSortBy.value}`, isAscending);
+      const headers = Array.from(this.parent.querySelectorAll('.table-headers > .table-header'));
+      headers.forEach(node => node.classList.remove('sorting-ascending', 'sorting-descending'));
+      let element = headers.find(e => e.dataset.sortBy === initialSortBy.value);
+      if(element != null) {
+        element.classList.add(isAscending ? 'sorting-ascending' : 'sorting-descending');
+      }
+    }
+  }
+
+  innerSortBy(attribute, ascending) {
+    let entries = [...this.parent.querySelectorAll('.entry')];
+    if (entries.length === 0) {
+      return;
+    }
+    let parent = entries[0].parentElement;
+    entries.sort((a, b) => {
+      if (attribute === 'data-name') {
+        let firstName = a.textContent;
+        let secondName = b.textContent;
+        return ascending ? firstName.localeCompare(secondName) : secondName.localeCompare(firstName);
+      } else {
+        // The last two remaining sort options are either e.g. file.size or entry.last_modified
+        // Both of these are numbers so they're simple to compare
+        let first = parseInt(a.getAttribute(attribute), 10);
+        let second = parseInt(b.getAttribute(attribute), 10);
+        return ascending ? first - second : second - first;
+      }
+    });
+
+    entries.forEach(obj => parent.appendChild(obj));
+  }
+
+  sortBy(event, attribute) {
+    // Check if the element has an descending class tag
+    // If it does, then when we're clicking on it we actually want to sort ascending
+    let descending = !event.target.classList.contains('sorting-descending');
+
+    // Make sure to toggle everything else off...
+    this.parent.querySelectorAll('.table-headers > .table-header').forEach(node => node.classList.remove('sorting-ascending', 'sorting-descending'));
+
+    // Sort the elements by what we requested
+    this.innerSortBy(`data-${attribute}`, !descending);
+
+    // Add the element class list depending on the operation we did
+    let className = descending ? 'sorting-descending' : 'sorting-ascending';
+    event.target.classList.add(className);
+  }
+}
+
 let previousEntryOrder = null;
 
 function resetSearchFilter() {
@@ -59,16 +130,7 @@ function resetSearchFilter() {
 }
 
 function __scoreByName(el, query) {
-  let total = __score(el.dataset.name, query);
-  let native = el.dataset.japaneseName;
-  if (native !== null) {
-    total = Math.max(total, __score(native, query));
-  }
-  let english = el.dataset.englishName;
-  if (english !== null) {
-    total = Math.max(total, __score(english, query));
-  }
-  return total;
+  return __score(el.dataset.name, query);
 }
 
 function filterEntries(query) {
@@ -106,5 +168,6 @@ function filterEntries(query) {
 parseEntryObjects();
 changeModifiedToRelative();
 
+let sorter = new TableSorter(document.querySelector('.files'));
 document.getElementById('clear-search-filter')?.addEventListener('click', resetSearchFilter);
 filterElement?.addEventListener('input', debounced(e => filterEntries(e.target.value)))

@@ -118,14 +118,12 @@ My Account | Klappstuhl_me
         <span class="table-header" data-sort-by="uploaded-at">Date</span>
     </div>
     {% for entry in entries %}
-    <div class="entry">
-        <a href="/gallery/{{ entry.id }}.{{ entry.ext() }}" class="table-data file-name" target="_blank">{{ entry.id }}.{{ entry.ext() }}</a>
-        <span class="table-data file-modified" title="{{ entry.uploaded_at|isoformat }}">{{ entry.uploaded_at|isoformat }}</span>
-
-        <!-- Preview container (hidden by default) -->
-        <div class="image-preview" style="display:none;">
-            <img id="preview-image" src='{{ "/gallery/{{ entry.id }}.{{ entry.ext() }}"|canonical_url }}' alt="Image preview" />
-        </div>
+    <div class="entry" data-extra="{{ entry.data()|json }}">
+        <a href="/gallery/{{ entry.id }}.{{ entry.ext() }}" class="table-data file-name" target="_blank">
+            {{ entry.id }}.{{ entry.ext() }}
+            <img id="preview-image" src="/gallery/{{ entry.id }}.{{ entry.ext() }}" alt="preview"/>
+        </a>
+        <span class="table-data file-uploaded" title="{{ entry.uploaded_at|isoformat }}">{{ entry.uploaded_at|isoformat }}</span>
     </div>
     {% endfor %}
 </div>

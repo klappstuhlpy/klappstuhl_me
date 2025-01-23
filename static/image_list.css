@@ -29,7 +29,7 @@
     background-color: var(--table-background-hover);
 }
 
-.file-modified {
+.file-uploaded {
     text-align: right;
 }
 
@@ -295,7 +295,7 @@ a.relation:not(:last-child)::after {
         text-align: right;
     }
 
-    .files[data-columns="4"] > .entry > .file-modified {
+    .files[data-columns="4"] > .entry > .file-uploaded {
         grid-column: 4;
     }
 
@@ -360,16 +360,27 @@ a.relation:not(:last-child)::after {
 
 /* image preview for tabled list */
 
-.image-preview {
-    position: absolute;
-    border: 1px solid #ccc;
-    background: white;
-    padding: 10px;
+.entry a.table-data img {
     display: none;
-    max-width: 200px;
+    position: absolute;
+    top: -150px; /* Adjust position as needed */
+    left: 50%; /* Center horizontally */
+    transform: translateX(-50%);
+    width: 120px;
+    height: 120px;
+    background-color: gray; /* Optional */
+    border-radius: 50%; /* Make it round */
+    background-size: cover;
+    background-position: center;
+    z-index: 10; /* Ensure it is on top of other elements */
 }
 
-.image-preview img {
-    max-width: 100%;
-    height: auto;
+/* Show the image on hover */
+.entry a.table-data:hover img {
+    display: block;
+}
+
+.entry a.table-data:hover img:after {
+    content: ''; /* Remove the arrow */
+    display: none;
 }
