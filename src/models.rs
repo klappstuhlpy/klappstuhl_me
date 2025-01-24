@@ -8,26 +8,6 @@ use utoipa::ToSchema;
 
 use crate::{database::Table, key::SecretKey, token::Token};
 
-#[derive(Deserialize)]
-pub struct ProjectList {
-    pub projects: Vec<ProjectEntry>,
-}
-
-#[derive(Debug, Serialize, PartialEq, Eq, Clone, Deserialize, ToSchema)]
-#[schema(as = Entry)]
-pub struct ProjectEntry {
-    /// The name of the entry.
-    pub name: String,
-    /// The description of the entry.
-    pub description: String,
-    /// The avatar image of the entry.
-    pub avatar: String,
-    /// The github repo link of the entry.
-    pub link: String,
-    /// The discord invite link of the entry.
-    pub invite: String,
-}
-
 /// An entry that represents a saved image.
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, ToSchema)]
 #[schema(as = ImageEntry)]
