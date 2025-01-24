@@ -8,6 +8,25 @@ use utoipa::ToSchema;
 
 use crate::{database::Table, key::SecretKey, token::Token};
 
+/// Represents an image file.
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct ImageFile {
+    /// The file's download URL.
+    pub(crate) url: String,
+    /// The ID of the image.
+    pub(crate) id: String,
+    /// The mime type of the image.
+    #[schema(example = "image/png")]
+    pub(crate) mimetype: String,
+    /// The representable image bytes.
+    pub(crate) image_data: Vec<u8>,
+    /// The file's size in bytes.
+    pub(crate) size: u64,
+    /// The date the the file was uploaded, in UTC, as an RFC3339 string.
+    #[serde(with = "time::serde::rfc3339")]
+    pub(crate) uploaded_at: OffsetDateTime,
+}
+
 /// An entry that represents a saved image.
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, ToSchema)]
 #[schema(as = ImageEntry)]

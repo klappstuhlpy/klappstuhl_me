@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/image_list.css" type="text/css">
+<meta property="og:url" content="{{ crate::CONFIG.get().unwrap().canonical_url() }}/images">
+{% endblock %}
+
+{% block title %}
+Your Images | Klappstuh.me
+{% endblock %}
+
+{% block body %}
+<h1>Your Images</h1>
+
+{%- for flash in flashes -%}
+{{ flash.html()|safe }}
+{%- endfor -%}
+
+<hr>
+<div class="commands">
+    <div class="text-input-container">
+        <input autocomplete="off" type="search" id="search-files" placeholder="Search files by name..." spellcheck="false">
+        <button class="clear" tabindex="-1" id="clear-search-filter">✖&#xfe0e;</button>
+    </div>
+    <div class="command-buttons">
+        <form id="upload-form" method="POST" action="/images/bulk" enctype="multipart/form-data">
+            <label for="upload-file-input" id="upload-button" class="button upload primary">Upload</label>
+            <input name="file" type="file" id="upload-file-input" accept=".apng,.png,.jpg,.jpeg,.gif,.avif" hidden multiple>
+        </form>
+    </div>
+</div>
+<div class="files" data-columns="4">
+    <div class="table-headers">
+        <span class="table-header"><input class="bulk-check" autocomplete="off" type="checkbox"></span>
+        <span class="table-header sorting-ascending" data-sort-by="name">Name</span>
+        <span class="table-header" data-sort-by="size">Size</span>
+        <span class="table-header" data-sort-by="uploaded-at">Date</span>
+    </div>
+    {% for file in files -%}
+    <div class="entry" data-extra="{{ file|json }}">
+        <span class="table-data file-bulk"><input autocomplete="off" type="checkbox"></span>
+        <a href="{{ file.url }}" class="table-data file-name">{{ file.id|e }}</a>
+        <span class="table-data file-size">{{ file.size|filesizeformat}}</span>
+        <span class="table-data file-uploaded" title="{{ file.uploaded_at|isoformat }}">{{ file.uploaded_at|isoformat }}</span>
+    </div>
+    {% endfor -%}
+</div>
+<div class="commands">
+    <div class="file-count">
+        <span id="total-file-count">{{ files.len() }} file{% if files.len() != 1 %}s{% endif %}</span>
+        <span class="hidden" class="selected-file-count" id="selected-file-count"></span>
+    </div>
+    <div class="command-buttons">
+        <button id="delete-files" class="button danger">Delete</button>
+    </div>
+</div>
+
+<div id="file-upload-drop-zone">
+    <h1>Drop subtitles to upload</h1>
+    <p>Supported file types: .apng, .png, .jpg, .jpeg, .gif, .avif</p>
+</div>
+
+<dialog id="confirm-delete-modal">
+    <form>
+        <h1>Are you sure?</h1>
+        <p>This will delete <span id="delete-count"></span>.</p>
+        <footer>
+            <button id="confirm-delete" class="button danger">Delete</button>
+            <button class="button" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/fuzzysort.min.js"></script>
+<script src="/static/files.js"></script>
+<script src="/static/images.js"></script>
+{% endblock %}

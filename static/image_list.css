@@ -1,3 +1,16 @@
+/* general styling */
+
+hr {
+    margin-bottom: 2rem;
+}
+
+.text-input-container {
+    margin-bottom: 1.5rem;
+}
+
+.commands {
+    margin-top: 1.5rem;
+}
 
 /* Image entry list */
 

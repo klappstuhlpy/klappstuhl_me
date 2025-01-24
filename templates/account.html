@@ -112,21 +112,7 @@ My Account | Klappstuhl_me
 {% endif %}
 {% if !entries.is_empty() %}
 <h3>Uploaded Images</h3>
-<div class="files" data-columns="2">
-    <div class="table-headers">
-        <span class="table-header sorting-ascending" data-sort-by="name">Name</span>
-        <span class="table-header" data-sort-by="uploaded-at">Date</span>
-    </div>
-    {% for entry in entries %}
-    <div class="entry" data-extra="{{ entry.data()|json }}">
-        <a href="/gallery/{{ entry.id }}.{{ entry.ext() }}" class="table-data file-name" target="_blank">
-            {{ entry.id }}.{{ entry.ext() }}
-            <img id="preview-image" src="/gallery/{{ entry.id }}.{{ entry.ext() }}" alt="preview"/>
-        </a>
-        <span class="table-data file-uploaded" title="{{ entry.uploaded_at|isoformat }}">{{ entry.uploaded_at|isoformat }}</span>
-    </div>
-    {% endfor %}
-</div>
+<p>You have uploaded a total of {{ entries.len() }} images, for further information, visit the <a href="/images">Images</a> page.</p>
 {% endif %}
 <dialog id="change-password-modal">
     <form autocomplete="off" method="POST" action="/account/change_password">

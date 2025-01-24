@@ -291,11 +291,12 @@ struct AccountInfoTemplate {
 
 impl AccountInfoTemplate {
     async fn new(account: Account, user: Account, current_token: Token, state: &AppState) -> Self {
-        let entries = state
-            .database()
-            .all("SELECT * FROM images WHERE uploader_id = ?", [user.id])
+        let entries = state.resolve_images()
             .await
-            .unwrap();
+            .iter()
+            .filter(|e| e.uploader_id == Option::from(user.id))
+            .cloned()
+            .collect::<Vec<_>>();
 
         let mut sessions = if user.id == account.id {
             state

@@ -1,21 +1,17 @@
 use crate::error::{ApiError, ApiErrorCode, InternalError};
-use crate::flash::Flashes;
-use crate::models::{Account, ImageEntry, ResolvedImageData};
+use crate::flash::{FlashMessage, Flasher, Flashes};
+use crate::models::{Account, ImageEntry, ImageFile, ResolvedImageData};
 use crate::{audit, AppState, filters};
 use anyhow::bail;
 use askama::Template;
 use axum::extract::multipart::Field;
 use axum::extract::Multipart;
-use axum::routing::{get};
-use axum::{
-    extract::{Path, State},
-    response::{IntoResponse, Redirect, Response},
-    Router,
-};
+use axum::routing::{delete, get, post};
+use axum::{extract::{Path, State}, response::{IntoResponse, Redirect, Response}, Json, Router};
 use base64::engine::general_purpose;
 use base64::Engine;
 use bytes::Bytes;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, read, remove_file};
 use std::io::Write;
 use std::path::PathBuf;
@@ -23,12 +19,14 @@ use tokio::task::JoinSet;
 use utoipa::ToSchema;
 use crate::audit::FileOperation;
 use crate::filters::canonical_url;
+use crate::headers::Referrer;
+use crate::ratelimit::RateLimit;
 use crate::utils::get_new_image_id;
 
 #[derive(Debug, Clone)]
 struct ProcessedFile {
+    name: String,
     path: PathBuf,
-    identifier: String,
     bytes: Bytes,
     ext: String,
 }
@@ -60,17 +58,17 @@ struct ProcessedFiles {
     skipped: usize,
 }
 
-async fn verify_file(file_name: PathBuf, field: Field<'_>) -> anyhow::Result<ProcessedFile> {
-    match file_name.extension().and_then(|ext| ext.to_str()) {
+async fn verify_file(file: PathBuf, field: Field<'_>) -> anyhow::Result<ProcessedFile> {
+    match file.extension().and_then(|ext| ext.to_str()) {
         Some("apng" | "png" | "jpg" | "jpeg" | "gif" | "avif") => {
-            let ext = file_name.extension().and_then(|ext| ext.to_str()).unwrap().to_string();
-            let identifier: String = get_new_image_id();
+            let ext = file.extension().and_then(|ext| ext.to_str()).unwrap().to_string();
             let bytes = field.bytes().await?;
-            let path = PathBuf::from(format!("temp/{}", file_name.to_string_lossy()));
+            let path = PathBuf::from(format!("temp/{}", file.to_string_lossy()));
+            let name = file.to_string_lossy().split(".").collect::<Vec<&str>>()[0].to_string();
 
             Ok(ProcessedFile {
+                name,
                 path,
-                identifier,
                 bytes,
                 ext,
             })
@@ -169,7 +167,7 @@ pub async fn raw_upload_file(
     let mut errored = 0usize;
     let total = processed.files.len();
     let mut data = audit::Upload {
-        file: FileOperation::placeholder(),
+        files: Vec::with_capacity(total),
         api,
     };
     let mut set = JoinSet::new();
@@ -185,6 +183,7 @@ pub async fn raw_upload_file(
         match task {
             Ok(op) => {
                 errored += op.failed as usize;
+                data.files.push(op);
             }
             _ => errored += 1,
         }
@@ -193,7 +192,7 @@ pub async fn raw_upload_file(
     let successful = total > 0 && errored == 0 && processed.skipped == 0;
     if successful && errored != total {
         for file in files.clone() {
-            links.push(canonical_url(format!("/gallery/{}.{}", file.identifier.clone(), file.ext.clone()))?.to_string());
+            let mut file_name = file.name.clone();
             let image_data = read(&file.path)?;
             let mimetype = tree_magic::from_u8(&file.bytes);
 
@@ -203,47 +202,63 @@ pub async fn raw_upload_file(
             };
 
             let image_data_owned = image_data.clone(); // Ensure ownership
-            let err = state
+            let result = state
                 .database()
                 .execute(
-                    "INSERT INTO images (id, mimetype, uploader_id, image_data) VALUES (?, ?, ?, ?)",
+                    "INSERT INTO images (id, mimetype, uploader_id, image_data)
+                           VALUES (?, ?, ?, ?)", // Ignore conflicts and don't insert
                     (
-                        file.identifier.clone(),
+                        file.name.clone(),
                         mimetype.to_string(),
                         account.id.to_string(),
-                        image_data_owned
+                        image_data_owned.clone(),
                     ),
                 )
                 .await;
 
-            data.file = FileOperation {
-                name: file.identifier.clone(),
-                failed: false,
-            };
-
-            if let Err(e) = err {
-                tracing::error!(error=%e, "Could not insert image");
-                data.file.failed = true;
+            // Check if the insertion was successful
+            if let Err(e) = result {
+                if e.to_string().contains("UNIQUE constraint failed") {
+                    // Handle the conflict case here by generating a new ID
+                    file_name = format!("{}-{}", file_name, get_new_image_id());
+                    state
+                        .database()
+                        .execute(
+                            "INSERT INTO images (id, mimetype, uploader_id, image_data)
+                                   VALUES (?, ?, ?, ?)",
+                            (
+                                file_name.clone(),
+                                mimetype.to_string(),
+                                account.id.to_string(),
+                                image_data_owned,
+                            ),
+                        )
+                        .await?;
+                }
             }
-            state.audit(audit::AuditLogEntry::full(data.clone(), file.identifier.clone(), account.id)).await;
 
-            let title = if api {
-                format!("[API] Image Upload: {:?} files", files.len())
-            } else {
-                format!("Image Upload: {:?} files", files.len())
-            };
-
-            state.send_alert(
-                crate::discord::Alert::success(title)
-                    .url(format!("/logs?image_id={:?}", file.identifier.clone()))
-                    .account(account.clone())
-                    .field("ID", file.identifier.clone())
-                    .field("Failed", data.file.failed)
-            );
+            links.push(canonical_url(format!("/gallery/{}.{}", file_name, file.ext.clone()))?.to_string());
         }
 
         state.cached_images().invalidate().await;
     }
+
+    let audit_id = state.audit(audit::AuditLogEntry::full(data, account.id)).await;
+
+    let title = if api {
+        format!("[API] Image Upload: {:?} files", files.len())
+    } else {
+        format!("Image Upload: {:?} files", files.len())
+    };
+
+    state.send_alert(
+        crate::discord::Alert::success(title)
+            .url(format!("/logs?id={audit_id}"))
+            .account(account.clone())
+            .field("Total", total)
+            .field("Failed", errored)
+            .field("Links", links.join("\n")),
+    );
 
     Ok(UploadResult {
         errors: errored,
@@ -284,7 +299,7 @@ pub async fn delete_image(
         },
         api
     };
-    state.audit(audit::AuditLogEntry::full(data, id.clone(), account.id)).await;
+    state.audit(audit::AuditLogEntry::full(data, account.id)).await;
 
     let title = if api {
         "[API] Deleted Image"
@@ -306,17 +321,110 @@ pub async fn delete_image(
     })
 }
 
+#[derive(Deserialize)]
+struct BulkFilesPayload {
+    files: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct BulkFileOperationResponse {
+    success: usize,
+    failed: usize,
+}
+
+async fn bulk_delete_files(
+    State(state): State<AppState>,
+    account: Account,
+    Json(payload): Json<BulkFilesPayload>,
+) -> Result<Json<BulkFileOperationResponse>, ApiError> {
+    let mut success = 0;
+    let mut failed = 0;
+    let mut audit_data = audit::DeleteFiles {
+        files: Vec::with_capacity(payload.files.len()),
+    };
+    let total = payload.files.len();
+    let description = crate::utils::join_iter("\n", payload.files.iter().map(|x| format!("- {x}")).take(25));
+    for file in payload.files {
+        let filename = file.clone().split(".").collect::<Vec<&str>>()[0].to_string();
+        let result = state
+            .database()
+            .execute(
+                "DELETE FROM images WHERE uploader_id = ? AND id = ?",
+                (account.id, filename),
+            )
+            .await;
+
+        audit_data.add_file(file.clone(), result.is_err());
+        match result {
+            Ok(_) => success += 1,
+            Err(_) => failed += 1,
+        }
+    }
+
+    if success == 0 {
+        return Err(ApiError::not_found("No files were found to delete"));
+    } else {
+        state.cached_images().invalidate().await;
+    }
+
+    let audit_id = state
+        .audit(audit::AuditLogEntry::full(audit_data, account.id))
+        .await;
+    state.send_alert(
+        crate::discord::Alert::error("Deleted Images")
+            .url(format!("/logs?id={audit_id}"))
+            .description(description)
+            .account(account)
+            .field("Total", total)
+            .field("Failed", failed)
+    );
+
+    Ok(Json(BulkFileOperationResponse {
+        success,
+        failed,
+    }))
+}
+
+async fn upload_file(
+    State(state): State<AppState>,
+    Referrer(url): Referrer,
+    account: Account,
+    flasher: Flasher,
+    multipart: Multipart,
+) -> Response {
+    let result = match raw_upload_file(state, account, multipart, false).await {
+        Ok(result) => result,
+        Err(msg) => return flasher.add(msg.error.as_ref()).bail(&url),
+    };
+    let message = if result.is_success() {
+        FlashMessage::success("Upload successful.")
+    } else if result.is_error() {
+        FlashMessage::error("Upload failed.")
+    } else {
+        let successful = result.successful();
+        FlashMessage::warning(format!(
+            "Uploaded {successful} file{}, {} {} skipped and {} failed",
+            if successful == 1 { "" } else { "s" },
+            result.skipped,
+            if result.skipped == 1 { "was" } else { "were" },
+            result.errors,
+        ))
+    };
+    flasher.add(message).bail(&url)
+}
+
+
 #[derive(Template)]
 #[template(path = "image.html")]
 #[allow(dead_code)]
-struct EntryTemplate {
+struct ImageTemplate {
     account: Option<Account>,
     entry: ImageEntry,
     data: ResolvedImageData,
     flashes: Flashes,
 }
 
-async fn get_entry(
+async fn get_image(
     State(state): State<AppState>,
     Path(image_id): Path<String>,
     account: Option<Account>,
@@ -337,7 +445,7 @@ async fn get_entry(
         content_type: entry.mimetype.clone(),
     };
 
-    Ok(EntryTemplate {
+    Ok(ImageTemplate {
         account,
         entry,
         data,
@@ -346,7 +454,58 @@ async fn get_entry(
     .into_response())
 }
 
+#[derive(Template)]
+#[template(path = "images.html")]
+#[allow(dead_code)]
+struct ImagesTemplate {
+    account: Option<Account>,
+    files: Vec<ImageFile>,
+    flashes: Flashes,
+}
+
+pub(crate) async fn get_file_images(state: AppState, user_id: i64) -> std::io::Result<Vec<ImageFile>> {
+    let entries = state.resolve_images()
+        .await
+        .iter()
+        .filter(|e| e.uploader_id == Option::from(user_id))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let mut files = Vec::new();
+    for file in entries {
+        let entry = file;
+        let filename = format!("{}.{}", entry.id, entry.ext());
+        let url = format!("/gallery/{filename}");
+        files.push(ImageFile {
+            url,
+            id: filename,
+            mimetype: entry.mimetype,
+            image_data: entry.image_data.clone(),
+            size: entry.image_data.len() as u64,
+            uploaded_at: entry.uploaded_at,
+        });
+    }
+    Ok(files)
+}
+
+async fn get_images(
+    State(state): State<AppState>,
+    account: Account,
+    flashes: Flashes,
+) -> Result<Response, InternalError> {
+    let files = get_file_images(state.clone(), account.id).await?;
+    Ok(ImagesTemplate {
+        account: Some(account),
+        files,
+        flashes,
+    }
+        .into_response())
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/gallery/:id", get(get_entry))
+        .route("/images", get(get_images))
+        .route("/gallery/:id", get(get_image))
+        .route("/images/bulk", delete(bulk_delete_files))
+        .route("/images/bulk", post(upload_file).layer(RateLimit::default().build()))
 }

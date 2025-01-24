@@ -10,23 +10,6 @@ use crate::{database::Table};
     It's important to note that the data in here should be backwards compatible.
 */
 
-/// Audit log data for a created directory entry
-///
-/// For this data, `image_id`, `account_id` are only null if the data is deleted.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CreateImageEntry {
-    /// The identifier of the entry
-    pub identifier: String,
-    /// Whether the entry was created using the API
-    pub api: bool,
-    /// The mime type of the image
-    pub mimetype: String,
-    /// The image_data
-    pub image_data: Vec<u8>,
-    /// The id of the image
-    pub image_id: i64
-}
-
 /// Inner data for a file operation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileOperation {
@@ -51,7 +34,7 @@ impl FileOperation {
 /// For this data, `image_id` and `account_id` are only null if the data is deleted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Upload {
-    pub file: FileOperation,
+    pub files: Vec<FileOperation>,
     pub api: bool,
 }
 
@@ -64,18 +47,38 @@ pub struct DeleteImage {
     pub api: bool
 }
 
+/// Audit log data for a file delete operation
+///
+/// For this data and `account_id` are only null if the data is deleted.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeleteFiles {
+    pub files: Vec<FileOperation>,
+}
+
+impl DeleteFiles {
+    pub fn add_file(&mut self, name: String, failed: bool) {
+        self.files.push(FileOperation { name, failed });
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum AuditLogData {
-    CreateImageEntry(CreateImageEntry),
     Upload(Upload),
     DeleteImage(DeleteImage),
+    DeleteFiles(DeleteFiles),
 }
 
 impl From<DeleteImage> for AuditLogData {
     fn from(v: DeleteImage) -> Self {
         Self::DeleteImage(v)
+    }
+}
+
+impl From<DeleteFiles> for AuditLogData {
+    fn from(v: DeleteFiles) -> Self {
+        Self::DeleteFiles(v)
     }
 }
 
@@ -104,9 +107,6 @@ pub struct AuditLogEntry {
     /// The ID of the entry. This is represented as a datetime with milliseconds precision
     /// in the database.
     pub id: i64,
-    /// The ID of the entry. This is represented as a datetime with milliseconds precision
-    /// in the database.
-    pub image_id: Option<String>,
     /// The account ID that created this entry.
     pub account_id: Option<i64>,
     /// The actual data for this audit log entry.
@@ -126,19 +126,17 @@ impl AuditLogEntry {
     {
         Self {
             id: datetime_to_ms(OffsetDateTime::now_utc()),
-            image_id: None,
             account_id: None,
             data: data.into(),
         }
     }
 
-    pub fn full<T>(data: T, image_id: String, account_id: i64) -> Self
+    pub fn full<T>(data: T, account_id: i64) -> Self
     where
         T: Into<AuditLogData>,
     {
         Self {
             id: datetime_to_ms(OffsetDateTime::now_utc()),
-            image_id: Some(image_id),
             account_id: Some(account_id),
             data: data.into(),
         }
@@ -156,13 +154,12 @@ impl AuditLogEntry {
 
 impl Table for AuditLogEntry {
     const NAME: &'static str = "audit_log";
-    const COLUMNS: &'static [&'static str] = &["id", "image_id", "account_id", "data"];
+    const COLUMNS: &'static [&'static str] = &["id", "account_id", "data"];
     type Id = i64;
 
     fn from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
             id: row.get("id")?,
-            image_id: row.get("image_id")?,
             account_id: row.get("account_id")?,
             data: row.get("data")?,
         })

@@ -29,6 +29,7 @@ const imageLink = (image_id, info, fallback) => {
 }
 
 const simplePlural = (c, s) => c === 1 ? `${c} ${s}` : `${c} ${s}s`;
+const fileToElement = (op) => html('li.file', op.name, {class: op.failed ? 'failed' : 'success'});
 
 function auditLogEntry(id, title, contents) {
   const isEmpty = (e) => e == null || (Array.isArray(e) && e.length === 0);
@@ -49,11 +50,22 @@ const auditLogTypes = Object.freeze({
     let title = [
       data.api ? "[API] " : "",
       userLink(log.account_id, info),
-      " uploaded image with id ",
-      imageLink(log.image_id, info),
+      " uploaded ",
+      simplePlural(data.files.length, 'file'),
     ];
+    let files = data.files.map(fileToElement);
+    return auditLogEntry(log.id, title, html('ul', files));
+  },
+  delete_files: (data, log, info) => {
+    let title = [
+      userLink(log.account_id, info),
+      " deleted ",
+      simplePlural(data.files.length, 'image'),
+    ];
+    let contents = [];
 
-    return auditLogEntry(log.id, title);
+    contents.push(html('ul', data.files.map(fileToElement)));
+    return auditLogEntry(log.id, title, contents);
   },
   delete_image: (data, log, info) => {
     let title = [

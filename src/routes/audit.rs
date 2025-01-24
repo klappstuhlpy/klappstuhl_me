@@ -9,12 +9,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    audit::{AuditLogEntry},
-    error::ApiError,
-    models::{Account},
-    AppState,
-};
+use crate::database::Table;
+use crate::{audit::AuditLogEntry, error::ApiError, models::Account, AppState};
 
 #[derive(Debug, Serialize)]
 struct EntryImages {
@@ -25,8 +21,6 @@ struct EntryImages {
 #[derive(Debug, Deserialize)]
 struct AuditLogQuery {
     #[serde(default)]
-    image_id: Option<String>,
-    #[serde(default)]
     account_id: Option<i64>,
     #[serde(default)]
     before: Option<i64>,
@@ -36,21 +30,18 @@ struct AuditLogQuery {
 
 impl AuditLogQuery {
     fn to_sql(&self) -> (String, Vec<i64>) {
-        let mut filters: Vec<String> = Vec::new();
+        let mut filters = Vec::new();
         let mut params = Vec::new();
-        if let Some(ref image_id) = self.image_id {
-            filters.push(format!("audit_log.image_id = '{}'", image_id));
-        }
         if let Some(account_id) = self.account_id {
-            filters.push("audit_log.account_id = ?".to_string());
+            filters.push("audit_log.account_id = ?");
             params.push(account_id);
         }
         if let Some(before) = self.before {
-            filters.push("audit_log.id < ?".to_string());
+            filters.push("audit_log.id < ?");
             params.push(before);
         }
         if let Some(after) = self.after {
-            filters.push("audit_log.id > ?".to_string());
+            filters.push("audit_log.id > ?");
             params.push(after);
         }
 
@@ -65,7 +56,6 @@ impl AuditLogQuery {
 #[derive(Debug, Default, Serialize)]
 struct AuditLogResult {
     logs: Vec<AuditLogEntry>,
-    entries: HashMap<String, EntryImages>,
     users: HashMap<i64, String>,
 }
 
@@ -81,18 +71,12 @@ async fn get_audit_logs(
     let (filter, params) = query.to_sql();
     let mut query = r###"
         SELECT
-            audit_log.id AS audit_log_id,
-            audit_log.image_id AS audit_log_image_id,
-            audit_log.account_id AS audit_log_account_id,
-            audit_log.data AS audit_log_data,
-            images.id AS image_id,
-            images.mimetype AS image_mimetype,
+            audit_log.*,
             account.name AS account_name
         FROM audit_log
-        LEFT JOIN images ON images.id = audit_log.image_id
         LEFT JOIN account ON account.id = audit_log.account_id
     "###
-        .to_owned();
+    .to_owned();
 
     if !filter.is_empty() {
         query.push_str("WHERE ");
@@ -108,20 +92,8 @@ async fn get_audit_logs(
             let mut rows = stmt.query(rusqlite::params_from_iter(params))?;
 
             while let Some(row) = rows.next()? {
-                let log = AuditLogEntry {
-                    id: row.get("audit_log_id")?,
-                    image_id: row.get("audit_log_image_id")?,
-                    account_id: row.get("audit_log_account_id")?,
-                    data: row.get("audit_log_data")?,
-                };
+                let log = AuditLogEntry::from_row(row)?;
 
-                if let Some(image_id) = log.image_id.clone() {
-                    let entry = EntryImages {
-                        id: row.get("image_id")?,
-                        mimetype: row.get("image_mimetype")?,
-                    };
-                    result.entries.insert(image_id, entry);
-                }
                 if let Some(account_id) = log.account_id.clone() {
                     result.users.insert(account_id, row.get("account_name")?);
                 }

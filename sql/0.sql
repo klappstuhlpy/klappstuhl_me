@@ -57,14 +57,12 @@ CREATE INDEX IF NOT EXISTS session_api_key_idx ON session (api_key);
 CREATE TABLE IF NOT EXISTS audit_log
 (
     id         INTEGER PRIMARY KEY,
-    image_id   TEXT    REFERENCES images (id) ON DELETE SET NULL,
     account_id INTEGER REFERENCES account (id) ON DELETE SET NULL,
     data       TEXT    NOT NULL -- JSON data
 
 );
 
 CREATE INDEX IF NOT EXISTS audit_log_account_id_idx ON audit_log (account_id);
-CREATE INDEX IF NOT EXISTS audit_log_image_id_idx ON audit_log (image_id);
 
 -- This trigger has to be remade if the limit ever changes
 -- CREATE TRIGGER IF NOT EXISTS cleanup_audit_log AFTER INSERT ON audit_log

@@ -1,5 +1,6 @@
 use quick_cache::sync::Cache;
 use std::{sync::Arc, time::Duration};
+use tokio::sync::RwLockReadGuard;
 use crate::{
     audit::AuditLogEntry,
     auth::hash_password,
@@ -87,18 +88,20 @@ impl AppState {
     /// Sends an audit log entry.
     ///
     /// Errors are silently dropped, since they can't be handled anyway.
-    pub async fn audit(&self, entry: AuditLogEntry) {
+    pub async fn audit(&self, entry: AuditLogEntry) -> i64 {
         let err = self
             .database()
             .execute(
-                "INSERT INTO audit_log(id, image_id, account_id, data) VALUES (?, ?, ?, ?)",
-                (entry.id, entry.image_id, entry.account_id, entry.data),
+                "INSERT INTO audit_log(id, account_id, data) VALUES (?, ?, ?)",
+                (entry.id, entry.account_id, entry.data),
             )
             .await;
 
         if let Err(e) = err {
             tracing::error!(error=%e, "Could not insert audit log entry");
+            return -1;
         }
+        entry.id
     }
 
     /// Sends an alert webhook with the given webhook payload.
@@ -307,6 +310,23 @@ impl AppState {
         for session in sessions {
             self.inner.valid_sessions.remove(&session.id);
         }
+    }
+
+    pub async fn resolve_images(&self) -> RwLockReadGuard<'_, Vec<ImageEntry>> {
+        {
+            let reader = self.inner.cached_images.get().await;
+            if let Some(lock) = reader {
+                return lock;
+            }
+        }
+
+        // Cache miss
+        let files: Vec<ImageEntry> = self
+            .database()
+            .all("SELECT * FROM images ORDER BY id ASC", [])
+            .await
+            .unwrap();
+        self.inner.cached_images.set(files).await
     }
 
     /// Gets the image by the given ID.
