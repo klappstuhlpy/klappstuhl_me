@@ -9,7 +9,7 @@ use utoipa::ToSchema;
 use crate::{database::Table, key::SecretKey, token::Token};
 
 /// Represents an image file.
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Debug, Serialize, PartialEq, Eq, Clone, ToSchema)]
 pub(crate) struct ImageFile {
     /// The file's download URL.
     pub(crate) url: String,
@@ -25,6 +25,9 @@ pub(crate) struct ImageFile {
     /// The date the the file was uploaded, in UTC, as an RFC3339 string.
     #[serde(with = "time::serde::rfc3339")]
     pub(crate) uploaded_at: OffsetDateTime,
+    /// The id of the uploader
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) uploader_id: Option<i64>,
 }
 
 /// An entry that represents a saved image.

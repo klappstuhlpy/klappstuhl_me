@@ -130,7 +130,7 @@ async fn invalidate_caches(
     Extension(cache): Extension<BodyCache>,
 ) -> Redirect {
     if account.flags.is_admin() {
-        state.cached_images().invalidate().await;
+        state.invalidate_image_caches().await;
         state.clear_account_cache();
         state.clear_session_cache();
         cache.invalidate_all();

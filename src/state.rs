@@ -11,6 +11,7 @@ use crate::{
     token::MAX_TOKEN_AGE,
     Config, Database,
 };
+use crate::models::ImageFile;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct SessionInfo {
@@ -40,6 +41,7 @@ struct InnerState {
     config: Config,
     database: Database,
     cached_images: TimedCachedValue<Vec<ImageEntry>>,
+    cached_image_files: TimedCachedValue<Vec<ImageFile>>,
     cached_users: Cache<i64, Account>,
     valid_sessions: Cache<String, SessionInfo>,
 }
@@ -68,6 +70,7 @@ impl AppState {
                 config,
                 database,
                 cached_images: TimedCachedValue::new(Duration::from_secs(60 * 30)),
+                cached_image_files: TimedCachedValue::new(Duration::from_secs(60 * 30)),
                 cached_users: Cache::new(1000),
                 valid_sessions: Cache::new(1000),
             }),
@@ -117,6 +120,15 @@ impl AppState {
 
     pub fn cached_images(&self) -> &TimedCachedValue<Vec<ImageEntry>> {
         &self.inner.cached_images
+    }
+
+    pub fn cached_image_files(&self) -> &TimedCachedValue<Vec<ImageFile>> {
+        &self.inner.cached_image_files
+    }
+
+    pub async fn invalidate_image_caches(&self) {
+        self.inner.cached_images.invalidate().await;
+        self.inner.cached_image_files.invalidate().await;
     }
 
     pub async fn get_account(&self, id: i64) -> Option<Account> {
@@ -326,7 +338,38 @@ impl AppState {
             .all("SELECT * FROM images ORDER BY id ASC", [])
             .await
             .unwrap();
+
+        let mut image_files = Vec::new();
+        for file in files.clone() {
+            let entry = file;
+            let filename = format!("{}.{}", entry.id, entry.ext());
+            let url = format!("/gallery/{filename}");
+            image_files.push(ImageFile {
+                url,
+                id: filename,
+                mimetype: entry.mimetype,
+                image_data: entry.image_data.clone(),
+                size: entry.image_data.len() as u64,
+                uploaded_at: entry.uploaded_at,
+                uploader_id: entry.uploader_id,
+            });
+        }
+
+        let _ = self.inner.cached_image_files.set(image_files).await;
         self.inner.cached_images.set(files).await
+    }
+
+    pub async fn resolve_image_files(&self) -> RwLockReadGuard<'_, Vec<ImageFile>> {
+        {
+            let reader = self.inner.cached_image_files.get().await;
+            if let Some(lock) = reader {
+                return lock;
+            }
+        }
+
+        // Cache miss
+        let _ = self.resolve_images().await;
+        self.inner.cached_image_files.get().await.unwrap()
     }
 
     /// Gets the image by the given ID.

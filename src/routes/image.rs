@@ -240,7 +240,7 @@ pub async fn raw_upload_file(
             links.push(canonical_url(format!("/gallery/{}.{}", file_name, file.ext.clone()))?.to_string());
         }
 
-        state.cached_images().invalidate().await;
+        state.invalidate_image_caches().await;
     }
 
     let audit_id = state.audit(audit::AuditLogEntry::full(data, account.id)).await;
@@ -282,7 +282,7 @@ pub async fn delete_image(
         return Err(ApiError::not_found(format!("Image `{}` was not found", id.clone())));
     }
 
-    let _ = state
+    let result = state
         .database()
         .execute(
             "DELETE FROM images WHERE account_id = ? AND id = ?",
@@ -290,15 +290,18 @@ pub async fn delete_image(
         )
         .await;
 
-    state.cached_images().invalidate().await;
-
     let data = audit::DeleteImage {
         file: FileOperation {
             name: id.clone(),
-            failed: false,
+            failed: result.is_err(),
         },
         api
     };
+
+    if !result.is_err() {
+        state.invalidate_image_caches().await;
+    }
+
     state.audit(audit::AuditLogEntry::full(data, account.id)).await;
 
     let title = if api {
@@ -364,7 +367,7 @@ async fn bulk_delete_files(
     if success == 0 {
         return Err(ApiError::not_found("No files were found to delete"));
     } else {
-        state.cached_images().invalidate().await;
+        state.invalidate_image_caches().await;
     }
 
     let audit_id = state
@@ -463,37 +466,18 @@ struct ImagesTemplate {
     flashes: Flashes,
 }
 
-pub(crate) async fn get_file_images(state: AppState, user_id: i64) -> std::io::Result<Vec<ImageFile>> {
-    let entries = state.resolve_images()
-        .await
-        .iter()
-        .filter(|e| e.uploader_id == Option::from(user_id))
-        .cloned()
-        .collect::<Vec<_>>();
-
-    let mut files = Vec::new();
-    for file in entries {
-        let entry = file;
-        let filename = format!("{}.{}", entry.id, entry.ext());
-        let url = format!("/gallery/{filename}");
-        files.push(ImageFile {
-            url,
-            id: filename,
-            mimetype: entry.mimetype,
-            image_data: entry.image_data.clone(),
-            size: entry.image_data.len() as u64,
-            uploaded_at: entry.uploaded_at,
-        });
-    }
-    Ok(files)
-}
-
 async fn get_images(
     State(state): State<AppState>,
     account: Account,
     flashes: Flashes,
 ) -> Result<Response, InternalError> {
-    let files = get_file_images(state.clone(), account.id).await?;
+    let files = state.resolve_image_files()
+        .await
+        .iter()
+        .filter(|e| e.uploader_id == Option::from(account.id))
+        .cloned()
+        .collect::<Vec<_>>();
+
     Ok(ImagesTemplate {
         account: Some(account),
         files,

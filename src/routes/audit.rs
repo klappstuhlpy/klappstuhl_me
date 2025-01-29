@@ -12,12 +12,6 @@ use serde::{Deserialize, Serialize};
 use crate::database::Table;
 use crate::{audit::AuditLogEntry, error::ApiError, models::Account, AppState};
 
-#[derive(Debug, Serialize)]
-struct EntryImages {
-    id: String,
-    mimetype: String,
-}
-
 #[derive(Debug, Deserialize)]
 struct AuditLogQuery {
     #[serde(default)]
