@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link href="/static/services.css" rel="stylesheet">
+
+<meta property="og:title" content="Services | Klappstuhl.me">
+{% endblock %}
+
+{% block title %}
+Services | Klappstuhl_me
+{% endblock %}
+
+{% block body %}
+<h1>All Services</h1>
+
+{% for flash in flashes %}
+{{ flash.html()|safe }}
+{% endfor %}
+
+<div class="services-grid">
+    {% for service in services %}
+    <div class="service-card">
+        <h2>{{ service.name }}</h2>
+        <p>Status:
+            {% if service.running %}
+            <span class="running">🟢 Running</span>
+            {% else %}
+            <span class="offline">🔴 Offline</span>
+            {% endif %}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block body_end %}
+<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+{% endblock %}

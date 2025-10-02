@@ -1,0 +1,29 @@
+body {
+    box-sizing: border-box;
+    color: white;
+}
+
+h1 {
+    border-bottom: 1px solid var(--dividers);
+    padding-bottom: 1rem;
+    margin-bottom: 4rem;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 2rem;
+    justify-content: center;   /* center the grid items */
+    max-width: 1000px;         /* optional: limit width */
+    margin: 0 auto;            /* center the whole grid block */
+}
+
+.service-card {
+    background: #1a1a1a;
+    border: 1px solid var(--dividers);
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+}
+.running { color: lightgreen; }
+.offline { color: red; }

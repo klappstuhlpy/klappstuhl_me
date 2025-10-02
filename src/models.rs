@@ -10,7 +10,7 @@ use crate::{database::Table, key::SecretKey, token::Token};
 
 /// Represents an image file.
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, ToSchema)]
-pub(crate) struct ImageFile {
+pub struct ImageFile {
     /// The file's download URL.
     pub(crate) url: String,
     /// The ID of the image.
