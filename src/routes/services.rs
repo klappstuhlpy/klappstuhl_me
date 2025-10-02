@@ -40,7 +40,7 @@ fn is_screen_running(name: &str) -> bool {
 }
 
 fn is_docker_container_running(name: &str) -> bool {
-    match Command::new("docker").args(["ps", name]).output() {
+    match Command::new("docker").args(["ps"]).output() {
         Ok(out) => String::from_utf8_lossy(&out.stdout).contains(name),
         Err(_) => {
             eprintln!("Warning: `docker` not found on PATH");
