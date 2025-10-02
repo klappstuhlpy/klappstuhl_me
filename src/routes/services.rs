@@ -29,32 +29,19 @@ struct ServicesTemplate {
     services: Vec<ServiceEntry>,
 }
 
-fn is_service_active(name: &str) -> bool {
-    match Command::new("systemctl").args(["is-active", name]).output() {
-        Ok(out) => String::from_utf8_lossy(&out.stdout).trim() == "active",
-        Err(_) => {
-            eprintln!("Warning: `systemctl` not found on PATH");
-            false
-        }
-    }
-}
-
 fn is_screen_running(name: &str) -> bool {
     match Command::new("screen").args(["-ls", name]).output() {
         Ok(out) => String::from_utf8_lossy(&out.stdout).contains(name),
         Err(_) => {
-            eprintln!("Warning: `systemctl` not found on PATH");
+            eprintln!("Warning: `screen` not found on PATH");
             false
         }
     }
 }
 
 fn is_docker_container_running(name: &str) -> bool {
-    match Command::new("docker")
-        .args(["ps", "--filter", &format!("name={}", name), "--format", "{{.Names}}"])
-        .output()
-    {
-        Ok(out) => !String::from_utf8_lossy(&out.stdout).trim().is_empty(),
+    match Command::new("docker").args(["ps", name]).output() {
+        Ok(out) => String::from_utf8_lossy(&out.stdout).contains(name),
         Err(_) => {
             eprintln!("Warning: `docker` not found on PATH");
             false
@@ -81,11 +68,11 @@ async fn services_index(
         },
         ServiceEntry {
             name: "Database".to_string(),
-            running: is_service_active("postgresql"),
+            running: is_docker_container_running("postgres"),
         },
         ServiceEntry {
             name: "Percy-v2 Bot".to_string(),
-            running: is_docker_container_running("percy"),
+            running: is_docker_container_running("percy-bot"),
         },
     ];
 
