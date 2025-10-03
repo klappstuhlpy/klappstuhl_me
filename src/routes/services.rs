@@ -42,41 +42,50 @@ struct ServiceAction {
 }
 
 fn docker_container_started_at(name: &str) -> Option<DateTime<Utc>> {
-    match Command::new("docker")
-        .args(["inspect", "-f", "'{{ .State.StartedAt }}'", name])
+    let output = Command::new("docker")
+        .args(["inspect", "-f", "{{.State.StartedAt}}", name])
         .output()
-    {
-        Ok(out) => {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !s.contains("Error") { Some(s.parse().unwrap()) } else { None }
-        }
-        Err(_) => None,
+        .ok()?;
+
+    let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if s.is_empty() || s.contains("Error") {
+        return None;
     }
+
+    // parse RFC3339 string into DateTime<Utc>
+    DateTime::parse_from_rfc3339(&s)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
 }
 
 fn screen_started_at(name: &str) -> Option<DateTime<Utc>> {
-    match Command::new("pgrep").args(["-af", name]).output() {
-        Ok(out) => {
-            if out.stdout.is_empty() {
-                return None;
-            }
-            // crude: get elapsed time of first PID
-            let pid = String::from_utf8_lossy(&out.stdout)
-                .split_whitespace()
-                .next()
-                .unwrap_or("")
-                .to_string();
+    // 1. get PID
+    let pid_output = Command::new("pgrep")
+        .args(["-f", name])
+        .output()
+        .ok()?;
+    let pid = String::from_utf8_lossy(&pid_output.stdout)
+        .lines()
+        .next()? // take first PID
+        .trim()
+        .to_string();
 
-            if pid.is_empty() {
-                return None;
-            }
+    // 2. get start time
+    let start_output = Command::new("ps")
+        .args(["-p", &pid, "-o", "lstart="])
+        .output()
+        .ok()?;
 
-            let etime_out = Command::new("ps").args(["-o", "etime=", "-p", &pid]).output().ok()?;
-            let etime = String::from_utf8_lossy(&etime_out.stdout).trim().to_string();
-            if etime.is_empty() { None } else { Some(etime.parse().unwrap()) }
-        }
-        Err(_) => None,
+    let start_str = String::from_utf8_lossy(&start_output.stdout).trim().to_string();
+    if start_str.is_empty() {
+        return None;
     }
+
+    // 3. optionally convert to chrono datetime
+    // Example format: "Fri Oct  3 09:12:34 2025"
+    let dt = chrono::NaiveDateTime::parse_from_str(&start_str, "%a %b %e %H:%M:%S %Y").ok()?;
+
+    Some(DateTime::from_utc(dt, Utc))
 }
 
 fn get_servicestatus() -> Vec<ServiceEntry> {
