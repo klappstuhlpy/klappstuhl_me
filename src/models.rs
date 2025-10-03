@@ -41,6 +41,8 @@ pub struct ImageEntry {
     pub mimetype: String,
     /// The representable image bytes.
     pub image_data: Vec<u8>,
+    /// The file's size in bytes.
+    pub size: u64,
     /// The timestamp when the image was uploaded.
     #[serde(with = "time::serde::rfc3339")]
     pub uploaded_at: OffsetDateTime,
@@ -55,6 +57,7 @@ impl ImageEntry {
         Self {
             id,
             mimetype: Default::default(),
+            size: Default::default(),
             image_data: Default::default(),
             uploaded_at: OffsetDateTime::now_utc(),
             uploader_id: Default::default()
@@ -66,6 +69,7 @@ impl ImageEntry {
         ImageEntryData {
             id: &self.id,
             mimetype: &self.mimetype,
+            size: &self.size,
             image_data: &self.image_data,
             uploaded_at: &self.uploaded_at,
             uploader_id: self.uploader_id
@@ -99,6 +103,7 @@ impl Table for ImageEntry {
         Ok(Self {
             id: row.get("id")?,
             mimetype: row.get("mimetype")?,
+            size: row.get("size")?,
             image_data: row.get("image_data")?,
             uploaded_at: row.get("uploaded_at")?,
             uploader_id: row.get("uploader_id")?
@@ -121,6 +126,8 @@ pub struct ImageEntryData<'a> {
     pub id: &'a str,
     /// The mime type of the image.
     pub mimetype: &'a str,
+    /// The file's size in bytes.
+    pub size: &'a u64,
     /// The image_data
     pub image_data: &'a Vec<u8>,
     /// The timestamp when the image was uploaded.

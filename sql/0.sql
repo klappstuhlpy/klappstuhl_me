@@ -9,13 +9,15 @@
 CREATE TABLE IF NOT EXISTS images
 (
     id          TEXT    NOT NULL PRIMARY KEY,
-    image_data  BLOB,
+    image_data  BLOB    NOT NULL,
+    size        INTEGER GENERATED ALWAYS AS (length(image_data)) STORED,
     mimetype    TEXT    NOT NULL,
     uploaded_at TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     uploader_id INTEGER REFERENCES account (id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS image_idx ON images (id);
+
 
 -- This is for the authentication aspect
 -- Note that usernames are all lowercase

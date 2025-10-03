@@ -85,11 +85,11 @@ fn screen_started_at(name: &str) -> Option<DateTime<Utc>> {
     // Example format: "Fri Oct  3 09:12:34 2025"
     let dt = chrono::NaiveDateTime::parse_from_str(&start_str, "%a %b %e %H:%M:%S %Y").ok()?;
 
-    Some(DateTime::from_utc(dt, Utc))
+    Some(DateTime::from_naive_utc_and_offset(dt, Utc))
 }
 
 fn get_servicestatus() -> Vec<ServiceEntry> {
-    return vec![
+    vec![
         ServiceEntry {
             name: "Lavalink".to_string(),
             running: is_screen_running("lavalink"),
@@ -110,7 +110,7 @@ fn get_servicestatus() -> Vec<ServiceEntry> {
             running: is_docker_container_running("percy-bot"),
             started_at: docker_container_started_at("percy"),
         },
-    ];
+    ]
 }
 
 fn is_screen_running(name: &str) -> bool {

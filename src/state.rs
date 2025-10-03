@@ -1,16 +1,7 @@
 use quick_cache::sync::Cache;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::RwLockReadGuard;
-use crate::{
-    audit::AuditLogEntry,
-    auth::hash_password,
-    cached::TimedCachedValue,
-    database::Table,
-    logging::RequestLogger,
-    models::{Account, ImageEntry, Session},
-    token::MAX_TOKEN_AGE,
-    Config, Database,
-};
+use crate::{audit::AuditLogEntry, auth::hash_password, boxed_params, cached::TimedCachedValue, database::Table, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
 use crate::models::ImageFile;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -325,17 +316,15 @@ impl AppState {
     }
 
     pub async fn resolve_images(&self) -> RwLockReadGuard<'_, Vec<ImageEntry>> {
-        {
-            let reader = self.inner.cached_images.get().await;
-            if let Some(lock) = reader {
-                return lock;
-            }
+        let reader = self.inner.cached_images.get().await;
+        if let Some(lock) = reader {
+            return lock;
         }
 
         // Cache miss
         let files: Vec<ImageEntry> = self
             .database()
-            .all("SELECT * FROM images ORDER BY id ASC", [])
+            .all("SELECT id, size, X'' AS image_data, mimetype, uploader_id, uploaded_at FROM images ORDER BY id ASC", [])
             .await
             .unwrap();
 
@@ -348,8 +337,8 @@ impl AppState {
                 url,
                 id: filename,
                 mimetype: entry.mimetype,
-                image_data: entry.image_data.clone(),
-                size: entry.image_data.len() as u64,
+                size: entry.size,
+                image_data: entry.image_data,
                 uploaded_at: entry.uploaded_at,
                 uploader_id: entry.uploader_id,
             });
@@ -359,13 +348,25 @@ impl AppState {
         self.inner.cached_images.set(files).await
     }
 
+    pub async fn resolve_image_data_for(&self, id: &str) -> Option<Vec<u8>> {
+        let id = id.to_string(); // owned
+
+        self.database()
+            .get_row(
+                "SELECT image_data FROM images WHERE id = ?",
+                boxed_params![id], // <--- use boxed_params! to satisfy Send + 'static
+                |row| row.get::<_, Vec<u8>>(0),
+            )
+            .await
+            .ok()
+    }
+
     pub async fn resolve_image_files(&self) -> RwLockReadGuard<'_, Vec<ImageFile>> {
-        {
-            let reader = self.inner.cached_image_files.get().await;
-            if let Some(lock) = reader {
-                return lock;
-            }
+        if let Some(lock) = self.inner.cached_image_files.get().await {
+            tracing::debug!("Cache hit for image files");
+            return lock;
         }
+        tracing::debug!("Cache miss, reloading images from DB");
 
         // Cache miss
         let _ = self.resolve_images().await;
@@ -380,10 +381,24 @@ impl AppState {
     /// All errors are coerced into None.
     pub async fn get_image(&self, id: String) -> Option<ImageEntry> {
         if let Some(guard) = self.cached_images().get().await {
-            let found = guard.iter().find(|x| x.id == id);
-            // Cache hit, return a copy
-            if found.is_some() {
-                return found.cloned();
+            if let Some(found_ref) = guard.iter().find(|x| x.id == id) {
+                // Clone the entry first
+                let mut entry = found_ref.clone();
+
+                // Now we can drop the lock safely
+                drop(guard);
+
+                // If image_data is missing, fetch it from DB
+                if entry.image_data.is_empty() {
+                    if let Some(data) = self.resolve_image_data_for(&id).await {
+                        entry.image_data = data;
+                        return Some(entry);
+                    } else {
+                        return None;
+                    }
+                }
+
+                return Some(entry);
             }
         }
 
