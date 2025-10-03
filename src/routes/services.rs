@@ -14,7 +14,7 @@ use crate::{
     models::Account,
     AppState,
 };
-use chrono::{Utc, DateTime};
+use chrono::{Utc, DateTime, Timelike};
 
 #[derive(Debug, PartialEq, Eq, Clone, ToSchema)]
 pub struct ServiceEntry {
@@ -55,7 +55,7 @@ fn docker_container_started_at(name: &str) -> Option<DateTime<Utc>> {
     // parse RFC3339 string into DateTime<Utc>
     DateTime::parse_from_rfc3339(&s)
         .ok()
-        .map(|dt| dt.with_timezone(&Utc))
+        .map(|dt| dt.with_timezone(&Utc).with_nanosecond(0).unwrap())
 }
 
 fn screen_started_at(name: &str) -> Option<DateTime<Utc>> {
@@ -108,7 +108,7 @@ fn get_servicestatus() -> Vec<ServiceEntry> {
         ServiceEntry {
             name: "Percy-v2 Bot".to_string(),
             running: is_docker_container_running("percy-bot"),
-            started_at: docker_container_started_at("percy-bot"),
+            started_at: docker_container_started_at("percy"),
         },
     ];
 }

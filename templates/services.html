@@ -25,11 +25,9 @@ Services | Klappstuhl_me
             {% endif %}
         </p>
         <p>
-            Uptime:
+            Started At:
             {% if service.running && service.started_at.is_some() %}
-            <span class="uptime"
-                  data-started-at="{{ service.started_at.unwrap().timestamp() }}">
-        </span>
+            {{ service.started_at.unwrap() }}
             {% else %}
             N/A
             {% endif %}
