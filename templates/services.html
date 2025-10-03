@@ -35,8 +35,8 @@ Services | Klappstuhl_me
 
         <form method="post" action="/services/action">
             <input type="hidden" name="name" value="{{ service.name }}">
-            <button type="submit" name="action" value="start" class="start-btn">▶ Start</button>
-            <button type="submit" name="action" value="stop" class="stop-btn">⏹ Stop</button>
+            <button type="submit" name="action" value="start" class="start-btn" disabled>▶ Start</button>
+            <button type="submit" name="action" value="stop" class="stop-btn" disabled>⏹ Stop</button>
         </form>
     </div>
     {% endfor %}
