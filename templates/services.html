@@ -24,7 +24,16 @@ Services | Klappstuhl_me
             <span class="offline">🔴 Offline</span>
             {% endif %}
         </p>
-        <p>Uptime: {{ service.uptime }}</p>
+        <p>
+            Uptime:
+            {% if service.running && service.started_at.is_some() %}
+            <span class="uptime"
+                  data-started-at="{{ service.started_at.unwrap().timestamp() }}">
+        </span>
+            {% else %}
+            N/A
+            {% endif %}
+        </p>
 
         <form method="post" action="/services/action">
             <input type="hidden" name="name" value="{{ service.name }}">

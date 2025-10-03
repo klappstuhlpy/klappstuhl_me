@@ -6,25 +6,24 @@ use axum::{
     Router,
 };
 use axum::{Form};
-use serde::Serialize;
 use serde::Deserialize;
 use utoipa::ToSchema;
 use std::process::Command;
-use axum::extract::State;
 use axum::response::Redirect;
 use crate::{
     models::Account,
     AppState,
 };
+use chrono::{Utc, DateTime};
 
-#[derive(Debug, Serialize, PartialEq, Eq, Clone, ToSchema)]
+#[derive(Debug, PartialEq, Eq, Clone, ToSchema)]
 pub struct ServiceEntry {
     /// The service's name.
     pub(crate) name: String,
     /// Whether the service is running.
     pub(crate) running: bool,
-    /// The uptime of the service, if available.
-    pub(crate) uptime: String,
+    /// The start time of the service, if available.
+    pub(crate) started_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Template)]
@@ -42,20 +41,20 @@ struct ServiceAction {
     action: String,
 }
 
-fn docker_container_uptime(name: &str) -> Option<String> {
+fn docker_container_started_at(name: &str) -> Option<DateTime<Utc>> {
     match Command::new("docker")
-        .args(["ps", "--filter", &format!("name={}", name), "--format", "{{.RunningFor}}"])
+        .args(["inspect", "-f", "'{{ .State.StartedAt }}'", name])
         .output()
     {
         Ok(out) => {
             let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !s.is_empty() { Some(s) } else { None }
+            if !s.contains("Error") { Some(s.parse().unwrap()) } else { None }
         }
         Err(_) => None,
     }
 }
 
-fn screen_uptime(name: &str) -> Option<String> {
+fn screen_started_at(name: &str) -> Option<DateTime<Utc>> {
     match Command::new("pgrep").args(["-af", name]).output() {
         Ok(out) => {
             if out.stdout.is_empty() {
@@ -74,7 +73,7 @@ fn screen_uptime(name: &str) -> Option<String> {
 
             let etime_out = Command::new("ps").args(["-o", "etime=", "-p", &pid]).output().ok()?;
             let etime = String::from_utf8_lossy(&etime_out.stdout).trim().to_string();
-            if etime.is_empty() { None } else { Some(etime) }
+            if etime.is_empty() { None } else { Some(etime.parse().unwrap()) }
         }
         Err(_) => None,
     }
@@ -85,22 +84,22 @@ fn get_servicestatus() -> Vec<ServiceEntry> {
         ServiceEntry {
             name: "Lavalink".to_string(),
             running: is_screen_running("lavalink"),
-            uptime: screen_uptime("lavalink").unwrap_or("N/A".to_string()).to_string(),
+            started_at: screen_started_at("lavalink"),
         },
         ServiceEntry {
             name: "Snekbox API".to_string(),
-            running: is_docker_container_running("snekbox"),
-            uptime: docker_container_uptime("snekbox").unwrap_or("N/A".to_string()).to_string(),
+            running: is_docker_container_running("percy-snekbox"),
+            started_at: docker_container_started_at("percy-snekbox"),
         },
         ServiceEntry {
             name: "Database".to_string(),
-            running: is_docker_container_running("postgres"),
-            uptime: docker_container_uptime("postgres").unwrap_or("N/A".to_string()).to_string(),
+            running: is_docker_container_running("percy-db"),
+            started_at: docker_container_started_at("percy-db"),
         },
         ServiceEntry {
             name: "Percy-v2 Bot".to_string(),
             running: is_docker_container_running("percy-bot"),
-            uptime: docker_container_uptime("percy-bot").unwrap_or("N/A".to_string()).to_string(),
+            started_at: docker_container_started_at("percy-bot"),
         },
     ];
 }
@@ -126,7 +125,6 @@ fn is_docker_container_running(name: &str) -> bool {
 }
 
 async fn service_action(
-    State(state): State<AppState>,
     account: Account,
     Form(data): Form<ServiceAction>,
 ) -> Result<Redirect, StatusCode> {

@@ -38,8 +38,6 @@ sanitise-file-name = "1.0.0"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
 sha2 = "0.10.8"
-strsim = "0.11.0"
-sublime_fuzzy = "0.7.0"
 time = { version = "0.3.34", features = ["macros", "serde-human-readable"] }
 tokio = { version = "1.36.0", features = ["full"] }
 tokio-rustls = "0.25"
@@ -49,7 +47,6 @@ tracing = "0.1.40"
 tracing-appender = { git = "https://github.com/Rapptz/tracing-appender" }
 tracing-subscriber = { version = "0.3.18", features = ["json"] }
 utoipa = { version = "4.2.0", features = ["time", "axum_extras", "repr", "preserve_path_order"] }
-zip = "0.6.6"
-imagesize = "0.13.0"
 nanoid = "0.4.0"
 tree_magic = "0.2.3"
+chrono = "0.4.42"
