@@ -13,10 +13,6 @@ Services | Klappstuhl_me
 {% block body %}
 <h1>All Services</h1>
 
-{% for flash in flashes %}
-{{ flash.html()|safe }}
-{% endfor %}
-
 <div class="services-grid">
     {% for service in services %}
     <div class="service-card">
@@ -28,6 +24,13 @@ Services | Klappstuhl_me
             <span class="offline">🔴 Offline</span>
             {% endif %}
         </p>
+        <p>Uptime: {{ service.uptime }}</p>
+
+        <form method="post" action="/services/action">
+            <input type="hidden" name="name" value="{{ service.name }}">
+            <button type="submit" name="action" value="start" class="start-btn">▶ Start</button>
+            <button type="submit" name="action" value="stop" class="stop-btn">⏹ Stop</button>
+        </form>
     </div>
     {% endfor %}
 </div>
@@ -36,4 +39,5 @@ Services | Klappstuhl_me
 
 {% block body_end %}
 <script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+<script src="/static/services.js"></script>
 {% endblock %}
