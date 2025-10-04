@@ -194,11 +194,42 @@ input::-webkit-search-cancel-button {
     display: none;
 }
 
-input[type="checkbox"],
-input[type="radio"] {
-    width: 1.5rem;
-    height: 1.5rem;
-    accent-color: var(--form-input-focus-border);
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 1.2rem;
+    height: 1.2rem;
+    border: 2px solid var(--form-input-focus-border);
+    border-radius: 50%; /* makes it round */
+    background-color: rgba(39, 56, 81, 0.3); /* semi-transparent to match background */
+    display: inline-block;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+input[type="checkbox"]:hover {
+    background-color: rgba(39, 56, 81, 0.6);
+    border-color: var(--primary-button-rgb);
+    box-shadow: 0 0 4px rgba(var(--primary-button-rgb), 0.4);
+}
+
+input[type="checkbox"]:checked {
+    background-color: rgb(var(--primary-button-rgb));
+    border-color: rgb(var(--primary-button-rgb));
+}
+
+input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 0.6rem;
+    height: 0.6rem;
+    background: var(--button-text);
+    border-radius: 50%; /* smooth filled center */
+    transition: all 0.2s ease;
 }
 
 .form-container {
