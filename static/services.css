@@ -24,6 +24,18 @@ h1 {
     padding: 1.5rem;
     border-radius: 12px;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* ensures top and bottom sections separate */
+    height: 100%; /* ensures equal card height in the grid */
 }
+
+.service-card form {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: auto; /* pushes form to the bottom */
+}
+
 .running { color: lightgreen; }
 .offline { color: red; }
