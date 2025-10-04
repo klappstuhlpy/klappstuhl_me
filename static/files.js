@@ -1,7 +1,5 @@
 /* This file is licensed under AGPL-3.0 */
 const filterElement = document.getElementById('search-files');
-const escapedRegex = /[-\/\\^$*+?.()|[\]{}]/g;
-const escapeRegex = (e) => e.replace(escapedRegex, '\\$&');
 const MIN_SCORE = -1500;
 
 function __score(haystack, query) {
@@ -57,11 +55,11 @@ class TableSorter {
       el.addEventListener('click', e => this.sortBy(e, el.dataset.sortBy))
     });
     if(this.parent) {
-      let isAscending = initialSortOrder.value === 'ascending';
-      this.innerSortBy(`data-${initialSortBy.value}`, isAscending);
+      let isAscending = initialSortOrder === 'ascending';
+      this.innerSortBy(`data-${initialSortBy}`, isAscending);
       const headers = Array.from(this.parent.querySelectorAll('.table-headers > .table-header'));
       headers.forEach(node => node.classList.remove('sorting-ascending', 'sorting-descending'));
-      let element = headers.find(e => e.dataset.sortBy === initialSortBy.value);
+      let element = headers.find(e => e.dataset.sortBy === initialSortBy);
       if(element != null) {
         element.classList.add(isAscending ? 'sorting-ascending' : 'sorting-descending');
       }
