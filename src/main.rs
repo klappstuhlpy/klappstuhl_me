@@ -16,6 +16,7 @@ use tower_http::{
     compression::CompressionLayer,
     normalize_path::NormalizePathLayer,
     services::{ServeDir, ServeFile},
+    timeout::TimeoutLayer,
 };
 use tracing::{error, info};
 use tracing_appender::{non_blocking::WorkerGuard, rolling::Rotation};
@@ -131,6 +132,7 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         .layer(DefaultBodyLimit::max(klappstuhl_me::MAX_BODY_SIZE))
         .layer(tower_http::limit::RequestBodyLimitLayer::new(klappstuhl_me::MAX_BODY_SIZE))
         .layer(CompressionLayer::new())
+        .layer(TimeoutLayer::new(Duration::from_secs(30)))
         .layer(GlobalConcurrencyLimitLayer::new(512))
         .with_state(state);
 
@@ -202,6 +204,12 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
                     continue;
                 }
             };
+            let sock_ref = socket2::SockRef::from(&tcp);
+            let keep_alive = socket2::TcpKeepalive::new()
+                .with_time(Duration::from_secs(60))
+                .with_interval(Duration::from_secs(10));
+            let _ = sock_ref.set_tcp_keepalive(&keep_alive);
+
             let challenge_config = challenge_config.clone();
             let default_config = default_config.clone();
             let tower_service = unwrap_infallible(service.call(addr).await);

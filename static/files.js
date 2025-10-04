@@ -168,6 +168,6 @@ function filterEntries(query) {
 parseEntryObjects();
 changeModifiedToRelative();
 
-let sorter = new TableSorter(document.querySelector('.files'));
+let sorters = Array.from(document.querySelectorAll('.files')).map(el => new TableSorter(el));
 document.getElementById('clear-search-filter')?.addEventListener('click', resetSearchFilter);
 filterElement?.addEventListener('input', debounced(e => filterEntries(e.target.value)))
