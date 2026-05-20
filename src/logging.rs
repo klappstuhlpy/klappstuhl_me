@@ -17,8 +17,6 @@ use tracing::{event, Level};
 use crate::token::get_token_from_request;
 
 const REQUEST_LOGGING_QUERY: &str = r#"
-PRAGMA journal_mode=wal;
-
 CREATE TABLE IF NOT EXISTS request (
     id INTEGER PRIMARY KEY,
     ts INTEGER NOT NULL,
@@ -143,6 +141,7 @@ impl RequestLogger {
         path.set_file_name("requests.db");
 
         let mut connection = rusqlite::Connection::open(path)?;
+        connection.execute_batch("PRAGMA journal_mode=WAL;")?;
         connection.execute_batch(REQUEST_LOGGING_QUERY)?;
 
         std::thread::spawn(move || {

@@ -261,15 +261,20 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
 const MIGRATIONS: [&str; 2] = [include_str!("../sql/0.sql"), include_str!("../sql/1.sql")];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
+    connection.execute_batch("PRAGMA foreign_keys=1;")?;
+    connection.execute_batch("PRAGMA journal_mode=wal;")?;
+
     let tx = connection.transaction()?;
-    tx.execute_batch("PRAGMA foreign_keys=1;\nPRAGMA journal_mode=wal;")?;
+
     let version: usize = {
         let mut stmt = tx.prepare_cached("PRAGMA user_version;")?;
         stmt.query_row([], |r| r.get(0))?
     };
+
     for migration in MIGRATIONS.iter().skip(version) {
         tx.execute_batch(migration)?;
     }
+
     tx.commit()
 }
 
