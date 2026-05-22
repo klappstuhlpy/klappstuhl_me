@@ -1,0 +1,60 @@
+services:
+  klappstuhl_me:
+    build: .
+    image: klappstuhl_me:latest
+    restart: unless-stopped
+
+    ports:
+      # Production (TLS via rustls-acme / Let's Encrypt).
+      # Port 443 must be reachable from the public internet for ACME
+      # TLS-ALPN-01 domain validation to succeed.
+      - "443:443"
+      # Uncomment the line below when running in non-production mode
+      # (config.json: "production": false) on a non-standard port.
+      # - "9510:9510"
+
+    volumes:
+      # Persistent data: config, database, logs, ACME cert cache.
+      # On first run the app auto-creates the config file at:
+      #   ./data/config/klappstuhl_me/config.json
+      # Edit that file (see notes below) then restart the container.
+      - ./data:/data
+
+      # Docker socket – required so the /services admin page can call
+      # `docker ps` and `docker inspect` on the host.
+      # Remove this mount if you are not using the services feature.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    # NET_BIND_SERVICE lets the non-root process inside the container
+    # bind to port 443 without running as root.
+    cap_add:
+      - NET_BIND_SERVICE
+
+    # Optional: pass RUST_LOG to control log verbosity.
+    # environment:
+    #   RUST_LOG: "info"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# First-run setup
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. Start once to let the app write a default config:
+#      docker compose up -d
+#    Then stop it:
+#      docker compose down
+#
+# 2. Edit ./data/config/klappstuhl_me/config.json – minimum production config:
+#
+#      {
+#        "production": true,
+#        "domains": ["yourdomain.com"],
+#        "server": { "port": 443 },
+#        "secret_key": "<keep the auto-generated value>",
+#        "discord_webhook_url": null,
+#        "services": []
+#      }
+#
+# 3. Create the admin account (interactive prompt):
+#      docker compose run --rm klappstuhl_me ./klappstuhl_me admin
+#
+# 4. Start permanently:
+#      docker compose up -d
