@@ -1,12 +1,7 @@
-body {
-    box-sizing: border-box;
-    color: white;
-}
-
 h1 {
     border-bottom: 1px solid var(--dividers);
     padding-bottom: 1rem;
-    margin-bottom: 4rem;
+    margin-bottom: 2rem;
 }
 
 .project-container {

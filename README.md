@@ -1,45 +1,68 @@
 # Klappstuhl.me
 
-Klappstuhl.me is my personal website that features a public image hosting service.
-This Website is partly based on [Rapptz's jimaku](https://github.com/Rapptz/jimaku)
+Personal website and image hosting service built with Rust.
 
+## Tech Stack
 
-# Install
+- **Backend:** Rust, [Axum](https://github.com/tokio-rs/axum), SQLite (via rusqlite), Tokio
+- **Templates:** [Askama](https://github.com/djc/askama) (server-side rendering)
+- **TLS:** Automatic Let's Encrypt via rustls-acme
+- **API Docs:** OpenAPI 3.0 via utoipa + Scalar
 
-Right now, Rust v1.74 or higher is required. To install just run `cargo build`.
+## Requirements
 
-In order to actually run the server the `static` directory needs to be next to the executable. Maybe in the future there'll be a way to automatically move it.
+Rust 1.74 or higher.
 
-In order to create an admin account, run the `admin` subcommand.
+## Building
 
-# Configuration
+```
+cargo build --release
+```
 
-Configuration is done using a JSON file. The location of the configuration file depends on the operating system:
+The `static/` directory must be placed next to the compiled binary at runtime.
 
-- Linux: `$XDG_CONFIG_HOME/klappstuhl_me/config.json` or `$HOME/.config/klappstuhl_me/config.json`
-- macOS: `$HOME/Library/Application Support/klappstuhl_me/config.json`
-- Windows: `%AppData%/klappstuhl_me/config.json`
+## Running
 
-The documentation for the actual configuration options is documented in the [source code](src/config.rs).
+```
+./klappstuhl_me
+```
 
-## Data and Logs
+To create an admin account interactively:
 
-The server also contains a database and some logs which are written to different directories depending on the operating system as well:
+```
+./klappstuhl_me admin
+```
 
-For data it is as follows:
+## Configuration
 
-- Linux: `$XDG_DATA_HOME/klappstuhl_me` or `$HOME/.local/share/klappstuhl_me`
-- macOS: `$HOME/Library/Application Support/klappstuhl_me`
-- Windows: `%AppData%/klappstuhl_me`
+Configuration is loaded from a JSON file. The location depends on the OS:
 
-For logs it is as follows:
+| OS      | Path                                                               |
+|---------|--------------------------------------------------------------------|
+| Linux   | `$XDG_CONFIG_HOME/klappstuhl_me/config.json`                      |
+| macOS   | `$HOME/Library/Application Support/klappstuhl_me/config.json`     |
+| Windows | `%AppData%\klappstuhl_me\config.json`                              |
 
-- Linux: `$XDG_STATE_HOME/klappstuhl_me` or `$HOME/.local/state/klappstuhl_me`
-- macOS: `./logs`
-- Windows: `./logs`
+A default config file is created automatically on first run. All available options are documented in [`src/config.rs`](src/config.rs).
 
-The data directory contains the database.
+## Data & Logs
 
-# License
+**Database:**
 
-AGPL-v3.
+| OS      | Path                                                          |
+|---------|---------------------------------------------------------------|
+| Linux   | `$XDG_DATA_HOME/klappstuhl_me/main.db`                       |
+| macOS   | `$HOME/Library/Application Support/klappstuhl_me/main.db`    |
+| Windows | `%AppData%\klappstuhl_me\main.db`                             |
+
+**Logs:**
+
+| OS      | Path                   |
+|---------|------------------------|
+| Linux   | `$XDG_STATE_HOME/klappstuhl_me/` |
+| macOS   | `./logs/`              |
+| Windows | `./logs/`              |
+
+## License
+
+AGPL-3.0 — see [LICENSE](LICENSE).

@@ -1,12 +1,7 @@
-body {
-    box-sizing: border-box;
-    color: white;
-}
-
 h1 {
     border-bottom: 1px solid var(--dividers);
     padding-bottom: 1rem;
-    margin-bottom: 4rem;
+    margin-bottom: 2rem;
 }
 
 .services-grid {
@@ -19,8 +14,8 @@ h1 {
 }
 
 .service-card {
-    background: #1a1a1a;
-    border: 1px solid var(--dividers);
+    background: var(--box);
+    border: 1px solid var(--box-border);
     padding: 1.5rem;
     border-radius: 12px;
     text-align: center;
@@ -37,5 +32,5 @@ h1 {
     margin-top: auto; /* pushes form to the bottom */
 }
 
-.running { color: lightgreen; }
-.offline { color: red; }
+.running { color: #4ade80; }
+.offline { color: var(--error-bg); }

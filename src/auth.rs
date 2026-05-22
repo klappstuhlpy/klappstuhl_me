@@ -3,12 +3,14 @@ use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
 
+/// Hashes a plaintext password using Argon2 with a random salt.
 pub fn hash_password(password: &str) -> anyhow::Result<String> {
     let argon2 = Argon2::default();
     let salt = SaltString::generate(&mut OsRng);
     Ok(argon2.hash_password(password.as_bytes(), &salt)?.to_string())
 }
 
+/// Verifies a plaintext password against an Argon2 hash. Returns `Ok(())` if the password matches.
 pub fn validate_password(password: &str, password_hash: &str) -> anyhow::Result<()> {
     let argon2 = Argon2::default();
     let hash = PasswordHash::new(password_hash)?;

@@ -59,7 +59,7 @@ enum Message {
 
 /// Builder to help open a database connection.
 ///
-/// This is retrieved from [`Datebase::file`].
+/// This is retrieved from [`Database::file`].
 pub struct DatabaseBuilder {
     path: PathBuf,
     max_connections: usize,

@@ -38,7 +38,7 @@ impl std::ops::Deref for Flashes {
     }
 }
 
-/// The data that represents an actual flash emssage.
+/// The data that represents an actual flash message.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Default, Clone)]
 pub struct FlashMessage {
     /// The content of the message.

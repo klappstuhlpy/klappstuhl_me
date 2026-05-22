@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Kanit&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 * {
     box-sizing: border-box;
@@ -144,6 +144,7 @@ select {
     width: auto;
     box-shadow: none;
     max-width: 25rem;
+    transition: border-color 150ms ease;
 }
 
 textarea {
@@ -291,6 +292,7 @@ input[type="checkbox"]:checked::after {
     appearance: none;
     cursor: pointer;
     width: max-content;
+    transition: opacity 150ms ease, background-color 150ms ease;
 }
 
 .button:disabled {
@@ -420,6 +422,7 @@ table tbody tr:hover {
 header.grid-item {
     background-color: var(--header);
     grid-area: h;
+    border-bottom: 1px solid var(--box-border);
 }
 
 main.grid-item {
@@ -496,6 +499,7 @@ nav.main-navigation .nav-item {
     color: var(--nav-link);
     text-decoration: none;
     border: 1px solid transparent;
+    transition: color 150ms ease, border-color 150ms ease;
 }
 
 nav.main-navigation .branding {

@@ -76,13 +76,13 @@ impl ImageEntry {
         }
     }
 
+    /// Returns the file extension derived from the MIME type (e.g. `"png"` from `"image/png"`).
     pub fn ext(&self) -> String {
-        let _ext = self.mimetype.split("/");
-        if let Some(ext) = _ext.last() {
-            ext.to_string()
-        } else {
-            "png".to_string()
-        }
+        self.mimetype
+            .split('/')
+            .last()
+            .unwrap_or("png")
+            .to_string()
     }
 }
 
@@ -251,6 +251,7 @@ impl AccountCheck for Option<Account> {
     }
 }
 
+/// Returns `true` if the username satisfies length and character constraints (3–32 chars, `[a-z0-9._-]`).
 pub fn is_valid_username(s: &str) -> bool {
     s.len() >= 3
         && s.len() <= 32

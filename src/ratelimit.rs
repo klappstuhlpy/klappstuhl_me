@@ -274,6 +274,7 @@ impl Default for RateLimit<IpKeyExtractor> {
 }
 
 impl<T: KeyExtractor> RateLimit<T> {
+    /// Replaces the key extractor used to identify clients.
     pub fn extractor<U: KeyExtractor>(self, key: U) -> RateLimit<U> {
         RateLimit {
             max_capacity: self.max_capacity,
@@ -283,17 +284,20 @@ impl<T: KeyExtractor> RateLimit<T> {
         }
     }
 
+    /// Sets the maximum number of unique keys (clients) tracked in memory.
     pub fn max_capacity(mut self, capacity: usize) -> Self {
         self.max_capacity = capacity;
         self
     }
 
+    /// Sets the rate limit quota: `rate` requests allowed per `per` seconds.
     pub fn quota(mut self, rate: u16, per: f32) -> Self {
         self.rate = rate;
         self.per = per;
         self
     }
 
+    /// Builds the [`RateLimitLayer`] ready to be used as a tower middleware.
     pub fn build(self) -> RateLimitLayer<T> {
         RateLimitLayer {
             lookup: Arc::new(Cache::new(self.max_capacity)),
