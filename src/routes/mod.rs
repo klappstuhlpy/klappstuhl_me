@@ -62,16 +62,6 @@ async fn projects(
 }
 
 #[derive(Template)]
-#[template(path = "help.html")]
-struct HelpTemplate {
-    account: Option<Account>,
-}
-
-async fn help_page(account: Option<Account>) -> impl IntoResponse {
-    HelpTemplate { account }
-}
-
-#[derive(Template)]
 #[template(path = "contact.html")]
 struct ContactTemplate {
     account: Option<Account>,
@@ -85,7 +75,6 @@ pub fn all() -> Router<AppState> {
     Router::new()
         .route("/", get(index))
         .route("/projects", get(projects))
-        .route("/help", get(help_page))
         .route("/contact", get(contact_page))
         .merge(auth::routes())
         .merge(image::routes())

@@ -10,6 +10,27 @@ use serde::{Deserialize, Serialize};
 use crate::key::SecretKey;
 use crate::{cli::PROGRAM_NAME, discord::Webhook};
 
+/// How a monitored service is managed.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ServiceKind {
+    /// A Docker container identified by container name.
+    Docker,
+    /// A GNU Screen session identified by session name.
+    Screen,
+}
+
+/// Configuration for a single monitored service on the `/services` page.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ServiceConfig {
+    /// Human-readable display name.
+    pub name: String,
+    /// How the service is managed.
+    pub kind: ServiceKind,
+    /// The container or session identifier passed to docker/screen.
+    pub identifier: String,
+}
+
 /// The server configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -25,6 +46,9 @@ pub struct Config {
     #[serde(rename = "discord_webhook_url")]
     #[serde(default)]
     pub webhook: Option<Webhook>,
+    /// Services to monitor on the `/services` admin page.
+    #[serde(default)]
+    pub services: Vec<ServiceConfig>,
     /// The server IP and port configuration
     #[serde(default)]
     pub server: ServerConfig,
@@ -40,6 +64,7 @@ impl Config {
             production: false,
             domains: Vec::new(),
             webhook: None,
+            services: Vec::new(),
             server: ServerConfig::default(),
             secret_key: SecretKey::random()?,
         })

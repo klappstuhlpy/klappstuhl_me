@@ -1,23 +1,23 @@
+/* ── Toolbar ──────────────────────────────────────────────────── */
+
 .audit-log-actions {
     display: flex;
     margin-bottom: 0.75rem;
-    border-bottom: 1px solid var(--dividers);
+    border-bottom: 1px solid var(--box-border);
+    padding-bottom: 0.75rem;
     align-items: center;
     flex-wrap: wrap-reverse;
+    gap: 0.5rem;
 }
 
 .select-container {
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.select-container > label {
-    margin-right: 0.5rem;
-}
-
-.audit-log-entry {
-    border: 2px solid var(--box-border);
-    border-radius: 5px;
-}
+/* ── Loading spinner ─────────────────────────────────────────── */
 
 #loading {
     position: absolute;
@@ -26,6 +26,8 @@
     margin: -25px 0 0 -25px;
 }
 
+/* ── Entry list ──────────────────────────────────────────────── */
+
 #audit-log-entries {
     display: flex;
     flex-direction: column;
@@ -33,17 +35,23 @@
     margin-bottom: 0.5rem;
 }
 
+.audit-log-entry {
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
 .audit-log-entry > summary {
     list-style: none;
     display: flex;
-    background-color: var(--box-shade);
+    background-color: var(--box);
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem 1rem;
+    padding: 0.625rem 1rem;
     user-select: none;
     -webkit-user-select: none;
     cursor: pointer;
-    border-radius: 5px;
+    gap: 0.5rem;
 }
 
 .audit-log-entry > summary::marker,
@@ -51,81 +59,115 @@
     display: none;
 }
 
+.audit-log-entry > summary:hover {
+    background-color: var(--box-shade);
+}
+
 .audit-log-entry[open]:not(.empty) > summary {
-    border-radius: 5px 5px 0 0;
-    border-bottom: 2px solid var(--box-border);
+    border-bottom: 1px solid var(--box-border);
 }
 
 .audit-log-entry.empty > summary {
     cursor: default;
 }
 
+/* Chevron indicator */
 .audit-log-entry > summary::after {
-    content: '\25B6';
-    transition: 0.2s;
+    content: '';
+    display: inline-block;
+    width: 0.4rem;
+    height: 0.4rem;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
+    transform: rotate(-45deg);
+    transition: transform 0.2s;
+    flex-shrink: 0;
 }
 
 .audit-log-entry[open] > summary::after {
-    transform: rotate(90deg);
+    transform: rotate(45deg);
 }
 
 .audit-log-entry.empty > summary::after {
     display: none;
 }
 
+/* ── Entry body ──────────────────────────────────────────────── */
+
 .description {
     display: flex;
     flex-direction: column;
+    padding: 0.75rem 1rem;
+    background: var(--box);
+    gap: 0.25rem;
 }
+
+.fallback, .before, .after {
+    font-weight: 600;
+}
+
+.reason {
+    padding-left: 1.5rem;
+    margin-top: 0.75rem;
+    display: inline-block;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.reason:only-child {
+    margin-bottom: 0.75rem;
+}
+
+/* ── File status list ────────────────────────────────────────── */
+
+li.file {
+    list-style: none;
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+li.file::before {
+    position: absolute;
+    left: 0;
+    font-weight: 700;
+}
+
+li.file.failed::before {
+    content: '\00D7';
+    color: var(--error-text);
+}
+
+li.file.success::before {
+    content: '\2713';
+    color: var(--success-text);
+}
+
+/* ── Load more ───────────────────────────────────────────────── */
 
 .center {
     display: flex;
     justify-content: center;
-    align-content: center;
+    align-items: center;
 }
 
 #load-more {
     appearance: none;
-    border: 2px solid var(--box-border);
-    background-color: var(--box-shade);
+    border: 1px solid var(--box-border);
+    background-color: var(--box);
     color: var(--foreground);
-    border-radius: 5px;
-    height: 4rem;
+    border-radius: 0.5rem;
+    height: 3rem;
     width: 100%;
     cursor: pointer;
+    font-size: 0.875rem;
+    transition: background-color 0.15s;
 }
 
 #load-more:hover:not(:disabled) {
-    background-color: var(--box-border);
-    opacity: 0.9;
+    background-color: var(--box-shade);
 }
 
 #load-more:disabled {
     cursor: default;
-    opacity: 0.7;
-}
-
-
-li.file.failed {
-    list-style-type: '\274c\fe0f';
-    padding-inline-start: 1ch;
-}
-
-li.file.success {
-    list-style-type: '\2705\fe0f';
-    padding-inline-start: 1ch;
-}
-
-.fallback, .before, .after {
-    font-weight: bold;
-}
-
-.reason {
-    padding-left: 2rem;
-    margin-top: 1rem;
-    display: inline-block;
-}
-
-.reason:only-child {
-    margin-bottom: 1rem;
+    opacity: 0.5;
 }

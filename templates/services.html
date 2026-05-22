@@ -6,34 +6,35 @@
 <meta property="og:title" content="Services | Klappstuhl.me">
 {% endblock %}
 
-{% block title %}
-Services | Klappstuhl.me
-{% endblock %}
+{% block title %}Services | Klappstuhl.me{% endblock %}
 
 {% block body %}
-<h1>All Services</h1>
+<h1>Services</h1>
 
 <div class="services-grid">
     {% for service in services %}
     <div class="service-card" data-running="{{ service.running }}">
-        <h2>{{ service.name }}</h2>
-        <p>Status:
+        <div class="service-header">
+            <h2>{{ service.name }}</h2>
             {% if service.running %}
-            <span class="running">🟢 Running</span>
+            <span class="status-badge running">Running</span>
             {% else %}
-            <span class="offline">🔴 Offline</span>
+            <span class="status-badge offline">Offline</span>
+            {% endif %}
+        </div>
+        <p class="service-uptime">
+            {% if service.running %}
+            {% match service.started_at %}
+            {% when Some with (started) %}
+            Started {{ started|isoformat }}
+            {% when None %}
+            Start time unavailable
+            {% endmatch %}
+            {% else %}
+            Not running
             {% endif %}
         </p>
-        <p>
-            Started At:
-            {% if service.running && service.started_at.is_some() %}
-            {{ service.started_at.unwrap() }}
-            {% else %}
-            N/A
-            {% endif %}
-        </p>
-
-        <form method="post" action="/services/action">
+        <form method="post" action="/services/action" class="service-actions">
             <input type="hidden" name="name" value="{{ service.name }}">
             <button type="submit" name="action" value="start" class="button start-btn">Start</button>
             <button type="submit" name="action" value="stop" class="button danger stop-btn">Stop</button>

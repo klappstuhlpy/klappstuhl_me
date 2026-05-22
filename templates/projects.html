@@ -7,25 +7,43 @@
 <meta property="og:title" content="Projects | Klappstuhl.me">
 {% endblock %}
 
-{% block title %}
-Projects | Klappstuhl.me
-{% endblock %}
+{% block title %}Projects | Klappstuhl.me{% endblock %}
 
 {% block body %}
-<h1>My Projects</h1>
+<h1>Projects</h1>
 
 {% for flash in flashes %}
 {{ flash.html()|safe }}
 {% endfor %}
 
-<section class="project-container">
-    <div class="github-card" data-github="klappstuhlpy/percy" data-width="400" data-height="" data-theme="default"></div>
-    <div class="github-card" data-github="klappstuhlpy/robohashira" data-width="400" data-height="" data-theme="default"></div>
-    <div class="github-card" data-github="klappstuhlpy/klappstuhl_me" data-width="400" data-height="" data-theme="default"></div>
-</section>
+<div class="project-grid">
 
-{% endblock %}
+    <a class="project-card" href="https://github.com/klappstuhlpy/Percy" target="_blank" rel="noopener">
+        <div class="project-header">
+            <span class="project-name">Percy</span>
+            <span class="project-tag">Python</span>
+        </div>
+        <p class="project-desc">A multipurpose Discord bot featuring moderation, music playback, utilities, and more.</p>
+        <span class="project-link">github.com/klappstuhlpy/Percy ↗</span>
+    </a>
 
-{% block body_end %}
-<script src="//cdn.jsdelivr.net/github-cards/latest/widget.js"></script>
+    <a class="project-card" href="https://github.com/klappstuhlpy/RoboHashira" target="_blank" rel="noopener">
+        <div class="project-header">
+            <span class="project-name">RoboHashira</span>
+            <span class="project-tag">Python</span>
+        </div>
+        <p class="project-desc">A Discord bot with anime tracking, manga reader integration, and community tools.</p>
+        <span class="project-link">github.com/klappstuhlpy/RoboHashira ↗</span>
+    </a>
+
+    <a class="project-card" href="https://github.com/klappstuhlpy/klappstuhl_me" target="_blank" rel="noopener">
+        <div class="project-header">
+            <span class="project-name">klappstuhl.me</span>
+            <span class="project-tag">Rust</span>
+        </div>
+        <p class="project-desc">This website — a personal image host and project showcase built with Axum and SQLite.</p>
+        <span class="project-link">github.com/klappstuhlpy/klappstuhl_me ↗</span>
+    </a>
+
+</div>
 {% endblock %}

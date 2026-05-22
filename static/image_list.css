@@ -1,162 +1,25 @@
-/* general styling */
+/* Toolbar */
 
-hr {
-    margin-bottom: 2rem;
-}
-
-.text-input-container {
+h1 {
     margin-bottom: 1.5rem;
 }
 
-.commands {
-    margin-top: 1.5rem;
-}
-
-/* Image entry list */
-
-.files {
-    display: grid;
-    margin-bottom: 0.5rem;
-}
-
-.entry {
-    display: contents;
-}
-
-.entry > .table-data {
-    padding: 0.25rem;
-    border-bottom: 2px solid var(--table-border);
-    text-decoration: none;
-    background-color: var(--table-background);
-}
-
-.entry:last-child > .table-data {
-    border-bottom: none;
-}
-
-.entry > .file-name {
-    word-wrap: break-word;
-}
-
-.entry:hover > .table-data, .table-headers:hover > .table-header {
-    background-color: var(--table-background-hover);
-}
-
-.file-uploaded {
-    text-align: right;
-}
-
-.file-size {
-    text-align: center;
-}
-
-.file-reason {
-    max-width: 350px;
-}
-
-.entry-info {
+.toolbar {
     display: flex;
-    flex-direction: row;
-    align-items: baseline;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
     flex-wrap: wrap;
 }
 
-.external-links {
+.toolbar .text-input-container {
+    flex: 1;
+    min-width: 180px;
+}
+
+.toolbar-actions {
     display: flex;
-}
-
-.entry-info > .external-links {
-    margin-right: auto;
-    height: 24px;
-    align-self: center;
-}
-
-.entry-info:has(> .external-links) > .title {
-    margin-right: 0.5rem;
-}
-
-.entry-info > .title {
-    margin-right: auto;
-}
-
-.entry-info > .badges {
-    margin-left: 0.5rem;
-}
-
-.files[data-columns="2"] {
-    grid-template-columns: repeat(2, auto);
-}
-
-.files[data-columns="2"] .table-header:last-child {
-    text-align: right;
-}
-
-.files[data-columns="4"] {
-    grid-template-columns: min-content minmax(0, 1fr) repeat(2, max-content);
-}
-
-.files[data-columns="5"] {
-    grid-template-columns: min-content minmax(0, 1fr) repeat(3, max-content);
-}
-
-.table-header {
-    border-bottom: 2px solid var(--table-border);
-    padding: 0.25rem;
-}
-
-.table-headers {
-    display: contents;
-    font-weight: bold;
-    border-bottom: 2px solid var(--table-border);
-    padding: 0.25rem;
-}
-
-.table-headers > span {
-    min-height: 1.5rem;
-}
-
-.table-headers > span:hover {
-    cursor: pointer;
-}
-
-.table-headers > span::after {
-    content: '\25B4';
-    padding-left: 0.25rem;
-    display: none;
-}
-
-.table-headers > span.sorting-ascending::after {
-    content: '\25B4';
-    display: inline;
-}
-
-.table-headers > span.sorting-descending::after {
-    content: '\25BE';
-    display: inline;
-}
-
-.commands {
-    display: flex;
-    margin-bottom: 0.5rem;
-    align-items: stretch;
-    flex-direction: column;
     gap: 0.5rem;
-}
-
-.commands > .text-input-container {
-    flex-grow: 1;
-}
-
-.commands > .command-buttons {
-    align-self: flex-end;
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-    margin-left: auto;
-}
-
-.commands > .command-buttons.left {
-    margin-left: initial;
 }
 
 .text-input-container {
@@ -167,7 +30,8 @@ hr {
 
 .text-input-container > input {
     width: 100%;
-    padding-right: 2rem;
+    max-width: 100%;
+    padding-right: 0.5rem;
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
 }
@@ -184,48 +48,194 @@ hr {
 .text-input-container > .clear {
     height: 2rem;
     background-color: var(--form-input-background);
-    border: none;
-    color: var(--foreground);
+    border: 2px solid var(--form-input-border);
+    border-left: none;
+    color: transparent;
     width: 2rem;
-    box-shadow: none;
-    max-width: 25rem;
     cursor: pointer;
     border-top-right-radius: 0.25rem;
     border-bottom-right-radius: 0.25rem;
+    transition: color 150ms ease;
 }
 
 .text-input-container > input:focus {
-    border-right: none;
+    border-right-color: transparent;
 }
 
 .text-input-container > input:focus + .clear {
-    border: 2px solid var(--form-input-focus-border);
-    border-left: none;
+    border-color: var(--form-input-focus-border);
+    border-left-color: transparent;
 }
 
 .text-input-container > .clear:hover {
     color: var(--text-muted);
 }
 
-#relations {
-    display: flex;
-    gap: 0.25rem;
-    flex-wrap: wrap;
+/* Sort header row */
+
+.files {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.875rem;
+    margin-bottom: 1rem;
 }
 
-a.relation:not(:last-child)::after {
-    content: ' | ';
+.table-headers {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--box-border);
+}
+
+.table-header {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    transition: color 150ms ease, background-color 150ms ease;
+}
+
+.table-header:first-child {
+    cursor: default;
+    padding-left: 0.25rem;
+}
+
+.table-header:not(:first-child):hover {
+    background: var(--box);
     color: var(--foreground);
 }
 
-#relations > span {
-    flex-basis: 100%;
-    font-weight: bold;
+.table-header.sorting-ascending,
+.table-header.sorting-descending {
+    color: var(--foreground);
 }
 
-#relations > span::after {
-    content: ': ';
+.table-header.sorting-ascending::after {
+    content: ' ▴';
 }
+
+.table-header.sorting-descending::after {
+    content: ' ▾';
+}
+
+/* Image cards */
+
+.entry {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 150ms ease;
+}
+
+.entry:hover {
+    border-color: var(--branding);
+}
+
+.entry.hidden {
+    display: none !important;
+}
+
+.card-thumb-link {
+    display: block;
+    height: 150px;
+    overflow: hidden;
+    background: var(--box-shade);
+    text-decoration: none;
+}
+
+.card-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 150ms ease;
+}
+
+.card-meta {
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.card-name {
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--foreground);
+    text-decoration: none;
+    transition: color 150ms ease;
+}
+
+.card-name:hover {
+    color: var(--link-text);
+}
+
+.card-info {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.25rem;
+}
+
+.file-size,
+.file-uploaded {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+/* Checkbox: hidden until hover or checked */
+
+.file-bulk {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.4rem;
+    z-index: 2;
+    cursor: pointer;
+}
+
+.file-bulk input[type="checkbox"] {
+    opacity: 0;
+    transition: opacity 150ms ease;
+}
+
+.entry:hover .file-bulk input[type="checkbox"],
+.entry .file-bulk input[type="checkbox"]:checked {
+    opacity: 1;
+}
+
+/* Bottom bar */
+
+.bottom-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--box-border);
+}
+
+.file-count-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-right: auto;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+#selected-file-count::before {
+    content: '·';
+    margin-right: 0.5rem;
+}
+
+/* Drop zone */
 
 #file-upload-drop-zone {
     position: fixed;
@@ -234,7 +244,7 @@ a.relation:not(:last-child)::after {
     width: 100%;
     height: 100%;
     z-index: 99;
-    background-color: rgba(0, 0, 0, 40%);
+    background-color: rgba(0, 0, 0, 60%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -249,151 +259,14 @@ a.relation:not(:last-child)::after {
     opacity: 1;
 }
 
-#rename-entries-modal {
-    width: 80%;
-}
-
-#rename-entries-modal > form {
-    max-width: 100%;
-}
-
-.selected-file-count::before {
-    content: ' | ';
-}
-
-.file-count {
-    margin-left: auto;
-}
-
-.form-contents > table {
-    padding: 0.5rem;
-    border-collapse: separate;
-}
-
-
-/* tables are easier as desktop first */
-@media (max-width: 480px) {
-    .files[data-columns="2"] {
-        grid-template-columns: 250px auto;
-    }
-
-    .files[data-columns="4"] {
-        grid-template-columns: min-content repeat(3, minmax(0, 1fr));
-    }
-
-    .files[data-columns="5"] {
-        grid-template-columns: min-content repeat(4, minmax(0, 1fr));
-    }
-
-    .files[data-columns="4"] > .entry > .file-bulk {
-        border-bottom: none;
-    }
-
-    .files[data-columns="4"] > .entry > .file-name {
-        grid-column: 2 / span 3;
-        border-bottom: none;
-    }
-
-    .files[data-columns="5"] > .entry > .file-location {
-        grid-column: 2 / span 4;
-        border-bottom: none;
-    }
-
-    .files[data-columns="4"] > .entry > .file-size {
-        grid-column: 1 / span 3;
-        text-align: right;
-    }
-
-    .files[data-columns="4"] > .table-headers > .table-header:nth-last-child(-n+2) {
-        text-align: right;
-    }
-
-    .files[data-columns="4"] > .entry > .file-uploaded {
-        grid-column: 4;
-    }
-
-    .files[data-columns="5"] > .entry > .file-reason {
-        grid-column: 2 / span 4;
-        border-bottom: none;
-        text-align: right;
-    }
-
-    .files[data-columns="5"] > .entry > .file-bulk {
-        border-bottom: none;
-    }
-
-    .files[data-columns="5"] > .entry > .file-size {
-        grid-column: 1 / span 4;
-        text-align: right;
-    }
-
-    .files[data-columns="5"] > .table-headers > .table-header:nth-last-child(-n+3) {
-        text-align: right;
-    }
-}
-
 @media (min-width: 480px) {
-    .commands {
-        flex-direction: row;
-    }
-
-    .commands > .command-buttons {
-        align-self: normal;
-    }
-
-    #relations > span {
-        flex-basis: auto;
-    }
-
-    .file-count {
-        margin-left: initial;
+    .files {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     }
 }
 
 @media (min-width: 840px) {
-    .form-contents {
-        display: flex;
-        padding-right: 1rem;
+    .files {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     }
-
-    .form-contents > table {
-        padding: 0.5rem;
-        border-collapse: collapse;
-        table-layout: fixed;
-    }
-
-    .form-contents > table > thead > tr {
-        height: 1rem;
-    }
-
-    .form-contents > .form-container {
-        min-width: 300px;
-    }
-}
-
-/* image preview for tabled list */
-
-.entry a.table-data img {
-    display: none;
-    position: absolute;
-    top: -150px; /* Adjust position as needed */
-    left: 50%; /* Center horizontally */
-    transform: translateX(-50%);
-    width: 120px;
-    height: 120px;
-    background-color: gray; /* Optional */
-    border-radius: 50%; /* Make it round */
-    background-size: cover;
-    background-position: center;
-    z-index: 10; /* Ensure it is on top of other elements */
-}
-
-/* Show the image on hover */
-.entry a.table-data:hover img {
-    display: block;
-}
-
-.entry a.table-data:hover img:after {
-    content: ''; /* Remove the arrow */
-    display: none;
 }

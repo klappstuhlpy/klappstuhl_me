@@ -1,17 +1,59 @@
+/* ── Controls ────────────────────────────────────────────────── */
+
 .controls {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  margin-bottom: 1.5rem;
 }
+
+/* ── Statistic boxes ─────────────────────────────────────────── */
+
+.summary {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.statistic-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: var(--box);
+  border: 1px solid var(--box-border);
+  padding: 1rem 1.25rem;
+  border-radius: 0.5rem;
+  min-width: 150px;
+}
+
+.statistic-box > .title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.statistic-box > .value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--foreground);
+}
+
+/* ── Charts ──────────────────────────────────────────────────── */
 
 .charts {
   display: flex;
   flex-wrap: wrap;
+  margin-bottom: 2rem;
 }
 
 .chart {
   padding: 1.5rem;
-  border: 1px solid var(--table-border);
+  border: 1px solid var(--box-border);
+  background: var(--box);
 }
 
 .charts > .chart {
@@ -25,59 +67,27 @@
   height: 300px;
 }
 
-@media (min-width: 1200px) {
+@media (max-width: 900px) {
   .charts > .chart {
-    flex: 0 0 50%;
-    max-width: 50%;
+    max-width: 100%;
   }
 }
 
+/* ── Log level colors in table cells ────────────────────────── */
+
 td.info {
-  color: var(--info-bg);
+  color: var(--info-text);
 }
 
 td.warn {
-  color: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 td.error {
-  color: var(--error-bg);
+  color: var(--error-text);
 }
 
-
-.summary {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 2rem;
-  margin-bottom: 2rem;
-}
-
-.statistic-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: var(--box);
-  border: 1px solid var(--box-border);
-  padding: 0.5rem;
-  border-radius: 0.5rem;
-  width: 175px;
-  height: 100px;
-}
-
-.statistic-box > .title {
-  align-self: start;
-  font-weight: bold;
-  font-size: 0.75rem;
-}
-
-.statistic-box > .value {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  font-size: 1.5rem;
-}
+/* ── Tables ──────────────────────────────────────────────────── */
 
 .tables {
   display: flex;
@@ -91,4 +101,13 @@ td.error {
 
 .table-container:has(#recent-logs) {
   flex-basis: 100%;
+}
+
+.table-container > h2 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
 }

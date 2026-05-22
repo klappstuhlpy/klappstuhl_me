@@ -1,139 +1,141 @@
-use askama::Template;
-use axum::{
-    http::StatusCode,
-    routing::get,
-    routing::post,
-    Router,
-};
-use axum::{Form};
-use serde::Deserialize;
-use utoipa::ToSchema;
-use std::process::Command;
-use axum::response::Redirect;
+//! Admin-only page that displays the live status of configured services.
+//!
+//! Services are defined in `config.json` under the `services` key.
+//! Each entry specifies a name, kind (docker or screen), and an identifier.
+
 use crate::{
+    config::ServiceKind,
+    filters,
     models::Account,
     AppState,
 };
-use chrono::{Utc, DateTime, Timelike};
+use askama::Template;
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::Redirect,
+    routing::{get, post},
+    Form, Router,
+};
+use serde::Deserialize;
+use std::process::Command;
+use time::OffsetDateTime;
 
-#[derive(Debug, PartialEq, Eq, Clone, ToSchema)]
-pub struct ServiceEntry {
-    /// The service's name.
-    pub(crate) name: String,
-    /// Whether the service is running.
-    pub(crate) running: bool,
-    /// The start time of the service, if available.
-    pub(crate) started_at: Option<DateTime<Utc>>,
+/// Runtime status of a single service, derived from a [`crate::config::ServiceConfig`].
+pub struct ServiceStatus {
+    pub name: String,
+    pub running: bool,
+    pub started_at: Option<OffsetDateTime>,
 }
 
 #[derive(Template)]
 #[template(path = "services.html")]
 struct ServicesTemplate {
     account: Option<Account>,
-    services: Vec<ServiceEntry>,
+    services: Vec<ServiceStatus>,
 }
 
 #[derive(Deserialize)]
 struct ServiceAction {
-    /// The service's name.
     name: String,
-    /// The action to perform: "start", "stop".
     action: String,
 }
 
-fn docker_container_started_at(name: &str) -> Option<DateTime<Utc>> {
-    let output = Command::new("docker")
-        .args(["inspect", "-f", "{{.State.StartedAt}}", name])
+// --- Docker helpers ---------------------------------------------------------
+
+fn is_docker_running(identifier: &str) -> bool {
+    Command::new("docker")
+        .args(["ps", "--filter", &format!("name={identifier}"), "--format", "{{.Names}}"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains(identifier))
+        .unwrap_or(false)
+}
+
+fn docker_started_at(identifier: &str) -> Option<OffsetDateTime> {
+    let out = Command::new("docker")
+        .args(["inspect", "-f", "{{.State.StartedAt}}", identifier])
         .output()
         .ok()?;
-
-    let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
     if s.is_empty() || s.contains("Error") {
         return None;
     }
-
-    // parse RFC3339 string into DateTime<Utc>
-    DateTime::parse_from_rfc3339(&s)
-        .ok()
-        .map(|dt| dt.with_timezone(&Utc).with_nanosecond(0).unwrap())
+    // Docker returns RFC 3339 — parse with time
+    OffsetDateTime::parse(&s, &time::format_description::well_known::Rfc3339).ok()
 }
 
-fn screen_started_at(name: &str) -> Option<DateTime<Utc>> {
-    // 1. get PID
-    let pid_output = Command::new("pgrep")
-        .args(["-f", name])
+// --- Screen helpers ---------------------------------------------------------
+
+fn is_screen_running(identifier: &str) -> bool {
+    Command::new("screen")
+        .args(["-ls", identifier])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains(identifier))
+        .unwrap_or(false)
+}
+
+fn screen_started_at(identifier: &str) -> Option<OffsetDateTime> {
+    let pid_out = Command::new("pgrep")
+        .args(["-f", identifier])
         .output()
         .ok()?;
-    let pid = String::from_utf8_lossy(&pid_output.stdout)
+    let pid = String::from_utf8_lossy(&pid_out.stdout)
         .lines()
-        .next()? // take first PID
+        .next()?
         .trim()
         .to_string();
 
-    // 2. get start time
-    let start_output = Command::new("ps")
+    let start_out = Command::new("ps")
         .args(["-p", &pid, "-o", "lstart="])
         .output()
         .ok()?;
-
-    let start_str = String::from_utf8_lossy(&start_output.stdout).trim().to_string();
+    let start_str = String::from_utf8_lossy(&start_out.stdout).trim().to_string();
     if start_str.is_empty() {
         return None;
     }
-
-    // 3. optionally convert to chrono datetime
-    // Example format: "Fri Oct  3 09:12:34 2025"
-    let dt = chrono::NaiveDateTime::parse_from_str(&start_str, "%a %b %e %H:%M:%S %Y").ok()?;
-
-    Some(DateTime::from_naive_utc_and_offset(dt, Utc))
+    // ps lstart format: "Fri Oct  3 09:12:34 2025"
+    let format = time::macros::format_description!("[weekday repr:short] [month repr:short] [day padding:space] [hour]:[minute]:[second] [year]");
+    time::PrimitiveDateTime::parse(&start_str, format)
+        .ok()
+        .map(|dt| dt.assume_utc())
 }
 
-fn get_servicestatus() -> Vec<ServiceEntry> {
-    vec![
-        ServiceEntry {
-            name: "Lavalink".to_string(),
-            running: is_screen_running("lavalink"),
-            started_at: screen_started_at("lavalink"),
-        },
-        ServiceEntry {
-            name: "Snekbox API".to_string(),
-            running: is_docker_container_running("percy-snekbox"),
-            started_at: docker_container_started_at("percy-snekbox"),
-        },
-        ServiceEntry {
-            name: "Database".to_string(),
-            running: is_docker_container_running("percy-db"),
-            started_at: docker_container_started_at("percy-db"),
-        },
-        ServiceEntry {
-            name: "Percy-v2 Bot".to_string(),
-            running: is_docker_container_running("percy-bot"),
-            started_at: docker_container_started_at("percy"),
-        },
-    ]
-}
+// --- Route handlers ---------------------------------------------------------
 
-fn is_screen_running(name: &str) -> bool {
-    match Command::new("screen").args(["-ls", name]).output() {
-        Ok(out) => String::from_utf8_lossy(&out.stdout).contains(name),
-        Err(_) => {
-            eprintln!("Warning: `screen` not found on PATH");
-            false
-        }
+async fn services_index(
+    State(state): State<AppState>,
+    account: Account,
+) -> Result<ServicesTemplate, StatusCode> {
+    if !account.flags.is_admin() {
+        return Err(StatusCode::FORBIDDEN);
     }
-}
 
-fn is_docker_container_running(name: &str) -> bool {
-    match Command::new("docker").args(["ps"]).output() {
-        Ok(out) => String::from_utf8_lossy(&out.stdout).contains(name),
-        Err(_) => {
-            eprintln!("Warning: `docker` not found on PATH");
-            false
-        }
-    }
+    let services = state
+        .config()
+        .services
+        .iter()
+        .map(|cfg| match cfg.kind {
+            ServiceKind::Docker => ServiceStatus {
+                name: cfg.name.clone(),
+                running: is_docker_running(&cfg.identifier),
+                started_at: docker_started_at(&cfg.identifier),
+            },
+            ServiceKind::Screen => ServiceStatus {
+                name: cfg.name.clone(),
+                running: is_screen_running(&cfg.identifier),
+                started_at: screen_started_at(&cfg.identifier),
+            },
+        })
+        .collect();
+
+    Ok(ServicesTemplate {
+        account: Some(account),
+        services,
+    })
 }
 
 async fn service_action(
+    State(state): State<AppState>,
     account: Account,
     Form(data): Form<ServiceAction>,
 ) -> Result<Redirect, StatusCode> {
@@ -141,46 +143,36 @@ async fn service_action(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    match data.action.as_str() {
-        "start" => {
-            if data.name == "Snekbox API" {
-                let _ = Command::new("docker").args(["start", "percy-snekbox"]).status();
-            } else if data.name == "Database" {
-                let _ = Command::new("docker").args(["start", "percy-db"]).status();
-            } else if data.name == "Percy-v2 Bot" {
-                let _ = Command::new("docker").args(["start", "percy"]).status();
-            } else if data.name == "Lavalink" {
-                let _ = Command::new("screen").args(["-dmS", "lavalink", "/usr/bin/java", "-jar", "/home/parzival/executables/lavalink/Lavalink.jar"]).status();
+    let cfg = state
+        .config()
+        .services
+        .iter()
+        .find(|s| s.name == data.name)
+        .cloned();
+
+    if let Some(cfg) = cfg {
+        match (data.action.as_str(), &cfg.kind) {
+            ("start", ServiceKind::Docker) => {
+                let _ = Command::new("docker").args(["start", &cfg.identifier]).status();
             }
-        }
-        "stop" => {
-            if data.name == "Snekbox API" {
-                let _ = Command::new("docker").args(["stop", "percy-snekbox"]).status();
-            } else if data.name == "Database" {
-                let _ = Command::new("docker").args(["stop", "percy-db"]).status();
-            } else if data.name == "Percy-v2 Bot" {
-                let _ = Command::new("docker").args(["stop", "percy"]).status();
-            } else if data.name == "Lavalink" {
-                let _ = Command::new("screen").args(["-S", "lavalink", "-X", "quit"]).status();
+            ("stop", ServiceKind::Docker) => {
+                let _ = Command::new("docker").args(["stop", &cfg.identifier]).status();
             }
+            ("start", ServiceKind::Screen) => {
+                // Screen sessions require a command — we can't start them without knowing the command.
+                // Users should configure this via a wrapper script if needed.
+                tracing::warn!("start action for screen sessions is not supported via the web UI");
+            }
+            ("stop", ServiceKind::Screen) => {
+                let _ = Command::new("screen")
+                    .args(["-S", &cfg.identifier, "-X", "quit"])
+                    .status();
+            }
+            _ => {}
         }
-        _ => {}
     }
 
     Ok(Redirect::to("/services"))
-}
-
-async fn services_index(account: Account) -> Result<ServicesTemplate, StatusCode> {
-    if !account.flags.is_admin() {
-        return Err(StatusCode::FORBIDDEN);
-    }
-
-    let services = get_servicestatus();
-
-    Ok(ServicesTemplate {
-        account: Some(account),
-        services,
-    })
 }
 
 pub fn routes() -> Router<AppState> {

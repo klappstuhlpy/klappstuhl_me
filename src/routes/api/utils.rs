@@ -1,44 +1,8 @@
 use async_trait::async_trait;
-use axum::{extract::{path::Path, FromRequest, FromRequestParts, Query, Request}, http, response::{IntoResponse, Response}, Json};
+use axum::{extract::{FromRequest, Request}, response::{IntoResponse, Response}, Json};
 use serde::de::DeserializeOwned;
 
 use crate::error::ApiError;
-
-pub struct ApiPath<T>(pub T);
-
-#[async_trait]
-impl<S, T> FromRequestParts<S> for ApiPath<T>
-where
-    T: DeserializeOwned + Send,
-    S: Send + Sync,
-{
-    type Rejection = ApiError;
-
-    async fn from_request_parts(parts: &mut http::request::Parts, state: &S) -> Result<Self, Self::Rejection> {
-        match Path::<T>::from_request_parts(parts, state).await {
-            Ok(value) => Ok(Self(value.0)),
-            Err(rejection) => Err(ApiError::new(rejection.to_string())),
-        }
-    }
-}
-
-pub struct ApiQuery<T>(pub T);
-
-#[async_trait]
-impl<S, T> FromRequestParts<S> for ApiQuery<T>
-where
-    T: DeserializeOwned + Send,
-    S: Send + Sync,
-{
-    type Rejection = ApiError;
-
-    async fn from_request_parts(parts: &mut http::request::Parts, state: &S) -> Result<Self, Self::Rejection> {
-        match Query::<T>::from_request_parts(parts, state).await {
-            Ok(value) => Ok(Self(value.0)),
-            Err(rejection) => Err(ApiError::new(rejection.to_string())),
-        }
-    }
-}
 
 pub struct ApiJson<T>(pub T);
 

@@ -1,7 +1,6 @@
 use crate::{
     auth::{hash_password, validate_password},
-    database::is_unique_constraint_violation,
-    error::{ApiError, ApiErrorCode},
+    error::ApiError,
     filters,
     flash::{FlashMessage, Flasher, Flashes},
     headers::Referrer,
@@ -38,33 +37,12 @@ async fn login(account: Option<Account>, flashes: Flashes) -> Response {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum AuthenticationAction {
-    Login,
-    Register,
-}
-
-impl<'de> Deserialize<'de> for AuthenticationAction {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = std::borrow::Cow::<'_, str>::deserialize(deserializer)?;
-        match s.as_ref() {
-            "login" => Ok(Self::Login),
-            "register" => Ok(Self::Register),
-            _ => Err(serde::de::Error::custom("invalid authentication action provided")),
-        }
-    }
-}
-
 #[derive(Debug, Deserialize)]
 struct Credentials {
     username: String,
     password: String,
     #[serde(deserialize_with = "crate::utils::empty_string_is_none")]
     session_description: Option<String>,
-    action: AuthenticationAction,
 }
 
 fn cookie_to_response(cookie: Cookie<'static>) -> Response {
@@ -73,49 +51,6 @@ fn cookie_to_response(cookie: Cookie<'static>) -> Response {
         .headers_mut()
         .insert(SET_COOKIE, HeaderValue::from_str(&cookie.to_string()).unwrap());
     response
-}
-
-async fn register(state: &AppState, token: &Option<Token>, credentials: Credentials) -> Result<Response, ApiError> {
-    if token.is_some() {
-        return Err(ApiError::new("user already has an account"));
-    }
-
-    if !is_valid_username(&credentials.username) {
-        return Err(ApiError::new("invalid username given"));
-    }
-
-    if !((8..=128).contains(&credentials.password.len())) {
-        return Err(ApiError::new("password length must be 8 to 128 characters"));
-    }
-
-    let password_hash = hash_password(&credentials.password)?;
-    let result: rusqlite::Result<Option<Account>> = state
-        .database()
-        .get(
-            "INSERT INTO account(name, password) VALUES (?, ?) RETURNING *",
-            [credentials.username, password_hash],
-        )
-        .await;
-
-    match result {
-        Ok(Some(account)) => {
-            let token = Token::new(account.id)?;
-            let cookie = token.to_cookie(&state.config().secret_key);
-            state.save_session(&token, credentials.session_description).await;
-            Ok(cookie_to_response(cookie))
-        }
-        Ok(None) => Err(ApiError {
-            error: "account registration returned no rows".into(),
-            code: ApiErrorCode::ServerError,
-        }),
-        Err(e) => {
-            if is_unique_constraint_violation(&e) {
-                Err(ApiError::new("username already taken").with_code(ApiErrorCode::UsernameRegistered))
-            } else {
-                Err(e.into())
-            }
-        }
-    }
 }
 
 async fn authenticate(state: &AppState, credentials: Credentials) -> Result<Response, ApiError> {
@@ -259,15 +194,10 @@ async fn change_password(
 
 async fn login_form(
     State(state): State<AppState>,
-    token: Option<Token>,
     flasher: Flasher,
     Form(credentials): Form<Credentials>,
 ) -> Response {
-    let result = match credentials.action {
-        AuthenticationAction::Login => authenticate(&state, credentials).await,
-        AuthenticationAction::Register => register(&state, &token, credentials).await,
-    };
-    match result {
+    match authenticate(&state, credentials).await {
         Ok(r) => r,
         Err(e) => {
             let mut response = flasher.add(e.error.into_owned()).bail("/login");
