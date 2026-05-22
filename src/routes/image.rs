@@ -289,11 +289,12 @@ pub async fn delete_image(
 
 async fn upload_file(
     State(state): State<AppState>,
-    Referrer(url): Referrer,
+    referrer: Option<Referrer>,
     account: Account,
     flasher: Flasher,
     multipart: Multipart,
 ) -> Response {
+    let url = referrer.map(|r| r.0).unwrap_or_else(|| "/images".to_string());
     match raw_upload_file(state, account, multipart, false).await {
         Err(msg) => flasher.add(msg.error.as_ref()).bail(&url),
         Ok(result) => {

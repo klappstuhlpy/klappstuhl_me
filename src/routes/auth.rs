@@ -135,11 +135,12 @@ struct ChangePasswordForm {
 
 async fn change_password(
     State(state): State<AppState>,
-    Referrer(url): Referrer,
+    referrer: Option<Referrer>,
     token: Token,
     flasher: Flasher,
     Form(form): Form<ChangePasswordForm>,
 ) -> Response {
+    let url = referrer.map(|r| r.0).unwrap_or_else(|| "/account".to_string());
     if !((8..=128).contains(&form.new_password.len())) {
         return flasher.add("Password length must be 8 to 128 characters").bail(&url);
     }
