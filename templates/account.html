@@ -24,10 +24,10 @@
         {% if user.flags.is_admin() %}
         <a href="/admin" class="button">Dashboard</a>
         <a href="/services" class="button">Services</a>
-        <a href="/logs?account_id={{ user.id }}" class="button">Logs</a>
+        <a href="https://ssh.klappstuhl.me" class="button primary">SSH Terminal</a>
         {% endif %}
         {% if account.id == user.id %}
-        <button class="button" id="change-password">Change Password</button>
+        <button class="button danger" id="change-password">Change Password</button>
         {% endif %}
     </div>
 </div>

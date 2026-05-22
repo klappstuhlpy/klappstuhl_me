@@ -1,7 +1,7 @@
 use quick_cache::sync::Cache;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::RwLockReadGuard;
-use crate::{audit::AuditLogEntry, auth::hash_password, boxed_params, cached::TimedCachedValue, database::Table, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
+use crate::{auth::hash_password, boxed_params, cached::TimedCachedValue, database::Table, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
 use crate::models::ImageFile;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -77,25 +77,6 @@ impl AppState {
 
     pub fn database(&self) -> &Database {
         &self.inner.database
-    }
-
-    /// Sends an audit log entry.
-    ///
-    /// Errors are silently dropped, since they can't be handled anyway.
-    pub async fn audit(&self, entry: AuditLogEntry) -> i64 {
-        let err = self
-            .database()
-            .execute(
-                "INSERT INTO audit_log(id, account_id, data) VALUES (?, ?, ?)",
-                (entry.id, entry.account_id, entry.data),
-            )
-            .await;
-
-        if let Err(e) = err {
-            tracing::error!(error=%e, "Could not insert audit log entry");
-            return -1;
-        }
-        entry.id
     }
 
     /// Sends an alert webhook with the given webhook payload.

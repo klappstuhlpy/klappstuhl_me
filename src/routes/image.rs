@@ -3,7 +3,7 @@
 use crate::error::{ApiError, InternalError};
 use crate::flash::{FlashMessage, Flasher, Flashes};
 use crate::models::{Account, ImageEntry, ImageFile, ResolvedImageData};
-use crate::{audit, database::is_unique_constraint_violation, AppState, filters};
+use crate::{database::is_unique_constraint_violation, AppState, filters};
 use askama::Template;
 use axum::extract::multipart::Field;
 use axum::extract::Multipart;
@@ -19,7 +19,6 @@ use base64::Engine;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use crate::audit::FileOperation;
 use crate::filters::canonical_url;
 use crate::headers::Referrer;
 use crate::ratelimit::RateLimit;
@@ -169,7 +168,6 @@ pub async fn raw_upload_file(
     let total = files.len();
     let mut errors = 0usize;
     let mut links = Vec::with_capacity(total);
-    let mut audit_files = Vec::with_capacity(total);
 
     for mut file in files {
         // Resolve ID conflicts by appending a suffix.
@@ -195,12 +193,10 @@ pub async fn raw_upload_file(
 
                 if retry.is_err() {
                     errors += 1;
-                    audit_files.push(FileOperation { name: file.id.clone(), failed: true });
                     continue;
                 }
             } else {
                 errors += 1;
-                audit_files.push(FileOperation { name: file.id.clone(), failed: true });
                 continue;
             }
         }
@@ -209,13 +205,9 @@ pub async fn raw_upload_file(
             .unwrap_or_default()
             .to_string();
         links.push(link);
-        audit_files.push(FileOperation { name: file.id.clone(), failed: false });
     }
 
     state.invalidate_image_caches().await;
-
-    let audit_data = audit::Upload { files: audit_files, api };
-    let audit_id = state.audit(audit::AuditLogEntry::full(audit_data, account.id)).await;
 
     let title = if api {
         format!("[API] Image Upload: {} files", total)
@@ -225,7 +217,6 @@ pub async fn raw_upload_file(
 
     state.send_alert(
         crate::discord::Alert::success(title)
-            .url(format!("/logs?id={audit_id}"))
             .account(account)
             .field("Total", total)
             .field("Errors", errors)
@@ -265,12 +256,6 @@ pub async fn delete_image(
     if !failed {
         state.invalidate_image_caches().await;
     }
-
-    let audit_data = audit::DeleteImage {
-        file: FileOperation { name: id.clone(), failed },
-        api,
-    };
-    state.audit(audit::AuditLogEntry::full(audit_data, account.id)).await;
 
     let title = if api { "[API] Deleted Image" } else { "Deleted Image" };
     state.send_alert(
@@ -334,9 +319,6 @@ async fn bulk_delete_files(
 ) -> Result<Json<BulkFileOperationResponse>, ApiError> {
     let mut success = 0usize;
     let mut failed = 0usize;
-    let mut audit_data = audit::DeleteFiles {
-        files: Vec::with_capacity(payload.files.len()),
-    };
     let total = payload.files.len();
     let description = crate::utils::join_iter(
         "\n",
@@ -354,7 +336,6 @@ async fn bulk_delete_files(
             )
             .await;
 
-        audit_data.add_file(file, result.is_err());
         if result.is_ok() {
             success += 1;
         } else {
@@ -368,13 +349,8 @@ async fn bulk_delete_files(
 
     state.invalidate_image_caches().await;
 
-    let audit_id = state
-        .audit(audit::AuditLogEntry::full(audit_data, account.id))
-        .await;
-
     state.send_alert(
         crate::discord::Alert::error("Deleted Images")
-            .url(format!("/logs?id={audit_id}"))
             .description(description)
             .account(account)
             .field("Total", total)
