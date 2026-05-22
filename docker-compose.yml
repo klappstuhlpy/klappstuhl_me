@@ -11,7 +11,7 @@ services:
       - "443:443"
       # Uncomment the line below when running in non-production mode
       # (config.json: "production": false) on a non-standard port.
-      # - "9510:9510"
+      - "9510:9510"
 
     volumes:
       # Persistent data: config, database, logs, ACME cert cache.
