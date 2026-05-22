@@ -1,7 +1,6 @@
 use crate::{
     flash::Flashes,
-    models::{Account},
-    filters
+    models::{Account}
 };
 use askama::Template;
 use axum::{
@@ -60,21 +59,10 @@ async fn projects(
     }
 }
 
-#[derive(Template)]
-#[template(path = "contact.html")]
-struct ContactTemplate {
-    account: Option<Account>,
-}
-
-async fn contact_page(account: Option<Account>) -> impl IntoResponse {
-    ContactTemplate { account }
-}
-
 pub fn all() -> Router<AppState> {
     Router::new()
         .route("/", get(index))
         .route("/projects", get(projects))
-        .route("/contact", get(contact_page))
         .merge(auth::routes())
         .merge(image::routes())
         .merge(admin::routes())
