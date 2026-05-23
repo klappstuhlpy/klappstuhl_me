@@ -1,5 +1,6 @@
 services:
   klappstuhl_me:
+    container_name: klappstuhl_me
     build: .
     image: klappstuhl_me:latest
     restart: unless-stopped
