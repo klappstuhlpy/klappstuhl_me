@@ -43,6 +43,10 @@ struct Credentials {
     password: String,
     #[serde(deserialize_with = "crate::utils::empty_string_is_none")]
     session_description: Option<String>,
+    /// Present (with any value) when the "Eingeloggt bleiben" checkbox is ticked.
+    /// Absent when unchecked – HTML form checkboxes omit the field entirely.
+    #[serde(default)]
+    remember_me: Option<String>,
 }
 
 fn cookie_to_response(cookie: Cookie<'static>) -> Response {
@@ -78,7 +82,12 @@ async fn authenticate(state: &AppState, credentials: Credentials) -> Result<Resp
             Some(acc) => {
                 state.invalidate_account_cache(acc.id);
                 let token = Token::new(acc.id)?;
-                let cookie = token.to_cookie(&state.config().secret_key);
+                let key = &state.config().secret_key;
+                let cookie = if credentials.remember_me.is_some() {
+                    token.to_cookie(key)
+                } else {
+                    token.to_session_cookie(key)
+                };
                 state.save_session(&token, credentials.session_description).await;
                 Ok(cookie_to_response(cookie))
             }

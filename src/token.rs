@@ -124,13 +124,22 @@ impl Token {
         buffer
     }
 
-    /// Returns the Cookie containing the signed token.
+    /// Returns a persistent Cookie containing the signed token (survives browser restart).
     pub fn to_cookie(&self, key: &SecretKey) -> Cookie<'static> {
         Cookie::build(("token", self.signed(key)))
             .path("/")
             .same_site(cookie::SameSite::Lax)
             .http_only(true)
             .max_age(MAX_TOKEN_AGE)
+            .build()
+    }
+
+    /// Returns a session-only Cookie containing the signed token (expires on browser close).
+    pub fn to_session_cookie(&self, key: &SecretKey) -> Cookie<'static> {
+        Cookie::build(("token", self.signed(key)))
+            .path("/")
+            .same_site(cookie::SameSite::Lax)
+            .http_only(true)
             .build()
     }
 }
