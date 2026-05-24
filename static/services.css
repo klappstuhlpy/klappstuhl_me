@@ -240,6 +240,29 @@ h1 {
 
 .log-line:last-child { padding-bottom: 0.25rem; }
 
+/* ── Log highlight tokens ────────────────────────────────────── */
+
+/* Timestamps */
+.log-line .hl-ts          { color: #6b8fa8; }
+
+/* Log levels */
+.log-line .hl-error       { color: #f87171; font-weight: 600; }
+.log-line .hl-warn        { color: #fbbf24; font-weight: 600; }
+.log-line .hl-info        { color: #60a5fa; }
+.log-line .hl-debug       { color: #a78bfa; }
+
+/* HTTP */
+.log-line .hl-method      { color: #c084fc; }
+.log-line .hl-url         { color: #67e8f9; }
+.log-line .hl-status-ok   { color: #86efac; }
+.log-line .hl-status-err  { color: #f87171; }
+
+/* Values */
+.log-line .hl-string      { color: #a3e635; }
+.log-line .hl-ip          { color: #67e8f9; }
+.log-line .hl-duration    { color: #fdba74; }
+.log-line .hl-num         { color: #fdba74; }
+
 /* ── Modal footer ────────────────────────────────────────────── */
 
 .log-modal-footer {
