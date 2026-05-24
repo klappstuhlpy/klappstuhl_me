@@ -11,21 +11,54 @@ use crate::{
 };
 use askama::Template;
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::StatusCode,
-    response::Redirect,
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        Redirect,
+    },
     routing::{get, post},
     Form, Router,
 };
+use futures_util::stream;
 use serde::Deserialize;
-use std::process::Command;
+use std::{convert::Infallible, process::Command};
 use time::OffsetDateTime;
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 /// Runtime status of a single service, derived from a [`crate::config::ServiceConfig`].
 pub struct ServiceStatus {
     pub name: String,
+    pub kind: ServiceKind,
     pub running: bool,
     pub started_at: Option<OffsetDateTime>,
+    /// Docker image name (Docker only).
+    pub image: Option<String>,
+    /// First 12 characters of the container ID (Docker only).
+    pub short_id: Option<String>,
+    /// Total automatic restart count (Docker only).
+    pub restart_count: Option<u32>,
+}
+
+impl ServiceStatus {
+    /// Human-readable kind label for use in templates.
+    pub fn kind_label(&self) -> &'static str {
+        match self.kind {
+            ServiceKind::Docker => "Docker",
+            ServiceKind::Screen => "Screen",
+        }
+    }
+}
+
+/// Wraps a child process and kills it when dropped.
+///
+/// Used to ensure `docker logs --follow` exits when the SSE client disconnects.
+struct KillOnDrop(tokio::process::Child);
+
+impl Drop for KillOnDrop {
+    fn drop(&mut self) {
+        let _ = self.0.start_kill();
+    }
 }
 
 #[derive(Template)]
@@ -62,6 +95,37 @@ fn docker_started_at(identifier: &str) -> Option<OffsetDateTime> {
     }
     // Docker returns RFC 3339 — parse with time
     OffsetDateTime::parse(&s, &time::format_description::well_known::Rfc3339).ok()
+}
+
+/// Returns `(image, short_id, restart_count)` for a Docker container via `docker inspect`.
+///
+/// Returns `(None, None, None)` if the container does not exist or inspect fails.
+fn docker_details(identifier: &str) -> (Option<String>, Option<String>, Option<u32>) {
+    let out = Command::new("docker")
+        .args([
+            "inspect",
+            "--format",
+            "{{.Config.Image}}\t{{slice .Id 0 12}}\t{{.RestartCount}}",
+            identifier,
+        ])
+        .output()
+        .ok();
+
+    let Some(out) = out else {
+        return (None, None, None);
+    };
+
+    let raw = String::from_utf8_lossy(&out.stdout);
+    let s = raw.trim();
+    if s.is_empty() || s.starts_with("Error") {
+        return (None, None, None);
+    }
+
+    let mut parts = s.splitn(3, '\t');
+    let image = parts.next().filter(|s| !s.is_empty()).map(str::to_owned);
+    let short_id = parts.next().filter(|s| !s.is_empty()).map(str::to_owned);
+    let restart_count = parts.next().and_then(|s| s.trim().parse().ok());
+    (image, short_id, restart_count)
 }
 
 // --- Screen helpers ---------------------------------------------------------
@@ -115,23 +179,33 @@ async fn services_index(
         .services
         .iter()
         .map(|cfg| match cfg.kind {
-            ServiceKind::Docker => ServiceStatus {
-                name: cfg.name.clone(),
-                running: is_docker_running(&cfg.identifier),
-                started_at: docker_started_at(&cfg.identifier),
-            },
+            ServiceKind::Docker => {
+                let running = is_docker_running(&cfg.identifier);
+                let started_at = if running { docker_started_at(&cfg.identifier) } else { None };
+                let (image, short_id, restart_count) = docker_details(&cfg.identifier);
+                ServiceStatus {
+                    name: cfg.name.clone(),
+                    kind: cfg.kind.clone(),
+                    running,
+                    started_at,
+                    image,
+                    short_id,
+                    restart_count,
+                }
+            }
             ServiceKind::Screen => ServiceStatus {
                 name: cfg.name.clone(),
+                kind: cfg.kind.clone(),
                 running: is_screen_running(&cfg.identifier),
                 started_at: screen_started_at(&cfg.identifier),
+                image: None,
+                short_id: None,
+                restart_count: None,
             },
         })
         .collect();
 
-    Ok(ServicesTemplate {
-        account: Some(account),
-        services,
-    })
+    Ok(ServicesTemplate { account: Some(account), services })
 }
 
 async fn service_action(
@@ -158,9 +232,10 @@ async fn service_action(
             ("stop", ServiceKind::Docker) => {
                 let _ = Command::new("docker").args(["stop", &cfg.identifier]).status();
             }
+            ("restart", ServiceKind::Docker) => {
+                let _ = Command::new("docker").args(["restart", &cfg.identifier]).status();
+            }
             ("start", ServiceKind::Screen) => {
-                // Screen sessions require a command — we can't start them without knowing the command.
-                // Users should configure this via a wrapper script if needed.
                 tracing::warn!("start action for screen sessions is not supported via the web UI");
             }
             ("stop", ServiceKind::Screen) => {
@@ -175,8 +250,99 @@ async fn service_action(
     Ok(Redirect::to("/services"))
 }
 
+/// Streams container logs as Server-Sent Events.
+///
+/// For Docker services this tails the last 200 lines and then follows new output,
+/// merging both the container's stdout and stderr.  GNU Screen sessions are not
+/// supported; a single informational message is sent instead.
+///
+/// The spawned `docker logs --follow` process is killed automatically when the
+/// client disconnects (via [`KillOnDrop`]).
+async fn container_logs_sse(
+    State(state): State<AppState>,
+    account: Account,
+    Path(name): Path<String>,
+) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, Infallible>>>, StatusCode> {
+    if !account.flags.is_admin() {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let cfg = state
+        .config()
+        .services
+        .iter()
+        .find(|s| s.name == name)
+        .cloned()
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Use a boxed stream so both match arms share the same concrete type.
+    type LogStream =
+        std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<Event, Infallible>> + Send>>;
+
+    let log_stream: LogStream = match cfg.kind {
+        ServiceKind::Screen => {
+            let s = stream::once(async {
+                Ok::<_, Infallible>(
+                    Event::default()
+                        .data("[Log streaming is not supported for GNU Screen sessions]"),
+                )
+            });
+            Box::pin(s)
+        }
+        ServiceKind::Docker => {
+            let mut child = tokio::process::Command::new("docker")
+                .args(["logs", "--follow", "--tail", "200", &cfg.identifier])
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+            let stdout = child.stdout.take().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+            let stderr = child.stderr.take().ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+
+            // Use a channel to merge stdout + stderr from the spawned reader tasks.
+            let (tx, rx) = tokio::sync::mpsc::channel::<String>(256);
+            let tx2 = tx.clone();
+
+            tokio::spawn(async move {
+                let mut lines = BufReader::new(stdout).lines();
+                while let Ok(Some(line)) = lines.next_line().await {
+                    if tx.send(line).await.is_err() {
+                        break;
+                    }
+                }
+            });
+
+            tokio::spawn(async move {
+                let mut lines = BufReader::new(stderr).lines();
+                while let Ok(Some(line)) = lines.next_line().await {
+                    if tx2.send(line).await.is_err() {
+                        break;
+                    }
+                }
+            });
+
+            // Dropping `rx` closes the channel → sender tasks exit.
+            // Dropping `KillOnDrop` kills the docker process.
+            // Both happen automatically when the SSE client disconnects.
+            let s = stream::unfold(
+                (rx, KillOnDrop(child)),
+                |(mut rx, killer)| async move {
+                    rx.recv().await.map(|line| {
+                        (Ok::<_, Infallible>(Event::default().data(line)), (rx, killer))
+                    })
+                },
+            );
+            Box::pin(s)
+        }
+    };
+
+    Ok(Sse::new(log_stream).keep_alive(KeepAlive::default()))
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/services", get(services_index))
         .route("/services/action", post(service_action))
+        .route("/services/logs/:name", get(container_logs_sse))
 }
