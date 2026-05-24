@@ -151,11 +151,14 @@ h1 {
 /* ── Log console modal ───────────────────────────────────────── */
 
 #log-modal {
-    /* Geometry — centred in the viewport via margin:auto in the top layer */
+    /* Use height (not max-height) so .log-terminal's flex:1 has a
+       definite size to grow into — max-height alone leaves flex
+       children with no concrete dimension and they collapse.
+       dvh = dynamic viewport height: correctly excludes the mobile
+       browser's collapsible address-bar chrome. */
     width: min(900px, 95vw);
-    max-height: min(80vh, 700px);
+    height: min(80dvh, 700px);
     margin: auto;
-    /* Appearance */
     border-radius: 0.625rem;
     padding: 0;
     overflow: hidden;
@@ -171,6 +174,16 @@ h1 {
 }
 
 #log-modal::backdrop { background: rgba(0, 0, 0, 0.7); }
+
+/* On phones: full-width, nearly full-height */
+@media (max-width: 640px) {
+    #log-modal {
+        width: 100vw;
+        height: 92dvh;
+        border-radius: 0.625rem 0.625rem 0 0;
+        margin: auto 0 0;   /* stick to bottom edge */
+    }
+}
 
 .log-modal-header {
     display: flex;
