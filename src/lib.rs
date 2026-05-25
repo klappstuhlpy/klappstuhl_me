@@ -9,6 +9,7 @@ pub mod flash;
 pub mod headers;
 pub mod key;
 pub mod logging;
+pub mod metrics;
 pub mod models;
 pub mod ratelimit;
 pub mod routes;

@@ -1,0 +1,103 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}Invites | Admin | Klappstuhl.me{% endblock %}
+
+{% block admin_body %}
+<div class="admin-page-header">
+    <h1>Invites</h1>
+    <p class="admin-page-sub">Generate single-use signup codes. Share the URL with the person you want to invite.</p>
+</div>
+
+{% for flash in flashes %}
+{{ flash.html()|safe }}
+{% endfor %}
+
+{# ─── Create form ──────────────────────────────────────────── #}
+<section class="admin-section">
+    <h2>Create new invite</h2>
+    <form class="invite-create-form" method="POST" action="/admin/invites">
+        <div class="form-row">
+            <label for="invite-note">Note</label>
+            <input id="invite-note" name="note" class="form-field" type="text"
+                   placeholder="e.g. for Alice" maxlength="120" autocomplete="off">
+        </div>
+        <div class="form-row">
+            <label for="invite-expiry">Expires in</label>
+            <select id="invite-expiry" name="expires_in_days" class="form-field" autocomplete="off">
+                <option value="1">1 day</option>
+                <option value="7" selected>7 days</option>
+                <option value="30">30 days</option>
+                <option value="0">Never</option>
+            </select>
+        </div>
+        <button type="submit" class="button primary">Generate invite</button>
+    </form>
+</section>
+
+{# ─── Active invites ───────────────────────────────────────── #}
+<section class="admin-section">
+    <h2>Active invites <span class="count-badge">{{ active.len() }}</span></h2>
+    {% if active.is_empty() %}
+    <p class="admin-empty">No active invites. Create one above.</p>
+    {% else %}
+    <div class="invite-list">
+        {% for invite in active %}
+        <div class="invite-card" data-code="{{ invite.code }}">
+            <div class="invite-info">
+                <span class="invite-label">{{ invite.label() }}</span>
+                <div class="invite-meta">
+                    <span title="Created {{ invite.created_at|isoformat }}">
+                        Created {{ invite.created_at|isoformat }}
+                    </span>
+                    {% match invite.expires_at %}
+                    {% when Some with (exp) %}
+                    <span class="dot">·</span>
+                    <span title="Expires {{ exp|isoformat }}">Expires {{ exp|isoformat }}</span>
+                    {% when None %}
+                    <span class="dot">·</span>
+                    <span>Never expires</span>
+                    {% endmatch %}
+                </div>
+                <code class="invite-url" data-url="{{ base_url }}/signup?code={{ invite.code }}">{{ base_url }}/signup?code={{ invite.code }}</code>
+            </div>
+            <div class="invite-actions">
+                <button type="button" class="button copy-invite" data-code="{{ invite.code }}">Copy URL</button>
+                <form method="POST" action="/admin/invites/{{ invite.code }}/delete" class="inline">
+                    <button type="submit" class="button danger outline">Revoke</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+
+{# ─── Used / history ───────────────────────────────────────── #}
+{% if !used.is_empty() %}
+<section class="admin-section">
+    <h2>History <span class="count-badge muted">{{ used.len() }}</span></h2>
+    <div class="invite-list">
+        {% for invite in used %}
+        <div class="invite-card history">
+            <div class="invite-info">
+                <span class="invite-label">{{ invite.label() }}</span>
+                <div class="invite-meta">
+                    {% match invite.used_at %}
+                    {% when Some with (ts) %}<span>Redeemed {{ ts|isoformat }}</span>{% when None %}{% endmatch %}
+                    <span class="dot">·</span>
+                    {% match invite.used_by_name %}
+                    {% when Some with (name) %}<span>by <a href="/user/{{ name }}">{{ name }}</a></span>
+                    {% when None %}<span class="muted">unknown user</span>{% endmatch %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/admin_invites.js"></script>
+{% endblock %}

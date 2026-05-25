@@ -116,6 +116,10 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         }
     });
 
+    // Live metrics: scrape host + docker every 30s, prune old samples hourly.
+    klappstuhl_me::metrics::spawn_collector(state.clone());
+    klappstuhl_me::metrics::spawn_pruner(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()
@@ -258,13 +262,28 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 2] = [include_str!("../sql/0.sql"), include_str!("../sql/1.sql")];
+const MIGRATIONS: [&str; 4] = [
+    include_str!("../sql/0.sql"),
+    include_str!("../sql/1.sql"),
+    include_str!("../sql/2.sql"),
+    include_str!("../sql/3.sql"),
+];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
+    // The connection pool spawns 10 workers in parallel that all run this
+    // init function on the same database file. Without a busy timeout, the
+    // workers that lose the race for the write lock during journal_mode=wal
+    // and the migration transaction below fail immediately with SQLITE_BUSY.
+    // Five seconds is plenty for any DDL to finish.
+    connection.busy_timeout(Duration::from_secs(5))?;
+
     connection.execute_batch("PRAGMA foreign_keys=1;")?;
     connection.execute_batch("PRAGMA journal_mode=wal;")?;
 
-    let tx = connection.transaction()?;
+    // Use IMMEDIATE so writers serialize from the very start of the
+    // transaction instead of upgrading mid-flight and triggering
+    // SQLITE_BUSY_SNAPSHOT.
+    let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
 
     let version: usize = {
         let mut stmt = tx.prepare_cached("PRAGMA user_version;")?;

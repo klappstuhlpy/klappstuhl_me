@@ -1,19 +1,21 @@
-{% extends "layout.html" %}
+{% extends "admin_layout.html" %}
 
-{% block css %}
-<link rel="stylesheet" href="/static/admin.css" type="text/css">
-{% endblock %}
+{% block title %}Dashboard | Admin | Klappstuhl.me{% endblock %}
 
-{% block body %}
-<div class="controls">
-    <label for="log-select">Show Logs From</label>
-    <select id="log-select" autocomplete="off">
-        <option value="today" default>Today</option>
-        <option value="7-days">Last 7 days</option>
-        <option value="14-days">Last 14 days</option>
-        <option value="30-days">Last 30 days</option>
-    </select>
+{% block admin_body %}
+<div class="admin-page-header">
+    <h1>Dashboard</h1>
+    <div class="controls">
+        <label for="log-select">Time range</label>
+        <select id="log-select" autocomplete="off">
+            <option value="today" default>Today</option>
+            <option value="7-days">Last 7 days</option>
+            <option value="14-days">Last 14 days</option>
+            <option value="30-days">Last 30 days</option>
+        </select>
+    </div>
 </div>
+
 <div class="dashboard">
     <div class="summary">
         <div class="statistic-box">
@@ -44,6 +46,7 @@
                     <th>Target</th>
                     <th>Message</th>
                     <th>Fields</th>
+                </tr>
                 </thead>
                 <tbody></tbody>
             </table>

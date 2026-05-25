@@ -1,0 +1,45 @@
+{#
+    Admin shell — adds a sidebar nav to every admin page.
+
+    Child templates must:
+      - extend admin_layout.html
+      - override {% block admin_body %}{% endblock %}
+      - expose an `active_page: &'static str` field on the template struct
+        (used to highlight the matching sidebar link)
+#}
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/admin.css" type="text/css">
+{% block admin_css %}{% endblock %}
+{% endblock %}
+
+{% block body %}
+<div class="admin-shell">
+    <aside class="admin-sidebar">
+        <div class="admin-sidebar-title">Admin</div>
+        <nav class="admin-nav">
+            <a href="/admin" class="admin-nav-item{% if active_page == "dashboard" %} active{% endif %}">
+                <span>Dashboard</span>
+            </a>
+            <a href="/admin/invites" class="admin-nav-item{% if active_page == "invites" %} active{% endif %}">
+                <span>Invites</span>
+            </a>
+            <a href="/services" class="admin-nav-item{% if active_page == "services" %} active{% endif %}">
+                <span>Services</span>
+            </a>
+            <a href="/admin/metrics" class="admin-nav-item{% if active_page == "metrics" %} active{% endif %}">
+                <span>Metrics</span>
+            </a>
+        </nav>
+        <div class="admin-sidebar-section">
+            <div class="admin-sidebar-heading">Coming soon</div>
+            <span class="admin-nav-item disabled"><span>Security</span></span>
+            <span class="admin-nav-item disabled"><span>Secrets</span></span>
+        </div>
+    </aside>
+    <section class="admin-content">
+        {% block admin_body %}{% endblock %}
+    </section>
+</div>
+{% endblock %}

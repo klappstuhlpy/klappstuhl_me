@@ -304,3 +304,76 @@ impl Session {
         Token::from_base64(&self.id).map(|t| t.signed(key))
     }
 }
+
+/// An invite code that allows a new account to register.
+///
+/// Created by admins on `/admin/invites`. A code can be redeemed at most once —
+/// when it is used, `used_at` / `used_by` are populated and the code becomes
+/// permanent audit history.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Invite {
+    /// The invite code (random URL-safe string).
+    pub code: String,
+    /// Account ID of the admin who created the invite.
+    pub created_by: i64,
+    /// Creation timestamp.
+    pub created_at: OffsetDateTime,
+    /// Optional expiry timestamp. `None` = never expires.
+    pub expires_at: Option<OffsetDateTime>,
+    /// When the invite was redeemed. `None` = still valid.
+    pub used_at: Option<OffsetDateTime>,
+    /// Account ID created from this invite (when used).
+    pub used_by: Option<i64>,
+    /// Free-form admin note (e.g. "for Alice").
+    pub note: Option<String>,
+}
+
+impl Invite {
+    pub fn is_used(&self) -> bool {
+        self.used_at.is_some()
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.expires_at
+            .map(|exp| OffsetDateTime::now_utc() > exp)
+            .unwrap_or(false)
+    }
+
+    /// Returns `true` if the invite can still be redeemed.
+    pub fn is_redeemable(&self) -> bool {
+        !self.is_used() && !self.is_expired()
+    }
+
+    /// Human-readable note used in the UI; falls back to a placeholder.
+    pub fn label(&self) -> &str {
+        self.note.as_deref().unwrap_or("Unnamed invite")
+    }
+}
+
+impl Table for Invite {
+    const NAME: &'static str = "invite";
+
+    const COLUMNS: &'static [&'static str] = &[
+        "code",
+        "created_by",
+        "created_at",
+        "expires_at",
+        "used_at",
+        "used_by",
+        "note",
+    ];
+
+    type Id = String;
+
+    fn from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            code: row.get("code")?,
+            created_by: row.get("created_by")?,
+            created_at: row.get("created_at")?,
+            expires_at: row.get("expires_at")?,
+            used_at: row.get("used_at")?,
+            used_by: row.get("used_by")?,
+            note: row.get("note")?,
+        })
+    }
+}

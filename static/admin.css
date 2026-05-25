@@ -1,10 +1,302 @@
+/* ─────────────────────────────────────────────────────────────
+   Admin shell — sidebar + content area
+   ───────────────────────────────────────────────────────────── */
+
+.admin-shell {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.admin-sidebar {
+    flex-shrink: 0;
+    width: 200px;
+    position: sticky;
+    top: 1rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.625rem;
+    padding: 1rem 0.75rem;
+}
+
+.admin-sidebar-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--box-border);
+    margin-bottom: 0.5rem;
+}
+
+.admin-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.admin-nav-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    color: var(--nav-link);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: background 0.12s, color 0.12s;
+}
+
+.admin-nav-item:hover {
+    background: var(--box-shade);
+    color: var(--foreground);
+}
+
+.admin-nav-item.active {
+    background: rgba(124, 58, 237, 0.12);
+    color: var(--foreground);
+    font-weight: 600;
+}
+
+.admin-nav-item.disabled {
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.admin-sidebar-section {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--box-border);
+}
+
+.admin-sidebar-heading {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0 0.75rem 0.4rem;
+}
+
+.admin-content {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ── Mobile: stack the sidebar above the content ───────────── */
+@media (max-width: 768px) {
+    .admin-shell {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .admin-sidebar {
+        width: 100%;
+        position: static;
+    }
+
+    .admin-nav {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .admin-sidebar-section { display: none; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Admin page headers
+   ───────────────────────────────────────────────────────────── */
+
+.admin-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--box-border);
+}
+
+.admin-page-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.admin-page-sub {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.admin-section { margin-bottom: 2rem; }
+
+.admin-section > h2 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin: 0 0 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.admin-empty {
+    padding: 1rem 1.25rem;
+    border: 1px dashed var(--box-border);
+    border-radius: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    padding: 0 0.4rem;
+    height: 1.25rem;
+    background: var(--branding);
+    color: #fff;
+    border-radius: 0.625rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.count-badge.muted {
+    background: var(--box-shade);
+    color: var(--text-muted);
+    border: 1px solid var(--box-border);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Invite create form
+   ───────────────────────────────────────────────────────────── */
+
+.invite-create-form {
+    display: grid;
+    grid-template-columns: 1fr 12rem auto;
+    gap: 0.75rem 1rem;
+    align-items: end;
+    padding: 1.25rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+}
+
+.invite-create-form .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.invite-create-form label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.invite-create-form button { white-space: nowrap; }
+
+@media (max-width: 640px) {
+    .invite-create-form {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Invite list
+   ───────────────────────────────────────────────────────────── */
+
+.invite-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.invite-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+}
+
+.invite-card.history { opacity: 0.85; }
+
+.invite-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.invite-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.invite-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-items: center;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.invite-meta .dot { opacity: 0.5; }
+.invite-meta .muted { opacity: 0.7; }
+
+.invite-url {
+    display: inline-block;
+    padding: 0.35rem 0.5rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.invite-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.invite-actions .inline { display: inline; }
+
+@media (max-width: 640px) {
+    .invite-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .invite-actions { justify-content: flex-end; }
+}
+
 /* ── Controls ────────────────────────────────────────────────── */
 
 .controls {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  margin-bottom: 1.5rem;
 }
 
 /* ── Statistic boxes ─────────────────────────────────────────── */

@@ -1,0 +1,212 @@
+/* ── Range picker (1h / 6h / 24h / 7d / 30d) ─────────────────── */
+
+.range-picker {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.range-picker .button {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+}
+
+.range-picker .button.active {
+    background: var(--branding);
+    color: #fff;
+    border-color: var(--branding);
+}
+
+/* ── Tile row ────────────────────────────────────────────────── */
+
+.metric-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.metric-tile {
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.625rem;
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    position: relative;
+}
+
+.tile-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tile-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.tile-status {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--success-text);
+    flex-shrink: 0;
+}
+
+.tile-status.warn  { background: var(--warning-text); }
+.tile-status.alert { background: var(--error-text); }
+
+.tile-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 0.15rem;
+}
+
+.tile-value .unit {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.tile-value-stacked {
+    font-size: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+}
+
+.tile-value-stacked .net-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.tile-value-stacked .arrow {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.tile-sub {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+
+/* ── Charts ──────────────────────────────────────────────────── */
+
+.metric-charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 900px) {
+    .metric-charts { grid-template-columns: 1fr; }
+}
+
+.chart-panel {
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.625rem;
+    padding: 1rem 1.25rem 0.75rem;
+}
+
+.chart-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+/* uPlot dark theme tweaks */
+.uplot {
+    font-family: inherit;
+}
+
+.u-legend {
+    font-size: 0.78rem;
+}
+
+.uplot .u-axis,
+.uplot .u-grid {
+    color: var(--text-muted);
+}
+
+.u-legend .u-marker {
+    border-radius: 2px;
+}
+
+/* ── Container table ─────────────────────────────────────────── */
+
+.container-table-wrap {
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.625rem;
+    overflow: hidden;
+}
+
+.container-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.container-table th,
+.container-table td {
+    text-align: left;
+    padding: 0.6rem 1rem;
+}
+
+.container-table thead th {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--box-border);
+}
+
+.container-table tbody tr + tr td { border-top: 1px solid var(--box-border); }
+.container-table .muted { color: var(--text-muted); }
+
+.container-table td.numeric {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+/* Inline mini-bar for CPU/mem in the container table */
+.bar {
+    position: relative;
+    background: var(--box-shade);
+    border-radius: 0.25rem;
+    height: 0.5rem;
+    min-width: 4rem;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.bar > span {
+    display: block;
+    height: 100%;
+    background: var(--branding);
+    transition: width 0.4s;
+}
+.bar.warn > span  { background: var(--warning-text); }
+.bar.alert > span { background: var(--error-text); }
+
+.bar-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    justify-content: flex-end;
+}
