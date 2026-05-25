@@ -102,6 +102,10 @@
     padding: 1rem 1.25rem 0.75rem;
 }
 
+.chart-panel .count {
+    margin-left: 1rem;
+}
+
 .chart-title {
     font-size: 0.78rem;
     font-weight: 600;
