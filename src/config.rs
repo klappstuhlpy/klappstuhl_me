@@ -29,6 +29,24 @@ pub struct ServiceConfig {
     pub kind: ServiceKind,
     /// The container or session identifier passed to docker/screen.
     pub identifier: String,
+    /// Working directory that contains the `docker-compose.yml`.
+    ///
+    /// When set, Start/Stop/Restart run `docker compose up -d` /
+    /// `docker compose down` / `docker compose restart` in this directory
+    /// instead of the plain `docker start` / `docker stop` / `docker restart`
+    /// commands.
+    ///
+    /// Example config:
+    /// ```json
+    /// {
+    ///   "name": "My App",
+    ///   "kind": "docker",
+    ///   "identifier": "my_app",
+    ///   "path": "/home/user/my-app"
+    /// }
+    /// ```
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 /// The server configuration.

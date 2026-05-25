@@ -227,13 +227,35 @@ async fn service_action(
     if let Some(cfg) = cfg {
         match (data.action.as_str(), &cfg.kind) {
             ("start", ServiceKind::Docker) => {
-                let _ = Command::new("docker").args(["start", &cfg.identifier]).status();
+                if let Some(ref path) = cfg.path {
+                    // Run detached so the HTTP handler is not blocked
+                    let _ = Command::new("docker")
+                        .args(["compose", "up", "-d"])
+                        .current_dir(path)
+                        .status();
+                } else {
+                    let _ = Command::new("docker").args(["start", &cfg.identifier]).status();
+                }
             }
             ("stop", ServiceKind::Docker) => {
-                let _ = Command::new("docker").args(["stop", &cfg.identifier]).status();
+                if let Some(ref path) = cfg.path {
+                    let _ = Command::new("docker")
+                        .args(["compose", "down"])
+                        .current_dir(path)
+                        .status();
+                } else {
+                    let _ = Command::new("docker").args(["stop", &cfg.identifier]).status();
+                }
             }
             ("restart", ServiceKind::Docker) => {
-                let _ = Command::new("docker").args(["restart", &cfg.identifier]).status();
+                if let Some(ref path) = cfg.path {
+                    let _ = Command::new("docker")
+                        .args(["compose", "restart"])
+                        .current_dir(path)
+                        .status();
+                } else {
+                    let _ = Command::new("docker").args(["restart", &cfg.identifier]).status();
+                }
             }
             ("start", ServiceKind::Screen) => {
                 tracing::warn!("start action for screen sessions is not supported via the web UI");
