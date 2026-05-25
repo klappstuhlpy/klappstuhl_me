@@ -2,19 +2,95 @@
 
 use std::{
     future::Future,
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Ipv6Addr, SocketAddr},
     pin::Pin,
     task::{Context, Poll},
     time::{Duration, Instant, SystemTime},
 };
 
-use axum::{extract::Request, response::Response};
+use axum::{
+    extract::Request,
+    http::HeaderMap,
+    response::Response,
+};
 use crossbeam_channel::Sender;
 use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 use tracing::{event, Level};
 
 use crate::token::get_token_from_request;
+
+/// Returns the *real* client IP, accounting for trusted reverse-proxy headers.
+///
+/// We trust `CF-Connecting-IP`, then `X-Forwarded-For` (first hop), then
+/// `X-Real-IP` — **only** when the immediate connection is coming from a
+/// private / loopback / link-local source (i.e. a reverse proxy or tunnel
+/// running on the same host or in the same private network).  Requests
+/// arriving directly from the public internet have their proxy headers
+/// ignored, so an attacker hitting the app directly cannot inject a fake IP.
+///
+/// This makes Cloudflare Tunnel / nginx-in-front-of-Docker / Caddy / etc.
+/// work without any configuration — the cloudflared container, Docker bridge
+/// gateway (172.x.0.1), and a sibling nginx on 127.0.0.1 all qualify.
+pub fn real_client_ip(
+    extensions: &axum::http::Extensions,
+    headers: &HeaderMap,
+) -> Option<IpAddr> {
+    let connect_ip = extensions
+        .get::<axum::extract::ConnectInfo<SocketAddr>>()
+        .map(|c| c.0.ip())?;
+
+    if is_trusted_proxy_source(connect_ip) {
+        if let Some(real) = read_proxy_headers(headers) {
+            return Some(real);
+        }
+    }
+    Some(connect_ip)
+}
+
+fn read_proxy_headers(headers: &HeaderMap) -> Option<IpAddr> {
+    // Cloudflare's authoritative header — set by the edge after it has
+    // identified the real source. Wins outright when present.
+    if let Some(ip) = header_to_ip(headers, "cf-connecting-ip") {
+        return Some(ip);
+    }
+    // Generic reverse-proxy header. Format is "client, proxy1, proxy2, …" —
+    // first hop is the original client.
+    if let Some(value) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+        if let Some(first) = value.split(',').next() {
+            if let Ok(ip) = first.trim().parse::<IpAddr>() {
+                return Some(ip);
+            }
+        }
+    }
+    if let Some(ip) = header_to_ip(headers, "x-real-ip") {
+        return Some(ip);
+    }
+    None
+}
+
+fn header_to_ip(headers: &HeaderMap, name: &str) -> Option<IpAddr> {
+    headers
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.trim().parse::<IpAddr>().ok())
+}
+
+/// True when the IP belongs to a network where we are willing to trust
+/// proxy headers — RFC 1918 private ranges, loopback, link-local, and
+/// the IPv6 unique-local block (fc00::/7).
+fn is_trusted_proxy_source(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => v4.is_private() || v4.is_loopback() || v4.is_link_local(),
+        IpAddr::V6(v6) => v6.is_loopback() || is_ipv6_ula(v6),
+    }
+}
+
+/// Detects the IPv6 unique-local block (fc00::/7) without relying on the
+/// still-unstable `Ipv6Addr::is_unique_local()` method.
+fn is_ipv6_ula(addr: Ipv6Addr) -> bool {
+    (addr.segments()[0] & 0xfe00) == 0xfc00
+}
 
 const REQUEST_LOGGING_QUERY: &str = r#"
 CREATE TABLE IF NOT EXISTS request (
@@ -361,10 +437,10 @@ where
             .get::<axum::extract::MatchedPath>()
             .map(|p| p.as_str().to_owned());
 
-        let ip = req
-            .extensions()
-            .get::<axum::extract::ConnectInfo<SocketAddr>>()
-            .map(|addr| addr.ip());
+        // Real client IP — respects CF-Connecting-IP / X-Forwarded-For
+        // when the immediate hop is a private-range proxy (Cloudflare
+        // Tunnel, nginx, Docker bridge gateway, etc.).
+        let ip = real_client_ip(req.extensions(), req.headers());
 
         let log = RequestLogEntry {
             ts: unix_now_ms(),
