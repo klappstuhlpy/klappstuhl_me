@@ -63,8 +63,23 @@ services:
 #        "server": { "port": 443 },
 #        "secret_key": "<keep the auto-generated value>",
 #        "discord_webhook_url": null,
-#        "services": []
+#        "services": [],
+#        "geoip_db_path": null,
+#        "cloudflare_api_token": null,
+#        "cloudflare_zone_id": null
 #      }
+#
+# Optional security dashboard setup
+# ---------------------------------
+# GeoIP: drop a MaxMind GeoLite2-City.mmdb at
+#   ./data/geoip/GeoLite2-City.mmdb
+# (sign up free at maxmind.com → My Account → Download Databases →
+#  GeoLite2 City → Binary). The app picks this up automatically;
+# you can override with config.json -> "geoip_db_path".
+#
+# Cloudflare: set "cloudflare_api_token" (with Zone.Analytics:Read on
+# the target zone) and "cloudflare_zone_id" in config.json to enable
+# the Cloudflare traffic + WAF panels at /admin/security.
 #
 # 3. Create the admin account (interactive prompt):
 #      docker compose run --rm klappstuhl_me ./klappstuhl_me admin

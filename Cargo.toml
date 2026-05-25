@@ -46,3 +46,4 @@ tracing-subscriber = { version = "0.3.18", features = ["json"] }
 utoipa = { version = "4.2.0", features = ["time", "axum_extras", "repr", "preserve_path_order"] }
 nanoid = "0.4.0"
 tree_magic = "0.2.3"
+maxminddb = "0.24.0"

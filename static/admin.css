@@ -291,6 +291,26 @@
     .invite-actions { justify-content: flex-end; }
 }
 
+/* ── Range picker (1h / 6h / 24h / 7d / 30d) ─────────────────── */
+
+.range-picker {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.range-picker .button {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+
+    border-color: var(--box-border);  /* default border, also used for the active state to avoid shifting */
+}
+
+.range-picker .button.active {
+    background: var(--branding);
+    color: #fff;
+    border-color: var(--branding);
+}
+
 /* ── Controls ────────────────────────────────────────────────── */
 
 .controls {

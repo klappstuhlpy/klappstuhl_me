@@ -70,6 +70,19 @@ pub struct Config {
     /// The server IP and port configuration
     #[serde(default)]
     pub server: ServerConfig,
+    /// Path to a MaxMind GeoLite2-City `.mmdb` file used by `/admin/security`.
+    /// Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset. Optional — if
+    /// the file is missing, IP lookups quietly degrade to "Unknown".
+    #[serde(default)]
+    pub geoip_db_path: Option<PathBuf>,
+    /// Cloudflare API token (with read access to zone analytics). When set
+    /// alongside `cloudflare_zone_id`, the security dashboard adds the
+    /// "Cloudflare" section with traffic / threat / WAF panels.
+    #[serde(default)]
+    pub cloudflare_api_token: Option<String>,
+    /// Cloudflare zone ID for the domain this app sits behind.
+    #[serde(default)]
+    pub cloudflare_zone_id: Option<String>,
     /// The secret key used for all crypto related functionality in the server.
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
@@ -84,6 +97,9 @@ impl Config {
             webhook: None,
             services: Vec::new(),
             server: ServerConfig::default(),
+            geoip_db_path: None,
+            cloudflare_api_token: None,
+            cloudflare_zone_id: None,
             secret_key: SecretKey::random()?,
         })
     }
@@ -111,6 +127,24 @@ impl Config {
             serde_json::to_writer_pretty(file, &config)?;
             Ok(config)
         }
+    }
+
+    /// Writes the current Config back to the same JSON file `load()` reads from.
+    ///
+    /// Used when the app discovers a value at runtime (e.g. an auto-detected
+    /// GeoIP database path) and wants to persist it so the next start-up
+    /// doesn't have to repeat the discovery.  Pretty-printed for readability
+    /// since this file is normally edited by hand.
+    pub fn save(&self) -> anyhow::Result<()> {
+        let path = Self::path()?;
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent).context("could not create config directory")?;
+            }
+        }
+        let file = std::fs::File::create(&path).context("could not open config file for writing")?;
+        serde_json::to_writer_pretty(file, self).context("could not serialise config")?;
+        Ok(())
     }
 
     /// Checks if the string is a valid configured hostname.

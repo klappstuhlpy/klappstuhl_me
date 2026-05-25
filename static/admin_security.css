@@ -1,0 +1,96 @@
+/* Security dashboard - reuses .metric-tile, .chart-panel, .container-table,
+   .range-picker and .admin-section from admin.css / admin_metrics.css.       */
+
+.security-grid-2 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+    margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+    .security-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* ── Reason / country breakdown lists ────────────────────────── */
+
+.reason-list, .country-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.reason-row, .country-row {
+    display: grid;
+    grid-template-columns: 1fr 3rem auto;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.reason-row .label, .country-row .label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reason-row .count, .country-row .count {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.reason-row .bar, .country-row .bar {
+    background: var(--box-shade);
+    border-radius: 0.25rem;
+    height: 0.5rem;
+    width: 100%;
+    overflow: hidden;
+}
+
+.reason-row .bar > span,
+.country-row .bar > span {
+    display: block;
+    height: 100%;
+    background: var(--branding);
+}
+
+.reason-row.error    .bar > span { background: var(--error-text); }
+.reason-row.warn     .bar > span { background: var(--warning-text); }
+.reason-row.info     .bar > span { background: var(--info-text); }
+
+/* ── Country flag (UTF-8 regional-indicator emoji) ───────────── */
+
+.flag {
+    font-size: 1.1rem;
+    margin-right: 0.4rem;
+    display: inline-block;
+    width: 1.5rem;
+}
+
+/* ── Status pill (used in recent events) ─────────────────────── */
+
+.status-pill {
+    display: inline-block;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.7rem;
+    border-radius: 9999px;
+    border: 1px solid;
+    font-variant-numeric: tabular-nums;
+}
+.status-pill.s4xx { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
+.status-pill.s5xx { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
+
+/* ── Reason pill ─────────────────────────────────────────────── */
+
+.reason-pill {
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    font-size: 0.7rem;
+    border-radius: 9999px;
+    border: 1px solid var(--box-border);
+    color: var(--text-muted);
+    background: var(--box-shade);
+}
+.reason-pill.failed-login { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
+.reason-pill.rate-limited { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }

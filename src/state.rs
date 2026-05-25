@@ -1,7 +1,7 @@
 use quick_cache::sync::Cache;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::RwLockReadGuard;
-use crate::{auth::hash_password, boxed_params, cached::TimedCachedValue, database::Table, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
+use crate::{auth::hash_password, boxed_params, cached::TimedCachedValue, cloudflare::Cloudflare, database::Table, geoip::GeoIp, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
 use crate::models::ImageFile;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -35,6 +35,8 @@ struct InnerState {
     cached_image_files: TimedCachedValue<Vec<ImageFile>>,
     cached_users: Cache<i64, Account>,
     valid_sessions: Cache<String, SessionInfo>,
+    geoip: GeoIp,
+    cloudflare: Option<Cloudflare>,
 }
 
 /// Global application state for the axum Router.
@@ -47,7 +49,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn new(config: Config, database: Database) -> Self {
+    pub async fn new(mut config: Config, database: Database) -> Self {
         let incorrect_default_password_hash =
             hash_password("incorrect-default-password").expect("could not hash default password");
         let client = reqwest::Client::builder()
@@ -56,6 +58,84 @@ impl AppState {
             .expect("could not build HTTP client");
 
         let requests = RequestLogger::new().expect("could not build request logger");
+
+        // Resolve a GeoIP database path. Tries (in order):
+        //   1. `config.geoip_db_path`              (explicit override)
+        //   2. `<data>/geoip/GeoLite2-City.mmdb`   (subdirectory layout — Docker)
+        //   3. `<data>/GeoLite2-City.mmdb`         (flat layout — bare-metal Windows/macOS)
+        //   4. `<config>/geoip/GeoLite2-City.mmdb` (subdirectory in config dir)
+        //   5. `<config>/GeoLite2-City.mmdb`       (flat in config dir, in case the
+        //                                          user dropped it next to config.json)
+        // The first one that actually exists on disk wins. If none exist, we log
+        // every path we tried so the user can see where to put the file.
+        let geoip_was_unset = config.geoip_db_path.is_none();
+        let geoip_path = {
+            let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+            if let Some(p) = config.geoip_db_path.clone() {
+                candidates.push(p);
+            }
+            if let Some(data_dir) = crate::database::directory()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.to_owned()))
+            {
+                candidates.push(data_dir.join("geoip").join("GeoLite2-City.mmdb"));
+                candidates.push(data_dir.join("GeoLite2-City.mmdb"));
+            }
+            if let Some(config_dir) = crate::Config::path()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.to_owned()))
+            {
+                candidates.push(config_dir.join("geoip").join("GeoLite2-City.mmdb"));
+                candidates.push(config_dir.join("GeoLite2-City.mmdb"));
+            }
+
+            let found = candidates.iter().find(|p| p.exists()).cloned();
+            if found.is_none() {
+                tracing::info!(
+                    "GeoIP database not found. Checked: {}",
+                    candidates
+                        .iter()
+                        .map(|p| p.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
+            found
+        };
+
+        // Persist the discovered path back to config.json so subsequent
+        // start-ups skip the candidate scan and log a clear, stable path.
+        // We only persist when the user hadn't set one explicitly — that
+        // way an explicit override is never silently overwritten.
+        if geoip_was_unset {
+            if let Some(p) = geoip_path.as_ref() {
+                config.geoip_db_path = Some(p.clone());
+                match config.save() {
+                    Ok(()) => tracing::info!(
+                        path = %p.display(),
+                        "saved auto-detected GeoIP path to config"
+                    ),
+                    Err(e) => tracing::warn!(
+                        error = %e,
+                        "could not persist auto-detected GeoIP path to config"
+                    ),
+                }
+            }
+        }
+
+        let geoip = GeoIp::open(geoip_path.as_deref());
+
+        // Cloudflare client (only if both token and zone are configured).
+        let cloudflare = match (
+            config.cloudflare_api_token.as_ref(),
+            config.cloudflare_zone_id.as_ref(),
+        ) {
+            (Some(token), Some(zone)) if !token.is_empty() && !zone.is_empty() => {
+                Some(Cloudflare::new(client.clone(), token.clone(), zone.clone()))
+            }
+            _ => None,
+        };
+
         Self {
             inner: Arc::new(InnerState {
                 config,
@@ -64,11 +144,21 @@ impl AppState {
                 cached_image_files: TimedCachedValue::new(Duration::from_secs(60 * 30)),
                 cached_users: Cache::new(1000),
                 valid_sessions: Cache::new(1000),
+                geoip,
+                cloudflare,
             }),
             client,
             requests,
             incorrect_default_password_hash,
         }
+    }
+
+    pub fn geoip(&self) -> &GeoIp {
+        &self.inner.geoip
+    }
+
+    pub fn cloudflare(&self) -> Option<&Cloudflare> {
+        self.inner.cloudflare.as_ref()
     }
 
     pub fn config(&self) -> &Config {

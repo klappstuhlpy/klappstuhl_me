@@ -26,7 +26,9 @@ CREATE TABLE IF NOT EXISTS request (
     user_id INTEGER,
     user_agent TEXT,
     referrer TEXT,
-    latency REAL
+    latency REAL,
+    ip TEXT,
+    bad_reason TEXT
 );
 
 CREATE INDEX IF NOT EXISTS request_status_code_idx ON request(status_code);
@@ -35,7 +37,23 @@ CREATE INDEX IF NOT EXISTS request_user_id_idx ON request(user_id);
 CREATE INDEX IF NOT EXISTS request_referrer_idx ON request(referrer);
 CREATE INDEX IF NOT EXISTS request_path_idx ON request(path);
 CREATE INDEX IF NOT EXISTS request_route_idx ON request(route);
+CREATE INDEX IF NOT EXISTS request_ip_idx ON request(ip);
+CREATE INDEX IF NOT EXISTS request_bad_reason_idx ON request(bad_reason);
 "#;
+
+/// Adds the `ip` and `bad_reason` columns to existing databases that pre-date
+/// the security dashboard.  SQLite doesn't support `ADD COLUMN IF NOT EXISTS`,
+/// so we try-and-ignore: the error returned for "duplicate column name" is
+/// what we want to silently swallow, anything else propagates.
+fn migrate_request_log_schema(conn: &rusqlite::Connection) {
+    let _ = conn.execute("ALTER TABLE request ADD COLUMN ip TEXT", []);
+    let _ = conn.execute("ALTER TABLE request ADD COLUMN bad_reason TEXT", []);
+    let _ = conn.execute("CREATE INDEX IF NOT EXISTS request_ip_idx ON request(ip)", []);
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS request_bad_reason_idx ON request(bad_reason)",
+        [],
+    );
+}
 
 ///A request log entry
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -58,10 +76,20 @@ pub struct RequestLogEntry {
     pub referrer: Option<String>,
     /// The latency (in seconds) of the request
     pub latency: f64,
+    /// Client IP (extracted from ConnectInfo, falls back to None if missing).
+    pub ip: Option<String>,
+    /// If the request was a 4xx, the categorised reason (BadRequestReason::as_str).
+    pub bad_reason: Option<String>,
 }
 
 impl RequestLogEntry {
     fn from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        // Use `column_index` lookups instead of `row.get("col")?` so existing
+        // databases without the new ip / bad_reason columns still deserialise.
+        let ip: Option<String> = row.get::<_, Option<String>>("ip").unwrap_or(None);
+        let bad_reason: Option<String> = row
+            .get::<_, Option<String>>("bad_reason")
+            .unwrap_or(None);
         Ok(Self {
             id: row.get("id")?,
             ts: row.get("ts")?,
@@ -72,6 +100,8 @@ impl RequestLogEntry {
             user_agent: row.get("user_agent")?,
             referrer: row.get("referrer")?,
             latency: row.get("latency")?,
+            ip,
+            bad_reason,
         })
     }
 }
@@ -94,7 +124,8 @@ where
     It: Iterator<Item = RequestLogEntry>,
 {
     let tx = connection.transaction()?;
-    let query = r#"INSERT INTO request(ts, status_code, path, route, user_id, user_agent, referrer, latency) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#;
+    let query = r#"INSERT INTO request(ts, status_code, path, route, user_id, user_agent, referrer, latency, ip, bad_reason)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#;
 
     {
         let mut stmt = tx.prepare_cached(query)?;
@@ -108,6 +139,8 @@ where
                 log.user_agent,
                 log.referrer,
                 log.latency,
+                log.ip,
+                log.bad_reason,
             ])?;
         }
     }
@@ -143,6 +176,8 @@ impl RequestLogger {
         let mut connection = rusqlite::Connection::open(path)?;
         connection.execute_batch("PRAGMA journal_mode=WAL;")?;
         connection.execute_batch(REQUEST_LOGGING_QUERY)?;
+        // Bring databases created before the security dashboard up to date.
+        migrate_request_log_schema(&connection);
 
         std::thread::spawn(move || {
             // This set up is so it can be bulk-inserted somewhat efficiently
@@ -326,6 +361,11 @@ where
             .get::<axum::extract::MatchedPath>()
             .map(|p| p.as_str().to_owned());
 
+        let ip = req
+            .extensions()
+            .get::<axum::extract::ConnectInfo<SocketAddr>>()
+            .map(|addr| addr.ip());
+
         let log = RequestLogEntry {
             ts: unix_now_ms(),
             path,
@@ -333,13 +373,9 @@ where
             user_id: get_token_from_request(req.extensions()).map(|t| t.id),
             user_agent,
             referrer,
+            ip: ip.map(|i| i.to_string()),
             ..Default::default()
         };
-
-        let ip = req
-            .extensions()
-            .get::<axum::extract::ConnectInfo<SocketAddr>>()
-            .map(|addr| addr.ip());
 
         PostFuture {
             inner: self.inner.call(req),
@@ -388,6 +424,7 @@ where
             }
             if (400..=499).contains(&status_code) {
                 let reason = BadRequestReason::from_response(res).as_str();
+                this.log.bad_reason = Some(reason.to_string());
                 if let Some(ip) = this.ip {
                     event!(name: "Bad Request", target: "bad_request", Level::INFO, %ip, reason, status_code, path = this.log.path);
                 }
