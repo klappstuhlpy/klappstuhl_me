@@ -115,6 +115,18 @@
     margin-bottom: 0.75rem;
 }
 
+/* Shown by JS when a chart can't be drawn (no data, JS error, etc.) */
+.chart-message {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 /* uPlot dark theme tweaks */
 .uplot {
     font-family: inherit;

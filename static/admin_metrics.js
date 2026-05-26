@@ -152,19 +152,42 @@ function buildChart(id, opts) {
 
 /* ── load history + render charts ─────────────────────────────── */
 
+function showChartMessage(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = `<div class="chart-message">${escapeHtml(msg)}</div>`;
+}
+
+const CHART_IDS = ["chart-cpu", "chart-mem", "chart-net", "chart-disk-io"];
+
 async function loadHistory() {
   try {
     const res = await fetch(`/admin/metrics/history?range=${encodeURIComponent(currentRange)}`);
-    if (!res.ok) return;
+    if (!res.ok) {
+      CHART_IDS.forEach(id => showChartMessage(id, `History endpoint returned HTTP ${res.status}`));
+      return;
+    }
     const data = await res.json();
-    renderCharts(data.points || []);
+    const points = data.points || [];
+    if (points.length < 2) {
+      CHART_IDS.forEach(id =>
+        showChartMessage(id, points.length === 0
+          ? "No samples yet — first scrape lands ~30s after startup."
+          : "Only one sample so far — charts appear after the next scrape."));
+      return;
+    }
+    renderCharts(points);
   } catch (e) {
     console.error("history load failed:", e);
+    CHART_IDS.forEach(id => showChartMessage(id, "Failed to load history: " + (e && e.message || e)));
   }
 }
 
 function renderCharts(points) {
-  if (!window.uPlot) return;
+  if (!window.uPlot) {
+    CHART_IDS.forEach(id => showChartMessage(id, "uPlot library failed to load (CDN blocked?)."));
+    return;
+  }
 
   const xs = points.map(p => p.ts);
   const cpu = points.map(p => p.cpu_total);
@@ -255,9 +278,21 @@ function renderCharts(points) {
 
 function rebuildChart(id, cfg) {
   const el = document.getElementById(id);
+  if (!el) {
+    console.error("missing chart container:", id);
+    return;
+  }
   el.innerHTML = "";
-  const { width, height } = chartSize(el);
-  charts[id] = new uPlot({ width, height, ...cfg }, cfg.data, el);
+  try {
+    const { width, height } = chartSize(el);
+    if (charts[id]) {
+      charts[id].destroy();
+    }
+    charts[id] = new uPlot({ width, height, ...cfg }, cfg.data, el);
+  } catch (e) {
+    console.error("chart render failed:", id, e);
+    showChartMessage(id, `Render error: ${e && e.message || e}`);
+  }
 }
 
 /* ── range picker ────────────────────────────────────────────── */

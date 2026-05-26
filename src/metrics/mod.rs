@@ -78,12 +78,31 @@ pub fn spawn_pruner(state: AppState) {
 }
 
 async fn scrape_once(state: &AppState, alert_state: &AlertState) -> anyhow::Result<()> {
-    let sample = host::collect().await?;
-    let containers = docker::collect().await.unwrap_or_default();
+    // Heartbeat so every scrape attempt is visible in the log file,
+    // even when something downstream hangs or no errors fire.
+    info!(target: "metrics", "scrape: starting");
+
+    let sample = host::collect().await.map_err(|e| {
+        tracing::error!(target: "metrics", error = %e, "host::collect failed");
+        e
+    })?;
+    let containers = match docker::collect().await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(target: "metrics", error = %e, "docker::collect failed (continuing)");
+            Vec::new()
+        }
+    };
     let ts = time::OffsetDateTime::now_utc().unix_timestamp();
 
-    storage::insert_sample(state, ts, &sample).await?;
-    storage::insert_docker_stats(state, ts, &containers).await?;
+    storage::insert_sample(state, ts, &sample).await.map_err(|e| {
+        tracing::error!(target: "metrics", error = %e, "insert_sample failed — check that the four disk_* columns exist on metric_sample (PRAGMA table_info(metric_sample))");
+        e
+    })?;
+    storage::insert_docker_stats(state, ts, &containers).await.map_err(|e| {
+        tracing::error!(target: "metrics", error = %e, "insert_docker_stats failed");
+        e
+    })?;
 
     alerts::check_and_fire(state, alert_state, &sample).await;
     info!(target: "metrics", "scrape ok: cpu={:.1}% mem={:.1}% containers={}",
