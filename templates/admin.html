@@ -2,6 +2,10 @@
 
 {% block title %}Dashboard | Admin | Klappstuhl.me{% endblock %}
 
+{% block admin_css %}
+<link rel="stylesheet" href="/static/admin_metrics.css">
+{% endblock %}
+
 {% block admin_body %}
 <div class="admin-page-header">
     <h1>Dashboard</h1>
@@ -16,30 +20,34 @@
     </div>
 </div>
 
-<div class="dashboard">
-    <div class="summary">
-        <div class="statistic-box">
-            <span class="title">Requests</span>
-            <span id="request-count" class="value"></span>
-        </div>
-        <div class="statistic-box">
-            <span class="title">Active Users</span>
-            <span id="active-users" class="value"></span>
-        </div>
-        <div class="statistic-box">
-            <span class="title">Average Response Time</span>
-            <span id="average-response-time" class="value"></span>
-        </div>
-        <div class="statistic-box">
-            <span class="title">% Success</span>
-            <span id="percent-success" class="value"></span>
-        </div>
+<div class="metric-tiles">
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Requests</span></div>
+        <div class="tile-value"><span id="request-count">—</span></div>
+        <div class="tile-sub">non-static HTTP traffic</div>
     </div>
-    <div class="tables">
-        <div class="table-container">
-            <h2>Recent Server Logs</h2>
-            <table id="recent-logs">
-                <thead>
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Active users</span></div>
+        <div class="tile-value"><span id="active-users">—</span></div>
+        <div class="tile-sub">unique authenticated</div>
+    </div>
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Avg. response</span></div>
+        <div class="tile-value"><span id="average-response-time">—</span></div>
+        <div class="tile-sub">round-trip latency</div>
+    </div>
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Success rate</span></div>
+        <div class="tile-value"><span id="percent-success">—</span></div>
+        <div class="tile-sub">2xx / 3xx responses</div>
+    </div>
+</div>
+
+<section class="admin-section">
+    <h2>Recent server logs</h2>
+    <div class="container-table-wrap">
+        <table class="container-table" id="recent-logs">
+            <thead>
                 <tr>
                     <th>Timestamp</th>
                     <th>Level</th>
@@ -47,61 +55,74 @@
                     <th>Message</th>
                     <th>Fields</th>
                 </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-        <div class="table-container">
-            <h2>Popular routes</h2>
-            <table id="popular-routes">
-                <thead>
-                <tr>
-                    <th>Route</th>
-                    <th>Views</th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-        <div class="table-container">
-            <h2>Referring sites</h2>
-            <table id="referring-sites">
-                <thead>
-                <tr>
-                    <th>Site</th>
-                    <th>Views</th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-        <div class="table-container">
-            <h2>Popular API routes</h2>
-            <table id="popular-api-routes">
-                <thead>
-                <tr>
-                    <th>Route</th>
-                    <th>Calls</th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-        <div class="table-container">
-            <h2>Top API Consumers</h2>
-            <table id="popular-api-users">
-                <thead>
-                <tr>
-                    <th>User ID</th>
-                    <th>Total</th>
-                    <th>Success</th>
-                    <th>Failed</th>
-                </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+            </thead>
+            <tbody><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+        </table>
     </div>
+</section>
+
+<div class="admin-grid-2">
+    <section class="admin-section">
+        <h2>Popular routes</h2>
+        <div class="container-table-wrap">
+            <table class="container-table" id="popular-routes">
+                <thead>
+                    <tr>
+                        <th>Route</th>
+                        <th class="numeric">Views</th>
+                    </tr>
+                </thead>
+                <tbody><tr><td colspan="2" class="muted">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="admin-section">
+        <h2>Referring sites</h2>
+        <div class="container-table-wrap">
+            <table class="container-table" id="referring-sites">
+                <thead>
+                    <tr>
+                        <th>Site</th>
+                        <th class="numeric">Views</th>
+                    </tr>
+                </thead>
+                <tbody><tr><td colspan="2" class="muted">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="admin-section">
+        <h2>Popular API routes</h2>
+        <div class="container-table-wrap">
+            <table class="container-table" id="popular-api-routes">
+                <thead>
+                    <tr>
+                        <th>Route</th>
+                        <th class="numeric">Calls</th>
+                    </tr>
+                </thead>
+                <tbody><tr><td colspan="2" class="muted">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="admin-section">
+        <h2>Top API consumers</h2>
+        <div class="container-table-wrap">
+            <table class="container-table" id="popular-api-users">
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th class="numeric">Total</th>
+                        <th class="numeric">Success</th>
+                        <th class="numeric">Failed</th>
+                    </tr>
+                </thead>
+                <tbody><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </section>
 </div>
 {% endblock %}
 
