@@ -163,10 +163,12 @@ runBtn.addEventListener("click", async () => {
     runBtn.disabled = true;
     showStatus("Running…");
 
+    // serde_urlencoded can't parse `danger_mode=` (empty) into a bool, so
+    // always send an explicit "true"/"false" instead of an empty string.
     const body = new URLSearchParams({
         db,
         sql,
-        danger_mode: safeToggle.checked ? "" : "true",
+        danger_mode: safeToggle.checked ? "false" : "true",
     });
 
     try {
