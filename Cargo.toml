@@ -5,6 +5,9 @@ edition = "2021"
 license = "AGPL-v3"
 description = "A custom information website about Klappstuhl and API support."
 
+[toolchain]
+channel = "nightly"
+
 [dependencies]
 anyhow = "1.0.80"
 argon2 = { version = "0.5.3", features = ["std"] }
