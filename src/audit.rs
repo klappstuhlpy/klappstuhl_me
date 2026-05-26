@@ -119,7 +119,26 @@ impl<'a> AuditBuilder<'a> {
         let actor_label = self.actor_label;
         let target = self.target;
         let ip = self.ip;
-        let meta_json = self.meta.map(|v| v.to_string());
+        let meta = self.meta;
+        let meta_json = meta.as_ref().map(|v| v.to_string());
+
+        // Push to /ws subscribers immediately. The DB insert still
+        // happens in the background; the live feed doesn't need to wait
+        // for fsync to propagate the event.
+        state.live_publish(
+            "audit",
+            serde_json::json!({
+                "ts": time::OffsetDateTime::now_utc()
+                    .format(&time::format_description::well_known::Rfc3339)
+                    .unwrap_or_default(),
+                "actor_id": actor_id,
+                "actor_label": actor_label.clone(),
+                "action": action,
+                "target": target.clone(),
+                "ip": ip.clone(),
+                "meta": meta,
+            }),
+        );
 
         tokio::spawn(async move {
             let result = state

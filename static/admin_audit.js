@@ -28,6 +28,7 @@ function actionClass(action) {
   if (action.startsWith("service.")) return "service";
   if (action.startsWith("invite.")) return "invite";
   if (action.startsWith("secret.")) return "secret";
+  if (action.startsWith("postgres.")) return "postgres";
   return "";
 }
 
@@ -96,7 +97,67 @@ document.getElementById("clear-filters").addEventListener("click", () => {
   loadData();
 });
 
-/* ── boot + auto-refresh every 15s ─────────────────────────── */
+/* ── live indicator ────────────────────────────────────────── */
+
+function setLiveState(state) {
+  const el = document.getElementById("live-pill");
+  if (!el) return;
+  el.className = "live-pill " + state;     // connecting | live | closed
+  el.textContent = state === "live"
+    ? "● Live"
+    : state === "connecting" ? "● Connecting…" : "● Polling";
+}
+
+function prependLiveEvent(evt) {
+  const tbody = document.querySelector("#audit-table tbody");
+  if (!tbody) return;
+  // Apply current filters before deciding to insert.
+  if (currentAction && !evt.action.startsWith(currentAction)) return;
+  if (currentActor  && evt.actor_label !== currentActor) return;
+
+  const cls = actionClass(evt.action);
+  const target = evt.target ? `<code>${escapeHtml(evt.target)}</code>` : "";
+  let detail = "";
+  if (evt.meta) {
+    try {
+      detail = `<code class="detail-snippet" title="${escapeHtml(JSON.stringify(evt.meta, null, 2))}">${escapeHtml(JSON.stringify(evt.meta))}</code>`;
+    } catch (_) {}
+  }
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><span title="${escapeHtml(evt.ts)}">just now</span></td>
+    <td>${escapeHtml(evt.actor_label)}</td>
+    <td><span class="action-pill ${cls}">${escapeHtml(evt.action)}</span></td>
+    <td>${target}</td>
+    <td><code>${escapeHtml(evt.ip || "")}</code></td>
+    <td>${detail}</td>`;
+  tr.classList.add("live-row");
+  tbody.prepend(tr);
+  // Drop the "No events" placeholder if it was showing.
+  const placeholder = tbody.querySelector("td.muted");
+  if (placeholder) placeholder.closest("tr").remove();
+  // Trim to a reasonable size so the page doesn't grow unboundedly.
+  while (tbody.children.length > 200) {
+    tbody.removeChild(tbody.lastElementChild);
+  }
+}
+
+/* ── boot + live stream (falls back to 15s poll if WS dies) ── */
 
 loadData();
-setInterval(loadData, 15_000);
+const pollTimer = setInterval(loadData, 15_000);
+
+if (window.LiveConnection) {
+  const conn = new LiveConnection({
+    topics: ["audit"],
+    onEvent: (topic, data) => {
+      if (topic === "audit") {
+        prependLiveEvent(data);
+        // Refresh the tile counts opportunistically without re-querying the table.
+        loadData();
+      }
+    },
+    onStateChange: setLiveState,
+  });
+  conn.start();
+}

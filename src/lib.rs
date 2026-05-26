@@ -14,6 +14,7 @@ pub mod key;
 pub mod logging;
 pub mod metrics;
 pub mod models;
+pub mod postgres;
 pub mod ratelimit;
 pub mod routes;
 pub mod scope;

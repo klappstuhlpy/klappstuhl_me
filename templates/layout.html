@@ -2,15 +2,38 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}Klappstuhl.me{% endblock %}</title>
+
+    {# PWA install + theming. Theme colour matches --background so the
+       browser chrome / Android status bar blend into the page. #}
     <link rel="manifest" href="/static/site.webmanifest">
-    <meta name="theme-color" content="#c4a058">
+    <meta name="theme-color" content="#09090b">
+    <meta name="color-scheme" content="dark">
+
+    {# iOS standalone-mode hints — without these Safari opens links from
+       the home-screen icon in regular Safari instead of the PWA shell. #}
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Klappstuhl">
+    <link rel="apple-touch-icon" href="/static/img/logo.jpg">
+
     <meta property="og:site_name" content="Klappstuhl.me">
     <meta property="og:type" content="website"/>
     <meta property="og:image" content="https://klappstuhl.me/gallery/URjyG.jpeg"/>
     <link rel="stylesheet" href="/static/base.css" type="text/css"/>
     {% block css %}{% endblock %}
+
+    <script>
+        // Register the service worker on the first paint. Skip on
+        // localhost over plain http where the browser refuses anyway.
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("/sw.js").catch(() => {});
+            });
+        }
+    </script>
 </head>
 <body>
 <div class="grid">

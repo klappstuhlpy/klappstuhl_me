@@ -17,9 +17,11 @@ mod auth;
 mod image;
 mod api;
 mod metrics;
+mod postgres;
 mod secrets;
 mod security;
 mod services;
+mod ws;
 
 pub use api::{copy_api_token, ApiToken};
 
@@ -72,8 +74,10 @@ pub fn all() -> Router<AppState> {
         .merge(admin::routes())
         .merge(audit::routes())
         .merge(metrics::routes())
+        .merge(postgres::routes())
         .merge(secrets::routes())
         .merge(security::routes())
         .merge(services::routes())
+        .merge(ws::routes())
         .nest("/api", api::routes())
 }

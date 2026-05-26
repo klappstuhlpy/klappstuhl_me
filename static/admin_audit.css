@@ -67,6 +67,7 @@
 .action-pill.service   { color: var(--branding);     border-color: rgba(124,58,237,0.4);  background: rgba(124,58,237,0.10); }
 .action-pill.invite    { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
 .action-pill.secret    { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
+.action-pill.postgres  { color: #67e8f9;             border-color: #155e75;               background: #083344; }
 
 .detail-snippet {
     font-size: 0.72rem;
@@ -83,4 +84,31 @@
 .detail-snippet:hover {
     white-space: normal;
     overflow: visible;
+}
+
+/* ── Live-connection pill ──────────────────────────────────── */
+
+.live-pill {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.55rem;
+    border-radius: 9999px;
+    border: 1px solid var(--box-border);
+    background: var(--box-shade);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.live-pill.connecting { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
+.live-pill.live       { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
+.live-pill.closed     { color: var(--text-muted); }
+
+/* Brief highlight pulse for newly-streamed audit rows. */
+.live-row {
+    animation: live-flash 1.4s ease-out;
+}
+@keyframes live-flash {
+    0%   { background: rgba(124, 58, 237, 0.18); }
+    100% { background: transparent; }
 }

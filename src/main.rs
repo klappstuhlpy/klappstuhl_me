@@ -128,6 +128,10 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     let router = klappstuhl_me::routes::all()
         .nest_service("/favicon.ico", ServeFile::new("static/img/favicon.ico"))
         .nest_service("/site.webmanifest", ServeFile::new("static/site.webmanifest"))
+        // Service worker must be reachable at the origin root so its
+        // scope can cover the whole site (a worker served from /static/
+        // can only control /static/*).
+        .nest_service("/sw.js", ServeFile::new("static/sw.js"))
         .nest_service("/robots.txt", ServeFile::new("static/robots.txt"))
         .nest_service("/static", ServeDir::new("static"))
         .layer(middleware::from_fn_with_state(state.clone(), klappstuhl_me::copy_api_token))

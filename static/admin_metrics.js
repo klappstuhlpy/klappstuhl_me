@@ -318,4 +318,105 @@ window.addEventListener("resize", () => {
 
 pollCurrent();
 loadHistory();
-setInterval(pollCurrent, LIVE_POLL_MS);
+let pollTimer = setInterval(pollCurrent, LIVE_POLL_MS);
+
+/* ── WebSocket: push-based tile updates ──────────────────────
+   When the server pushes a "metrics" event we apply it directly
+   instead of polling on a timer. Polling stays as a fallback that
+   activates whenever the socket is closed/reconnecting. */
+
+function applyMetricsEvent(m) {
+  const host = {
+    ts: m.ts,
+    cpu_total: m.cpu_total,
+    cpu_user: 0, cpu_system: 0, cpu_iowait: 0, cpu_idle: 100 - m.cpu_total,
+    load_1: m.load_1, load_5: m.load_5, load_15: m.load_15,
+    mem_total: m.mem_total, mem_used: m.mem_used, mem_used_pct: m.mem_used_pct,
+    swap_total: 0, swap_used: 0, mem_cached: 0,
+    net_rx_bytes: m.net_rx_bytes, net_tx_bytes: m.net_tx_bytes,
+    disk_read_bytes:  m.disk_read_bytes,
+    disk_write_bytes: m.disk_write_bytes,
+    disk_read_ops:    m.disk_read_ops,
+    disk_write_ops:   m.disk_write_ops,
+    disk_total: m.disk_total, disk_used: m.disk_used, disk_used_pct: m.disk_used_pct,
+  };
+  // Pretend we got the standard /current shape.
+  renderCurrent({ host, containers: m.containers || [] });
+}
+
+// Refactor: extract the existing pollCurrent body into something reusable.
+function renderCurrent(data) {
+  const host = data.host;
+  if (host) {
+    document.getElementById("tile-cpu-pct").textContent = host.cpu_total.toFixed(1);
+    document.getElementById("tile-cpu-load").textContent =
+      `load ${host.load_1.toFixed(2)} · ${host.load_5.toFixed(2)} · ${host.load_15.toFixed(2)}`;
+    document.getElementById("tile-cpu-status").className = "tile-status " + statusClassFor(host.cpu_total);
+    document.getElementById("tile-mem-pct").textContent = host.mem_used_pct.toFixed(1);
+    document.getElementById("tile-mem-detail").textContent = `${fmtBytes(host.mem_used)} / ${fmtBytes(host.mem_total)}`;
+    document.getElementById("tile-mem-status").className = "tile-status " + statusClassFor(host.mem_used_pct);
+    document.getElementById("tile-disk-pct").textContent = host.disk_used_pct.toFixed(1);
+    document.getElementById("tile-disk-detail").textContent = `${fmtBytes(host.disk_used)} / ${fmtBytes(host.disk_total)}`;
+    document.getElementById("tile-disk-status").className = "tile-status " + statusClassFor(host.disk_used_pct, 80, 90);
+
+    if (lastDiskRead != null && lastDiskTs != null && host.ts > lastDiskTs) {
+      const dt = host.ts - lastDiskTs;
+      const rRate = (host.disk_read_bytes  - lastDiskRead)  / dt;
+      const wRate = (host.disk_write_bytes - lastDiskWrite) / dt;
+      const rOps  = (host.disk_read_ops  - lastDiskOps.read)  / dt;
+      const wOps  = (host.disk_write_ops - lastDiskOps.write) / dt;
+      document.getElementById("tile-disk-read").textContent  = fmtRate(Math.max(0, rRate));
+      document.getElementById("tile-disk-write").textContent = fmtRate(Math.max(0, wRate));
+      document.getElementById("tile-disk-iops").textContent  =
+        `${(Math.max(0, rOps) + Math.max(0, wOps)).toFixed(0)} IOPS`;
+    }
+    lastDiskRead  = host.disk_read_bytes;
+    lastDiskWrite = host.disk_write_bytes;
+    lastDiskOps   = { read: host.disk_read_ops, write: host.disk_write_ops };
+    lastDiskTs    = host.ts;
+
+    if (lastNetRx != null && lastNetTs != null && host.ts > lastNetTs) {
+      const dt = host.ts - lastNetTs;
+      document.getElementById("tile-net-rx").textContent = fmtRate(Math.max(0, (host.net_rx_bytes - lastNetRx.rx) / dt));
+      document.getElementById("tile-net-tx").textContent = fmtRate(Math.max(0, (host.net_tx_bytes - lastNetRx.tx) / dt));
+    }
+    lastNetRx = { rx: host.net_rx_bytes, tx: host.net_tx_bytes };
+    lastNetTs = host.ts;
+  }
+
+  const tbody = document.querySelector("#container-table tbody");
+  document.getElementById("container-count").textContent = data.containers.length;
+  if (data.containers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="muted">No running containers</td></tr>';
+  } else {
+    tbody.innerHTML = data.containers.map(c => {
+      const memPct = c.mem_limit > 0 ? (c.mem_used / c.mem_limit * 100) : 0;
+      return `<tr>
+        <td>${escapeHtml(c.name)}</td>
+        <td><div class="bar-cell"><span>${c.cpu_pct.toFixed(1)}%</span>
+            <div class="bar ${statusClassFor(c.cpu_pct)}"><span style="width:${Math.min(c.cpu_pct, 100)}%"></span></div></div></td>
+        <td><div class="bar-cell"><span>${fmtBytes(c.mem_used)} / ${fmtBytes(c.mem_limit)}</span>
+            <div class="bar ${statusClassFor(memPct)}"><span style="width:${Math.min(memPct, 100)}%"></span></div></div></td>
+        <td class="numeric">↓ ${fmtBytes(c.net_rx_bytes)} · ↑ ${fmtBytes(c.net_tx_bytes)}</td>
+      </tr>`;
+    }).join("");
+  }
+}
+
+if (window.LiveConnection) {
+  const conn = new LiveConnection({
+    topics: ["metrics"],
+    onEvent: (topic, data) => {
+      if (topic === "metrics") applyMetricsEvent(data);
+    },
+    onStateChange: (state) => {
+      // Pause polling whenever we have a live stream so we don't double-update.
+      if (state === "live") {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      } else if (!pollTimer) {
+        pollTimer = setInterval(pollCurrent, LIVE_POLL_MS);
+      }
+    },
+  });
+  conn.start();
+}

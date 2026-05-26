@@ -1,8 +1,21 @@
 use quick_cache::sync::Cache;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::RwLockReadGuard;
+use tokio::sync::{broadcast, RwLockReadGuard};
 use crate::{auth::hash_password, boxed_params, cached::TimedCachedValue, cloudflare::Cloudflare, database::Table, geoip::GeoIp, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
 use crate::models::ImageFile;
+
+/// One live event pushed over WebSocket subscribers.
+///
+/// `topic` is one of "metrics", "audit", "secrets" — clients say which
+/// topics they care about when they connect, and the `/ws` handler
+/// filters accordingly.  The `data` field is whatever JSON payload the
+/// producer chose to ship (typically the same JSON the matching HTTP
+/// endpoint would return).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct LiveEvent {
+    pub topic: &'static str,
+    pub data: serde_json::Value,
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct SessionInfo {
@@ -37,6 +50,12 @@ struct InnerState {
     valid_sessions: Cache<String, SessionInfo>,
     geoip: GeoIp,
     cloudflare: Option<Cloudflare>,
+    /// Broadcast hub for live updates pushed to /ws subscribers. Each
+    /// LiveEvent carries its own topic tag; the WS handler decides
+    /// whether to forward it based on the client's subscriptions.
+    /// 64 buffer slots — slow clients get RecvError::Lagged rather than
+    /// blocking producers.
+    live_tx: broadcast::Sender<LiveEvent>,
 }
 
 /// Global application state for the axum Router.
@@ -136,6 +155,8 @@ impl AppState {
             _ => None,
         };
 
+        let (live_tx, _) = broadcast::channel(64);
+
         Self {
             inner: Arc::new(InnerState {
                 config,
@@ -146,6 +167,7 @@ impl AppState {
                 valid_sessions: Cache::new(1000),
                 geoip,
                 cloudflare,
+                live_tx,
             }),
             client,
             requests,
@@ -159,6 +181,18 @@ impl AppState {
 
     pub fn cloudflare(&self) -> Option<&Cloudflare> {
         self.inner.cloudflare.as_ref()
+    }
+
+    /// Returns a fresh receiver for live events. Each WS connection
+    /// subscribes once and filters by topic in user space.
+    pub fn live_subscribe(&self) -> broadcast::Receiver<LiveEvent> {
+        self.inner.live_tx.subscribe()
+    }
+
+    /// Publish a live event. Never fails — when nobody is subscribed,
+    /// broadcast::Sender::send returns Err that we silently drop.
+    pub fn live_publish(&self, topic: &'static str, data: serde_json::Value) {
+        let _ = self.inner.live_tx.send(LiveEvent { topic, data });
     }
 
     /// Start an audit-log entry. Call `.actor(…).target(…).ip_opt(…).fire()`

@@ -105,6 +105,34 @@ async fn scrape_once(state: &AppState, alert_state: &AlertState) -> anyhow::Resu
     })?;
 
     alerts::check_and_fire(state, alert_state, &sample).await;
+
+    // Push to /ws subscribers so live dashboards refresh without polling.
+    // We ship a compact subset of fields — enough for the tile row +
+    // container table. Charts still use the /history endpoint.
+    state.live_publish(
+        "metrics",
+        serde_json::json!({
+            "ts": ts,
+            "cpu_total": sample.cpu_total_pct(),
+            "mem_used": sample.mem_used as i64,
+            "mem_total": sample.mem_total as i64,
+            "mem_used_pct": sample.mem_used_pct(),
+            "disk_used": sample.disk_used as i64,
+            "disk_total": sample.disk_total as i64,
+            "disk_used_pct": sample.disk_used_pct(),
+            "load_1": sample.load_1,
+            "load_5": sample.load_5,
+            "load_15": sample.load_15,
+            "net_rx_bytes": sample.net_rx_bytes as i64,
+            "net_tx_bytes": sample.net_tx_bytes as i64,
+            "disk_read_bytes":  sample.disk_read_bytes as i64,
+            "disk_write_bytes": sample.disk_write_bytes as i64,
+            "disk_read_ops":  sample.disk_read_ops as i64,
+            "disk_write_ops": sample.disk_write_ops as i64,
+            "containers": containers,
+        }),
+    );
+
     info!(target: "metrics", "scrape ok: cpu={:.1}% mem={:.1}% containers={}",
           sample.cpu_total_pct(),
           sample.mem_used_pct(),

@@ -92,6 +92,21 @@ pub struct Config {
     /// dist) are skipped automatically.
     #[serde(default)]
     pub secret_scan_paths: Vec<PathBuf>,
+    /// PostgreSQL connection string for the `/admin/postgres` page.
+    ///
+    /// Format (libpq URL):
+    /// `postgresql://user:password@host:port/database`
+    ///
+    /// Leave unset to disable the page. The configured account should have
+    /// at least read access to `pg_catalog` and connection rights to every
+    /// database you want to browse — typically the `postgres` superuser
+    /// (or a dedicated read-only role with `pg_read_all_data`).
+    ///
+    /// Safe-mode queries are wrapped in `BEGIN READ ONLY` so even
+    /// privileged credentials can't accidentally mutate state through the
+    /// query runner unless the operator explicitly opts in to danger mode.
+    #[serde(default)]
+    pub postgres_url: Option<String>,
     /// The secret key used for all crypto related functionality in the server.
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
@@ -110,6 +125,7 @@ impl Config {
             cloudflare_api_token: None,
             cloudflare_zone_id: None,
             secret_scan_paths: Vec::new(),
+            postgres_url: None,
             secret_key: SecretKey::random()?,
         })
     }
