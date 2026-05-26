@@ -252,20 +252,129 @@
     font-size: 0.9rem;
 }
 
-/* ── API key ─────────────────────────────────────────────────── */
+/* ── Quick-link grids (admin tools + apps on /account) ───────── */
 
-.api-key-row { margin-bottom: 0.75rem; }
+.quick-links-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
 
-#api-key {
-    display: inline-block;
+@media (max-width: 768px) {
+    .quick-links-section { grid-template-columns: 1fr; }
+}
+
+.quick-links-group {
+    background: var(--box);
     border: 1px solid var(--box-border);
-    padding: 0.5rem 0.75rem;
+    border-radius: 0.625rem;
+    padding: 1rem 1.25rem;
+}
+
+.quick-links-heading {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.65rem;
+}
+
+.quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.quick-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.375rem;
+    color: var(--foreground);
+    text-decoration: none;
+    font-size: 0.82rem;
+    transition: background 0.12s, border-color 0.12s, transform 0.12s;
+}
+
+.quick-link:hover {
+    background: var(--box);
+    border-color: var(--branding);
+}
+
+.quick-link.external::after {
+    content: "↗";
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+/* ── API key (hidden-by-default) ─────────────────────────────── */
+
+.api-key-row { margin-bottom: 0.4rem; }
+
+/* Wraps the input + reveal button as a single rounded control */
+.api-key-field {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--box-border);
     background: var(--box-shade);
     border-radius: 0.375rem;
+    overflow: hidden;
+    max-width: 32rem;
+}
+
+.api-key-field:focus-within {
+    border-color: var(--form-input-focus-border);
+}
+
+.api-key-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: transparent;
+    border: none;
+    color: var(--foreground);
+    font-family: inherit;
     font-size: 0.85rem;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    max-width: 100%;
+    outline: none;
+    /* Bigger letter-spacing on type=password to look more like masked
+       dots without using -webkit-text-security (which is non-standard). */
+    letter-spacing: 0.05em;
+    min-width: 0;
+}
+
+.api-key-input[type="password"] {
+    letter-spacing: 0.15em;
+}
+
+.api-key-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--box-border);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: background 0.12s;
+}
+
+.api-key-toggle:hover {
+    background: var(--box);
+}
+
+.api-key-toggle img {
+    display: block;
+}
+
+.api-key-hint {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin: 0 0 0.75rem;
 }
 
 .section-actions {

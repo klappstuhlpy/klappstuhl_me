@@ -13,6 +13,7 @@
 {% block body %}
 {% let account = account.as_ref().unwrap() %}
 
+{# ─── Header ──────────────────────────────────────────────────── #}
 <div class="account-header">
     <div class="account-identity">
         <h1 class="account-name">{{ user.name }}</h1>
@@ -20,19 +21,39 @@
         <span class="badge branding">Admin</span>
         {% endif %}
     </div>
+    {% if account.id == user.id %}
     <div class="account-header-actions">
-        {% if user.flags.is_admin() %}
-        <a href="/admin" class="button">Dashboard</a>
-        <a href="https://ssh.klappstuhl.me" class="button primary">SSH Terminal</a>
-        <a href="https://vaultwarden.klappstuhl.me" class="button primary">Password Manger</a>
-        <a href="https://cloud.klappstuhl.me" class="button primary">Nextcloud</a>
-        {% endif %}
-        {% if account.id == user.id %}
-        <button class="button danger" id="change-password">Change Password</button>
-        {% endif %}
+        <button class="button danger outline" id="change-password">Change Password</button>
     </div>
+    {% endif %}
 </div>
 
+{# ─── Quick-links (admin only) ───────────────────────────────── #}
+{% if user.flags.is_admin() %}
+<section class="quick-links-section">
+    <div class="quick-links-group">
+        <div class="quick-links-heading">Admin tools</div>
+        <div class="quick-links">
+            <a href="/admin"          class="quick-link"><span>Dashboard</span></a>
+            <a href="/services"       class="quick-link"><span>Services</span></a>
+            <a href="/admin/metrics"  class="quick-link"><span>Metrics</span></a>
+            <a href="/admin/security" class="quick-link"><span>Security</span></a>
+            <a href="/admin/secrets"  class="quick-link"><span>Secrets</span></a>
+            <a href="/admin/invites"  class="quick-link"><span>Invites</span></a>
+        </div>
+    </div>
+    <div class="quick-links-group">
+        <div class="quick-links-heading">Apps</div>
+        <div class="quick-links">
+            <a href="https://ssh.klappstuhl.me"         class="quick-link external" rel="noopener"><span>SSH Terminal</span></a>
+            <a href="https://vaultwarden.klappstuhl.me" class="quick-link external" rel="noopener"><span>Vaultwarden</span></a>
+            <a href="https://cloud.klappstuhl.me"       class="quick-link external" rel="noopener"><span>Nextcloud</span></a>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{# ─── Images ──────────────────────────────────────────────────── #}
 {% if !entries.is_empty() %}
 <section class="account-section">
     <h2>Images</h2>
@@ -40,6 +61,7 @@
 </section>
 {% endif %}
 
+{# ─── API access ──────────────────────────────────────────────── #}
 {% if account.id == user.id %}
 <section class="account-section">
     <h2>API Access</h2>
@@ -48,8 +70,14 @@
         {% match api_key %}
         {% when Some with (api) %}
         <div class="api-key-row">
-            <code id="api-key">{{ api }}</code>
+            <div class="api-key-field">
+                <input type="password" id="api-key" class="api-key-input" readonly value="{{ api }}" autocomplete="off" spellcheck="false">
+                <button type="button" class="api-key-toggle" id="api-key-reveal" aria-label="Show or hide API key" title="Show / hide">
+                    <img src="/static/img/visibility.svg" alt="" width="20" height="20">
+                </button>
+            </div>
         </div>
+        <p class="api-key-hint">Treat this token like a password. Anyone with it can act as you via the API.</p>
         <div class="section-actions">
             <button type="button" id="copy-api-key" class="button primary">Copy</button>
             <button type="submit" name="new" value="false" class="button danger outline">Regenerate</button>
@@ -63,6 +91,7 @@
 </section>
 {% endif %}
 
+{# ─── Sessions ────────────────────────────────────────────────── #}
 {% if current_session.is_some() || !sessions.is_empty() %}
 <section class="account-section" id="session-section">
     <h2>Sessions</h2>

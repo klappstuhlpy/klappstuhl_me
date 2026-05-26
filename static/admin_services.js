@@ -1,22 +1,170 @@
 /* ── Service card button state ───────────────────────────────── */
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll(".service-card").forEach(card => {
-    const isRunning = card.dataset.running === "true";
-    const startBtn   = card.querySelector(".start-btn");
-    const restartBtn = card.querySelector(".restart-btn");
-    const stopBtn    = card.querySelector(".stop-btn");
+function syncCardButtons(card) {
+  const isRunning  = card.dataset.running === "true";
+  const startBtn   = card.querySelector(".start-btn");
+  const restartBtn = card.querySelector(".restart-btn");
+  const stopBtn    = card.querySelector(".stop-btn");
+  const pullBtn    = card.querySelector(".pull-btn");
+  const recreateBtn = card.querySelector(".recreate-btn");
 
-    if (isRunning) {
-      startBtn.disabled   = true;
-      restartBtn.disabled = false;
-      stopBtn.disabled    = false;
-    } else {
-      startBtn.disabled   = false;
-      restartBtn.disabled = true;
-      stopBtn.disabled    = true;
-    }
-  });
+  if (startBtn)   startBtn.disabled   = isRunning;
+  if (restartBtn) restartBtn.disabled = !isRunning;
+  if (stopBtn)    stopBtn.disabled    = !isRunning;
+  // Pull works whether the service is running or not (compose pull
+  // doesn't require the container to be up). Recreate only makes sense
+  // when there's a target to replace, so disable when offline AND no
+  // compose path (the template only renders Recreate for Docker so we
+  // can leave it enabled — recreate will start a stopped container too
+  // via "docker compose up -d --force-recreate").
+  if (pullBtn) pullBtn.disabled = false;
+  if (recreateBtn) recreateBtn.disabled = false;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".service-card").forEach(syncCardButtons);
 });
+
+/* ── Filter (search) ─────────────────────────────────────────── */
+
+const searchInput = document.getElementById("services-search");
+const emptyState  = document.getElementById("services-empty");
+
+function applyFilter() {
+  if (!searchInput) return;
+  const q = searchInput.value.trim().toLowerCase();
+  let visible = 0;
+  document.querySelectorAll(".service-card").forEach(card => {
+    const hay = [
+      card.dataset.name  || "",
+      card.dataset.kind  || "",
+      card.dataset.image || "",
+    ].join(" ").toLowerCase();
+    const match = q === "" || hay.includes(q);
+    card.classList.toggle("filtered", !match);
+    if (match) visible++;
+  });
+  if (emptyState) emptyState.hidden = visible !== 0 || q === "";
+}
+
+searchInput?.addEventListener("input", applyFilter);
+
+/* ── Live auto-refresh ──────────────────────────────────────── */
+
+const refreshState = document.getElementById("services-refresh-state");
+const REFRESH_MS   = 15_000;
+let logModalOpen   = false;
+
+function fmtBytes(n) {
+  if (n == null || !isFinite(n)) return "—";
+  if (n === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KiB", "MiB", "GiB", "TiB"];
+  const i = Math.floor(Math.log(Math.abs(n)) / Math.log(k));
+  return (n / Math.pow(k, i)).toFixed(i ? 1 : 0) + " " + sizes[i];
+}
+
+function fmtIsoStarted(iso) {
+  if (!iso) return null;
+  try {
+    return "Started " + new Date(iso).toISOString().replace("T", " ").replace(/\.\d+Z$/, "Z");
+  } catch (_) {
+    return null;
+  }
+}
+
+function statusClass(pct) {
+  if (pct == null) return "";
+  if (pct >= 90) return "alert";
+  if (pct >= 70) return "warn";
+  return "";
+}
+
+function updateCardFromView(card, view) {
+  // Status badge + running flag (drives button disabled-state)
+  card.dataset.running = view.running ? "true" : "false";
+  const badge = card.querySelector("[data-role='status']");
+  if (badge) {
+    badge.classList.toggle("running", view.running);
+    badge.classList.toggle("offline", !view.running);
+    badge.textContent = view.running ? "Running" : "Offline";
+  }
+
+  // Started / not running text
+  const started = card.querySelector("[data-role='started']");
+  if (started) {
+    if (view.running) {
+      const t = fmtIsoStarted(view.started_at);
+      started.textContent = t || "Start time unavailable";
+      if (!t) started.classList.add("muted"); else started.classList.remove("muted");
+    } else {
+      started.textContent = "Not running";
+      started.classList.add("muted");
+    }
+  }
+
+  // Restarts
+  const restarts = card.querySelector("[data-role='restarts']");
+  if (restarts && view.restart_count != null) {
+    restarts.textContent = view.restart_count;
+  }
+
+  // Live CPU / RAM (only Docker services with `docker stats` data)
+  const cpuRow = card.querySelector("[data-role='cpu-row']");
+  const memRow = card.querySelector("[data-role='mem-row']");
+  if (view.cpu_pct != null && cpuRow && memRow) {
+    cpuRow.hidden = false;
+    memRow.hidden = false;
+
+    cpuRow.querySelector("[data-role='cpu-value']").textContent = view.cpu_pct.toFixed(1) + "%";
+    const cpuBar = cpuRow.querySelector("[data-role='cpu-bar']");
+    cpuBar.style.width = Math.min(view.cpu_pct, 100).toFixed(1) + "%";
+    cpuRow.querySelector(".bar").className = "bar " + statusClass(view.cpu_pct);
+
+    const memPct = view.mem_limit > 0 ? (view.mem_used / view.mem_limit * 100) : 0;
+    memRow.querySelector("[data-role='mem-value']").textContent =
+      `${fmtBytes(view.mem_used)} / ${fmtBytes(view.mem_limit)} (${memPct.toFixed(1)}%)`;
+    const memBar = memRow.querySelector("[data-role='mem-bar']");
+    memBar.style.width = Math.min(memPct, 100).toFixed(1) + "%";
+    memRow.querySelector(".bar").className = "bar " + statusClass(memPct);
+  } else if (cpuRow && memRow) {
+    cpuRow.hidden = true;
+    memRow.hidden = true;
+  }
+
+  syncCardButtons(card);
+}
+
+async function refreshServices() {
+  // Pause while the user is reading logs — the SSE stream would compete
+  // for the docker socket and the page is already pinned to one service.
+  if (logModalOpen) return;
+  if (refreshState) {
+    refreshState.classList.add("refreshing");
+    refreshState.textContent = "refreshing";
+  }
+  try {
+    const res = await fetch("/services/data");
+    if (!res.ok) return;
+    const views = await res.json();
+    const byName = new Map(views.map(v => [v.name, v]));
+    document.querySelectorAll(".service-card").forEach(card => {
+      const v = byName.get(card.dataset.name);
+      if (v) updateCardFromView(card, v);
+    });
+  } catch (e) {
+    console.error("services refresh failed", e);
+  } finally {
+    if (refreshState) {
+      refreshState.classList.remove("refreshing");
+      refreshState.textContent = "auto · 15s";
+    }
+  }
+}
+
+// Initial label + start the loop.
+if (refreshState) refreshState.textContent = "auto · 15s";
+refreshServices();
+setInterval(refreshServices, REFRESH_MS);
 
 /* ── Log console ─────────────────────────────────────────────── */
 
@@ -146,6 +294,7 @@ function appendLine(text) {
 
 function openLogs(serviceName) {
   closeLogs();                          // close any existing connection first
+  logModalOpen = true;                  // pause auto-refresh while reading
   terminal.innerHTML = "";
   modalName.textContent = serviceName + " — logs";
   setConnectionState("connecting");
@@ -169,6 +318,7 @@ function closeLogs() {
     activeSource.close();
     activeSource = null;
   }
+  logModalOpen = false;       // resume auto-refresh
   setConnectionState("closed");
 }
 

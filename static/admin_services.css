@@ -145,8 +145,66 @@ h1 {
 
 .service-actions button { flex: 1; }
 
-/* Logs button sits on its own row, left-aligned */
-.logs-btn { align-self: flex-start; }
+/* Secondary management actions (Logs / Pull / Recreate) wrap to a row.
+   The inline forms in the template need to behave like flex items. */
+.service-secondary-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.service-secondary-actions .inline-form { display: inline-flex; }
+.service-secondary-actions .button { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
+
+/* ── Toolbar (search + auto-refresh indicator) ──────────────── */
+
+.services-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.services-search-input {
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.375rem;
+    color: var(--foreground);
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
+    width: 14rem;
+    outline: none;
+}
+
+.services-search-input:focus {
+    border-color: var(--form-input-focus-border);
+}
+
+.services-refresh-state {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.services-refresh-state.refreshing { color: var(--branding); }
+
+/* Hide cards excluded by the search filter without changing the grid
+   geometry. */
+.service-card.filtered { display: none; }
+
+.services-empty {
+    padding: 1rem 1.25rem;
+    border: 1px dashed var(--box-border);
+    border-radius: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+/* ── Live CPU / RAM rows inside service cards ──────────────── */
+
+.stats-row .detail-value { display: contents; }
+.stats-row .bar { min-width: 5rem; }
 
 /* ── Log console modal ───────────────────────────────────────── */
 

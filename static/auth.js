@@ -62,8 +62,25 @@ document.querySelectorAll('.invalidate[data-token]').forEach(el => {
   el.addEventListener('click', () => invalidateToken(el, token));
 });
 
+/* ── API key reveal toggle ───────────────────────────────────── */
+document.getElementById('api-key-reveal')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  const input = document.getElementById('api-key');
+  const img = e.currentTarget.querySelector('img');
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (img) img.src = '/static/img/visibility_off.svg';
+  } else {
+    input.type = 'password';
+    if (img) img.src = '/static/img/visibility.svg';
+  }
+});
+
 document.getElementById('copy-api-key')?.addEventListener('click', async (e) => {
-  const key = document.getElementById('api-key').textContent;
+  const input = document.getElementById('api-key');
+  // .value because the API key now lives in an <input>, not a <code> node.
+  const key = input ? input.value : '';
+  if (!key) return;
   await navigator.clipboard.writeText(key);
   e.target.textContent = 'Done';
   e.target.disabled = true;
@@ -85,7 +102,7 @@ document.querySelector('#api-section button[type=submit][name="new"]')?.addEvent
   if(apiKey === null) {
     window.location.reload();
   } else {
-    apiKey.textContent = response.token;
+    apiKey.value = response.token;
     showAlert({level: 'success', content: 'Successfully regenerated API key.'})
   }
 })
