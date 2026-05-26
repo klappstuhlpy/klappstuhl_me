@@ -128,7 +128,10 @@ function resetSearchFilter() {
 }
 
 function __scoreByName(el, query) {
-  return __score(el.dataset.name, query);
+  // Image entries carry the filename in `data-id` (set from the JSON
+  // payload by parseEntryObjects). `data-name` is never populated, so
+  // we score against the id directly.
+  return __score(el.dataset.name ?? el.dataset.id, query);
 }
 
 function filterEntries(query) {

@@ -86,13 +86,10 @@ async fn scrape_once(state: &AppState, alert_state: &AlertState) -> anyhow::Resu
         tracing::error!(target: "metrics", error = %e, "host::collect failed");
         e
     })?;
-    let containers = match docker::collect().await {
-        Ok(v) => v,
-        Err(e) => {
-            tracing::warn!(target: "metrics", error = %e, "docker::collect failed (continuing)");
-            Vec::new()
-        }
-    };
+    let containers = docker::collect().await.unwrap_or_else(|e| {
+        tracing::warn!(target: "metrics", error = %e, "docker::collect failed (continuing)");
+        Vec::new()
+    });
     let ts = time::OffsetDateTime::now_utc().unix_timestamp();
 
     storage::insert_sample(state, ts, &sample).await.map_err(|e| {
