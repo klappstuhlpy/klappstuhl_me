@@ -15,6 +15,7 @@ pub mod metrics;
 pub mod models;
 pub mod ratelimit;
 pub mod routes;
+pub mod secrets;
 mod state;
 pub mod token;
 pub mod utils;

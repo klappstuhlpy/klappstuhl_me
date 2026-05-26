@@ -34,11 +34,10 @@
             <a href="/admin/security" class="admin-nav-item{% if active_page == "security" %} active{% endif %}">
                 <span>Security</span>
             </a>
+            <a href="/admin/secrets" class="admin-nav-item{% if active_page == "secrets" %} active{% endif %}">
+                <span>Secrets</span>
+            </a>
         </nav>
-        <div class="admin-sidebar-section">
-            <div class="admin-sidebar-heading">Coming soon</div>
-            <span class="admin-nav-item disabled"><span>Secrets</span></span>
-        </div>
     </aside>
     <section class="admin-content">
         {% block admin_body %}{% endblock %}

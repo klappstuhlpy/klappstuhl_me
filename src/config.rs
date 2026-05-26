@@ -83,6 +83,15 @@ pub struct Config {
     /// Cloudflare zone ID for the domain this app sits behind.
     #[serde(default)]
     pub cloudflare_zone_id: Option<String>,
+    /// Directories to scan for leaked secrets (API keys, tokens, private
+    /// keys, etc.).  When empty, the scheduled scanner is disabled — the
+    /// /admin/secrets page still loads and a manual scan can be triggered.
+    ///
+    /// Recursive: subdirectories are walked.  Binary files, files larger
+    /// than 1 MB, and common build directories (.git, node_modules, target,
+    /// dist) are skipped automatically.
+    #[serde(default)]
+    pub secret_scan_paths: Vec<PathBuf>,
     /// The secret key used for all crypto related functionality in the server.
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
@@ -100,6 +109,7 @@ impl Config {
             geoip_db_path: None,
             cloudflare_api_token: None,
             cloudflare_zone_id: None,
+            secret_scan_paths: Vec::new(),
             secret_key: SecretKey::random()?,
         })
     }

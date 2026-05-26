@@ -16,6 +16,7 @@ mod auth;
 mod image;
 mod api;
 mod metrics;
+mod secrets;
 mod security;
 mod services;
 
@@ -69,6 +70,7 @@ pub fn all() -> Router<AppState> {
         .merge(image::routes())
         .merge(admin::routes())
         .merge(metrics::routes())
+        .merge(secrets::routes())
         .merge(security::routes())
         .merge(services::routes())
         .nest("/api", api::routes())

@@ -120,6 +120,9 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     klappstuhl_me::metrics::spawn_collector(state.clone());
     klappstuhl_me::metrics::spawn_pruner(state.clone());
 
+    // Periodic secret scanner (no-op if `secret_scan_paths` is empty).
+    klappstuhl_me::secrets::spawn_scheduler(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()
@@ -262,11 +265,12 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 4] = [
+const MIGRATIONS: [&str; 5] = [
     include_str!("../sql/0.sql"),
     include_str!("../sql/1.sql"),
     include_str!("../sql/2.sql"),
     include_str!("../sql/3.sql"),
+    include_str!("../sql/4.sql"),
 ];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
@@ -294,7 +298,28 @@ fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
         tx.execute_batch(migration)?;
     }
 
-    tx.commit()
+    tx.commit()?;
+
+    // Idempotent column fix-ups for databases that landed at user_version=3
+    // *before* the temperature → disk-I/O refactor consolidated those
+    // columns into sql/3.sql.  Those installs have a metric_sample table
+    // without disk_read_bytes / disk_write_bytes / disk_read_ops /
+    // disk_write_ops, which makes the /admin/metrics/history query 500.
+    //
+    // SQLite has no ADD COLUMN IF NOT EXISTS, so we try-and-ignore:
+    // a "duplicate column name" error is the expected no-op outcome on
+    // schemas that already have the column.  Done outside the migration
+    // transaction so a failure here can never roll the version bump back.
+    for ddl in [
+        "ALTER TABLE metric_sample ADD COLUMN disk_read_bytes  INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE metric_sample ADD COLUMN disk_write_bytes INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE metric_sample ADD COLUMN disk_read_ops    INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE metric_sample ADD COLUMN disk_write_ops   INTEGER NOT NULL DEFAULT 0",
+    ] {
+        let _ = connection.execute(ddl, []);
+    }
+
+    Ok(())
 }
 
 async fn run(command: klappstuhl_me::Command) -> anyhow::Result<()> {
