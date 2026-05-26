@@ -4,7 +4,7 @@
 # Uses the official Rust image.  git is required because two Cargo dependencies
 # are pulled directly from GitHub repositories.
 # ─────────────────────────────────────────────────────────────────────────────
-FROM rust:1.86-slim-bookworm AS builder
+FROM rust:1.82-slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
@@ -34,7 +34,7 @@ RUN cargo build --release
 #
 # Minimal Debian image.  Only what is strictly needed at runtime:
 #   • ca-certificates  – validates the ACME certificate chain (Let's Encrypt)
-#   • docker-ce-cli    – the /admin/services admin page shells out to `docker`
+#   • docker-ce-cli    – the /services admin page shells out to `docker`
 # ─────────────────────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim
 
