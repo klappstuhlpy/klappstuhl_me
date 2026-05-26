@@ -21,6 +21,7 @@ mod postgres;
 mod secrets;
 mod security;
 mod services;
+mod ssh;
 mod ws;
 
 pub use api::{copy_api_token, ApiToken};
@@ -78,6 +79,7 @@ pub fn all() -> Router<AppState> {
         .merge(secrets::routes())
         .merge(security::routes())
         .merge(services::routes())
+        .merge(ssh::routes())
         .merge(ws::routes())
         .nest("/api", api::routes())
 }

@@ -19,6 +19,7 @@ pub mod ratelimit;
 pub mod routes;
 pub mod scope;
 pub mod secrets;
+pub mod ssh;
 mod state;
 pub mod token;
 pub mod utils;

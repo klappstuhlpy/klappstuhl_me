@@ -1,0 +1,76 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}SSH Audit Log | Admin | Klappstuhl.me{% endblock %}
+
+{% block admin_css %}
+<link rel="stylesheet" href="/static/admin_audit.css">
+<link rel="stylesheet" href="/static/admin_ssh_audit.css">
+{% endblock %}
+
+{% block admin_body %}
+<div class="admin-page-header">
+    <div>
+        <h1>SSH Audit Log</h1>
+        <p class="admin-page-sub">Per-key actions — add, revoke, delete, token issue/revoke, export.</p>
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+        <a href="/admin/ssh/export/authorized_keys" class="button outline" download>
+            Download authorized_keys
+        </a>
+        <a href="/admin/ssh" class="button outline">← SSH Keys</a>
+    </div>
+</div>
+
+<div class="summary">
+    <div class="statistic-box">
+        <span class="title">Shown</span>
+        <span class="value" id="stat-shown">—</span>
+    </div>
+    <div class="statistic-box">
+        <span class="title">Limit</span>
+        <span class="value muted" id="stat-limit">200</span>
+    </div>
+</div>
+
+<section class="admin-section">
+    <form id="audit-filters" class="audit-filters">
+        <div class="audit-filter">
+            <label for="filter-action">Action prefix</label>
+            <input id="filter-action" name="action" type="search"
+                   placeholder="ssh.key or ssh.token" class="form-field">
+        </div>
+        <div class="audit-filter">
+            <label for="filter-key">Key ID</label>
+            <input id="filter-key" name="key_id" type="number"
+                   placeholder="leave blank for all" class="form-field">
+        </div>
+        <div class="audit-filter">
+            <label for="filter-limit">Limit</label>
+            <input id="filter-limit" name="limit" type="number"
+                   value="200" min="10" max="500" class="form-field" style="width:5rem;">
+        </div>
+        <button type="submit" class="button primary">Filter</button>
+        <button type="button" id="clear-filters" class="button outline">Clear</button>
+    </form>
+
+    <div class="container-table-wrap" style="margin-top: 1rem;">
+        <table class="container-table" id="audit-table">
+            <thead>
+                <tr>
+                    <th>When</th>
+                    <th>Account</th>
+                    <th>Key ID</th>
+                    <th>Action</th>
+                    <th>IP</th>
+                    <th>User agent</th>
+                </tr>
+            </thead>
+            <tbody><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/admin_ssh_audit.js"></script>
+{% endblock %}

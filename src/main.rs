@@ -123,6 +123,9 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // Periodic secret scanner (no-op if `secret_scan_paths` is empty).
     klappstuhl_me::secrets::spawn_scheduler(state.clone());
 
+    // Sweep expired SSH tokens every hour.
+    klappstuhl_me::ssh::spawn_token_sweeper(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()
@@ -269,13 +272,14 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 6] = [
+const MIGRATIONS: [&str; 7] = [
     include_str!("../sql/0.sql"),
     include_str!("../sql/1.sql"),
     include_str!("../sql/2.sql"),
     include_str!("../sql/3.sql"),
     include_str!("../sql/4.sql"),
     include_str!("../sql/5.sql"),
+    include_str!("../sql/6.sql"),
 ];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {

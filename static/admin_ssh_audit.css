@@ -1,0 +1,32 @@
+/* ── SSH Audit page — extends admin_audit.css ──────────────── */
+
+/* Reuses .audit-filters / .action-pill / .audit-when / .detail-snippet
+   from admin_audit.css which is loaded before this file. */
+
+/* ── Action pill colours for ssh.* namespace ────────────────── */
+
+.action-pill.ssh-key    { color: var(--info-text);    border-color: var(--info-border);    background: var(--info-bg); }
+.action-pill.ssh-token  { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
+.action-pill.ssh-export { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
+
+/* ── Stat boxes (shared muted modifier) ─────────────────────── */
+
+.statistic-box > .value.muted { color: var(--text-muted); }
+
+/* ── User-agent truncation ──────────────────────────────────── */
+
+.ua-cell {
+    max-width: 18rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    cursor: default;
+}
+
+.ua-cell:hover {
+    white-space: normal;
+    overflow: visible;
+    word-break: break-all;
+}

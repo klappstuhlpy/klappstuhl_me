@@ -1,0 +1,308 @@
+/* ── SSH Keys admin page ────────────────────────────────────── */
+
+/* Reuses .summary / .statistic-box from admin.css */
+
+.statistic-box > .value.success { color: var(--success-text); }
+.statistic-box > .value.muted   { color: var(--text-muted); }
+
+/* ── Add-key drawer ─────────────────────────────────────────── */
+
+.ssh-add-drawer {
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.ssh-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ssh-drawer-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.ssh-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.ssh-form-row label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.ssh-key-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ssh-file-label {
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.55rem;
+}
+
+.ssh-key-textarea {
+    resize: vertical;
+    font-size: 0.78rem;
+    font-family: inherit;
+    min-height: 4.5rem;
+}
+
+/* ── Fingerprint preview ────────────────────────────────────── */
+
+.ssh-key-preview {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.375rem;
+    font-size: 0.78rem;
+}
+
+.ssh-preview-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.ssh-preview-fp {
+    color: var(--info-text);
+    word-break: break-all;
+}
+
+.ssh-preview-algo {
+    color: var(--success-text);
+}
+
+/* ── Error banner ───────────────────────────────────────────── */
+
+.ssh-error {
+    padding: 0.6rem 0.75rem;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: 0.375rem;
+    color: var(--error-text);
+    font-size: 0.82rem;
+}
+
+/* ── Drawer footer ──────────────────────────────────────────── */
+
+.ssh-drawer-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* ── Key table ──────────────────────────────────────────────── */
+
+/* .container-table-wrap / .container-table come from admin_audit.css /
+   admin_postgres.css — they share the same class names already in use */
+
+.key-fp {
+    font-size: 0.72rem;
+    color: var(--info-text);
+    word-break: break-all;
+}
+
+.key-algo {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    border: 1px solid;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.status-pill.active  { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
+.status-pill.revoked { color: var(--text-muted);   border-color: var(--box-border);     background: var(--box-shade); }
+
+.row-actions {
+    display: flex;
+    gap: 0.3rem;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+.row-actions .button {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+/* ── Shared small button modifier ───────────────────────────── */
+
+.button.small {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+}
+
+/* ── Section header with inline action button ───────────────── */
+
+.section-header-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.section-header-row h2 {
+    margin: 0;
+    flex: 1;
+}
+
+/* ── Token issue form grid ───────────────────────────────────── */
+
+.token-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 12rem;
+    gap: 0.75rem 1rem;
+}
+
+@media (max-width: 640px) {
+    .token-form-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Scope checkboxes ───────────────────────────────────────── */
+
+.scope-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.375rem;
+}
+
+.scope-check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: var(--foreground);
+}
+
+.scope-check input[type="checkbox"] {
+    accent-color: var(--branding);
+    width: 0.9rem;
+    height: 0.9rem;
+}
+
+/* ── Copy-once token reveal banner ──────────────────────────── */
+
+.token-reveal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+    border-radius: 0.5rem;
+    position: relative;
+}
+
+.token-reveal-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.token-reveal-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--success-text);
+}
+
+.token-reveal-warn {
+    font-size: 0.75rem;
+    color: var(--success-text);
+    opacity: 0.75;
+}
+
+.token-reveal-body {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.token-reveal-value {
+    flex: 1;
+    word-break: break-all;
+    font-size: 0.82rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--success-border);
+    border-radius: 0.375rem;
+    color: var(--success-text);
+    user-select: all;
+}
+
+.token-reveal-dismiss {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: var(--success-text);
+    opacity: 0.6;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.1rem 0.3rem;
+    line-height: 1;
+}
+
+.token-reveal-dismiss:hover { opacity: 1; }
+
+/* ── Token table extras ─────────────────────────────────────── */
+
+.scope-pill {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    border-radius: 0.25rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    color: var(--text-muted);
+    white-space: nowrap;
+    margin: 0.1rem 0.1rem 0 0;
+}
+
+.token-expires-soon {
+    color: var(--warning-text);
+}
+
+.token-expired {
+    color: var(--error-text);
+}
