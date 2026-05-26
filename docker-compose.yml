@@ -21,7 +21,7 @@ services:
       # Edit that file (see notes below) then restart the container.
       - ./data:/data
 
-      # Docker socket – required so the /services admin page can call
+      # Docker socket – required so the /admin/services admin page can call
       # `docker ps` and `docker inspect` on the host.
       # Remove this mount if you are not using the services feature.
       - /var/run/docker.sock:/var/run/docker.sock

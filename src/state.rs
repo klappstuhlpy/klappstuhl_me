@@ -161,6 +161,12 @@ impl AppState {
         self.inner.cloudflare.as_ref()
     }
 
+    /// Start an audit-log entry. Call `.actor(…).target(…).ip_opt(…).fire()`
+    /// to record it (fire-and-forget — the response is never delayed).
+    pub fn audit(&self, action: &'static str) -> crate::audit::AuditBuilder<'_> {
+        crate::audit::AuditBuilder::new(self, action)
+    }
+
     pub fn config(&self) -> &Config {
         &self.inner.config
     }
@@ -344,14 +350,27 @@ impl AppState {
         }
     }
 
-    pub async fn generate_api_key(&self, id: i64) -> anyhow::Result<String> {
+    pub async fn generate_api_key(
+        &self,
+        id: i64,
+        scopes: &[crate::models::Scope],
+    ) -> anyhow::Result<String> {
         let mut token = crate::token::Token::new(id)?;
         token.api_key = true;
         let key = token.base64();
+        // Persist scopes as comma-separated scope string. Empty string
+        // (no scopes selected) is treated as legacy/full at lookup time
+        // — see Session::has_scope.
+        let scopes_str = scopes
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join(",");
         self.database()
             .execute(
-                "INSERT INTO session(id, account_id, description, api_key) VALUES (?, ?, 'API Key', 1)",
-                (key.clone(), id),
+                "INSERT INTO session(id, account_id, description, api_key, scopes)
+                 VALUES (?, ?, 'API Key', 1, ?)",
+                (key.clone(), id, scopes_str),
             )
             .await?;
         Ok(key)

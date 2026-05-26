@@ -6,6 +6,7 @@
 //! - `POST /admin/secrets/:id/status`  mark dismissed / resolved / open
 
 use crate::{
+    headers::ClientIp,
     models::Account,
     secrets::{self, FindingRow, LastScan, StatusCounts},
     AppState,
@@ -100,6 +101,7 @@ struct TriggerResponse {
 
 async fn trigger_scan(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
 ) -> Result<Json<TriggerResponse>, StatusCode> {
     if !account.flags.is_admin() {
@@ -111,6 +113,11 @@ async fn trigger_scan(
             detail: "No scan paths configured. Add secret_scan_paths to config.json.".into(),
         }));
     }
+    state
+        .audit("secret.scan.trigger")
+        .actor(&account)
+        .ip_opt(client_ip)
+        .fire();
     // Run in the background so the HTTP call returns immediately; results
     // are visible on the next /data fetch.
     let bg = state.clone();
@@ -132,6 +139,7 @@ struct StatusUpdate {
 
 async fn update_status(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Path(id): Path<i64>,
     Form(payload): Form<StatusUpdate>,
@@ -145,6 +153,13 @@ async fn update_status(
     secrets::storage::set_status(&state, id, &payload.status)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    state
+        .audit("secret.status.change")
+        .actor(&account)
+        .target(format!("finding:{id}"))
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({ "status": payload.status }))
+        .fire();
     Ok(StatusCode::NO_CONTENT)
 }
 

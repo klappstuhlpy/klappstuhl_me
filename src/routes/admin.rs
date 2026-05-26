@@ -2,6 +2,7 @@ use crate::{
     database::Table,
     filters,
     flash::{FlashMessage, Flasher, Flashes},
+    headers::ClientIp,
     logging::RequestLogEntry,
     utils::logs_directory,
 };
@@ -134,6 +135,7 @@ async fn admin_user_by_id(
 
 async fn invalidate_caches(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Extension(cache): Extension<BodyCache>,
 ) -> Redirect {
@@ -142,6 +144,11 @@ async fn invalidate_caches(
         state.clear_account_cache();
         state.clear_session_cache();
         cache.invalidate_all();
+        state
+            .audit("admin.cache.invalidate")
+            .actor(&account)
+            .ip_opt(client_ip)
+            .fire();
     }
     Redirect::to("/")
 }
@@ -255,6 +262,7 @@ struct CreateInviteForm {
 
 async fn create_invite(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     flasher: Flasher,
     Form(form): Form<CreateInviteForm>,
@@ -290,6 +298,16 @@ async fn create_invite(
 
     match result {
         Ok(_) => {
+            state
+                .audit("invite.create")
+                .actor(&account)
+                .target(code.clone())
+                .ip_opt(client_ip)
+                .meta(serde_json::json!({
+                    "expires_in_days": form.expires_in_days,
+                    "note": form.note,
+                }))
+                .fire();
             flasher.add(FlashMessage::success(format!("Invite created: {code}")));
         }
         Err(e) => {
@@ -302,6 +320,7 @@ async fn create_invite(
 
 async fn delete_invite(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     flasher: Flasher,
     Path(code): Path<String>,
@@ -323,6 +342,12 @@ async fn delete_invite(
             flasher.add("Invite not found or already redeemed");
         }
         Ok(_) => {
+            state
+                .audit("invite.revoke")
+                .actor(&account)
+                .target(code.clone())
+                .ip_opt(client_ip)
+                .fire();
             flasher.add(FlashMessage::success("Invite revoked"));
         }
         Err(e) => {

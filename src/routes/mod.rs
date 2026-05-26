@@ -12,6 +12,7 @@ use axum::{
 use crate::{AppState};
 
 mod admin;
+mod audit;
 mod auth;
 mod image;
 mod api;
@@ -69,6 +70,7 @@ pub fn all() -> Router<AppState> {
         .merge(auth::routes())
         .merge(image::routes())
         .merge(admin::routes())
+        .merge(audit::routes())
         .merge(metrics::routes())
         .merge(secrets::routes())
         .merge(security::routes())

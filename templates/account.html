@@ -39,6 +39,7 @@
             <a href="/admin/metrics"  class="quick-link"><span>Metrics</span></a>
             <a href="/admin/security" class="quick-link"><span>Security</span></a>
             <a href="/admin/secrets"  class="quick-link"><span>Secrets</span></a>
+            <a href="/admin/audit"    class="quick-link"><span>Audit log</span></a>
             <a href="/admin/invites"  class="quick-link"><span>Invites</span></a>
         </div>
     </div>
@@ -78,15 +79,54 @@
             </div>
         </div>
         <p class="api-key-hint">Treat this token like a password. Anyone with it can act as you via the API.</p>
+        {% when None %}
+        {% endmatch %}
+
+        <fieldset class="scope-fieldset">
+            <legend>Scopes</legend>
+            <p class="api-key-hint" style="margin-top: 0;">
+                Tick the permissions this token should have. Leaving every
+                box unticked grants legacy full access (matches old, scope-less
+                keys). To narrow an existing key, tick the boxes you want and
+                hit Regenerate — the old token is invalidated.
+            </p>
+            <div class="scope-grid">
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="images:read"
+                        {% if api_key_scopes.contains("images:read") %}checked{% endif %}>
+                    <span class="scope-name">images:read</span>
+                    <span class="scope-desc">List + download images via the API</span>
+                </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="images:write"
+                        {% if api_key_scopes.contains("images:write") %}checked{% endif %}>
+                    <span class="scope-name">images:write</span>
+                    <span class="scope-desc">Upload and delete images</span>
+                </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="admin:read"
+                        {% if api_key_scopes.contains("admin:read") %}checked{% endif %}>
+                    <span class="scope-name">admin:read</span>
+                    <span class="scope-desc">Read-only admin dashboards (metrics / security / audit)</span>
+                </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="admin:write"
+                        {% if api_key_scopes.contains("admin:write") %}checked{% endif %}>
+                    <span class="scope-name">admin:write</span>
+                    <span class="scope-desc">Mutate admin state (invites, services, secrets)</span>
+                </label>
+            </div>
+        </fieldset>
+
         <div class="section-actions">
+            {% match api_key %}
+            {% when Some with (_) %}
             <button type="button" id="copy-api-key" class="button primary">Copy</button>
             <button type="submit" name="new" value="false" class="button danger outline">Regenerate</button>
-        </div>
-        {% when None %}
-        <div class="section-actions">
+            {% when None %}
             <button type="submit" name="new" value="true" class="button primary">Generate Token</button>
+            {% endmatch %}
         </div>
-        {% endmatch %}
     </form>
 </section>
 {% endif %}

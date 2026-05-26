@@ -265,12 +265,13 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 5] = [
+const MIGRATIONS: [&str; 6] = [
     include_str!("../sql/0.sql"),
     include_str!("../sql/1.sql"),
     include_str!("../sql/2.sql"),
     include_str!("../sql/3.sql"),
     include_str!("../sql/4.sql"),
+    include_str!("../sql/5.sql"),
 ];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
@@ -315,6 +316,9 @@ fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
         "ALTER TABLE metric_sample ADD COLUMN disk_write_bytes INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE metric_sample ADD COLUMN disk_read_ops    INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE metric_sample ADD COLUMN disk_write_ops   INTEGER NOT NULL DEFAULT 0",
+        // API-token scopes: comma-separated list. Empty string means
+        // "legacy / unrestricted" so pre-existing API keys keep working.
+        "ALTER TABLE session ADD COLUMN scopes TEXT NOT NULL DEFAULT ''",
     ] {
         let _ = connection.execute(ddl, []);
     }

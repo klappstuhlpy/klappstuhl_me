@@ -6,6 +6,7 @@
 use crate::{
     config::ServiceKind,
     filters,
+    headers::ClientIp,
     metrics::DockerStat,
     models::Account,
     AppState,
@@ -217,6 +218,7 @@ async fn services_index(
 
 async fn service_action(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Form(data): Form<ServiceAction>,
 ) -> Result<Redirect, StatusCode> {
@@ -230,6 +232,18 @@ async fn service_action(
         .iter()
         .find(|s| s.name == data.name)
         .cloned();
+
+    // Audit before kicking off the shell-out so the entry exists even if the
+    // command takes a while or this handler is cancelled.
+    if cfg.is_some() {
+        state
+            .audit("service.action")
+            .actor(&account)
+            .target(data.name.clone())
+            .ip_opt(client_ip)
+            .meta(serde_json::json!({ "action": data.action }))
+            .fire();
+    }
 
     if let Some(cfg) = cfg {
         match (data.action.as_str(), &cfg.kind) {
@@ -314,7 +328,7 @@ async fn service_action(
         }
     }
 
-    Ok(Redirect::to("/services"))
+    Ok(Redirect::to("/admin/services"))
 }
 
 /// Streams container logs as Server-Sent Events.
@@ -409,7 +423,7 @@ async fn container_logs_sse(
 
 // --- JSON: live service status + per-container stats ----------------------
 
-/// Shape returned by `GET /services/data`. Powers the auto-refresh loop in
+/// Shape returned by `GET /admin/services/data`. Powers the auto-refresh loop in
 /// the dashboard JS so we can update each card without a full page reload.
 #[derive(Serialize)]
 struct ServiceView {

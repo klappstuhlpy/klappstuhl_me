@@ -377,6 +377,57 @@
     margin: 0 0 0.75rem;
 }
 
+/* ── API token scope picker ─────────────────────────────────── */
+
+.scope-fieldset {
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem 1rem;
+    margin: 0 0 1rem;
+}
+
+.scope-fieldset legend {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 0 0.4rem;
+}
+
+.scope-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.scope-row {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: baseline;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.3rem 0.4rem;
+    border-radius: 0.25rem;
+    transition: background 0.12s;
+}
+
+.scope-row:hover {
+    background: var(--box-shade);
+}
+
+.scope-row .scope-name {
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: var(--branding);
+    font-weight: 500;
+}
+
+.scope-row .scope-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
 .section-actions {
     display: flex;
     gap: 0.5rem;

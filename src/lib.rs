@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod auth;
 pub mod cached;
 pub mod cli;
@@ -15,6 +16,7 @@ pub mod metrics;
 pub mod models;
 pub mod ratelimit;
 pub mod routes;
+pub mod scope;
 pub mod secrets;
 mod state;
 pub mod token;

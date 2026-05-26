@@ -34,7 +34,7 @@ RUN cargo build --release
 #
 # Minimal Debian image.  Only what is strictly needed at runtime:
 #   • ca-certificates  – validates the ACME certificate chain (Let's Encrypt)
-#   • docker-ce-cli    – the /services admin page shells out to `docker`
+#   • docker-ce-cli    – the /admin/services admin page shells out to `docker`
 # ─────────────────────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim
 

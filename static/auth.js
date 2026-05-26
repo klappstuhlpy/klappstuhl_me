@@ -91,12 +91,20 @@ document.getElementById('copy-api-key')?.addEventListener('click', async (e) => 
 
 document.querySelector('#api-section button[type=submit][name="new"]')?.addEventListener('click', async (e) => {
   e.preventDefault();
+  // Collect ticked scope checkboxes so the server stores them on the
+  // new session row. Empty array = legacy / unscoped (full access).
+  const scopes = Array.from(
+    document.querySelectorAll('#api-section input[name="scope"]:checked')
+  ).map((c) => c.value);
   let response = await callApi('/account/api_key', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
-    body: JSON.stringify({new: e.target.getAttribute('new') === 'true' })
+    body: JSON.stringify({
+      new: e.target.getAttribute('new') === 'true',
+      scopes,
+    })
   });
   let apiKey = document.getElementById('api-key');
   if(apiKey === null) {

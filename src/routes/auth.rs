@@ -3,10 +3,10 @@ use crate::{
     error::ApiError,
     filters,
     flash::{FlashMessage, Flasher, Flashes},
-    headers::Referrer,
+    headers::{ClientIp, Referrer},
     key::SecretKey,
     logging::BadRequestReason,
-    models::{is_valid_username, Account, ImageEntry, Invite, Session},
+    models::{is_valid_username, Account, ImageEntry, Invite, Scope, Session},
     ratelimit::RateLimit,
     token::{Token, TokenRejection},
     AppState,
@@ -58,7 +58,11 @@ fn cookie_to_response(cookie: Cookie<'static>) -> Response {
     response
 }
 
-async fn authenticate(state: &AppState, credentials: Credentials) -> Result<Response, ApiError> {
+async fn authenticate(
+    state: &AppState,
+    credentials: Credentials,
+    client_ip: Option<std::net::IpAddr>,
+) -> Result<Response, ApiError> {
     if !is_valid_username(&credentials.username) {
         return Err(ApiError::new("invalid username given"));
     }
@@ -67,6 +71,7 @@ async fn authenticate(state: &AppState, credentials: Credentials) -> Result<Resp
         return Err(ApiError::new("password length must be 8 to 128 characters"));
     }
 
+    let username_for_audit = credentials.username.clone();
     let account: Option<Account> = state
         .database()
         .get("SELECT * FROM account WHERE name = ?", [credentials.username])
@@ -90,24 +95,61 @@ async fn authenticate(state: &AppState, credentials: Credentials) -> Result<Resp
                     token.to_session_cookie(key)
                 };
                 state.save_session(&token, credentials.session_description).await;
+                state
+                    .audit("auth.login.success")
+                    .actor(&acc)
+                    .ip_opt(client_ip)
+                    .fire();
                 Ok(cookie_to_response(cookie))
             }
-            None => Err(ApiError::incorrect_login()),
+            None => {
+                state
+                    .audit("auth.login.fail")
+                    .actor_label(username_for_audit)
+                    .ip_opt(client_ip)
+                    .meta(serde_json::json!({ "reason": "unknown_user" }))
+                    .fire();
+                Err(ApiError::incorrect_login())
+            }
         }
     } else {
+        state
+            .audit("auth.login.fail")
+            .actor_label(username_for_audit)
+            .ip_opt(client_ip)
+            .meta(serde_json::json!({ "reason": "bad_password" }))
+            .fire();
         Err(ApiError::incorrect_login())
     }
 }
 
-async fn logout(State(state): State<AppState>, token: Token) -> TokenRejection {
+async fn logout(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    token: Token,
+) -> TokenRejection {
     state.invalidate_account_cache(token.id);
     state.invalidate_session(&token.base64()).await;
+    state
+        .audit("auth.logout")
+        .actor_label(format!("id:{}", token.id))
+        .ip_opt(client_ip)
+        .fire();
     TokenRejection
 }
 
-async fn logout_all(State(state): State<AppState>, account: Account) -> TokenRejection {
+async fn logout_all(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    account: Account,
+) -> TokenRejection {
     state.invalidate_account_cache(account.id);
     state.invalidate_account_sessions(account.id).await;
+    state
+        .audit("auth.logout_all")
+        .actor(&account)
+        .ip_opt(client_ip)
+        .fire();
     TokenRejection
 }
 
@@ -118,6 +160,7 @@ struct InvalidateSessionPayload {
 
 async fn invalidate_session(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Json(payload): Json<InvalidateSessionPayload>,
 ) -> StatusCode {
@@ -126,6 +169,12 @@ async fn invalidate_session(
         Some(token) => {
             if token.id == account.id {
                 state.invalidate_session(&token.base64()).await;
+                state
+                    .audit("auth.session.invalidate")
+                    .actor(&account)
+                    .target(token.base64())
+                    .ip_opt(client_ip)
+                    .fire();
                 StatusCode::NO_CONTENT
             } else {
                 StatusCode::NOT_FOUND
@@ -146,6 +195,7 @@ struct ChangePasswordForm {
 async fn change_password(
     State(state): State<AppState>,
     referrer: Option<Referrer>,
+    ClientIp(client_ip): ClientIp,
     token: Token,
     flasher: Flasher,
     Form(form): Form<ChangePasswordForm>,
@@ -196,6 +246,11 @@ async fn change_password(
             let cookie = token.to_cookie(&state.config().secret_key);
             state.invalidate_account_sessions(account.id).await;
             state.save_session(&token, form.session_description).await;
+            state
+                .audit("auth.password.change")
+                .actor(&account)
+                .ip_opt(client_ip)
+                .fire();
             flasher.add(FlashMessage::success("Successfully changed password."));
             cookie_to_response(cookie)
         }
@@ -205,10 +260,11 @@ async fn change_password(
 
 async fn login_form(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     flasher: Flasher,
     Form(credentials): Form<Credentials>,
 ) -> Response {
-    match authenticate(&state, credentials).await {
+    match authenticate(&state, credentials, client_ip).await {
         Ok(r) => r,
         Err(e) => {
             let mut response = flasher.add(e.error.into_owned()).bail("/login");
@@ -300,6 +356,7 @@ struct SignupForm {
 
 async fn signup_submit(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     flasher: Flasher,
     Form(form): Form<SignupForm>,
 ) -> Response {
@@ -397,6 +454,13 @@ async fn signup_submit(
     let key = &state.config().secret_key;
     let cookie = token.to_cookie(key);
     state.save_session(&token, form.session_description).await;
+    state
+        .audit("auth.signup")
+        .actor_label(form.username.clone())
+        .target(form.code.clone())
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({ "new_account_id": new_account_id }))
+        .fire();
     flasher.add(FlashMessage::success(format!(
         "Welcome, {}!",
         form.username
@@ -413,6 +477,10 @@ struct AccountInfoTemplate {
     sessions: Vec<Session>,
     current_session: Option<Session>,
     api_key: Option<String>,
+    /// Comma-separated string of scopes attached to the current API key
+    /// (empty for legacy / unscoped keys). Used to pre-check the boxes
+    /// in the scopes selection UI.
+    api_key_scopes: String,
     key: SecretKey,
 }
 
@@ -441,10 +509,14 @@ impl AccountInfoTemplate {
             .position(|s| s.id == session_id)
             .map(|idx| sessions.swap_remove(idx));
 
-        let api_key = sessions
+        // Pull out the API-key row (if any) so we can show its scopes
+        // separately from the regular browser sessions list.
+        let api_key_session = sessions
             .iter()
             .position(|s| s.api_key)
-            .map(|idx| sessions.swap_remove(idx).id);
+            .map(|idx| sessions.swap_remove(idx));
+        let api_key = api_key_session.as_ref().map(|s| s.id.clone());
+        let api_key_scopes = api_key_session.as_ref().map(|s| s.scopes.clone()).unwrap_or_default();
 
         sessions.sort_by_key(|s| std::cmp::Reverse(s.created_at));
         let key = state.config().secret_key;
@@ -456,6 +528,7 @@ impl AccountInfoTemplate {
             sessions,
             current_session,
             api_key,
+            api_key_scopes,
             key,
         }
     }
@@ -485,6 +558,11 @@ async fn show_other_account_info(
 #[derive(Deserialize)]
 struct GenerateApiKey {
     new: bool,
+    /// Scopes to grant the new token. String values matching `Scope::as_str`
+    /// (e.g. "images:read"); unknown values are silently dropped.
+    /// Empty array means "legacy / unrestricted" — same as a pre-scopes key.
+    #[serde(default)]
+    scopes: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -494,13 +572,36 @@ struct GeneratedApiKey {
 
 async fn generate_api_key(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Json(payload): Json<GenerateApiKey>,
 ) -> Result<Json<GeneratedApiKey>, ApiError> {
     if !payload.new {
         state.invalidate_api_keys(account.id).await;
     }
-    let token = state.generate_api_key(account.id).await?;
+    // Map the string list from the form into typed Scopes, dropping any
+    // we don't recognise (a stale client shouldn't be able to inject a
+    // spurious permission name into the DB).
+    let scopes: Vec<Scope> = payload
+        .scopes
+        .iter()
+        .filter_map(|s| Scope::from_str(s))
+        .collect();
+    let scopes_str = scopes
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join(",");
+    let token = state.generate_api_key(account.id, &scopes).await?;
+    state
+        .audit("auth.api_key.generate")
+        .actor(&account)
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({
+            "regenerated": !payload.new,
+            "scopes": scopes_str,
+        }))
+        .fire();
     Ok(Json(GeneratedApiKey { token }))
 }
 

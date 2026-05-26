@@ -1,0 +1,73 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}Audit log | Admin | Klappstuhl.me{% endblock %}
+
+{% block admin_css %}
+<link rel="stylesheet" href="/static/admin_metrics.css">
+<link rel="stylesheet" href="/static/admin_audit.css">
+{% endblock %}
+
+{% block admin_body %}
+<div class="admin-page-header">
+    <h1>Audit log</h1>
+</div>
+
+<div class="metric-tiles">
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Today</span></div>
+        <div class="tile-value"><span id="tile-today">—</span></div>
+        <div class="tile-sub">events recorded</div>
+    </div>
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Failed logins (24h)</span></div>
+        <div class="tile-value"><span id="tile-failed">—</span></div>
+        <div class="tile-sub">auth.login.fail</div>
+    </div>
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Admin actions (24h)</span></div>
+        <div class="tile-value"><span id="tile-admin">—</span></div>
+        <div class="tile-sub">service / invite / secret / admin</div>
+    </div>
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Total</span></div>
+        <div class="tile-value"><span id="tile-total">—</span></div>
+        <div class="tile-sub">all-time events</div>
+    </div>
+</div>
+
+<section class="admin-section">
+    <form id="audit-filters" class="audit-filters">
+        <div class="audit-filter">
+            <label for="filter-action">Action prefix</label>
+            <input id="filter-action" name="action" type="search" placeholder="e.g. auth. or service." class="form-field">
+        </div>
+        <div class="audit-filter">
+            <label for="filter-actor">Actor</label>
+            <input id="filter-actor" name="actor" type="search" placeholder="username" class="form-field">
+        </div>
+        <button type="submit" class="button primary">Filter</button>
+        <button type="button" id="clear-filters" class="button outline">Clear</button>
+    </form>
+
+    <div class="container-table-wrap" style="margin-top: 1rem;">
+        <table class="container-table" id="audit-table">
+            <thead>
+                <tr>
+                    <th>When</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>IP</th>
+                    <th>Detail</th>
+                </tr>
+            </thead>
+            <tbody><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/admin_audit.js"></script>
+{% endblock %}

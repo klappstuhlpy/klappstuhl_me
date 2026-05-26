@@ -1,0 +1,86 @@
+/* Reuses metric-tiles + container-table from admin.css / admin_metrics.css */
+
+.audit-filters {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.audit-filters .button {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+    border-color: var(--box-border);
+}
+
+.audit-filters .button.active {
+    background: var(--branding);
+    color: #fff;
+    border-color: var(--branding);
+}
+
+.audit-filters {
+    display: flex;
+    align-items: end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.audit-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 12rem;
+}
+
+.audit-filter label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.audit-filter input {
+    padding: 0.4rem 0.65rem;
+    font-size: 0.85rem;
+}
+
+/* Action pill, coloured by namespace prefix */
+.action-pill {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.72rem;
+    border-radius: 9999px;
+    border: 1px solid var(--box-border);
+    background: var(--box-shade);
+    color: var(--foreground);
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.action-pill.auth-fail { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
+.action-pill.auth      { color: var(--info-text);    border-color: var(--info-border);    background: var(--info-bg); }
+.action-pill.service   { color: var(--branding);     border-color: rgba(124,58,237,0.4);  background: rgba(124,58,237,0.10); }
+.action-pill.invite    { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
+.action-pill.secret    { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
+
+.detail-snippet {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: inherit;
+    max-width: 22rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.detail-snippet:hover {
+    white-space: normal;
+    overflow: visible;
+}

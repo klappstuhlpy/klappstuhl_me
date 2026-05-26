@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::{convert::Infallible, net::IpAddr};
 
 use axum::{
     extract::FromRequestParts,
@@ -10,6 +10,29 @@ use axum::{
 };
 
 use crate::AppState;
+
+/// The de-proxied client IP for the current request.
+///
+/// Wraps `crate::logging::real_client_ip` so handlers can take a
+/// `client_ip: ClientIp` parameter instead of digging into `Parts`.
+/// Used for audit-log entries; `None` when ConnectInfo isn't available.
+#[derive(Debug, Clone, Copy)]
+pub struct ClientIp(pub Option<IpAddr>);
+
+#[async_trait::async_trait]
+impl<S> FromRequestParts<S> for ClientIp
+where
+    S: Send + Sync,
+{
+    type Rejection = Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        Ok(Self(crate::logging::real_client_ip(
+            &parts.extensions,
+            &parts.headers,
+        )))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Referrer(pub String);

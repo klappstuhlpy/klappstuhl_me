@@ -274,12 +274,17 @@ pub struct Session {
     pub description: Option<String>,
     /// Whether the session is an API key.
     pub api_key: bool,
+    /// Comma-separated list of granted scopes for API keys. Empty for
+    /// browser sessions or legacy (pre-scopes) API tokens — see
+    /// [`Session::scope_set`] for parsing.
+    pub scopes: String,
 }
 
 impl Table for Session {
     const NAME: &'static str = "session";
 
-    const COLUMNS: &'static [&'static str] = &["id", "account_id", "created_at", "description", "api_key"];
+    const COLUMNS: &'static [&'static str] =
+        &["id", "account_id", "created_at", "description", "api_key", "scopes"];
 
     type Id = String;
 
@@ -290,7 +295,53 @@ impl Table for Session {
             created_at: row.get("created_at")?,
             description: row.get("description")?,
             api_key: row.get("api_key")?,
+            // Fall back to "" on databases that haven't been ALTER'd yet
+            // (defensive — the idempotent ALTER in main.rs handles this).
+            scopes: row.get::<_, Option<String>>("scopes").unwrap_or(None).unwrap_or_default(),
         })
+    }
+}
+
+/// Granular permissions that can be attached to an API token.
+///
+/// Browser sessions always behave as if all scopes are granted (the
+/// authorisation check is bypassed when `Session::api_key == false`).
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum Scope {
+    /// Read-only access to image/file resources via the API.
+    ImagesRead,
+    /// Upload + delete images via the API.
+    ImagesWrite,
+    /// Read-only access to admin dashboard JSON endpoints
+    /// (metrics, security, secrets, audit).
+    AdminRead,
+    /// Mutate admin state (invites, service actions, secret status).
+    AdminWrite,
+}
+
+impl Scope {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Scope::ImagesRead => "images:read",
+            Scope::ImagesWrite => "images:write",
+            Scope::AdminRead => "admin:read",
+            Scope::AdminWrite => "admin:write",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "images:read" => Some(Scope::ImagesRead),
+            "images:write" => Some(Scope::ImagesWrite),
+            "admin:read" => Some(Scope::AdminRead),
+            "admin:write" => Some(Scope::AdminWrite),
+            _ => None,
+        }
+    }
+
+    /// Every defined scope, in display order (used for the checkbox UI).
+    pub fn all() -> &'static [Scope] {
+        &[Scope::ImagesRead, Scope::ImagesWrite, Scope::AdminRead, Scope::AdminWrite]
     }
 }
 
@@ -302,6 +353,28 @@ impl Session {
 
     pub fn signed(&self, key: &SecretKey) -> Option<String> {
         Token::from_base64(&self.id).map(|t| t.signed(key))
+    }
+
+    /// Parses the comma-separated `scopes` column into a typed set.
+    pub fn scope_set(&self) -> std::collections::HashSet<Scope> {
+        self.scopes
+            .split(',')
+            .filter_map(|s| Scope::from_str(s.trim()))
+            .collect()
+    }
+
+    /// Returns `true` if this session is allowed to perform actions
+    /// requiring `needed`.  Browser sessions bypass scope checks;
+    /// legacy API keys (with an empty scopes string) also bypass for
+    /// backwards-compatibility.
+    pub fn has_scope(&self, needed: Scope) -> bool {
+        if !self.api_key {
+            return true; // browser-cookie session, full access
+        }
+        if self.scopes.is_empty() {
+            return true; // legacy API key, pre-scopes
+        }
+        self.scope_set().contains(&needed)
     }
 }
 

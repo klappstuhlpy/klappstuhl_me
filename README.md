@@ -16,6 +16,9 @@ management, security analytics, and an invite-only user system.
   - **Services** — start / stop / restart Docker containers (or `docker compose` stacks via a configured `path`). Per-service live log console streamed over Server-Sent Events with syntax highlighting.
   - **Metrics** — live host stats (CPU, RAM, disk usage, disk I/O, network throughput) plus per-container Docker stats. uPlot charts with selectable ranges (1h / 6h / 24h / 7d / 30d). Threshold alerts fire a Discord webhook on `OK → ALERT` transitions with a 30-minute cooldown.
   - **Security** — failed logins, top offending IPs (with GeoIP country/city), reason breakdown, country distribution, recent activity feed. Optional Cloudflare panels (zone analytics + WAF events) when an API token + zone ID are configured.
+  - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI / Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
+  - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, signup, password change, logout), invite create/revoke, service actions, secret status changes, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
+- **API tokens with scopes** — generated from `/account`, each token can be restricted to a subset of `images:read · images:write · admin:read · admin:write`. Legacy keys (created without selecting scopes) keep full access for back-compat.
 - **REST API** — OpenAPI 3.0 documented at `/api/docs` via utoipa + Scalar.
 - **Automatic TLS** — Let's Encrypt via rustls-acme (TLS-ALPN-01) in production mode.
 
@@ -55,7 +58,7 @@ After that, log in at `https://yourdomain.com/login`, then visit `/admin` to acc
 | Mount                        | Why                                                            |
 |------------------------------|----------------------------------------------------------------|
 | `./data:/data`               | Persistent config, database, logs, ACME cert cache.            |
-| `/var/run/docker.sock`       | So `/services` can run `docker ps` / `docker compose up -d`.   |
+| `/var/run/docker.sock`       | So `/admin/services` can run `docker ps` / `docker compose up -d`.   |
 | `/proc:/host/proc:ro`        | So `/admin/metrics` reports the **host's** CPU/RAM/network.    |
 | `/sys:/host/sys:ro`          | Same — for `/sys/block/*` (disk I/O counters).                 |
 
@@ -99,7 +102,7 @@ A default `config.json` is written on first start. Minimum production layout:
 
 ### Services configuration
 
-Each entry powers one card on `/services`:
+Each entry powers one card on `/admin/services`:
 
 ```json
 {
