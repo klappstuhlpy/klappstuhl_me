@@ -203,7 +203,7 @@ pub async fn run_query(
     sql: &str,
     safe: bool,
 ) -> anyhow::Result<QueryResult> {
-    let client = connect(state, Some(db)).await?;
+    let mut client = connect(state, Some(db)).await?;
 
     let started = Instant::now();
     let (rows, _) = if safe {
@@ -267,7 +267,7 @@ fn cell_to_string(row: &tokio_postgres::Row, idx: usize) -> String {
         || ty == &Type::BPCHAR
         || ty == &Type::NAME
         || ty == &Type::UNKNOWN
-        || ty == &Type::CITEXT
+        //|| ty == &Type::CITEXT
     {
         s_get(row, idx).unwrap_or_else(|| "NULL".into())
     } else if ty == &Type::INT2 {
