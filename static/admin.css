@@ -82,6 +82,8 @@
 .admin-content {
     flex: 1;
     min-width: 0;
+    /* ensure that the body stays in frame of browser */
+    max-width: 100%;
 }
 
 /* ── Mobile: stack the sidebar above the content ───────────── */
