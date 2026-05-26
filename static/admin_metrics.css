@@ -178,7 +178,8 @@
 .container-table tbody tr + tr td { border-top: 1px solid var(--box-border); }
 .container-table .muted { color: var(--text-muted); }
 
-.container-table td.numeric {
+.container-table td.numeric,
+.container-table th.numeric {
     font-variant-numeric: tabular-nums;
     text-align: right;
 }

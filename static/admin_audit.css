@@ -69,6 +69,12 @@
 .action-pill.secret    { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
 .action-pill.postgres  { color: #67e8f9;             border-color: #155e75;               background: #083344; }
 
+/* Relative "When" cell — hover shows the absolute datetime. */
+.audit-when {
+    border-bottom: 1px dotted var(--box-border);
+    white-space: nowrap;
+}
+
 .detail-snippet {
     font-size: 0.72rem;
     color: var(--text-muted);

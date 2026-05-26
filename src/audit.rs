@@ -28,6 +28,10 @@ use tracing::warn;
 #[derive(Debug, Serialize)]
 pub struct AuditEntry {
     pub id: i64,
+    // Always emitted as RFC3339 so JavaScript's `new Date(...)` can parse it.
+    // Without the explicit `with`, the time crate's default Iso8601 output
+    // includes a sub-second precision JS sometimes rejects.
+    #[serde(with = "time::serde::rfc3339")]
     pub ts: OffsetDateTime,
     pub actor_id: Option<i64>,
     pub actor_label: String,

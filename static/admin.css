@@ -401,27 +401,16 @@ td.error {
   color: var(--error-text);
 }
 
-/* ── Tables ──────────────────────────────────────────────────── */
+/* ── Dashboard 2-column grid for the smaller tables ─────────── */
 
-.tables {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
+.admin-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.25rem;
 }
 
-.table-container {
-  flex-grow: 1;
+@media (max-width: 900px) {
+  .admin-grid-2 { grid-template-columns: 1fr; }
 }
 
-.table-container:has(#recent-logs) {
-  flex-basis: 100%;
-}
-
-.table-container > h2 {
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 0.75rem;
-}
+.admin-grid-2 .admin-section { margin-bottom: 0; }

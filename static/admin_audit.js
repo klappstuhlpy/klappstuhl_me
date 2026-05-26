@@ -19,6 +19,17 @@ function fmtRelative(iso) {
   return Math.floor(diff / 86400) + "d ago";
 }
 
+function fmtAbsolute(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (!isFinite(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
 function fmtNumber(n) { return (n ?? 0).toLocaleString(); }
 
 /** Returns a CSS class for the action pill based on namespace prefix. */
@@ -70,7 +81,7 @@ function renderTable(rows) {
       } catch (_) {}
     }
     return `<tr>
-      <td><span title="${escapeHtml(r.ts)}">${fmtRelative(r.ts)}</span></td>
+      <td><span class="audit-when" title="${escapeHtml(fmtAbsolute(r.ts))}">${fmtRelative(r.ts)}</span></td>
       <td>${escapeHtml(r.actor_label)}</td>
       <td><span class="action-pill ${cls}">${escapeHtml(r.action)}</span></td>
       <td>${target}</td>
@@ -125,7 +136,7 @@ function prependLiveEvent(evt) {
   }
   const tr = document.createElement("tr");
   tr.innerHTML = `
-    <td><span title="${escapeHtml(evt.ts)}">just now</span></td>
+    <td><span class="audit-when" title="${escapeHtml(fmtAbsolute(evt.ts))}">just now</span></td>
     <td>${escapeHtml(evt.actor_label)}</td>
     <td><span class="action-pill ${cls}">${escapeHtml(evt.action)}</span></td>
     <td>${target}</td>

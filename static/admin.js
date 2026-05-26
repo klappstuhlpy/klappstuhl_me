@@ -138,6 +138,7 @@ function getReferringSites(requests) {
     }
     let c = document.createElement('td');
     c.setAttribute('data-th', 'Views');
+    c.className = 'numeric';
     c.textContent = count.toLocaleString();
     tr.appendChild(f);
     tr.appendChild(c);
@@ -168,6 +169,7 @@ function getPopularRoutes(requests) {
     f.appendChild(a);
     let c = document.createElement('td');
     c.setAttribute('data-th', 'Views');
+    c.className = 'numeric';
     c.textContent = count.toLocaleString();
     tr.appendChild(f);
     tr.appendChild(c);
@@ -191,7 +193,7 @@ function getPopularApiRoutes(requests) {
   for (const [route, count] of Object.entries(counter).sort(([, a], [, b]) => b - a).slice(0, 25)) {
     tbody.appendChild(html('tr',
       html('td', route, { dataset: { th: 'Route' } }),
-      html('td', count.toLocaleString(), { dataset: { th: 'Calls' } })
+      html('td', count.toLocaleString(), { dataset: { th: 'Calls' }, className: 'numeric' })
     ));
   }
 }
@@ -215,9 +217,9 @@ function getTopApiUsers(requests) {
   for (const [user_id, counts] of Object.entries(counter).sort(([, a], [, b]) => (b.success + b.failed) - (a.success + a.failed)).slice(0, 25)) {
     tbody.appendChild(html('tr',
       html('td', html('a', user_id, { href: `/admin/user/${user_id}` }), { dataset: { th: 'User ID' } }),
-      html('td', counts.success + counts.failed, { dataset: { th: 'Total' } }),
-      html('td', counts.success, { dataset: { th: 'Success' } }),
-      html('td', counts.failed || '0', { dataset: { th: 'Failed' } }),
+      html('td', counts.success + counts.failed, { dataset: { th: 'Total' }, className: 'numeric' }),
+      html('td', counts.success, { dataset: { th: 'Success' }, className: 'numeric' }),
+      html('td', counts.failed || '0', { dataset: { th: 'Failed' }, className: 'numeric' }),
     ));
   }
 }
