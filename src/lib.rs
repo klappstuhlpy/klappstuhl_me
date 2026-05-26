@@ -1,6 +1,7 @@
 pub mod audit;
 pub mod auth;
 pub mod cached;
+pub mod docker;
 pub mod cli;
 pub mod cloudflare;
 mod config;

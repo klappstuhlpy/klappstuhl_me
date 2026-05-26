@@ -14,6 +14,7 @@ use crate::{AppState};
 mod admin;
 mod audit;
 mod auth;
+mod docker;
 mod image;
 mod api;
 mod metrics;
@@ -80,6 +81,7 @@ pub fn all() -> Router<AppState> {
         .merge(security::routes())
         .merge(services::routes())
         .merge(ssh::routes())
+        .merge(docker::routes())
         .merge(ws::routes())
         .nest("/api", api::routes())
 }

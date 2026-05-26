@@ -1,7 +1,7 @@
 use quick_cache::sync::Cache;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, RwLockReadGuard};
-use crate::{auth::hash_password, boxed_params, cached::TimedCachedValue, cloudflare::Cloudflare, database::Table, geoip::GeoIp, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
+use crate::{auth::hash_password, boxed_params, cached::TimedCachedValue, cloudflare::Cloudflare, database::Table, docker::DockerClient, geoip::GeoIp, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
 use crate::models::ImageFile;
 
 /// One live event pushed over WebSocket subscribers.
@@ -56,6 +56,8 @@ struct InnerState {
     /// 64 buffer slots — slow clients get RecvError::Lagged rather than
     /// blocking producers.
     live_tx: broadcast::Sender<LiveEvent>,
+    /// Docker introspection client. `None` when Docker socket is unavailable.
+    docker: Option<Arc<DockerClient>>,
 }
 
 /// Global application state for the axum Router.
@@ -156,6 +158,7 @@ impl AppState {
         };
 
         let (live_tx, _) = broadcast::channel(64);
+        let docker = DockerClient::connect();
 
         Self {
             inner: Arc::new(InnerState {
@@ -168,6 +171,7 @@ impl AppState {
                 geoip,
                 cloudflare,
                 live_tx,
+                docker,
             }),
             client,
             requests,
@@ -181,6 +185,11 @@ impl AppState {
 
     pub fn cloudflare(&self) -> Option<&Cloudflare> {
         self.inner.cloudflare.as_ref()
+    }
+
+    /// Returns the Docker introspection client, if available.
+    pub fn docker(&self) -> Option<&Arc<DockerClient>> {
+        self.inner.docker.as_ref()
     }
 
     /// Returns a fresh receiver for live events. Each WS connection

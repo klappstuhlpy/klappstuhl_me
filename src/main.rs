@@ -126,6 +126,9 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // Sweep expired SSH tokens every hour.
     klappstuhl_me::ssh::spawn_token_sweeper(state.clone());
 
+    // Stream Docker daemon events → live "docker" WS topic.
+    klappstuhl_me::docker::spawn_event_watcher(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()

@@ -1,0 +1,62 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}Docker | Admin | Klappstuhl.me{% endblock %}
+
+{% block admin_css %}
+<link rel="stylesheet" href="/static/admin_docker.css">
+{% endblock %}
+
+{% block admin_body %}
+<div class="admin-page-header">
+    <h1>Docker Graph</h1>
+    <div class="docker-toolbar" id="docker-toolbar">
+        <div class="filter-chips" id="filter-chips">
+            <button class="chip active" data-filter="all">All</button>
+            <button class="chip" data-filter="container">Containers</button>
+            <button class="chip" data-filter="network">Networks</button>
+            <button class="chip" data-filter="volume">Volumes</button>
+        </div>
+        <button class="button outline small" id="btn-relayout" title="Re-run layout">Relayout</button>
+        <button class="button outline small" id="btn-refresh" title="Refresh graph data">Refresh</button>
+        <button class="button outline small" id="btn-fit" title="Fit graph to screen">Fit</button>
+    </div>
+</div>
+
+{% if !docker_available %}
+<div class="docker-unavailable">
+    <div class="docker-unavailable-icon">&#x1F433;</div>
+    <div class="docker-unavailable-title">Docker not available</div>
+    <div class="docker-unavailable-sub">The Docker socket is not reachable from this server.</div>
+</div>
+{% else %}
+<div class="docker-graph-wrap" id="docker-graph-wrap">
+    <div id="cy" class="cytoscape-canvas"></div>
+    <aside class="docker-side-panel" id="side-panel" hidden>
+        <div class="side-panel-header">
+            <div class="side-panel-kind" id="sp-kind"></div>
+            <button class="side-panel-close" id="sp-close" title="Close">&times;</button>
+        </div>
+        <div class="side-panel-name" id="sp-name"></div>
+        <div class="side-panel-body" id="sp-body"></div>
+    </aside>
+</div>
+<div class="docker-legend">
+    <span class="legend-item"><span class="legend-dot container"></span>Container</span>
+    <span class="legend-item"><span class="legend-dot network"></span>Network</span>
+    <span class="legend-item"><span class="legend-dot volume"></span>Volume</span>
+</div>
+<div class="docker-event-log" id="docker-event-log">
+    <div class="event-log-header">
+        <span class="event-log-title">Live Events</span>
+        <span class="event-log-status" id="event-log-status">Disconnected</span>
+        <button class="button outline small" id="event-log-clear">Clear</button>
+    </div>
+    <div class="event-log-body" id="event-log-body">
+        <div class="event-log-empty" id="event-log-empty">Waiting for events…</div>
+    </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.29.2/dist/cytoscape.min.js"></script>
+<script src="/static/admin_docker.js"></script>
+{% endblock %}
