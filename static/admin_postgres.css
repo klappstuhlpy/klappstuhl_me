@@ -1,6 +1,13 @@
 /* Postgres dashboard — reuses container-table, .toggle-label/track/thumb,
    .admin-section, .admin-empty from existing stylesheets. */
 
+.pg-tab-panel .button {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+    background: var(--branding);
+    border-color: var(--branding);
+}
+
 .postgres-toolbar {
     display: flex;
     align-items: center;
