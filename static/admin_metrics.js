@@ -10,6 +10,10 @@ let currentRange = "1h";
 const charts = {};          // chart-id → uPlot instance
 let lastNetRx = null;       // for live throughput calculation in tiles
 let lastNetTs = null;
+let lastDiskRead = null;    // for live disk-I/O calculation in tiles
+let lastDiskWrite = null;
+let lastDiskOps = null;     // {read, write}
+let lastDiskTs = null;
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -62,12 +66,22 @@ async function pollCurrent() {
         `${fmtBytes(host.disk_used)} / ${fmtBytes(host.disk_total)}`;
       document.getElementById("tile-disk-status").className = "tile-status " + statusClassFor(host.disk_used_pct, 80, 90);
 
-      // Temperature
-      const tMax = host.temp_max;
-      const tAvg = host.temp_avg;
-      document.getElementById("tile-temp-c").textContent = tMax == null ? "—" : tMax.toFixed(1);
-      document.getElementById("tile-temp-detail").textContent = tAvg == null ? "no sensors" : `avg ${tAvg.toFixed(1)} °C`;
-      document.getElementById("tile-temp-status").className = "tile-status " + statusClassFor(tMax, 70, 80);
+      // Disk I/O throughput: delta vs previous poll
+      if (lastDiskRead != null && lastDiskTs != null && host.ts > lastDiskTs) {
+        const dt = host.ts - lastDiskTs;
+        const rRate = (host.disk_read_bytes - lastDiskRead) / dt;
+        const wRate = (host.disk_write_bytes - lastDiskWrite) / dt;
+        const rOps  = (host.disk_read_ops  - lastDiskOps.read)  / dt;
+        const wOps  = (host.disk_write_ops - lastDiskOps.write) / dt;
+        document.getElementById("tile-disk-read").textContent  = fmtRate(Math.max(0, rRate));
+        document.getElementById("tile-disk-write").textContent = fmtRate(Math.max(0, wRate));
+        document.getElementById("tile-disk-iops").textContent  =
+          `${(Math.max(0, rOps) + Math.max(0, wOps)).toFixed(0)} IOPS`;
+      }
+      lastDiskRead  = host.disk_read_bytes;
+      lastDiskWrite = host.disk_write_bytes;
+      lastDiskOps   = { read: host.disk_read_ops, write: host.disk_write_ops };
+      lastDiskTs    = host.ts;
 
       // Network throughput: delta vs previous poll
       if (lastNetRx != null && lastNetTs != null && host.ts > lastNetTs) {
@@ -157,19 +171,28 @@ function renderCharts(points) {
   const load = points.map(p => p.load_1);
   const mem = points.map(p => p.mem_used_pct);
   const disk = points.map(p => p.disk_used_pct);
-  const temp = points.map(p => p.temp_max);
 
   // Network: convert cumulative byte counters into rate (bytes/s) using deltas
   const netRx = [];
   const netTx = [];
+  const diskR = [];
+  const diskW = [];
   for (let i = 0; i < points.length; i++) {
-    if (i === 0) { netRx.push(null); netTx.push(null); continue; }
+    if (i === 0) {
+      netRx.push(null); netTx.push(null);
+      diskR.push(null); diskW.push(null);
+      continue;
+    }
     const dt = points[i].ts - points[i-1].ts;
-    if (dt <= 0) { netRx.push(null); netTx.push(null); continue; }
-    const drx = Math.max(0, points[i].net_rx_bytes - points[i-1].net_rx_bytes) / dt;
-    const dtx = Math.max(0, points[i].net_tx_bytes - points[i-1].net_tx_bytes) / dt;
-    netRx.push(drx);
-    netTx.push(dtx);
+    if (dt <= 0) {
+      netRx.push(null); netTx.push(null);
+      diskR.push(null); diskW.push(null);
+      continue;
+    }
+    netRx.push(Math.max(0, points[i].net_rx_bytes - points[i-1].net_rx_bytes) / dt);
+    netTx.push(Math.max(0, points[i].net_tx_bytes - points[i-1].net_tx_bytes) / dt);
+    diskR.push(Math.max(0, points[i].disk_read_bytes  - points[i-1].disk_read_bytes)  / dt);
+    diskW.push(Math.max(0, points[i].disk_write_bytes - points[i-1].disk_write_bytes) / dt);
   }
 
   rebuildChart("chart-cpu", {
@@ -215,16 +238,17 @@ function renderCharts(points) {
     ],
   });
 
-  rebuildChart("chart-temp", {
-    data: [xs, temp],
+  rebuildChart("chart-disk-io", {
+    data: [xs, diskR, diskW],
     series: [
       {},
-      { label: "Max °C", stroke: "#fb923c", width: 1.5 },
+      { label: "↓ Read",  stroke: "#67e8f9", width: 1.5, value: (u, v) => fmtRate(v) },
+      { label: "↑ Write", stroke: "#fb923c", width: 1.5, value: (u, v) => fmtRate(v) },
     ],
-    scales: { x: { time: true }, y: { auto: true } },
+    scales: { x: { time: true } },
     axes: [
       { stroke: "#71717a" },
-      { stroke: "#71717a", grid: { stroke: "rgba(127,127,127,0.15)" }, values: (u, v) => v.map(x => x + " °C") },
+      { stroke: "#71717a", grid: { stroke: "rgba(127,127,127,0.15)" }, values: (u, v) => v.map(fmtRate) },
     ],
   });
 }

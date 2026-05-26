@@ -38,9 +38,12 @@ pub struct Sample {
     pub net_rx_bytes: u64,
     pub net_tx_bytes: u64,
 
-    // Temperatures (°C), if any sensors were found
-    pub temp_max: Option<f64>,
-    pub temp_avg: Option<f64>,
+    // Cumulative disk I/O counters (summed across whole block devices,
+    // excluding loop / ram / dm- virtual devices)
+    pub disk_read_bytes: u64,
+    pub disk_write_bytes: u64,
+    pub disk_read_ops: u64,
+    pub disk_write_ops: u64,
 
     // Root filesystem
     pub disk_total: u64,
@@ -115,10 +118,12 @@ pub async fn collect() -> anyhow::Result<Sample> {
         s.net_tx_bytes = tx;
     }
 
-    // Temperatures (scan /sys/class/thermal/thermal_zone*)
-    let (temp_max, temp_avg) = read_temperatures().await;
-    s.temp_max = temp_max;
-    s.temp_avg = temp_avg;
+    // Disk I/O (cumulative, across whole block devices)
+    let (rb, wb, ro, wo) = read_disk_io().await;
+    s.disk_read_bytes = rb;
+    s.disk_write_bytes = wb;
+    s.disk_read_ops = ro;
+    s.disk_write_ops = wo;
 
     // Disk usage of "/"
     if let Ok((total, used)) = root_disk_usage().await {
@@ -276,40 +281,73 @@ async fn read_net_dev() -> anyhow::Result<(u64, u64)> {
     Ok((rx_total, tx_total))
 }
 
-// ─── /sys/class/thermal/thermal_zone*/temp ───────────────────────────────
+// ─── /sys/block/*/stat — disk I/O ────────────────────────────────────────
 
-async fn read_temperatures() -> (Option<f64>, Option<f64>) {
-    let dir = sys_path().join("class/thermal");
-    let mut entries = match tokio::fs::read_dir(&dir).await {
+/// Returns `(read_bytes, write_bytes, read_ops, write_ops)` summed across
+/// every whole block device.
+///
+/// We enumerate `/sys/block/*` rather than parsing `/proc/diskstats`
+/// because `/sys/block/` only lists *whole disks* — partition stats would
+/// double-count if we summed everything in /proc/diskstats.
+///
+/// Loop, ram, zram, dm-* and md* virtual devices are skipped.
+///
+/// Each `stat` file has the standard kernel block-stats format:
+///   reads_completed reads_merged sectors_read time_reading
+///   writes_completed writes_merged sectors_written time_writing …
+/// Sector size is always 512 bytes by kernel convention regardless of
+/// the device's physical sector size.
+async fn read_disk_io() -> (u64, u64, u64, u64) {
+    let block_dir = sys_path().join("block");
+    let mut entries = match tokio::fs::read_dir(&block_dir).await {
         Ok(d) => d,
-        Err(_) => return (None, None),
+        Err(_) => return (0, 0, 0, 0),
     };
 
-    let mut temps_c: Vec<f64> = Vec::new();
+    let mut read_bytes = 0u64;
+    let mut write_bytes = 0u64;
+    let mut read_ops = 0u64;
+    let mut write_ops = 0u64;
+
     while let Ok(Some(entry)) = entries.next_entry().await {
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
-        if !name.starts_with("thermal_zone") {
+
+        // Skip virtual / non-physical devices
+        if name.starts_with("loop")
+            || name.starts_with("ram")
+            || name.starts_with("zram")
+            || name.starts_with("dm-")
+            || name.starts_with("md")
+        {
             continue;
         }
-        let temp_path = entry.path().join("temp");
-        if let Ok(s) = tokio::fs::read_to_string(&temp_path).await {
-            if let Ok(millideg) = s.trim().parse::<i64>() {
-                // Values are millidegrees Celsius
-                let c = millideg as f64 / 1000.0;
-                if (0.0..=150.0).contains(&c) {
-                    temps_c.push(c);
-                }
-            }
+
+        let stat_path = entry.path().join("stat");
+        let Ok(text) = tokio::fs::read_to_string(&stat_path).await else { continue };
+        let nums: Vec<u64> = text
+            .split_ascii_whitespace()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+        if nums.len() < 7 {
+            continue;
         }
+
+        // Field offsets (per Documentation/admin-guide/iostats.rst):
+        //   0 reads completed
+        //   1 reads merged
+        //   2 sectors read
+        //   3 time reading (ms)
+        //   4 writes completed
+        //   5 writes merged
+        //   6 sectors written
+        read_ops    = read_ops.saturating_add(nums[0]);
+        read_bytes  = read_bytes.saturating_add(nums[2].saturating_mul(512));
+        write_ops   = write_ops.saturating_add(nums[4]);
+        write_bytes = write_bytes.saturating_add(nums[6].saturating_mul(512));
     }
 
-    if temps_c.is_empty() {
-        return (None, None);
-    }
-    let max = temps_c.iter().copied().fold(f64::MIN, f64::max);
-    let avg = temps_c.iter().sum::<f64>() / temps_c.len() as f64;
-    (Some(max), Some(avg))
+    (read_bytes, write_bytes, read_ops, write_ops)
 }
 
 // ─── df / for root filesystem usage ─────────────────────────────────────

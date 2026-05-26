@@ -25,9 +25,9 @@ pub async fn insert_sample(state: &AppState, ts: i64, s: &Sample) -> rusqlite::R
                      load_1, load_5, load_15,
                      mem_total, mem_used, mem_cached, swap_total, swap_used,
                      net_rx_bytes, net_tx_bytes,
-                     temp_max, temp_avg,
-                     disk_total, disk_used)
-                 VALUES (?,?,?,?,?, ?,?,?, ?,?,?,?,?, ?,?, ?,?, ?,?)",
+                     disk_total, disk_used,
+                     disk_read_bytes, disk_write_bytes, disk_read_ops, disk_write_ops)
+                 VALUES (?,?,?,?,?, ?,?,?, ?,?,?,?,?, ?,?, ?,?, ?,?,?,?)",
             )?;
             stmt.execute(rusqlite::params![
                 ts,
@@ -36,8 +36,9 @@ pub async fn insert_sample(state: &AppState, ts: i64, s: &Sample) -> rusqlite::R
                 s.mem_total as i64, s.mem_used as i64, s.mem_cached as i64,
                 s.swap_total as i64, s.swap_used as i64,
                 s.net_rx_bytes as i64, s.net_tx_bytes as i64,
-                s.temp_max, s.temp_avg,
                 s.disk_total as i64, s.disk_used as i64,
+                s.disk_read_bytes as i64, s.disk_write_bytes as i64,
+                s.disk_read_ops as i64, s.disk_write_ops as i64,
             ])?;
             Ok(())
         })
@@ -117,7 +118,10 @@ pub struct HistoryPoint {
     pub mem_used_pct: f64,
     pub net_rx_bytes: i64,
     pub net_tx_bytes: i64,
-    pub temp_max: Option<f64>,
+    /// Cumulative disk-read bytes since boot — JS computes rates as deltas.
+    pub disk_read_bytes: i64,
+    /// Cumulative disk-write bytes since boot — JS computes rates as deltas.
+    pub disk_write_bytes: i64,
     pub disk_used_pct: f64,
     pub load_1: f64,
 }
@@ -130,7 +134,8 @@ pub async fn fetch_history(state: &AppState, seconds: i64) -> rusqlite::Result<V
         .call(move |conn| -> rusqlite::Result<Vec<HistoryPoint>> {
             let mut stmt = conn.prepare_cached(
                 "SELECT ts, cpu_idle, mem_used, mem_total, net_rx_bytes, net_tx_bytes,
-                        temp_max, disk_total, disk_used, load_1
+                        disk_read_bytes, disk_write_bytes,
+                        disk_total, disk_used, load_1
                  FROM metric_sample
                  WHERE ts >= ?
                  ORDER BY ts ASC",
@@ -139,17 +144,18 @@ pub async fn fetch_history(state: &AppState, seconds: i64) -> rusqlite::Result<V
                 let cpu_idle: f64 = row.get(1)?;
                 let mem_used: i64 = row.get(2)?;
                 let mem_total: i64 = row.get(3)?;
-                let disk_total: i64 = row.get(7)?;
-                let disk_used: i64 = row.get(8)?;
+                let disk_total: i64 = row.get(8)?;
+                let disk_used: i64 = row.get(9)?;
                 Ok(HistoryPoint {
                     ts: row.get(0)?,
                     cpu_total: (100.0 - cpu_idle).max(0.0).min(100.0),
                     mem_used_pct: if mem_total > 0 { mem_used as f64 / mem_total as f64 * 100.0 } else { 0.0 },
                     net_rx_bytes: row.get(4)?,
                     net_tx_bytes: row.get(5)?,
-                    temp_max: row.get(6)?,
+                    disk_read_bytes: row.get(6)?,
+                    disk_write_bytes: row.get(7)?,
                     disk_used_pct: if disk_total > 0 { disk_used as f64 / disk_total as f64 * 100.0 } else { 0.0 },
-                    load_1: row.get(9)?,
+                    load_1: row.get(10)?,
                 })
             })?;
             rows.collect()
@@ -217,8 +223,10 @@ pub struct CurrentView {
     pub swap_used: i64,
     pub net_rx_bytes: i64,
     pub net_tx_bytes: i64,
-    pub temp_max: Option<f64>,
-    pub temp_avg: Option<f64>,
+    pub disk_read_bytes: i64,
+    pub disk_write_bytes: i64,
+    pub disk_read_ops: i64,
+    pub disk_write_ops: i64,
     pub disk_total: i64,
     pub disk_used: i64,
     pub disk_used_pct: f64,
@@ -249,8 +257,10 @@ impl CurrentView {
             swap_used: row.get("swap_used")?,
             net_rx_bytes: row.get("net_rx_bytes")?,
             net_tx_bytes: row.get("net_tx_bytes")?,
-            temp_max: row.get("temp_max")?,
-            temp_avg: row.get("temp_avg")?,
+            disk_read_bytes: row.get("disk_read_bytes")?,
+            disk_write_bytes: row.get("disk_write_bytes")?,
+            disk_read_ops: row.get("disk_read_ops")?,
+            disk_write_ops: row.get("disk_write_ops")?,
             disk_total,
             disk_used,
             disk_used_pct: if disk_total > 0 { disk_used as f64 / disk_total as f64 * 100.0 } else { 0.0 },

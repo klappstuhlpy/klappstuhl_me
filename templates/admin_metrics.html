@@ -44,13 +44,15 @@
         <div class="tile-value"><span id="tile-disk-pct">—</span><span class="unit">%</span></div>
         <div class="tile-sub"><span id="tile-disk-detail">— / —</span></div>
     </div>
-    <div class="metric-tile" data-key="temp">
+    <div class="metric-tile" data-key="disk-io">
         <div class="tile-head">
-            <span class="tile-label">Temp</span>
-            <span class="tile-status" id="tile-temp-status"></span>
+            <span class="tile-label">Disk I/O</span>
         </div>
-        <div class="tile-value"><span id="tile-temp-c">—</span><span class="unit">°C</span></div>
-        <div class="tile-sub"><span id="tile-temp-detail">avg —</span></div>
+        <div class="tile-value tile-value-stacked">
+            <span class="net-line"><span class="arrow">↓</span><span id="tile-disk-read">—</span></span>
+            <span class="net-line"><span class="arrow">↑</span><span id="tile-disk-write">—</span></span>
+        </div>
+        <div class="tile-sub"><span id="tile-disk-iops">— IOPS</span></div>
     </div>
     <div class="metric-tile" data-key="net">
         <div class="tile-head">
@@ -80,8 +82,8 @@
             <div id="chart-net"></div>
         </div>
         <div class="chart-panel">
-            <div class="chart-title">Temperature</div>
-            <div id="chart-temp"></div>
+            <div class="chart-title">Disk I/O</div>
+            <div id="chart-disk-io"></div>
         </div>
     </div>
 </section>

@@ -16,7 +16,6 @@ const CPU_THRESHOLD: f64 = 90.0;        // percent
 const CPU_SUSTAIN_SECS: i64 = 5 * 60;   // must be above for this long
 const MEM_THRESHOLD: f64 = 90.0;        // percent
 const DISK_THRESHOLD: f64 = 90.0;       // percent
-const TEMP_THRESHOLD: f64 = 80.0;       // °C
 const COOLDOWN_SECS: i64 = 30 * 60;     // suppress repeat alerts for 30 min
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,7 +38,6 @@ struct Tracker {
     cpu: Status,
     mem: Status,
     disk: Status,
-    temp: Status,
 }
 
 /// Shared alert state held by the collector task. Wrapped in a Mutex because
@@ -78,13 +76,6 @@ pub async fn check_and_fire(state: &AppState, alerts: &AlertState, sample: &Samp
         let disk = sample.disk_used_pct();
         if let CheckOutcome::Fired = check_instant(&mut t.disk, disk, DISK_THRESHOLD, now) {
             fires.push(("💾 Disk almost full".into(), format!("Root filesystem at {disk:.1}% (≥ {DISK_THRESHOLD}%)")));
-        }
-
-        // Temperature — instant
-        if let Some(t_max) = sample.temp_max {
-            if let CheckOutcome::Fired = check_instant(&mut t.temp, t_max, TEMP_THRESHOLD, now) {
-                fires.push(("🌡️ High temperature".into(), format!("Sensor at {t_max:.1} °C (≥ {TEMP_THRESHOLD} °C)")));
-            }
         }
     } // drop the mutex guard before awaiting
 

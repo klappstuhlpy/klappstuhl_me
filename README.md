@@ -14,7 +14,7 @@ management, security analytics, and an invite-only user system.
   - **Dashboard** — request analytics, popular routes, referring sites, API consumers.
   - **Invites** — invite-only signup. Admins generate one-time codes (with optional expiry + note), copy a `/signup?code=…` URL, share it with the invitee. No public registration.
   - **Services** — start / stop / restart Docker containers (or `docker compose` stacks via a configured `path`). Per-service live log console streamed over Server-Sent Events with syntax highlighting.
-  - **Metrics** — live host stats (CPU, RAM, disk, temperatures, network throughput) plus per-container Docker stats. uPlot charts with selectable ranges (1h / 6h / 24h / 7d / 30d). Threshold alerts fire a Discord webhook on `OK → ALERT` transitions with a 30-minute cooldown.
+  - **Metrics** — live host stats (CPU, RAM, disk usage, disk I/O, network throughput) plus per-container Docker stats. uPlot charts with selectable ranges (1h / 6h / 24h / 7d / 30d). Threshold alerts fire a Discord webhook on `OK → ALERT` transitions with a 30-minute cooldown.
   - **Security** — failed logins, top offending IPs (with GeoIP country/city), reason breakdown, country distribution, recent activity feed. Optional Cloudflare panels (zone analytics + WAF events) when an API token + zone ID are configured.
 - **REST API** — OpenAPI 3.0 documented at `/api/docs` via utoipa + Scalar.
 - **Automatic TLS** — Let's Encrypt via rustls-acme (TLS-ALPN-01) in production mode.
@@ -57,7 +57,7 @@ After that, log in at `https://yourdomain.com/login`, then visit `/admin` to acc
 | `./data:/data`               | Persistent config, database, logs, ACME cert cache.            |
 | `/var/run/docker.sock`       | So `/services` can run `docker ps` / `docker compose up -d`.   |
 | `/proc:/host/proc:ro`        | So `/admin/metrics` reports the **host's** CPU/RAM/network.    |
-| `/sys:/host/sys:ro`          | Same — for temperature sensors.                                |
+| `/sys:/host/sys:ro`          | Same — for `/sys/block/*` (disk I/O counters).                 |
 
 `HOST_PROC=/host/proc` and `HOST_SYS=/host/sys` are pre-set in the compose file so the metrics collector picks up the host filesystem.
 
@@ -136,7 +136,6 @@ Hard-coded (`src/metrics/alerts.rs`). On the `OK → ALERT` transition, a red Di
 | CPU             | > 90%     | Must be sustained for 5 minutes.       |
 | RAM             | > 90%     | Instant.                               |
 | Disk (root `/`) | > 90%     | Instant.                               |
-| Temperature     | > 80 °C   | Hottest sensor in `/sys/class/thermal`.|
 
 ## Data and log paths
 
