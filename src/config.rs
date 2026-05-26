@@ -20,7 +20,7 @@ pub enum ServiceKind {
     Screen,
 }
 
-/// Configuration for a single monitored service on the `/services` page.
+/// Configuration for a single monitored service on the `/admin/services` page.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServiceConfig {
     /// Human-readable display name.
@@ -64,7 +64,7 @@ pub struct Config {
     #[serde(rename = "discord_webhook_url")]
     #[serde(default)]
     pub webhook: Option<Webhook>,
-    /// Services to monitor on the `/services` admin page.
+    /// Services to monitor on the `/admin/services` admin page.
     #[serde(default)]
     pub services: Vec<ServiceConfig>,
     /// The server IP and port configuration
