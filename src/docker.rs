@@ -111,6 +111,76 @@ impl DockerClient {
             .context("inspect_container")
     }
 
+    // ─── Snapshot operations ──────────────────────────────────────────────
+
+    /// Commit a container to a new image.  Returns the full image reference
+    /// `klappstuhl-snapshot:<tag>`.
+    pub async fn commit_snapshot(&self, container_id: &str, tag: &str) -> anyhow::Result<String> {
+        use bollard::image::CommitContainerOptions;
+        use bollard::container::Config;
+
+        let full_ref = format!("klappstuhl-snapshot:{tag}");
+        self.docker
+            .commit_container(
+                CommitContainerOptions {
+                    container: container_id.to_owned(),
+                    repo: "klappstuhl-snapshot".to_owned(),
+                    tag: tag.to_owned(),
+                    comment: String::new(),
+                    author: String::new(),
+                    pause: true,
+                    changes: None,
+                },
+                Config::<String>::default(),
+            )
+            .await
+            .context("commit_container")?;
+        Ok(full_ref)
+    }
+
+    /// Remove an image by its full reference (e.g. `klappstuhl-snapshot:abc`).
+    pub async fn delete_image(&self, name: &str) -> anyhow::Result<()> {
+        use bollard::image::RemoveImageOptions;
+
+        self.docker
+            .remove_image(
+                name,
+                Some(RemoveImageOptions { force: true, noprune: false }),
+                None,
+            )
+            .await
+            .context("remove_image")?;
+        self.invalidate().await;
+        Ok(())
+    }
+
+    /// Create and immediately start a container from `image` named `name`.
+    /// Returns the new container ID.
+    pub async fn run_snapshot(&self, image: &str, name: &str) -> anyhow::Result<String> {
+        use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
+
+        let created = self
+            .docker
+            .create_container(
+                Some(CreateContainerOptions {
+                    name: name.to_owned(),
+                    platform: None,
+                }),
+                Config {
+                    image: Some(image.to_owned()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .context("create_container")?;
+        self.docker
+            .start_container(&created.id, None::<StartContainerOptions<String>>)
+            .await
+            .context("start_container")?;
+        self.invalidate().await;
+        Ok(created.id)
+    }
+
     /// Invalidate all three caches (called after any state-changing action).
     pub async fn invalidate(&self) {
         self.cached_containers.invalidate().await;
