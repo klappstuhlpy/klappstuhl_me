@@ -2,7 +2,7 @@
    Strategy:
      - /static/* → cache-first (the shell rarely changes; immediate
        second-load + works on flaky mobile networks).
-     - Everything else (HTML, /admin/*/data, /ws, etc.) → network-only.
+     - Everything else (HTML, /admin/'*'/data, /ws, etc.) → network-only.
        Admin data is too dynamic to be useful when stale.
    Bump SHELL_CACHE on every static-asset change to bust old caches.
    ───────────────────────────────────────────────────────────── */
