@@ -165,6 +165,10 @@
 
 /* ── Section header with inline action button ───────────────── */
 
+.admin-section {
+    padding-bottom: 3rem;
+}
+
 .section-header-row {
     display: flex;
     align-items: center;

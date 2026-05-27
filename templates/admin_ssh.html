@@ -109,9 +109,14 @@
 
 <!-- ── Temporary access tokens ──────────────────────────────── -->
 <section class="admin-section">
-    <div class="section-header-row">
-        <h2>Temporary access tokens <span class="count-badge muted" id="token-count">0</span></h2>
-        <button class="button outline small" id="issue-token-btn" type="button">Issue token</button>
+    <div class="admin-page-header">
+        <div>
+            <h1>Temporary access tokens</h1>
+            <p class="admin-page-sub">Manage active API tokens across accounts. Currently active tokens: <span class="count-badge muted" id="token-count">0</span></p>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+            <button class="button outline small" id="issue-token-btn" type="button">Issue token</button>
+        </div>
     </div>
 
     <!-- Issue form (hidden by default) -->
