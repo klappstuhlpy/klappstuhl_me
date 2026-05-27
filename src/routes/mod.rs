@@ -23,7 +23,6 @@ mod sanitizer;
 mod secrets;
 mod spotlight;
 mod security;
-mod services;
 mod ssh;
 mod ws;
 
@@ -81,7 +80,6 @@ pub fn all() -> Router<AppState> {
         .merge(postgres::routes())
         .merge(secrets::routes())
         .merge(security::routes())
-        .merge(services::routes())
         .merge(ssh::routes())
         .merge(docker::routes())
         .merge(sanitizer::routes())

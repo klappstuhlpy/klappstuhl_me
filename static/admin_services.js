@@ -143,7 +143,7 @@ async function refreshServices() {
     refreshState.textContent = "refreshing";
   }
   try {
-    const res = await fetch("/admin/services/data");
+    const res = await fetch("/admin/docker/services/data");
     if (!res.ok) return;
     const views = await res.json();
     const byName = new Map(views.map(v => [v.name, v]));
@@ -300,7 +300,7 @@ function openLogs(serviceName) {
   setConnectionState("connecting");
   modal.showModal();
 
-  activeSource = new EventSource(`/admin/services/logs/${encodeURIComponent(serviceName)}`);
+  activeSource = new EventSource(`/admin/docker/logs/${encodeURIComponent(serviceName)}`);
 
   activeSource.onopen = () => setConnectionState("connected");
 

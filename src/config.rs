@@ -10,24 +10,15 @@ use serde::{Deserialize, Serialize};
 use crate::key::SecretKey;
 use crate::{cli::PROGRAM_NAME, discord::Webhook};
 
-/// How a monitored service is managed.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum ServiceKind {
-    /// A Docker container identified by container name.
-    Docker,
-    /// A GNU Screen session identified by session name.
-    Screen,
-}
-
-/// Configuration for a single monitored service on the `/admin/services` page.
+/// Configuration for a single Docker service shown on the `/admin/docker` page.
+///
+/// Note: the legacy `kind` field (previously `"docker"` or `"screen"`) is silently
+/// ignored if present in the config file — all services are now Docker-only.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServiceConfig {
     /// Human-readable display name.
     pub name: String,
-    /// How the service is managed.
-    pub kind: ServiceKind,
-    /// The container or session identifier passed to docker/screen.
+    /// The Docker container name passed to `docker start` / `docker stop` etc.
     pub identifier: String,
     /// Working directory that contains the `docker-compose.yml`.
     ///
@@ -40,7 +31,6 @@ pub struct ServiceConfig {
     /// ```json
     /// {
     ///   "name": "My App",
-    ///   "kind": "docker",
     ///   "identifier": "my_app",
     ///   "path": "/home/user/my-app"
     /// }

@@ -53,18 +53,17 @@ fn contains_ci(haystack: &str, needle: &str) -> bool {
 
 fn static_nav() -> Vec<SpotlightItem> {
     vec![
-        SpotlightItem::nav("Dashboard",       "Admin overview",               "/admin"),
-        SpotlightItem::nav("Invites",         "Manage invite codes",          "/admin/invites"),
-        SpotlightItem::nav("Services",        "Monitor running services",     "/admin/services"),
-        SpotlightItem::nav("Metrics",         "CPU, memory, network charts",  "/admin/metrics"),
-        SpotlightItem::nav("Security",        "Requests, GeoIP, Cloudflare",  "/admin/security"),
-        SpotlightItem::nav("Secrets",         "Secret scanner findings",      "/admin/secrets"),
-        SpotlightItem::nav("Audit log",       "All admin actions",            "/admin/audit"),
-        SpotlightItem::nav("Postgres",        "Query the database",           "/admin/postgres"),
-        SpotlightItem::nav("SSH Keys",        "Keys, tokens, session audit",  "/admin/ssh"),
-        SpotlightItem::nav("Docker graph",    "Container dependency graph",   "/admin/docker"),
-        SpotlightItem::nav("Snapshots",       "Capture and restore containers", "/admin/docker/snapshots"),
-        SpotlightItem::nav("File Sanitizer",  "ClamAV + VirusTotal scanning", "/admin/sanitizer"),
+        SpotlightItem::nav("Dashboard",       "Admin overview",                      "/admin"),
+        SpotlightItem::nav("Invites",         "Manage invite codes",                 "/admin/invites"),
+        SpotlightItem::nav("Docker",          "Services, graph, start/stop/restart", "/admin/docker"),
+        SpotlightItem::nav("Snapshots",       "Capture and restore containers",      "/admin/docker/snapshots"),
+        SpotlightItem::nav("Metrics",         "CPU, memory, network charts",         "/admin/metrics"),
+        SpotlightItem::nav("Security",        "Requests, GeoIP, Cloudflare",         "/admin/security"),
+        SpotlightItem::nav("Secrets",         "Secret scanner findings",             "/admin/secrets"),
+        SpotlightItem::nav("Audit log",       "All admin actions",                   "/admin/audit"),
+        SpotlightItem::nav("Postgres",        "Query the database",                  "/admin/postgres"),
+        SpotlightItem::nav("SSH Keys",        "Keys, tokens, session audit",         "/admin/ssh"),
+        SpotlightItem::nav("File Sanitizer",  "ClamAV + VirusTotal scanning",       "/admin/sanitizer"),
     ]
 }
 
