@@ -119,6 +119,7 @@ document.getElementById("submit-key-btn").addEventListener("click", async () => 
     submitBtn.disabled = true;
     submitBtn.textContent = "Adding…";
 
+    // Server derives the target host user from the key's comment.
     try {
         const res = await fetch("/admin/ssh/keys", {
             method: "POST",
@@ -163,7 +164,7 @@ async function loadData() {
 function renderKeys(keys) {
     const tbody = document.querySelector("#keys-table tbody");
     if (!keys || keys.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="muted">No keys — click "Add key" to add one.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="muted">No keys — click "Add key" to add one.</td></tr>`;
         return;
     }
 
@@ -184,10 +185,17 @@ function renderKeys(keys) {
             ? `<span class="key-comment muted"> — ${escapeHtml(k.comment)}</span>`
             : "";
 
+        // Target user cell: shows the host user this key authorizes. Only
+        // legacy rows (added before target_user existed) have no value.
+        const targetCell = k.target_user
+            ? `<code>${escapeHtml(k.target_user)}</code>`
+            : `<span class="status-pill revoked" title="Legacy key with no target_user — not synced to any authorized_keys file. Re-add to fix.">not synced</span>`;
+
         return `<tr data-id="${k.id}">
             <td><strong>${escapeHtml(k.name)}</strong>${comment}</td>
             <td><code class="key-fp">${escapeHtml(k.fingerprint)}</code></td>
             <td><span class="key-algo">${escapeHtml(k.algo)}</span></td>
+            <td>${targetCell}</td>
             <td><span title="${escapeHtml(k.added_at)}">${fmtRelative(k.added_at)}</span></td>
             <td><span title="${k.last_used_at || ''}">${fmtRelative(k.last_used_at)}</span></td>
             <td>${statusPill}</td>

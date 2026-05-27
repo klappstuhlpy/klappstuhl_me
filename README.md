@@ -106,7 +106,6 @@ A default `config.json` is written on first start. Full layout with all optional
   "clamav_addr": null,
   "virustotal_api_key": null,
   "spotlight_scripts": [],
-  "authorized_keys_path": null,
   "sshd_auth_log_path": null
 }
 ```
@@ -128,7 +127,6 @@ A default `config.json` is written on first start. Full layout with all optional
 | `clamav_addr`            | string \| null    | TCP address of a `clamd` daemon, e.g. `"127.0.0.1:3310"`. Enables ClamAV scanning.             |
 | `virustotal_api_key`     | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.              |
 | `spotlight_scripts`      | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                        |
-| `authorized_keys_path`   | string \| null    | Path of an `authorized_keys` file that's rewritten on every add/revoke/delete. See below.      |
 | `sshd_auth_log_path`     | string \| null    | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below. |
 
 ### Docker services configuration
@@ -209,19 +207,21 @@ On Windows the data dir and config dir are both `%AppData%\klappstuhl_me\`, so s
 
 The `/admin/ssh` page stores keys in SQLite by default — sshd on the host doesn't know about them until you wire one or both of the integrations below. They're independent, so you can enable either, both, or neither.
 
-**File sync — `authorized_keys_path`.** When set, every add / revoke / delete rewrites the file at that path (atomic temp-file + `rename`, mode `0600` on Unix). The parent directory must exist and be writable from inside the container. The export endpoint at `/admin/ssh/export/authorized_keys` is still available for one-shot downloads.
+**File sync — no config, just bind-mounts.** The target host user is derived from each key's comment (`root@laptop` → `root`, `parzival@nas` → `parzival`). The server writes to `/host-home/<user>/.ssh/authorized_keys` for normal users and `/host-root/.ssh/authorized_keys` for root, atomic temp-file + `rename`, mode `0600`. If `~/.ssh` doesn't exist on the host the server creates it (mode `0700`) and `chown`s both it and `authorized_keys` to match the home dir's UID/GID — that keeps sshd's `StrictModes yes` (the default) happy.
 
-Recommended Docker layout — bind-mount the target user's `.ssh` dir into the container and point the config at it:
+Recommended Docker layout — two bind-mounts of the host's home roots:
 
 ```yaml
 volumes:
-  - /home/parzival/.ssh:/host-ssh
-```
-```json
-"authorized_keys_path": "/host-ssh/authorized_keys"
+  - /home:/host-home
+  - /root:/host-root
 ```
 
-Replace `parzival` with `root` (and the path with `/root/.ssh`) if you SSH in as root. The mounted directory is rewritten in place — pre-existing `authorized_keys` content **is overwritten**, so move any hand-managed keys into the admin UI first or back the file up.
+That's all. No config keys, no per-user wiring. To add a key for a new host user, just upload it — as long as that user exists on the host (i.e. `/home/<user>` is a directory), the add succeeds and the file appears on the next sync. If the user doesn't exist, the add returns HTTP 422 with a clear message.
+
+Adding a key with no comment (`ssh-ed25519 AAAA…`) also returns 422 — the server has no way to know which account to route it to. Append `user@host` and retry.
+
+The mounted directories are rewritten in place — pre-existing `authorized_keys` content **is overwritten** on the next sync, so move any hand-managed keys into the admin UI first or back them up. Legacy keys from before the `target_user` column was added show up as **not synced** in the admin UI; delete and re-add them to fix. The export endpoint at `/admin/ssh/export/authorized_keys` still works for one-shot downloads of every active key regardless of target.
 
 **"Last used" — `sshd_auth_log_path`.** When set, a background thread tails the file and updates `ssh_key.last_used_at` whenever sshd logs a successful publickey auth whose `SHA256:<fingerprint>` matches a stored key (also fires an `ssh.key.use` audit entry). Survives log rotation via inode + size checks and reopens on errors.
 

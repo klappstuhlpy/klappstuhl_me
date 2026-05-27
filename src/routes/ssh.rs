@@ -74,7 +74,7 @@ async fn ssh_data(
         .database()
         .all(
             "SELECT id, account_id, name, public_key, fingerprint, algo, comment,
-                    added_at, last_used_at, revoked_at
+                    target_user, added_at, last_used_at, revoked_at
              FROM ssh_key ORDER BY added_at DESC",
             [],
         )
@@ -105,6 +105,7 @@ struct AddKeyResponse {
     id: i64,
     fingerprint: String,
     algo: String,
+    target_user: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -146,13 +147,84 @@ async fn add_key(
     let comment = parsed.comment.clone();
     let account_id = account.id;
 
+    // Derive target_user from the key's comment ('user@host' → 'user').
+    // Required: without a comment we have no way to know which host
+    // account this key authorizes.
+    let target_user = comment
+        .as_deref()
+        .and_then(|c| c.split('@').next())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(ErrorResponse {
+                    error: "key has no comment — cannot determine target host user. \
+                            Add a trailing 'user@host' to the key line.".into(),
+                }),
+            )
+        })?;
+
+    // Verify the host user exists (i.e. has a home dir under the mounted
+    // /host-home or is root with /host-root mounted) and prepare ~/.ssh.
+    // We run this synchronously on a blocking thread so we can return a
+    // clear 422 if e.g. the user doesn't exist on the host.
+    let prepared = {
+        let user = target_user.clone();
+        tokio::task::spawn_blocking(move || ssh::ensure_user_ssh_dir(&user))
+            .await
+            .map_err(|e| (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: format!("ssh-dir prep panicked: {e}") }),
+            ))?
+    };
+    match prepared {
+        Ok(()) => {}
+        Err(ssh::PrepareError::UserNotFound { user, home }) => {
+            return Err((
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(ErrorResponse {
+                    error: format!(
+                        "host user '{user}' does not exist (no directory at {}). \
+                         Either create the user on the host or fix the key's comment.",
+                        home.display()
+                    ),
+                }),
+            ));
+        }
+        Err(ssh::PrepareError::MountMissing { path }) => {
+            return Err((
+                StatusCode::FAILED_DEPENDENCY,
+                Json(ErrorResponse {
+                    error: format!(
+                        "host filesystem mount missing at {} — bind-mount /home and \
+                         /root into the container per docker-compose.yml to enable \
+                         authorized_keys sync.",
+                        path.display()
+                    ),
+                }),
+            ));
+        }
+        Err(ssh::PrepareError::Io { path, error }) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: format!("failed to prepare {}: {error}", path.display()),
+                }),
+            ));
+        }
+    }
+
+    let target_user_db = Some(target_user.clone());
+
     let result = state
         .database()
         .call(move |conn| {
             conn.execute(
-                "INSERT INTO ssh_key(account_id, name, public_key, fingerprint, algo, comment)
-                 VALUES (?, ?, ?, ?, ?, ?)",
-                rusqlite::params![account_id, name, raw_key, fingerprint, algo, comment],
+                "INSERT INTO ssh_key(account_id, name, public_key, fingerprint, algo, comment, target_user)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                rusqlite::params![account_id, name, raw_key, fingerprint, algo, comment, target_user_db],
             )
             .map(|_| conn.last_insert_rowid())
         })
@@ -182,6 +254,7 @@ async fn add_key(
                     id,
                     fingerprint: parsed.fingerprint,
                     algo: parsed.algo,
+                    target_user: Some(target_user),
                 }),
             ))
         }
@@ -582,7 +655,7 @@ async fn export_authorized_keys(
         .database()
         .all(
             "SELECT id, account_id, name, public_key, fingerprint, algo, comment,
-                    added_at, last_used_at, revoked_at
+                    target_user, added_at, last_used_at, revoked_at
              FROM ssh_key WHERE revoked_at IS NULL ORDER BY added_at ASC",
             [],
         )

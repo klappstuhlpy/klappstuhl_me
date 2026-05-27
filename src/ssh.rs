@@ -73,6 +73,11 @@ pub struct SshKey {
     pub fingerprint: String,
     pub algo: String,
     pub comment: Option<String>,
+    /// Host user the key authorizes — used to pick which `authorized_keys`
+    /// file the filesystem sync writes this key to. Resolved against
+    /// `Config::authorized_keys_paths`. NULL on legacy rows; such keys are
+    /// not synced and surface as "not synced" in the admin UI.
+    pub target_user: Option<String>,
     #[serde(with = "time::serde::rfc3339")]
     pub added_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339::option")]
@@ -91,7 +96,7 @@ impl Table for SshKey {
     const NAME: &'static str = "ssh_key";
     const COLUMNS: &'static [&'static str] = &[
         "id", "account_id", "name", "public_key", "fingerprint", "algo",
-        "comment", "added_at", "last_used_at", "revoked_at",
+        "comment", "target_user", "added_at", "last_used_at", "revoked_at",
     ];
     type Id = i64;
 
@@ -104,6 +109,7 @@ impl Table for SshKey {
             fingerprint: row.get("fingerprint")?,
             algo: row.get("algo")?,
             comment: row.get("comment")?,
+            target_user: row.get("target_user")?,
             added_at: row.get("added_at")?,
             last_used_at: row.get("last_used_at")?,
             revoked_at: row.get("revoked_at")?,
@@ -291,22 +297,144 @@ pub fn render_authorized_keys(keys: &[SshKey]) -> String {
     body
 }
 
-/// Rewrite the configured `authorized_keys` file from the current set of
-/// active DB keys. No-op when `authorized_keys_path` is not configured.
+// ─── Host filesystem layout (convention) ─────────────────────────────────────
+//
+// The container expects two bind-mounts from the host:
+//   /home   → /host-home   (every non-root user's home dir lives under here)
+//   /root   → /host-root   (the root user's home dir is here directly)
+//
+// The path a given target user's authorized_keys gets written to is derived
+// from the user's name only — no config map needed:
+//
+//   target_user == "root"   → /host-root/.ssh/authorized_keys
+//   target_user == "<x>"    → /host-home/<x>/.ssh/authorized_keys
+//
+// On the host side these are /root/.ssh/authorized_keys and
+// /home/<x>/.ssh/authorized_keys respectively, which is the standard layout
+// sshd reads from.
+
+const HOST_HOME_PARENT: &str = "/host-home";
+const HOST_ROOT_HOME:   &str = "/host-root";
+
+/// Returns the in-container path to the target user's home directory under
+/// the bind-mounted host filesystem. `root` is special-cased; everyone else
+/// is assumed to live under `/host-home/<user>`.
+fn target_home_dir(user: &str) -> std::path::PathBuf {
+    if user == "root" {
+        std::path::PathBuf::from(HOST_ROOT_HOME)
+    } else {
+        std::path::Path::new(HOST_HOME_PARENT).join(user)
+    }
+}
+
+/// Errors `ensure_user_ssh_dir` can return.
+#[derive(Debug, thiserror::Error)]
+pub enum PrepareError {
+    /// The bind-mount parent (`/host-home` or `/host-root`) doesn't exist —
+    /// the operator hasn't wired up docker-compose volumes for SSH sync.
+    #[error("host filesystem mount missing at {path}")]
+    MountMissing { path: std::path::PathBuf },
+    /// The bind-mount is there but no directory exists for this user.
+    #[error("user '{user}' has no home directory at {home}")]
+    UserNotFound { user: String, home: std::path::PathBuf },
+    /// Anything else — permission denied, EIO, etc.
+    #[error("io error at {path}: {error}")]
+    Io { path: std::path::PathBuf, error: std::io::Error },
+}
+
+/// Ensure `~<user>/.ssh` exists with the right perms and ownership so sshd's
+/// StrictModes check passes. Idempotent: leaves existing dirs untouched.
+///
+/// On non-Unix targets this is a stub that always succeeds — the feature
+/// only does anything useful on the production Linux container.
+pub fn ensure_user_ssh_dir(user: &str) -> Result<(), PrepareError> {
+    ensure_user_ssh_dir_impl(user)
+}
+
+#[cfg(unix)]
+fn ensure_user_ssh_dir_impl(user: &str) -> Result<(), PrepareError> {
+    use std::os::unix::fs::{chown, PermissionsExt};
+
+    // Sanity-check that the bind-mount parent itself is present. Without
+    // it we'd happily create the home dir but it would only exist inside
+    // the container, never reaching the host.
+    let mount_parent = if user == "root" {
+        std::path::PathBuf::from(HOST_ROOT_HOME)
+    } else {
+        std::path::PathBuf::from(HOST_HOME_PARENT)
+    };
+    if !mount_parent.exists() {
+        return Err(PrepareError::MountMissing { path: mount_parent });
+    }
+
+    let home = target_home_dir(user);
+    let meta = match std::fs::metadata(&home) {
+        Ok(m) if m.is_dir() => m,
+        Ok(_) => return Err(PrepareError::UserNotFound { user: user.into(), home }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(PrepareError::UserNotFound { user: user.into(), home });
+        }
+        Err(error) => return Err(PrepareError::Io { path: home, error }),
+    };
+
+    use std::os::unix::fs::MetadataExt;
+    let (uid, gid) = (meta.uid(), meta.gid());
+
+    let ssh_dir = home.join(".ssh");
+    match std::fs::metadata(&ssh_dir) {
+        Ok(m) if m.is_dir() => {} // already there, leave perms alone
+        Ok(_) => return Err(PrepareError::Io {
+            path: ssh_dir.clone(),
+            error: std::io::Error::new(std::io::ErrorKind::AlreadyExists,
+                ".ssh exists but is not a directory"),
+        }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            std::fs::create_dir(&ssh_dir)
+                .and_then(|_| std::fs::set_permissions(&ssh_dir,
+                    std::fs::Permissions::from_mode(0o700)))
+                .and_then(|_| chown(&ssh_dir, Some(uid), Some(gid)))
+                .map_err(|error| PrepareError::Io { path: ssh_dir.clone(), error })?;
+            tracing::info!(path = %ssh_dir.display(), uid, gid, "created ~/.ssh");
+        }
+        Err(error) => return Err(PrepareError::Io { path: ssh_dir, error }),
+    }
+
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn ensure_user_ssh_dir_impl(_user: &str) -> Result<(), PrepareError> {
+    // No-op on Windows dev. The feature only runs in the Linux container.
+    Ok(())
+}
+
+/// Rewrite every host user's `authorized_keys` file from the current set of
+/// active DB keys.
+///
+/// Groups active keys by their `target_user`, then for each user with at
+/// least one key writes `~user/.ssh/authorized_keys` atomically (temp +
+/// rename, mode 0600, chown'd to the home dir's owner UID/GID so sshd's
+/// StrictModes check passes). Users whose home dir disappeared since the
+/// key was added are logged at WARN and skipped.
+///
+/// Users with no remaining keys after a revoke get an empty (header-only)
+/// file rewritten over their existing one so the revocation actually takes
+/// effect. To know which users to clear out, we track a process-wide set
+/// of users we've ever written for. That's fine because sync runs in-band
+/// after every mutation — the set never gets stale within one process
+/// lifetime, and at startup an empty set is harmless (no extra file
+/// clears, the existing files still reflect the DB).
 ///
 /// Fire-and-forget: errors are logged at WARN, not propagated, so a failing
 /// disk sync never breaks the admin API call that triggered it.
 pub fn sync_authorized_keys(state: &AppState) {
-    let Some(path) = state.config().authorized_keys_path.clone() else {
-        return;
-    };
     let state = state.clone();
     tokio::spawn(async move {
         let keys_result: Result<Vec<SshKey>, _> = state
             .database()
             .all(
                 "SELECT id, account_id, name, public_key, fingerprint, algo, comment,
-                        added_at, last_used_at, revoked_at
+                        target_user, added_at, last_used_at, revoked_at
                  FROM ssh_key WHERE revoked_at IS NULL ORDER BY added_at ASC",
                 [],
             )
@@ -320,17 +448,108 @@ pub fn sync_authorized_keys(state: &AppState) {
             }
         };
 
-        let body = render_authorized_keys(&keys);
-        let path_for_blocking = path.clone();
-        let write_result = tokio::task::spawn_blocking(move || write_atomic(&path_for_blocking, body.as_bytes()))
-            .await
-            .unwrap_or_else(|e| Err(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())));
-
-        match write_result {
-            Ok(()) => tracing::info!(path = %path.display(), count = keys.len(), "authorized_keys synced"),
-            Err(e) => tracing::warn!(path = %path.display(), error = %e, "authorized_keys sync: write failed"),
+        // Bucket by target_user; legacy keys without one are skipped.
+        use std::collections::HashMap;
+        let mut by_user: HashMap<String, Vec<SshKey>> = HashMap::new();
+        for key in keys {
+            match key.target_user.clone() {
+                Some(user) => by_user.entry(user).or_default().push(key),
+                None => tracing::warn!(
+                    key_id = key.id,
+                    fingerprint = %key.fingerprint,
+                    "authorized_keys sync: legacy key has no target_user — skipped \
+                     (re-add the key to fix)"
+                ),
+            }
         }
+
+        // Also clear any user we've previously written for but who no longer
+        // has keys — otherwise a revoke wouldn't actually remove the line.
+        let previously_written = take_previously_written();
+        for user in previously_written.iter() {
+            by_user.entry(user.clone()).or_default();
+        }
+        let mut now_writing: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        for (user, bucket) in by_user {
+            let count = bucket.len();
+            let body = render_authorized_keys(&bucket);
+            let user_owned = user.clone();
+            let write_result = tokio::task::spawn_blocking(move || {
+                write_user_authorized_keys(&user_owned, body.as_bytes())
+            })
+            .await
+            .unwrap_or_else(|e| Err(PrepareError::Io {
+                path: std::path::PathBuf::new(),
+                error: std::io::Error::new(std::io::ErrorKind::Other, e.to_string()),
+            }));
+
+            match write_result {
+                Ok(path) => {
+                    tracing::info!(
+                        target_user = %user,
+                        path = %path.display(),
+                        count,
+                        "authorized_keys synced"
+                    );
+                    if count > 0 {
+                        now_writing.insert(user);
+                    }
+                }
+                Err(e) => tracing::warn!(
+                    target_user = %user,
+                    error = %e,
+                    "authorized_keys sync: write failed"
+                ),
+            }
+        }
+
+        // Remember who we wrote for so a future revoke can clear them.
+        set_previously_written(now_writing);
     });
+}
+
+// In-process memory of "which users have we ever written authorized_keys for
+// this session". Used to clear out users whose keys were all revoked.
+static PREVIOUSLY_WRITTEN: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::HashSet<String>>,
+> = std::sync::OnceLock::new();
+
+fn take_previously_written() -> std::collections::HashSet<String> {
+    let m = PREVIOUSLY_WRITTEN.get_or_init(|| std::sync::Mutex::new(Default::default()));
+    m.lock().map(|g| g.clone()).unwrap_or_default()
+}
+fn set_previously_written(set: std::collections::HashSet<String>) {
+    let m = PREVIOUSLY_WRITTEN.get_or_init(|| std::sync::Mutex::new(Default::default()));
+    if let Ok(mut g) = m.lock() {
+        *g = set;
+    }
+}
+
+/// Write one user's authorized_keys file, creating ~/.ssh if needed.
+/// Returns the path we wrote to so the caller can log it.
+fn write_user_authorized_keys(user: &str, body: &[u8]) -> Result<std::path::PathBuf, PrepareError> {
+    ensure_user_ssh_dir(user)?;
+    let path = target_home_dir(user).join(".ssh").join("authorized_keys");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{chown, MetadataExt};
+        // Match ownership of the home dir so sshd's StrictModes is happy.
+        let owner = std::fs::metadata(target_home_dir(user))
+            .map(|m| (m.uid(), m.gid()))
+            .map_err(|error| PrepareError::Io { path: target_home_dir(user), error })?;
+
+        write_atomic(&path, body)
+            .and_then(|_| chown(&path, Some(owner.0), Some(owner.1)))
+            .map_err(|error| PrepareError::Io { path: path.clone(), error })?;
+    }
+    #[cfg(not(unix))]
+    {
+        write_atomic(&path, body)
+            .map_err(|error| PrepareError::Io { path: path.clone(), error })?;
+    }
+    Ok(path)
 }
 
 // ─── sshd auth log watcher ───────────────────────────────────────────────────

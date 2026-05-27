@@ -34,19 +34,20 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
 
-      # Target user's ~/.ssh dir so the SSH admin page can sync the
-      # authorized_keys file whenever a key is added / revoked / deleted.
-      # Replace `parzival` with whichever host user you SSH in as
-      # (use `/root/.ssh` if you log in as root). The container writes
-      # the file with mode 0600; the parent dir must already exist on
-      # the host and be writable from inside the container.
+      # Host /home and /root so the SSH admin page can sync each user's
+      # authorized_keys file directly. The target user for a given key is
+      # derived from the comment ('user@host' → 'user'); the container
+      # writes to /host-home/<user>/.ssh/authorized_keys (or
+      # /host-root/.ssh/authorized_keys for root). ~/.ssh is auto-created
+      # if missing, chmod 0700, and chown'd to match the home dir's owner
+      # so sshd's StrictModes check accepts the file.
       #
-      # Required companion setting in config.json:
-      #   "authorized_keys_path": "/host-ssh/authorized_keys"
-      #
-      # Remove the mount AND the config key to disable filesystem sync —
-      # admins can still download authorized_keys from the SSH admin page.
-      - /home/parzival/.ssh:/host-ssh
+      # No config needed beyond these mounts — adding a key for a user
+      # that doesn't exist on the host returns HTTP 422. Remove these
+      # mounts to disable filesystem sync (the admin page still stores
+      # keys in the DB and offers a download).
+      - /home:/host-home
+      - /root:/host-root
 
       # Host sshd auth log (read-only) so the SSH admin page can populate
       # the "Last used" column. The container tails this file and updates
