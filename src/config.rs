@@ -126,6 +126,17 @@ pub struct Config {
     /// Each entry needs a unique `id`, a display `name`, and a shell `command`.
     #[serde(default)]
     pub spotlight_scripts: Vec<SpotlightScript>,
+    /// Optional path to an `authorized_keys` file that the SSH admin page
+    /// keeps in sync with the database. Every add/revoke/delete rewrites this
+    /// file (atomic temp-file + rename, mode 0600 on Unix). When unset, no
+    /// filesystem sync happens — admins can still download the file from
+    /// `/admin/ssh/export/authorized_keys`.
+    ///
+    /// In the default Docker setup, bind-mount the target user's `.ssh` dir
+    /// into the container (e.g. `- /home/<user>/.ssh:/host-ssh`) and set this
+    /// to `/host-ssh/authorized_keys`.
+    #[serde(default)]
+    pub authorized_keys_path: Option<PathBuf>,
     /// The secret key used for all crypto related functionality in the server.
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
@@ -148,6 +159,7 @@ impl Config {
             clamav_addr: None,
             virustotal_api_key: None,
             spotlight_scripts: Vec::new(),
+            authorized_keys_path: None,
             secret_key: SecretKey::random()?,
         })
     }

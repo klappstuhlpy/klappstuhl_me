@@ -34,6 +34,20 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
 
+      # Target user's ~/.ssh dir so the SSH admin page can sync the
+      # authorized_keys file whenever a key is added / revoked / deleted.
+      # Replace `parzival` with whichever host user you SSH in as
+      # (use `/root/.ssh` if you log in as root). The container writes
+      # the file with mode 0600; the parent dir must already exist on
+      # the host and be writable from inside the container.
+      #
+      # Required companion setting in config.json:
+      #   "authorized_keys_path": "/host-ssh/authorized_keys"
+      #
+      # Remove the mount AND the config key to disable filesystem sync —
+      # admins can still download authorized_keys from the SSH admin page.
+      - /home/parzival/.ssh:/host-ssh
+
     # NET_BIND_SERVICE lets the non-root process inside the container
     # bind to port 443 without running as root.
     cap_add:
