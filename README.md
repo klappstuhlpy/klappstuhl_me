@@ -25,7 +25,7 @@ management, security analytics, virus scanning, and an invite-only user system.
   - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI / Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
   - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, signup, password change, logout), invite create/revoke, service/snapshot/script actions, secret status changes, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
   - **Postgres** — browse databases, tables, and roles on a separate PostgreSQL server. Safe-mode query runner wraps every statement in `BEGIN TRANSACTION READ ONLY` so even a superuser credential can't accidentally mutate state; explicit danger-mode toggle for `INSERT` / `UPDATE` / `DELETE` / DDL when needed. Every query writes an audit entry (including blocked-by-safe-mode attempts).
-  - **SSH Keys** — manage authorized SSH public keys stored in the database. Add keys with an optional label. When `authorized_keys_path` is set in `config.json`, every add / revoke / delete rewrites that file atomically (mode 0600 on Unix); otherwise the file can be downloaded on demand from the admin page. When `sshd_auth_log_path` is set, a background task tails the host sshd log and updates each key's "Last used" timestamp on successful publickey auth (requires sshd `LogLevel VERBOSE` so fingerprints appear in log lines). Token audit (active API tokens across accounts) and session audit (active login sessions with IP + user-agent) sub-pages. Revoke individual keys, tokens, or sessions.
+  - **SSH Keys** — manage authorized SSH public keys stored in the database. Add keys with an optional label; optionally sync them to a real `authorized_keys` file on the host and populate each key's "Last used" timestamp by tailing the sshd auth log (see [SSH key sync](#ssh-key-sync-and-last-used-tracking)). Token audit (active API tokens across accounts) and session audit (active login sessions with IP + user-agent) sub-pages. Revoke individual keys, tokens, or sessions.
   - **File Sanitizer** — drag-and-drop file scanning with two optional backends.
     - **ClamAV** — streams the uploaded file to a local `clamd` daemon over TCP (INSTREAM protocol). Reports virus name on detection.
     - **VirusTotal** — looks up the file's SHA-256 against the VT v3 API (no file upload; hash-only). Shows `N/M engines detected` with a link to the VT report.
@@ -72,12 +72,14 @@ After that, log in at `https://yourdomain.com/login`, then visit `/admin` to acc
 
 ### What the compose file mounts
 
-| Mount                        | Why                                                              |
-|------------------------------|------------------------------------------------------------------|
-| `./data:/data`               | Persistent config, database, logs, ACME cert cache.              |
-| `/var/run/docker.sock`       | So `/admin/docker` can run `docker ps` / `docker compose up -d`. |
-| `/proc:/host/proc:ro`        | So `/admin/metrics` reports the **host's** CPU/RAM/network.      |
-| `/sys:/host/sys:ro`          | Same — for `/sys/block/*` (disk I/O counters).                   |
+| Mount                                       | Why                                                                                          |
+|---------------------------------------------|----------------------------------------------------------------------------------------------|
+| `./data:/data`                              | Persistent config, database, logs, ACME cert cache.                                          |
+| `/var/run/docker.sock`                      | So `/admin/docker` can run `docker ps` / `docker compose up -d`.                             |
+| `/proc:/host/proc:ro`                       | So `/admin/metrics` reports the **host's** CPU/RAM/network.                                  |
+| `/sys:/host/sys:ro`                         | Same — for `/sys/block/*` (disk I/O counters).                                               |
+| `/home/<user>/.ssh:/host-ssh`               | (Optional) Target user's `.ssh` dir, so the SSH admin page can write `authorized_keys` here. |
+| `/var/log/auth.log:/host-log/auth.log:ro`   | (Optional) Host sshd log, so the SSH admin page can populate `last_used_at`.                 |
 
 `HOST_PROC=/host/proc` and `HOST_SYS=/host/sys` are pre-set in the compose file so the metrics collector picks up the host filesystem.
 
@@ -103,27 +105,31 @@ A default `config.json` is written on first start. Full layout with all optional
   "postgres_url": null,
   "clamav_addr": null,
   "virustotal_api_key": null,
-  "spotlight_scripts": []
+  "spotlight_scripts": [],
+  "authorized_keys_path": null,
+  "sshd_auth_log_path": null
 }
 ```
 
-| Key                    | Type              | Notes                                                                                          |
-|------------------------|-------------------|------------------------------------------------------------------------------------------------|
-| `production`           | bool              | `true` switches the server to TLS via Let's Encrypt on port 443.                               |
-| `domains`              | string[]          | Hostnames that ACME will request certificates for.                                             |
-| `server.port`          | u16               | Listen port (`443` in production, anything else for dev).                                      |
-| `server.ip`            | string            | The IP the server listens on (default `0.0.0.0`).                                              |
-| `secret_key`           | string            | Auto-generated; used for HMAC signing of session tokens and flash cookies.                     |
-| `discord_webhook_url`  | string \| null    | Discord incoming webhook URL for metric alerts and secret findings.                            |
-| `services`             | ServiceConfig[]   | Docker services shown on `/admin/docker`. See below.                                           |
-| `geoip_db_path`        | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.          |
-| `cloudflare_api_token` | string \| null    | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                  |
-| `cloudflare_zone_id`   | string \| null    | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels. |
-| `secret_scan_paths`    | string[]          | Directory paths the secrets scanner walks recursively.                                         |
-| `postgres_url`         | string \| null    | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                 |
-| `clamav_addr`          | string \| null    | TCP address of a `clamd` daemon, e.g. `"127.0.0.1:3310"`. Enables ClamAV scanning.             |
-| `virustotal_api_key`   | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.              |
-| `spotlight_scripts`    | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                        |
+| Key                      | Type              | Notes                                                                                          |
+|--------------------------|-------------------|------------------------------------------------------------------------------------------------|
+| `production`             | bool              | `true` switches the server to TLS via Let's Encrypt on port 443.                               |
+| `domains`                | string[]          | Hostnames that ACME will request certificates for.                                             |
+| `server.port`            | u16               | Listen port (`443` in production, anything else for dev).                                      |
+| `server.ip`              | string            | The IP the server listens on (default `0.0.0.0`).                                              |
+| `secret_key`             | string            | Auto-generated; used for HMAC signing of session tokens and flash cookies.                     |
+| `discord_webhook_url`    | string \| null    | Discord incoming webhook URL for metric alerts and secret findings.                            |
+| `services`               | ServiceConfig[]   | Docker services shown on `/admin/docker`. See below.                                           |
+| `geoip_db_path`          | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.          |
+| `cloudflare_api_token`   | string \| null    | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                  |
+| `cloudflare_zone_id`     | string \| null    | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels. |
+| `secret_scan_paths`      | string[]          | Directory paths the secrets scanner walks recursively.                                         |
+| `postgres_url`           | string \| null    | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                 |
+| `clamav_addr`            | string \| null    | TCP address of a `clamd` daemon, e.g. `"127.0.0.1:3310"`. Enables ClamAV scanning.             |
+| `virustotal_api_key`     | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.              |
+| `spotlight_scripts`      | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                        |
+| `authorized_keys_path`   | string \| null    | Path of an `authorized_keys` file that's rewritten on every add/revoke/delete. See below.      |
+| `sshd_auth_log_path`     | string \| null    | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below. |
 
 ### Docker services configuration
 
@@ -198,6 +204,48 @@ On Windows the data dir and config dir are both `%AppData%\klappstuhl_me\`, so s
 **VirusTotal** — set `virustotal_api_key` to a free public API key. The File Sanitizer computes the SHA-256 of each upload and does a hash-only lookup against VT v3 — no file data is ever sent to VirusTotal. Files not yet in the VT database show as "Not in VT".
 
 **Postgres** — set `postgres_url` to a libpq connection string. The configured credential should have at least `pg_read_all_data`; a superuser works too since safe-mode queries are always wrapped in `BEGIN TRANSACTION READ ONLY`.
+
+### SSH key sync and "Last used" tracking
+
+The `/admin/ssh` page stores keys in SQLite by default — sshd on the host doesn't know about them until you wire one or both of the integrations below. They're independent, so you can enable either, both, or neither.
+
+**File sync — `authorized_keys_path`.** When set, every add / revoke / delete rewrites the file at that path (atomic temp-file + `rename`, mode `0600` on Unix). The parent directory must exist and be writable from inside the container. The export endpoint at `/admin/ssh/export/authorized_keys` is still available for one-shot downloads.
+
+Recommended Docker layout — bind-mount the target user's `.ssh` dir into the container and point the config at it:
+
+```yaml
+volumes:
+  - /home/parzival/.ssh:/host-ssh
+```
+```json
+"authorized_keys_path": "/host-ssh/authorized_keys"
+```
+
+Replace `parzival` with `root` (and the path with `/root/.ssh`) if you SSH in as root. The mounted directory is rewritten in place — pre-existing `authorized_keys` content **is overwritten**, so move any hand-managed keys into the admin UI first or back the file up.
+
+**"Last used" — `sshd_auth_log_path`.** When set, a background thread tails the file and updates `ssh_key.last_used_at` whenever sshd logs a successful publickey auth whose `SHA256:<fingerprint>` matches a stored key (also fires an `ssh.key.use` audit entry). Survives log rotation via inode + size checks and reopens on errors.
+
+```yaml
+volumes:
+  - /var/log/auth.log:/host-log/auth.log:ro
+```
+```json
+"sshd_auth_log_path": "/host-log/auth.log"
+```
+
+Distro-specific log locations:
+
+| Distro                 | Log path                |
+|------------------------|-------------------------|
+| Debian / Ubuntu        | `/var/log/auth.log`     |
+| RHEL / Fedora / Rocky  | `/var/log/secure`       |
+| Alpine / Arch          | usually journald only — see below |
+
+sshd must log fingerprints for the parser to match. On modern OpenSSH this is the default; if your `Accepted publickey ...` lines lack `ssh2: <algo> SHA256:<fp>`, set `LogLevel VERBOSE` in `/etc/ssh/sshd_config` and reload sshd.
+
+If the host runs systemd-only (no rsyslog / no `/var/log/auth.log`), the simplest fix is `apt install rsyslog` (or the distro equivalent); the watcher needs a real file. Piping `journalctl -u ssh -f` into a file via a sidecar works too but is uglier.
+
+Unknown / revoked fingerprints in the log are ignored at DEBUG level — a noisy log from brute-force attempts will not flood the audit table.
 
 ## Metric alert thresholds
 
