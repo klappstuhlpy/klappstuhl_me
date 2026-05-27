@@ -11,6 +11,58 @@ function escapeHtml(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// ── Safe row construction ────────────────────────────────────
+//
+// All table rows go through buildRow() so the cell count is enforced by
+// the JS structure, not by careful template-string composition. Earlier
+// code stitched <tr>/<td> as strings — one stray character in any field
+// could shift columns left or right and put e.g. the Status pill into
+// the "Last used" column. Building DOM nodes here means each cell is a
+// real element, isolated from its neighbours, and the column count is
+// always exactly cells.length.
+
+/**
+ * Build a <tr> from an array of cell contents.
+ * Each entry may be a Node (appended as-is), or a string of HTML
+ * (assigned via .innerHTML — caller is responsible for escaping any
+ * untrusted substrings before calling).
+ * Optional second arg sets data-* attrs on the row.
+ */
+function buildRow(cells, attrs) {
+    const tr = document.createElement("tr");
+    if (attrs) {
+        for (const [k, v] of Object.entries(attrs)) {
+            tr.setAttribute(k, String(v));
+        }
+    }
+    for (const cell of cells) {
+        const td = document.createElement("td");
+        if (cell instanceof Node) {
+            td.appendChild(cell);
+        } else {
+            td.innerHTML = cell == null ? "" : String(cell);
+        }
+        tr.appendChild(td);
+    }
+    return tr;
+}
+
+/** Replace a tbody's children with the given rows (or a colspan'd message). */
+function replaceTbody(tbody, rows, fallbackHtml, colCount) {
+    while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+    if (rows.length === 0) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = colCount;
+        td.className = "muted";
+        td.innerHTML = fallbackHtml;
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+    }
+    for (const row of rows) tbody.appendChild(row);
+}
+
 function fmtRelative(iso) {
     if (!iso) return "—";
     const t = new Date(iso).getTime();
@@ -148,60 +200,147 @@ function showError(msg) {
 
 // ── Key list ─────────────────────────────────────────────────
 
+/// Keys table column count — keep in sync with the <thead> in
+/// admin_ssh.html. Used by the loading / empty / error fallback rows so
+/// they always span the right number of columns.
+const KEYS_COLS = 8;
+
+// In-flight guard so concurrent loadData() calls (boot + every action
+// handler kicks one off) don't race and overwrite each other with stale
+// data. Newer call wins: when one is in flight we skip starting another
+// and instead set a "re-run when current finishes" flag.
+let loadDataInFlight = false;
+let loadDataDirty = false;
+
 async function loadData() {
-    const res = await fetch("/admin/ssh/data");
-    if (!res.ok) return;
-    const data = await res.json();
+    if (loadDataInFlight) { loadDataDirty = true; return; }
+    loadDataInFlight = true;
+    try {
+        await loadDataOnce();
+        if (loadDataDirty) {
+            loadDataDirty = false;
+            await loadDataOnce();
+        }
+    } finally {
+        loadDataInFlight = false;
+    }
+}
+
+async function loadDataOnce() {
+    const tbody = document.querySelector("#keys-table tbody");
+    let data;
+    try {
+        const res = await fetch("/admin/ssh/data");
+        if (!res.ok) {
+            replaceTbody(tbody, [],
+                `Failed to load keys — HTTP ${res.status} ${escapeHtml(res.statusText || "")}. ` +
+                `Check that you're still signed in.`,
+                KEYS_COLS);
+            return;
+        }
+        data = await res.json();
+    } catch (err) {
+        replaceTbody(tbody, [],
+            `Failed to load keys — ${escapeHtml(err.message || String(err))}.`,
+            KEYS_COLS);
+        return;
+    }
 
     document.getElementById("stat-total").textContent   = data.total;
     document.getElementById("stat-active").textContent  = data.active;
     document.getElementById("stat-revoked").textContent = data.revoked;
     document.getElementById("key-count").textContent    = data.total;
 
-    renderKeys(data.keys);
+    renderKeys(data.keys || []);
 }
 
 function renderKeys(keys) {
     const tbody = document.querySelector("#keys-table tbody");
-    if (!keys || keys.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="muted">No keys — click "Add key" to add one.</td></tr>`;
-        return;
-    }
 
-    tbody.innerHTML = keys.map(k => {
+    const rows = keys.map(k => {
         const isActive = !k.revoked_at;
-        const statusPill = isActive
-            ? `<span class="status-pill active">Active</span>`
-            : `<span class="status-pill revoked">Revoked</span>`;
 
-        const actions = isActive
-            ? `<a class="button outline" href="/admin/ssh/audit?key_id=${k.id}">Audit</a>
-               <button class="button outline" data-action="revoke" data-id="${k.id}">Revoke</button>
-               <button class="button danger"  data-action="delete" data-id="${k.id}">Delete</button>`
-            : `<a class="button outline" href="/admin/ssh/audit?key_id=${k.id}">Audit</a>
-               <button class="button danger"  data-action="delete" data-id="${k.id}">Delete</button>`;
+        // ── Cell 1: label + (optional) comment ──
+        const labelCell = document.createElement("span");
+        const nameEl = document.createElement("strong");
+        nameEl.textContent = k.name ?? "";
+        labelCell.appendChild(nameEl);
+        if (k.comment) {
+            const cmt = document.createElement("span");
+            cmt.className = "key-comment muted";
+            cmt.textContent = " — " + k.comment;
+            labelCell.appendChild(cmt);
+        }
 
-        const comment = k.comment
-            ? `<span class="key-comment muted"> — ${escapeHtml(k.comment)}</span>`
-            : "";
+        // ── Cell 2: fingerprint ──
+        const fpCell = document.createElement("code");
+        fpCell.className = "key-fp";
+        fpCell.textContent = k.fingerprint ?? "";
 
-        // Target user cell: shows the host user this key authorizes. Only
-        // legacy rows (added before target_user existed) have no value.
-        const targetCell = k.target_user
-            ? `<code>${escapeHtml(k.target_user)}</code>`
-            : `<span class="status-pill revoked" title="Legacy key with no target_user — not synced to any authorized_keys file. Re-add to fix.">not synced</span>`;
+        // ── Cell 3: algorithm ──
+        const algoCell = document.createElement("span");
+        algoCell.className = "key-algo";
+        algoCell.textContent = k.algo ?? "";
 
-        return `<tr data-id="${k.id}">
-            <td><strong>${escapeHtml(k.name)}</strong>${comment}</td>
-            <td><code class="key-fp">${escapeHtml(k.fingerprint)}</code></td>
-            <td><span class="key-algo">${escapeHtml(k.algo)}</span></td>
-            <td>${targetCell}</td>
-            <td><span title="${escapeHtml(k.added_at)}">${fmtRelative(k.added_at)}</span></td>
-            <td><span title="${k.last_used_at || ''}">${fmtRelative(k.last_used_at)}</span></td>
-            <td>${statusPill}</td>
-            <td><div class="row-actions">${actions}</div></td>
-        </tr>`;
-    }).join("");
+        // ── Cell 4: target user ──
+        let targetCell;
+        if (k.target_user) {
+            targetCell = document.createElement("code");
+            targetCell.textContent = k.target_user;
+        } else {
+            targetCell = document.createElement("span");
+            targetCell.className = "status-pill revoked";
+            targetCell.title = "Legacy key with no target_user — not synced to any authorized_keys file. Re-add to fix.";
+            targetCell.textContent = "not synced";
+        }
+
+        // ── Cell 5: added_at ──
+        const addedCell = document.createElement("span");
+        addedCell.title = k.added_at ?? "";
+        addedCell.textContent = fmtRelative(k.added_at);
+
+        // ── Cell 6: last_used_at ──
+        const lastCell = document.createElement("span");
+        lastCell.title = k.last_used_at ?? "";
+        lastCell.textContent = fmtRelative(k.last_used_at);
+
+        // ── Cell 7: status pill ──
+        const statusCell = document.createElement("span");
+        statusCell.className = "status-pill " + (isActive ? "active" : "revoked");
+        statusCell.textContent = isActive ? "Active" : "Revoked";
+
+        // ── Cell 8: action buttons ──
+        const actionsCell = document.createElement("div");
+        actionsCell.className = "row-actions";
+        const auditBtn = document.createElement("a");
+        auditBtn.className = "button outline";
+        auditBtn.href = `/admin/ssh/audit?key_id=${encodeURIComponent(k.id)}`;
+        auditBtn.textContent = "Audit";
+        actionsCell.appendChild(auditBtn);
+        if (isActive) {
+            const revokeBtn = document.createElement("button");
+            revokeBtn.className = "button outline";
+            revokeBtn.dataset.action = "revoke";
+            revokeBtn.dataset.id = String(k.id);
+            revokeBtn.type = "button";
+            revokeBtn.textContent = "Revoke";
+            actionsCell.appendChild(revokeBtn);
+        }
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "button danger";
+        deleteBtn.dataset.action = "delete";
+        deleteBtn.dataset.id = String(k.id);
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "Delete";
+        actionsCell.appendChild(deleteBtn);
+
+        return buildRow(
+            [labelCell, fpCell, algoCell, targetCell, addedCell, lastCell, statusCell, actionsCell],
+            { "data-id": k.id },
+        );
+    });
+
+    replaceTbody(tbody, rows, `No keys — click "Add key" to add one.`, KEYS_COLS);
 
     tbody.querySelectorAll("[data-action]").forEach(btn => {
         btn.addEventListener("click", () => handleAction(btn.dataset.action, btn.dataset.id));
@@ -223,58 +362,153 @@ async function handleAction(action, id) {
 
 // ── Token list ───────────────────────────────────────────────
 
+/// Tokens table column count — keep in sync with the <thead>.
+const TOKENS_COLS = 7;
+
+let loadTokensInFlight = false;
+let loadTokensDirty = false;
+
 async function loadTokens() {
-    const res = await fetch("/admin/ssh/tokens");
-    if (!res.ok) return;
-    const data = await res.json();
-    document.getElementById("token-count").textContent = data.total;
-    renderTokens(data.tokens);
+    if (loadTokensInFlight) { loadTokensDirty = true; return; }
+    loadTokensInFlight = true;
+    try {
+        await loadTokensOnce();
+        if (loadTokensDirty) {
+            loadTokensDirty = false;
+            await loadTokensOnce();
+        }
+    } finally {
+        loadTokensInFlight = false;
+    }
 }
 
-function fmtExpiry(iso) {
-    if (!iso) return '<span class="muted">Never</span>';
+async function loadTokensOnce() {
+    const tbody = document.querySelector("#tokens-table tbody");
+    let data;
+    try {
+        const res = await fetch("/admin/ssh/tokens");
+        if (!res.ok) {
+            replaceTbody(tbody, [],
+                `Failed to load tokens — HTTP ${res.status} ${escapeHtml(res.statusText || "")}.`,
+                TOKENS_COLS);
+            return;
+        }
+        data = await res.json();
+    } catch (err) {
+        replaceTbody(tbody, [],
+            `Failed to load tokens — ${escapeHtml(err.message || String(err))}.`,
+            TOKENS_COLS);
+        return;
+    }
+    document.getElementById("token-count").textContent = data.total;
+    renderTokens(data.tokens || []);
+}
+
+/** Build the expiry cell. Returns a real DOM Node so it slots into a td as-is. */
+function buildExpiryCell(iso) {
+    if (!iso) {
+        const span = document.createElement("span");
+        span.className = "muted";
+        span.textContent = "Never";
+        return span;
+    }
     const t = new Date(iso).getTime();
-    if (!isFinite(t)) return "—";
+    const span = document.createElement("span");
+    span.title = iso;
+    if (!isFinite(t)) {
+        span.textContent = "—";
+        return span;
+    }
     const now = Date.now();
-    if (t < now) return `<span class="token-expired" title="${escapeHtml(iso)}">Expired</span>`;
+    if (t < now) {
+        span.className = "token-expired";
+        span.textContent = "Expired";
+        return span;
+    }
     const diff = Math.floor((t - now) / 1000);
-    if (diff < 3600) return `<span class="token-expires-soon">${Math.floor(diff / 60)}m left</span>`;
-    if (diff < 86400) return `<span title="${escapeHtml(iso)}">${Math.floor(diff / 3600)}h left</span>`;
-    return `<span title="${escapeHtml(iso)}">${Math.floor(diff / 86400)}d left</span>`;
+    if (diff < 3600) {
+        span.className = "token-expires-soon";
+        span.textContent = `${Math.floor(diff / 60)}m left`;
+    } else if (diff < 86400) {
+        span.textContent = `${Math.floor(diff / 3600)}h left`;
+    } else {
+        span.textContent = `${Math.floor(diff / 86400)}d left`;
+    }
+    return span;
 }
 
 function renderTokens(tokens) {
     const tbody = document.querySelector("#tokens-table tbody");
-    if (!tokens || tokens.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="muted">No tokens — click "Issue token" to create one.</td></tr>`;
-        return;
-    }
 
-    tbody.innerHTML = tokens.map(t => {
+    const rows = tokens.map(t => {
         const isActive = !t.revoked_at;
-        const statusPill = isActive
-            ? `<span class="status-pill active">Active</span>`
-            : `<span class="status-pill revoked">Revoked</span>`;
 
-        const scopes = t.scopes
-            ? t.scopes.split(",").filter(Boolean).map(s => `<span class="scope-pill">${escapeHtml(s)}</span>`).join("")
-            : `<span class="muted">full</span>`;
+        // ── Cell 1: label ──
+        const labelCell = document.createElement("strong");
+        labelCell.textContent = t.label ?? "";
 
-        const actions = isActive
-            ? `<button class="button outline" data-taction="revoke" data-id="${t.id}">Revoke</button>
-               <button class="button danger"  data-taction="delete" data-id="${t.id}">Delete</button>`
-            : `<button class="button danger"  data-taction="delete" data-id="${t.id}">Delete</button>`;
+        // ── Cell 2: scopes ──
+        const scopesCell = document.createElement("div");
+        scopesCell.className = "scope-wrap";
+        if (t.scopes) {
+            for (const s of t.scopes.split(",").filter(Boolean)) {
+                const pill = document.createElement("span");
+                pill.className = "scope-pill";
+                pill.textContent = s;
+                scopesCell.appendChild(pill);
+            }
+        } else {
+            const muted = document.createElement("span");
+            muted.className = "muted";
+            muted.textContent = "full";
+            scopesCell.appendChild(muted);
+        }
 
-        return `<tr data-id="${t.id}">
-            <td><strong>${escapeHtml(t.label)}</strong></td>
-            <td><div class="scope-wrap">${scopes}</div></td>
-            <td><span title="${escapeHtml(t.created_at)}">${fmtRelative(t.created_at)}</span></td>
-            <td>${fmtExpiry(t.expires_at)}</td>
-            <td><span title="${t.used_at || ''}">${fmtRelative(t.used_at)}</span></td>
-            <td>${statusPill}</td>
-            <td><div class="row-actions">${actions}</div></td>
-        </tr>`;
-    }).join("");
+        // ── Cell 3: created_at ──
+        const createdCell = document.createElement("span");
+        createdCell.title = t.created_at ?? "";
+        createdCell.textContent = fmtRelative(t.created_at);
+
+        // ── Cell 4: expires_at ──
+        const expiresCell = buildExpiryCell(t.expires_at);
+
+        // ── Cell 5: used_at ──
+        const usedCell = document.createElement("span");
+        usedCell.title = t.used_at ?? "";
+        usedCell.textContent = fmtRelative(t.used_at);
+
+        // ── Cell 6: status ──
+        const statusCell = document.createElement("span");
+        statusCell.className = "status-pill " + (isActive ? "active" : "revoked");
+        statusCell.textContent = isActive ? "Active" : "Revoked";
+
+        // ── Cell 7: actions ──
+        const actionsCell = document.createElement("div");
+        actionsCell.className = "row-actions";
+        if (isActive) {
+            const revokeBtn = document.createElement("button");
+            revokeBtn.className = "button outline";
+            revokeBtn.dataset.taction = "revoke";
+            revokeBtn.dataset.id = String(t.id);
+            revokeBtn.type = "button";
+            revokeBtn.textContent = "Revoke";
+            actionsCell.appendChild(revokeBtn);
+        }
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "button danger";
+        deleteBtn.dataset.taction = "delete";
+        deleteBtn.dataset.id = String(t.id);
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "Delete";
+        actionsCell.appendChild(deleteBtn);
+
+        return buildRow(
+            [labelCell, scopesCell, createdCell, expiresCell, usedCell, statusCell, actionsCell],
+            { "data-id": t.id },
+        );
+    });
+
+    replaceTbody(tbody, rows, `No tokens — click "Issue token" to create one.`, TOKENS_COLS);
 
     tbody.querySelectorAll("[data-taction]").forEach(btn => {
         btn.addEventListener("click", () => handleTokenAction(btn.dataset.taction, btn.dataset.id));
