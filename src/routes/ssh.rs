@@ -65,9 +65,12 @@ struct SshData {
 async fn ssh_data(
     State(state): State<AppState>,
     account: Account,
-) -> Result<Json<SshData>, StatusCode> {
+) -> Result<Json<SshData>, (StatusCode, Json<ErrorResponse>)> {
     if !account.flags.is_admin() {
-        return Err(StatusCode::FORBIDDEN);
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse { error: "forbidden".into() }),
+        ));
     }
 
     let keys: Vec<SshKey> = state
@@ -79,7 +82,17 @@ async fn ssh_data(
             [],
         )
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            // Surface the real cause both in logs and in the response body
+            // so 'Failed to load — HTTP 500' in the UI shows the actual
+            // SQL error (e.g. 'no such column: target_user') instead of
+            // making the operator dig through docker logs.
+            tracing::error!(error = %e, "ssh_data: SELECT FROM ssh_key failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: format!("database error: {e}") }),
+            )
+        })?;
 
     let active = keys.iter().filter(|k| k.is_active()).count();
     let revoked = keys.len() - active;
@@ -291,7 +304,10 @@ async fn revoke_key(
             boxed_params!(id),
         )
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!(error = %e, key_id = id, "revoke_key: UPDATE failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     if rows == 0 {
         return Err(StatusCode::NOT_FOUND);
@@ -332,7 +348,10 @@ async fn delete_key(
         .database()
         .execute("DELETE FROM ssh_key WHERE id = ?", boxed_params!(id))
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!(error = %e, key_id = id, "delete_key: DELETE failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     if rows == 0 {
         return Err(StatusCode::NOT_FOUND);
@@ -369,9 +388,12 @@ struct TokensData {
 async fn list_tokens(
     State(state): State<AppState>,
     account: Account,
-) -> Result<Json<TokensData>, StatusCode> {
+) -> Result<Json<TokensData>, (StatusCode, Json<ErrorResponse>)> {
     if !account.flags.is_admin() {
-        return Err(StatusCode::FORBIDDEN);
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse { error: "forbidden".into() }),
+        ));
     }
 
     let tokens: Vec<SshToken> = state
@@ -383,7 +405,13 @@ async fn list_tokens(
             [],
         )
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!(error = %e, "list_tokens: SELECT FROM ssh_token failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: format!("database error: {e}") }),
+            )
+        })?;
 
     let active = tokens.iter().filter(|t| t.is_active()).count();
 
@@ -463,7 +491,13 @@ async fn issue_token(
             .map(|_| conn.last_insert_rowid())
         })
         .await
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse { error: "database error".into() })))?;
+        .map_err(|e| {
+            tracing::error!(error = %e, "issue_token: INSERT INTO ssh_token failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { error: format!("database error: {e}") }),
+            )
+        })?;
 
     ssh::audit(
         &state,
@@ -512,7 +546,10 @@ async fn revoke_token(
             boxed_params!(id),
         )
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!(error = %e, token_id = id, "revoke_token: UPDATE failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     if rows == 0 {
         return Err(StatusCode::NOT_FOUND);
@@ -542,7 +579,10 @@ async fn delete_token(
         .database()
         .execute("DELETE FROM ssh_token WHERE id = ?", boxed_params!(id))
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!(error = %e, token_id = id, "delete_token: DELETE failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     if rows == 0 {
         return Err(StatusCode::NOT_FOUND);
@@ -635,7 +675,10 @@ async fn ssh_audit_data(
             rows
         })
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!(error = %e, "ssh_audit_data: SELECT failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let total = entries.len();
     Ok(Json(SshAuditData { entries, total }))
@@ -660,7 +703,10 @@ async fn export_authorized_keys(
             [],
         )
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!(error = %e, "export_authorized_keys: SELECT failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let body = ssh::render_authorized_keys(&keys);
 

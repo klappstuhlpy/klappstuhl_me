@@ -232,9 +232,16 @@ async function loadDataOnce() {
     try {
         const res = await fetch("/admin/ssh/data");
         if (!res.ok) {
+            // Try to pull `{error: "..."}` out of the body so the operator
+            // sees the real reason (e.g. "no such column: target_user")
+            // instead of a bare 'HTTP 500'.
+            let detail = "";
+            try {
+                const body = await res.json();
+                if (body && body.error) detail = ` — ${body.error}`;
+            } catch { /* body wasn't JSON */ }
             replaceTbody(tbody, [],
-                `Failed to load keys — HTTP ${res.status} ${escapeHtml(res.statusText || "")}. ` +
-                `Check that you're still signed in.`,
+                `Failed to load keys — HTTP ${res.status} ${escapeHtml(res.statusText || "")}${escapeHtml(detail)}.`,
                 KEYS_COLS);
             return;
         }
@@ -388,8 +395,13 @@ async function loadTokensOnce() {
     try {
         const res = await fetch("/admin/ssh/tokens");
         if (!res.ok) {
+            let detail = "";
+            try {
+                const body = await res.json();
+                if (body && body.error) detail = ` — ${body.error}`;
+            } catch { /* body wasn't JSON */ }
             replaceTbody(tbody, [],
-                `Failed to load tokens — HTTP ${res.status} ${escapeHtml(res.statusText || "")}.`,
+                `Failed to load tokens — HTTP ${res.status} ${escapeHtml(res.statusText || "")}${escapeHtml(detail)}.`,
                 TOKENS_COLS);
             return;
         }
