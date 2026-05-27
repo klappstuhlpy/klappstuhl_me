@@ -72,12 +72,12 @@ After that, log in at `https://yourdomain.com/login`, then visit `/admin` to acc
 
 ### What the compose file mounts
 
-| Mount                        | Why                                                            |
-|------------------------------|----------------------------------------------------------------|
-| `./data:/data`               | Persistent config, database, logs, ACME cert cache.            |
+| Mount                        | Why                                                              |
+|------------------------------|------------------------------------------------------------------|
+| `./data:/data`               | Persistent config, database, logs, ACME cert cache.              |
 | `/var/run/docker.sock`       | So `/admin/docker` can run `docker ps` / `docker compose up -d`. |
-| `/proc:/host/proc:ro`        | So `/admin/metrics` reports the **host's** CPU/RAM/network.    |
-| `/sys:/host/sys:ro`          | Same — for `/sys/block/*` (disk I/O counters).                 |
+| `/proc:/host/proc:ro`        | So `/admin/metrics` reports the **host's** CPU/RAM/network.      |
+| `/sys:/host/sys:ro`          | Same — for `/sys/block/*` (disk I/O counters).                   |
 
 `HOST_PROC=/host/proc` and `HOST_SYS=/host/sys` are pre-set in the compose file so the metrics collector picks up the host filesystem.
 
@@ -112,16 +112,16 @@ A default `config.json` is written on first start. Full layout with all optional
 | `production`           | bool              | `true` switches the server to TLS via Let's Encrypt on port 443.                               |
 | `domains`              | string[]          | Hostnames that ACME will request certificates for.                                             |
 | `server.port`          | u16               | Listen port (`443` in production, anything else for dev).                                      |
-| `server.ip`            | string            | The IP the server listens on (default `0.0.0.0`).                                             |
+| `server.ip`            | string            | The IP the server listens on (default `0.0.0.0`).                                              |
 | `secret_key`           | string            | Auto-generated; used for HMAC signing of session tokens and flash cookies.                     |
 | `discord_webhook_url`  | string \| null    | Discord incoming webhook URL for metric alerts and secret findings.                            |
 | `services`             | ServiceConfig[]   | Docker services shown on `/admin/docker`. See below.                                           |
-| `geoip_db_path`        | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.         |
+| `geoip_db_path`        | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.          |
 | `cloudflare_api_token` | string \| null    | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                  |
 | `cloudflare_zone_id`   | string \| null    | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels. |
 | `secret_scan_paths`    | string[]          | Directory paths the secrets scanner walks recursively.                                         |
 | `postgres_url`         | string \| null    | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                 |
-| `clamav_addr`          | string \| null    | TCP address of a `clamd` daemon, e.g. `"127.0.0.1:3310"`. Enables ClamAV scanning.            |
+| `clamav_addr`          | string \| null    | TCP address of a `clamd` daemon, e.g. `"127.0.0.1:3310"`. Enables ClamAV scanning.             |
 | `virustotal_api_key`   | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.              |
 | `spotlight_scripts`    | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                        |
 
@@ -137,10 +137,10 @@ Each entry powers one card on `/admin/docker`:
 }
 ```
 
-| Field        | Description                                                                                       |
-|--------------|---------------------------------------------------------------------------------------------------|
-| `name`       | Human-readable label shown on the card.                                                           |
-| `identifier` | Container name passed to `docker ps` / `stop` / `start`.                                         |
+| Field        | Description                                                                                                                                                                                 |
+|--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `name`       | Human-readable label shown on the card.                                                                                                                                                     |
+| `identifier` | Container name passed to `docker ps` / `stop` / `start`.                                                                                                                                    |
 | `path`       | (Optional) Path containing a `docker-compose.yml`. When set, Start/Stop/Restart/Pull/Recreate use `docker compose` commands in that directory instead of plain `docker start/stop/restart`. |
 
 > **Note:** The legacy `kind` field (`"docker"` / `"screen"`) is silently ignored if present in an old config file. Screen support has been removed — all services are Docker.
@@ -167,13 +167,13 @@ Pre-defined shell commands that appear in the Ctrl+K palette under the **Scripts
 ]
 ```
 
-| Field         | Description                                                                                              |
-|---------------|----------------------------------------------------------------------------------------------------------|
-| `id`          | Unique identifier used internally. Must be unique across all scripts.                                    |
-| `name`        | Display name shown in the palette.                                                                       |
-| `command`     | Shell command executed via `sh -c` on Unix or `cmd /C` on Windows.                                      |
-| `description` | (Optional) Subtitle shown below the name in the palette. Defaults to the raw command string.             |
-| `cwd`         | (Optional) Working directory for the command. Defaults to the process working directory.                 |
+| Field         | Description                                                                                     |
+|---------------|-------------------------------------------------------------------------------------------------|
+| `id`          | Unique identifier used internally. Must be unique across all scripts.                           |
+| `name`        | Display name shown in the palette.                                                              |
+| `command`     | Shell command executed via `sh -c` on Unix or `cmd /C` on Windows.                              |
+| `description` | (Optional) Subtitle shown below the name in the palette. Defaults to the raw command string.    |
+| `cwd`         | (Optional) Working directory for the command. Defaults to the process working directory.        |
 
 Scripts time out after 30 seconds. Every execution is recorded in the audit log (`spotlight.script.run` with the script name as target).
 
@@ -213,12 +213,12 @@ Hard-coded (`src/metrics/alerts.rs`). On the `OK → ALERT` transition, a red Di
 
 When running directly (not in Docker), paths follow [XDG basedirs](https://specifications.freedesktop.org/basedir-spec/) on Linux:
 
-| Kind          | Linux                                  | macOS                                                      | Windows                              |
-|---------------|----------------------------------------|------------------------------------------------------------|--------------------------------------|
-| Config        | `$XDG_CONFIG_HOME/klappstuhl_me/`     | `~/Library/Application Support/klappstuhl_me/`            | `%AppData%\klappstuhl_me\`           |
-| Database      | `$XDG_DATA_HOME/klappstuhl_me/`       | `~/Library/Application Support/klappstuhl_me/`            | `%AppData%\klappstuhl_me\`           |
-| Logs          | `$XDG_STATE_HOME/klappstuhl_me/`      | `./logs/`                                                  | `./logs/`                            |
-| ACME cache    | `$XDG_CACHE_HOME/klappstuhl_me/`      | `~/Library/Caches/klappstuhl_me/`                          | `%LocalAppData%\klappstuhl_me\`      |
+| Kind          | Linux                                  | macOS                                                     | Windows                              |
+|---------------|----------------------------------------|-----------------------------------------------------------|--------------------------------------|
+| Config        | `$XDG_CONFIG_HOME/klappstuhl_me/`      | `~/Library/Application Support/klappstuhl_me/`            | `%AppData%\klappstuhl_me\`           |
+| Database      | `$XDG_DATA_HOME/klappstuhl_me/`        | `~/Library/Application Support/klappstuhl_me/`            | `%AppData%\klappstuhl_me\`           |
+| Logs          | `$XDG_STATE_HOME/klappstuhl_me/`       | `./logs/`                                                 | `./logs/`                            |
+| ACME cache    | `$XDG_CACHE_HOME/klappstuhl_me/`       | `~/Library/Caches/klappstuhl_me/`                         | `%LocalAppData%\klappstuhl_me\`      |
 
 Inside the Docker image these all live under `/data` via `XDG_CONFIG_HOME=/data/config`, `XDG_DATA_HOME=/data/data`, `XDG_STATE_HOME=/data/state`, `XDG_CACHE_HOME=/data/cache`.
 
