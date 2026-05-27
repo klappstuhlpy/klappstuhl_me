@@ -73,6 +73,23 @@ services:
     cap_add:
       - NET_BIND_SERVICE
 
+    # Map the magic hostname `host.docker.internal` to the host's gateway
+    # IP from inside the container. Needed to reach services running on
+    # the host (like clamd at host.docker.internal:3310). On Docker
+    # Desktop this hostname resolves automatically; on Linux Docker
+    # Engine it does not — `host-gateway` is the Docker-supplied alias
+    # that fills the gap.
+    #
+    # Required companion settings:
+    #   - config.json: "clamav_addr": "host.docker.internal:3310"
+    #   - /etc/clamav/clamd.conf on the host: `TCPAddr 0.0.0.0`
+    #     (or the Docker bridge IP — clamd's default `LocalSocketGroup`
+    #     listens on 127.0.0.1 only, which the container cannot reach).
+    #   - host firewall must allow port 3310 from the docker0 bridge
+    #     (usually 172.17.0.0/16). UFW: `sudo ufw allow from 172.17.0.0/16 to any port 3310`.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
     # HOST_PROC / HOST_SYS tell the metrics collector where the host
     # filesystem is mounted (see the read-only bind mounts above).
     environment:
@@ -89,31 +106,7 @@ services:
 #    Then stop it:
 #      docker compose down
 #
-# 2. Edit ./data/config/klappstuhl_me/config.json – minimum production config:
-#
-#      {
-#        "production": true,
-#        "domains": ["yourdomain.com"],
-#        "server": { "port": 443 },
-#        "secret_key": "<keep the auto-generated value>",
-#        "discord_webhook_url": null,
-#        "services": [],
-#        "geoip_db_path": null,
-#        "cloudflare_api_token": null,
-#        "cloudflare_zone_id": null
-#      }
-#
-# Optional security dashboard setup
-# ---------------------------------
-# GeoIP: drop a MaxMind GeoLite2-City.mmdb at
-#   ./data/geoip/GeoLite2-City.mmdb
-# (sign up free at maxmind.com → My Account → Download Databases →
-#  GeoLite2 City → Binary). The app picks this up automatically;
-# you can override with config.json -> "geoip_db_path".
-#
-# Cloudflare: set "cloudflare_api_token" (with Zone.Analytics:Read on
-# the target zone) and "cloudflare_zone_id" in config.json to enable
-# the Cloudflare traffic + WAF panels at /admin/security.
+# 2. Edit ./data/config/klappstuhl_me/config.json
 #
 # 3. Create the admin account (interactive prompt):
 #      docker compose run --rm klappstuhl_me ./klappstuhl_me admin

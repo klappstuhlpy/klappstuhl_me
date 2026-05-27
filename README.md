@@ -124,7 +124,7 @@ A default `config.json` is written on first start. Full layout with all optional
 | `cloudflare_zone_id`     | string \| null    | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels. |
 | `secret_scan_paths`      | string[]          | Directory paths the secrets scanner walks recursively.                                         |
 | `postgres_url`           | string \| null    | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                 |
-| `clamav_addr`            | string \| null    | TCP address of a `clamd` daemon, e.g. `"127.0.0.1:3310"`. Enables ClamAV scanning.             |
+| `clamav_addr`            | string \| null    | TCP address of a `clamd` daemon, e.g. `"host.docker.internal:3310"`. Enables ClamAV scanning.  |
 | `virustotal_api_key`     | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.              |
 | `spotlight_scripts`      | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                        |
 | `sshd_auth_log_path`     | string \| null    | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below. |
