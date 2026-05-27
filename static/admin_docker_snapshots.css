@@ -80,10 +80,42 @@
 
 /* ── Table column widths ────────────────────────────────────── */
 
-.snap-tag   { font-family: monospace; font-size: 0.75rem; color: var(--info-text); word-break: break-all; }
-.snap-image { font-size: 0.75rem; color: var(--text-muted); word-break: break-all; }
-.snap-date  { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
-.col-actions { text-align: right; white-space: nowrap; }
+.snap-tag {
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: var(--info-text);
+    word-break: break-all;
+}
+
+.snap-image {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    word-break: break-all;
+}
+
+.snap-date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.col-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.row-actions {
+    display: flex;
+    gap: 0.3rem;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+.row-actions .button {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
 
 /* ── Docker unavailable (shared with admin_docker.css) ──────── */
 
@@ -97,9 +129,20 @@
     text-align: center;
 }
 
-.docker-unavailable-icon  { font-size: 2.5rem; }
-.docker-unavailable-title { font-size: 1rem; font-weight: 600; color: var(--foreground); }
-.docker-unavailable-sub   { font-size: 0.82rem; color: var(--text-muted); }
+.docker-unavailable-icon {
+    font-size: 2.5rem;
+}
+
+.docker-unavailable-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+.docker-unavailable-sub {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
 
 /* ── Restore modal ──────────────────────────────────────────── */
 
@@ -113,7 +156,9 @@
     z-index: 200;
 }
 
-.modal-overlay[hidden] { display: none; }
+.modal-overlay[hidden] {
+    display: none;
+}
 
 .modal {
     background: var(--box);
