@@ -588,14 +588,30 @@ pub fn spawn_auth_log_watcher(state: AppState) {
         tracing::info!("SSH auth log watcher disabled (sshd_auth_log_path not set)");
         return;
     };
+    // Capture the current Tokio runtime handle while we're still on a
+    // runtime worker. The watcher's std::thread has no runtime in TLS,
+    // so any tokio::spawn / .await call from it would panic with
+    // "there is no reactor running". Passing the handle in lets the
+    // thread enter() the runtime for its entire lifetime, so the inner
+    // tokio::spawn calls in record_key_use / audit() just work.
+    let handle = tokio::runtime::Handle::current();
     std::thread::Builder::new()
         .name("ssh-auth-log-watcher".into())
-        .spawn(move || run_auth_log_watcher(state, path))
+        .spawn(move || run_auth_log_watcher(state, path, handle))
         .expect("failed to spawn ssh-auth-log-watcher thread");
 }
 
-fn run_auth_log_watcher(state: AppState, path: std::path::PathBuf) {
+fn run_auth_log_watcher(
+    state: AppState,
+    path: std::path::PathBuf,
+    handle: tokio::runtime::Handle,
+) {
     use std::io::{BufRead, BufReader, Seek, SeekFrom};
+
+    // Keep the runtime current for this thread for the whole loop —
+    // tokio::spawn, Handle::current(), and .await on Tokio futures all
+    // need this. The guard drops on function return (i.e. never).
+    let _runtime_guard = handle.enter();
 
     let mut reader: Option<BufReader<std::fs::File>> = None;
     let mut last_pos: u64 = 0;
