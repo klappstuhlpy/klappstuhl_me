@@ -266,10 +266,10 @@ volumes:
 
 Distro-specific log locations:
 
-| Distro                 | Log path                |
-|------------------------|-------------------------|
-| Debian / Ubuntu        | `/var/log/auth.log`     |
-| RHEL / Fedora / Rocky  | `/var/log/secure`       |
+| Distro                 | Log path                          |
+|------------------------|-----------------------------------|
+| Debian / Ubuntu        | `/var/log/auth.log`               |
+| RHEL / Fedora / Rocky  | `/var/log/secure`                 |
 | Alpine / Arch          | usually journald only — see below |
 
 sshd must log fingerprints for the parser to match. On modern OpenSSH this is the default; if your `Accepted publickey ...` lines lack `ssh2: <algo> SHA256:<fp>`, set `LogLevel VERBOSE` in `/etc/ssh/sshd_config` and reload sshd.
