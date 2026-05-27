@@ -4,7 +4,7 @@ Personal website, image-hosting service, and homelab admin platform built with R
 
 What started as a small image host has grown into a single binary that also runs
 the admin tooling for the machine it sits on: live system metrics, container
-management, security analytics, and an invite-only user system.
+management, security analytics, virus scanning, and an invite-only user system.
 
 ## Highlights
 
@@ -13,14 +13,26 @@ management, security analytics, and an invite-only user system.
 - **Admin shell at `/admin`** — sidebar layout with the following pages:
   - **Dashboard** — request analytics, popular routes, referring sites, API consumers.
   - **Invites** — invite-only signup. Admins generate one-time codes (with optional expiry + note), copy a `/signup?code=…` URL, share it with the invitee. No public registration.
-  - **Services** — start / stop / restart Docker containers (or `docker compose` stacks via a configured `path`). Per-service live log console streamed over Server-Sent Events with syntax highlighting.
+  - **Docker** — combined services dashboard and dependency graph.
+    - Per-service cards for every entry in `config.services`: live running/offline badge, uptime, image name, short container ID, restart count, live CPU % and RAM bar (auto-refreshed every 15 s). Start / Stop / Restart / Pull image / Recreate actions.
+    - Per-service live log console streamed over Server-Sent Events with syntax highlighting (timestamps, log levels, HTTP methods, status codes, IPs, durations, strings).
+    - Interactive Cytoscape.js dependency graph showing containers, networks, and volumes with edges for network membership, volume mounts, and `depends_on` links. Click any node for an inline side-panel with full inspect data. Filter by kind, re-layout, fit-to-screen. Graph updates softly (no layout re-run) when a WS Docker event arrives.
+    - Live Events strip at the bottom of the graph — WebSocket feed of Docker daemon events (start / stop / die / create / destroy / …).
+    - Quick link to the Snapshots page.
+  - **Snapshots** — point-in-time container image snapshots via `docker commit`. Capture any running container from the graph side-panel, give it an optional description; later restore it as a new named container in one click. Stored in SQLite; the committed image tag is a nanoid-generated string. Deletion removes both the DB row and the image (`docker rmi`).
   - **Metrics** — live host stats (CPU, RAM, disk usage, disk I/O, network throughput) plus per-container Docker stats. uPlot charts with selectable ranges (1h / 6h / 24h / 7d / 30d). Threshold alerts fire a Discord webhook on `OK → ALERT` transitions with a 30-minute cooldown.
   - **Security** — failed logins, top offending IPs (with GeoIP country/city), reason breakdown, country distribution, recent activity feed. Optional Cloudflare panels (zone analytics + WAF events) when an API token + zone ID are configured.
   - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI / Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
-  - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, signup, password change, logout), invite create/revoke, service actions, secret status changes, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
-  - **Postgres** — browse databases, tables, and roles on a separate PostgreSQL server (the one on your host, not the app's own SQLite). Safe-mode query runner wraps every statement in `BEGIN TRANSACTION READ ONLY` so even a superuser credential can't accidentally mutate state; explicit danger-mode toggle for `INSERT` / `UPDATE` / `DELETE` / DDL when needed. Every query writes an audit entry (including blocked-by-safe-mode attempts).
+  - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, signup, password change, logout), invite create/revoke, service/snapshot/script actions, secret status changes, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
+  - **Postgres** — browse databases, tables, and roles on a separate PostgreSQL server. Safe-mode query runner wraps every statement in `BEGIN TRANSACTION READ ONLY` so even a superuser credential can't accidentally mutate state; explicit danger-mode toggle for `INSERT` / `UPDATE` / `DELETE` / DDL when needed. Every query writes an audit entry (including blocked-by-safe-mode attempts).
+  - **SSH Keys** — manage authorized SSH public keys stored in the database. Add keys with an optional label; the server appends live-syncs them to `~/.ssh/authorized_keys`. Token audit (active API tokens across accounts) and session audit (active login sessions with IP + user-agent) sub-pages. Revoke individual keys, tokens, or sessions.
+  - **File Sanitizer** — drag-and-drop file scanning with two optional backends.
+    - **ClamAV** — streams the uploaded file to a local `clamd` daemon over TCP (INSTREAM protocol). Reports virus name on detection.
+    - **VirusTotal** — looks up the file's SHA-256 against the VT v3 API (no file upload; hash-only). Shows `N/M engines detected` with a link to the VT report.
+    - Scan history table (SQLite) with per-row deletion. Both backends are independent; results combine into a single clean/infected/unknown verdict.
+- **Spotlight palette (Ctrl+K)** — macOS-style command palette available on every admin page. Opens with `Ctrl+K` (or the Search button in the sidebar footer). Fuzzy-searches across all admin nav items, configured scripts, audit log entries, file scan history, SSH keys, and live Docker containers. Keyboard-navigable (↑/↓/Enter/Esc). Scripts run inline and show their stdout/stderr output in the palette without leaving the page.
 - **API tokens with scopes** — generated from `/account`, each token can be restricted to a subset of `images:read · images:write · admin:read · admin:write`. Legacy keys (created without selecting scopes) keep full access for back-compat.
-- **Live updates over WebSocket** — `/ws` push topic events to dashboards. Metrics tiles refresh on every scrape and audit-log entries appear instantly; polling is the automatic fallback when the socket is closed.
+- **Live updates over WebSocket** — `/ws` push topic events to dashboards. Metrics tiles refresh on every scrape, audit-log entries appear instantly, and Docker graph updates on container events; polling is the automatic fallback when the socket is closed.
 - **Installable PWA** — `site.webmanifest` + service worker shell-cache the static assets. iOS standalone-mode meta tags + a black theme colour so the app looks native when installed to the home screen. Network-only for everything dynamic; offline access is intentionally **not** a goal for a homelab admin tool.
 - **REST API** — OpenAPI 3.0 documented at `/api/docs` via utoipa + Scalar.
 - **Automatic TLS** — Let's Encrypt via rustls-acme (TLS-ALPN-01) in production mode.
@@ -29,12 +41,14 @@ management, security analytics, and an invite-only user system.
 
 - **Backend** — Rust, [Axum](https://github.com/tokio-rs/axum) 0.7, Tokio, SQLite (rusqlite, bundled).
 - **Templates** — [Askama](https://github.com/djc/askama) (compile-time server-side rendering).
-- **Storage** — three SQLite files inside the data dir: `main.db` (accounts, sessions, images, invites, metrics), `requests.db` (HTTP access log).
+- **Storage** — two SQLite files in the data dir: `main.db` (accounts, sessions, images, invites, metrics, snapshots, SSH keys, file scans), `requests.db` (HTTP access log).
 - **Auth** — HMAC-signed session tokens, Argon2 password hashing.
 - **TLS** — Automatic Let's Encrypt via rustls-acme.
 - **Metrics** — Native `/proc` and `/sys` parsing, `df` for disk usage, `docker stats` for containers. uPlot for charts.
 - **GeoIP** — Offline [MaxMind GeoLite2-City](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) database via the `maxminddb` crate.
 - **Cloudflare** — GraphQL Analytics API (zone traffic + firewall events) via `reqwest`.
+- **Docker** — [bollard](https://github.com/fussybeaver/bollard) crate for the Docker daemon API (container list, inspect, events stream, `docker commit`). [Cytoscape.js](https://js.cytoscape.org/) for the dependency graph.
+- **Virus scanning** — inline ClamAV INSTREAM TCP client; VirusTotal v3 REST API via `reqwest`. SHA-256 via the `sha2` crate.
 
 ## Quick start (Docker — recommended)
 
@@ -61,7 +75,7 @@ After that, log in at `https://yourdomain.com/login`, then visit `/admin` to acc
 | Mount                        | Why                                                            |
 |------------------------------|----------------------------------------------------------------|
 | `./data:/data`               | Persistent config, database, logs, ACME cert cache.            |
-| `/var/run/docker.sock`       | So `/admin/services` can run `docker ps` / `docker compose up -d`.   |
+| `/var/run/docker.sock`       | So `/admin/docker` can run `docker ps` / `docker compose up -d`. |
 | `/proc:/host/proc:ro`        | So `/admin/metrics` reports the **host's** CPU/RAM/network.    |
 | `/sys:/host/sys:ro`          | Same — for `/sys/block/*` (disk I/O counters).                 |
 
@@ -69,7 +83,7 @@ After that, log in at `https://yourdomain.com/login`, then visit `/admin` to acc
 
 ## Configuration
 
-A default `config.json` is written on first start. Minimum production layout:
+A default `config.json` is written on first start. Full layout with all optional fields:
 
 ```json
 {
@@ -85,32 +99,39 @@ A default `config.json` is written on first start. Minimum production layout:
   "geoip_db_path": null,
   "cloudflare_api_token": null,
   "cloudflare_zone_id": null,
-  "secret_scan_paths": []
+  "secret_scan_paths": [],
+  "postgres_url": null,
+  "clamav_addr": null,
+  "virustotal_api_key": null,
+  "spotlight_scripts": []
 }
 ```
 
-| Key                    | Type            | Notes                                                                                          |
-|------------------------|-----------------|------------------------------------------------------------------------------------------------|
-| `production`           | bool            | `true` switches the server to TLS via Let's Encrypt on port 443.                               |
-| `domains`              | string[]        | Hostnames that ACME will request certificates for.                                             |
-| `server.port`          | u16             | Listen port (`443` in production, anything else for dev).                                      |
-| `server.ip`            | string          | The ip the server runs on (default is localhost).                                              |
-| `secret_key`           | string          | Auto-generated; used for HMAC signing of session tokens and flash cookies.                     |
-| `discord_webhook_url`  | string \| null  | Used by metric threshold alerts.                                                               |
-| `services`             | ServiceConfig[] | See "Services configuration" below.                                                            |
-| `geoip_db_path`        | string \| null  | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.          |
-| `cloudflare_api_token` | string \| null  | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                  |
-| `cloudflare_zone_id`   | string \| null  | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels. |
-| `secret_scan_paths`    | string[]        | The list of paths that should be monitored with the secrets checcker                           |
+| Key                    | Type              | Notes                                                                                          |
+|------------------------|-------------------|------------------------------------------------------------------------------------------------|
+| `production`           | bool              | `true` switches the server to TLS via Let's Encrypt on port 443.                               |
+| `domains`              | string[]          | Hostnames that ACME will request certificates for.                                             |
+| `server.port`          | u16               | Listen port (`443` in production, anything else for dev).                                      |
+| `server.ip`            | string            | The IP the server listens on (default `0.0.0.0`).                                             |
+| `secret_key`           | string            | Auto-generated; used for HMAC signing of session tokens and flash cookies.                     |
+| `discord_webhook_url`  | string \| null    | Discord incoming webhook URL for metric alerts and secret findings.                            |
+| `services`             | ServiceConfig[]   | Docker services shown on `/admin/docker`. See below.                                           |
+| `geoip_db_path`        | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.         |
+| `cloudflare_api_token` | string \| null    | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                  |
+| `cloudflare_zone_id`   | string \| null    | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels. |
+| `secret_scan_paths`    | string[]          | Directory paths the secrets scanner walks recursively.                                         |
+| `postgres_url`         | string \| null    | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                 |
+| `clamav_addr`          | string \| null    | TCP address of a `clamd` daemon, e.g. `"127.0.0.1:3310"`. Enables ClamAV scanning.            |
+| `virustotal_api_key`   | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.              |
+| `spotlight_scripts`    | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                        |
 
-### Services configuration
+### Docker services configuration
 
-Each entry powers one card on `/admin/services`:
+Each entry powers one card on `/admin/docker`:
 
 ```json
 {
   "name": "Percy",
-  "kind": "docker",
   "identifier": "percy_main",
   "path": "/home/parzival/Percy"
 }
@@ -119,9 +140,42 @@ Each entry powers one card on `/admin/services`:
 | Field        | Description                                                                                       |
 |--------------|---------------------------------------------------------------------------------------------------|
 | `name`       | Human-readable label shown on the card.                                                           |
-| `kind`       | `"docker"` (container) or `"screen"` (GNU Screen session).                                        |
-| `identifier` | Container name passed to `docker ps`/`stop`/`start`, or the screen session name.                  |
-| `path`       | (Docker only, optional) Path containing a `docker-compose.yml`. When set, Start/Stop/Restart use `docker compose up -d` / `down` / `restart` in this directory instead of plain `docker start/stop/restart`. |
+| `identifier` | Container name passed to `docker ps` / `stop` / `start`.                                         |
+| `path`       | (Optional) Path containing a `docker-compose.yml`. When set, Start/Stop/Restart/Pull/Recreate use `docker compose` commands in that directory instead of plain `docker start/stop/restart`. |
+
+> **Note:** The legacy `kind` field (`"docker"` / `"screen"`) is silently ignored if present in an old config file. Screen support has been removed — all services are Docker.
+
+### Spotlight scripts configuration
+
+Pre-defined shell commands that appear in the Ctrl+K palette under the **Scripts** section and can be run directly from the palette:
+
+```json
+"spotlight_scripts": [
+  {
+    "id": "restart-nginx",
+    "name": "Restart nginx",
+    "command": "systemctl restart nginx",
+    "description": "Reload nginx config and restart the service",
+    "cwd": null
+  },
+  {
+    "id": "git-pull-site",
+    "name": "Pull site repo",
+    "command": "git pull",
+    "cwd": "/home/user/mysite"
+  }
+]
+```
+
+| Field         | Description                                                                                              |
+|---------------|----------------------------------------------------------------------------------------------------------|
+| `id`          | Unique identifier used internally. Must be unique across all scripts.                                    |
+| `name`        | Display name shown in the palette.                                                                       |
+| `command`     | Shell command executed via `sh -c` on Unix or `cmd /C` on Windows.                                      |
+| `description` | (Optional) Subtitle shown below the name in the palette. Defaults to the raw command string.             |
+| `cwd`         | (Optional) Working directory for the command. Defaults to the process working directory.                 |
+
+Scripts time out after 30 seconds. Every execution is recorded in the audit log (`spotlight.script.run` with the script name as target).
 
 ### Enabling the security dashboard's optional features
 
@@ -130,14 +184,20 @@ Each entry powers one card on `/admin/services`:
 | Priority | Location                                                          |
 |----------|-------------------------------------------------------------------|
 | 1        | The exact path in `config.geoip_db_path` (if set).                |
-| 2        | `<data dir>/geoip/GeoLite2-City.mmdb`                              |
-| 3        | `<data dir>/GeoLite2-City.mmdb`                                    |
-| 4        | `<config dir>/geoip/GeoLite2-City.mmdb`                            |
-| 5        | `<config dir>/GeoLite2-City.mmdb`                                  |
+| 2        | `<data dir>/geoip/GeoLite2-City.mmdb`                             |
+| 3        | `<data dir>/GeoLite2-City.mmdb`                                   |
+| 4        | `<config dir>/geoip/GeoLite2-City.mmdb`                           |
+| 5        | `<config dir>/GeoLite2-City.mmdb`                                 |
 
-On Windows the data dir and config dir are both `%AppData%\klappstuhl_me\`, so simply dropping the `.mmdb` file alongside your `config.json` works. For Docker that's `./data/geoip/GeoLite2-City.mmdb` on the host (mapped to `/data/geoip/` in the container). If no file is found, the security dashboard still works — country/city columns are simply hidden, and startup logs list every path that was checked.
+On Windows the data dir and config dir are both `%AppData%\klappstuhl_me\`, so simply dropping the `.mmdb` file alongside your `config.json` works. For Docker that's `./data/geoip/GeoLite2-City.mmdb` on the host (mapped to `/data/geoip/` in the container). If no file is found, the security dashboard still works — country/city columns are simply hidden.
 
 **Cloudflare** — create an API token with `Zone.Analytics:Read` on your zone, paste it as `cloudflare_api_token` along with the `cloudflare_zone_id`. The Cloudflare section appears automatically. Failures are non-fatal — if CF is unreachable, the rest of the dashboard still renders.
+
+**ClamAV** — run `clamd` on the same host (or reachable via TCP) and set `clamav_addr` to its address. The File Sanitizer streams uploaded files to clamd using the native INSTREAM protocol — no `clamdscan` binary required.
+
+**VirusTotal** — set `virustotal_api_key` to a free public API key. The File Sanitizer computes the SHA-256 of each upload and does a hash-only lookup against VT v3 — no file data is ever sent to VirusTotal. Files not yet in the VT database show as "Not in VT".
+
+**Postgres** — set `postgres_url` to a libpq connection string. The configured credential should have at least `pg_read_all_data`; a superuser works too since safe-mode queries are always wrapped in `BEGIN TRANSACTION READ ONLY`.
 
 ## Metric alert thresholds
 
@@ -190,16 +250,30 @@ src/
 ├── cloudflare.rs     — Cloudflare GraphQL Analytics client
 ├── config.rs         — Config struct + JSON load/save
 ├── database.rs       — async SQLite worker pool with prepared-stmt cache
+├── docker.rs         — bollard Docker client wrapper + event watcher background task
 ├── geoip.rs          — Optional MaxMind reader wrapper
 ├── logging.rs        — Request log middleware + writer
 ├── metrics/          — Live metrics (host parsers, docker stats, alerts)
 ├── models.rs         — DB row types (Account, Session, Invite, ImageEntry)
-├── routes/           — HTTP handlers grouped by area
+├── routes/
+│   ├── admin.rs      — Dashboard
+│   ├── audit.rs      — Audit log
+│   ├── auth.rs       — Login / signup / password change
+│   ├── docker.rs     — Docker services + graph + snapshots + log SSE
+│   ├── image.rs      — Image upload and gallery
+│   ├── metrics.rs    — Metrics charts + stats data
+│   ├── postgres.rs   — Postgres browser + query runner
+│   ├── sanitizer.rs  — File sanitizer (ClamAV + VirusTotal)
+│   ├── secrets.rs    — Secret scanner
+│   ├── security.rs   — Security dashboard + GeoIP + Cloudflare
+│   ├── spotlight.rs  — Ctrl+K search + script runner
+│   ├── ssh.rs        — SSH key management + token/session audit
+│   └── ws.rs         — WebSocket live-push hub
 └── token.rs          — Session token signing + cookie helpers
 
 templates/            — Askama HTML templates
 static/               — CSS, JS, images served verbatim
-sql/                  — Numbered migration files
+sql/                  — Numbered migration files (0.sql … 8.sql)
 ```
 
 ## License
