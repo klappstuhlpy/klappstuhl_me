@@ -199,6 +199,37 @@ On Windows the data dir and config dir are both `%AppData%\klappstuhl_me\`, so s
 
 **ClamAV** — run `clamd` on the same host (or reachable via TCP) and set `clamav_addr` to its address. The File Sanitizer streams uploaded files to clamd using the native INSTREAM protocol — no `clamdscan` binary required.
 
+When the app runs in Docker and `clamd` runs on the host, there are three traps to avoid. Walk this checklist top-to-bottom and uploads should "just work":
+
+1. **Make `clamd` listen on TCP, not just the unix socket.** In `/etc/clamav/clamd.conf` make sure both of these are uncommented:
+   ```
+   TCPSocket 3310
+   TCPAddr 0.0.0.0
+   ```
+   Then `sudo systemctl restart clamav-daemon`. Verify with `sudo ss -tlnp | grep clamd` — you should see `LISTEN ... 0.0.0.0:3310`. If `systemd` co-owns the FD (you'll see `("systemd",pid=1,...)` next to `("clamd",pid=N,...)` in the `users:` column), that's fine — socket activation works as long as `clamd` itself is healthy.
+
+2. **Let the container resolve the host.** The bind mount in `docker-compose.yml` already adds `host.docker.internal:host-gateway` to `extra_hosts` so the container can reach the host's gateway IP. Set `clamav_addr` in `config.json` to:
+   ```json
+   "clamav_addr": "host.docker.internal:3310"
+   ```
+
+3. **Open the UFW rule for the *correct* source range.** This is the one that bites everyone. The intuitive `sudo ufw allow from 172.17.0.0/16 to any port 3310` covers `docker0` only — but a `docker compose` project gets its own bridge network (`klappstuhl_me_default`, IP range typically `172.18.0.0/16` or higher). Use the full Docker default range instead:
+   ```bash
+   sudo ufw allow from 172.16.0.0/12 to any port 3310 proto tcp comment 'clamd from docker containers'
+   sudo ufw reload
+   ```
+   Default-deny on your public interface still protects port 3310 from the outside world.
+
+Quick end-to-end test from inside the container (install `nc` first if missing: `apt-get install -y --no-install-recommends netcat-openbsd`):
+
+```bash
+docker compose exec klappstuhl_me sh -c \
+  'printf "zPING\0" | nc -w 3 host.docker.internal 3310'
+# expected output: PONG
+```
+
+If that prints `PONG`, the File Sanitizer page will return a scan verdict in under a second. If it hangs silently with no output, `sudo journalctl -kf | grep "UFW BLOCK"` while the test runs — UFW will log the dropped SYN with the actual `SRC=` IP and `IN=br-XXXX` bridge name, which tells you exactly which range/interface your container is using if it's not the default.
+
 **VirusTotal** — set `virustotal_api_key` to a free public API key. The File Sanitizer computes the SHA-256 of each upload and does a hash-only lookup against VT v3 — no file data is ever sent to VirusTotal. Files not yet in the VT database show as "Not in VT".
 
 **Postgres** — set `postgres_url` to a libpq connection string. The configured credential should have at least `pg_read_all_data`; a superuser works too since safe-mode queries are always wrapped in `BEGIN TRANSACTION READ ONLY`.
