@@ -265,6 +265,7 @@ async fn services_data(
 
 async fn container_logs_sse(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Path(name): Path<String>,
 ) -> Result<Sse<impl futures_util::Stream<Item = Result<Event, Infallible>>>, StatusCode> {
@@ -279,6 +280,14 @@ async fn container_logs_sse(
         .find(|s| s.name == name)
         .cloned()
         .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Audit once per stream-open. Container logs can include secrets and
+    // request bodies, so privileged read.
+    state.audit("docker.container.logs.open")
+        .actor(&account)
+        .target(format!("service:{name} → {}", cfg.identifier))
+        .ip_opt(client_ip)
+        .fire();
 
     type LogStream = std::pin::Pin<Box<dyn futures_util::Stream<Item = Result<Event, Infallible>> + Send>>;
 
@@ -345,6 +354,7 @@ async fn graph_data(State(state): State<AppState>, account: Account) -> Response
 
 async fn inspect_container(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Path(id): Path<String>,
 ) -> Response {
@@ -355,7 +365,16 @@ async fn inspect_container(
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     };
     match docker.inspect(&id).await {
-        Ok(info) => Json(info).into_response(),
+        Ok(info) => {
+            // Inspect dumps env vars, mounts, and command line — those
+            // routinely contain credentials. Audit reads.
+            state.audit("docker.container.inspect")
+                .actor(&account)
+                .target(id.clone())
+                .ip_opt(client_ip)
+                .fire();
+            Json(info).into_response()
+        }
         Err(e) => {
             tracing::warn!(error = %e, id, "inspect_container failed");
             (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": e.to_string() }))).into_response()

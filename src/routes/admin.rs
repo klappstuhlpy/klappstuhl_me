@@ -67,6 +67,7 @@ impl LogsQuery {
 async fn get_last_logs(
     account: Account,
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     Query(query): Query<LogsQuery>,
 ) -> Result<Json<Vec<RequestLogEntry>>, ApiError> {
     if !account.flags.is_admin() {
@@ -74,22 +75,39 @@ async fn get_last_logs(
     }
 
     let (begin, end) = query.limit();
-    Ok(Json(
-        state
-            .requests
-            .query("SELECT * FROM request WHERE ts >= ? AND ts <= ?", (begin, end))
-            .await?,
-    ))
+    let rows: Vec<RequestLogEntry> = state
+        .requests
+        .query("SELECT * FROM request WHERE ts >= ? AND ts <= ?", (begin, end))
+        .await?;
+
+    // Sensitive read — request logs include URLs, IPs, user-agents, and
+    // referrers, so an admin pulling them is worth recording. Audit once
+    // per call (not per row).
+    state.audit("admin.request_log.read")
+        .actor(&account)
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({
+            "from_ts": begin,
+            "to_ts":   end,
+            "count":   rows.len(),
+        }))
+        .fire();
+
+    Ok(Json(rows))
 }
 
-async fn get_server_logs(account: Account) -> Result<Json<serde_json::Value>, ApiError> {
+async fn get_server_logs(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    account: Account,
+) -> Result<Json<serde_json::Value>, ApiError> {
     if !account.flags.is_admin() {
         return Err(ApiError::forbidden());
     }
 
     let today = OffsetDateTime::now_utc().date();
     let path = logs_directory().join(today.format(&DATE_FORMAT)?).with_extension("log");
-    let file = tokio::fs::read_to_string(path).await?;
+    let file = tokio::fs::read_to_string(&path).await?;
     let mut result = Vec::new();
     for line in file.lines() {
         let Ok(value) = serde_json::from_str(line) else {
@@ -97,6 +115,18 @@ async fn get_server_logs(account: Account) -> Result<Json<serde_json::Value>, Ap
         };
         result.push(value);
     }
+
+    // Tracing JSON logs can leak request bodies, error contexts, secrets
+    // that got logged accidentally — same threat surface as a journal
+    // grep. Worth recording who pulled them and when.
+    state.audit("admin.server_log.read")
+        .actor(&account)
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({
+            "date":  today.format(&DATE_FORMAT).ok(),
+            "lines": result.len(),
+        }))
+        .fire();
 
     Ok(Json(serde_json::Value::Array(result)))
 }
@@ -121,6 +151,7 @@ async fn admin_index(account: Account) -> Result<AdminIndexTemplate, StatusCode>
 
 async fn admin_user_by_id(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Path(user_id): Path<i64>,
 ) -> Result<Redirect, StatusCode> {
@@ -128,7 +159,16 @@ async fn admin_user_by_id(
         return Err(StatusCode::FORBIDDEN);
     }
     match state.get_account(user_id).await {
-        Some(acc) => Ok(Redirect::to(&format!("/user/{}", acc.name))),
+        Some(acc) => {
+            // Admin browsing another user's profile is a privileged read
+            // (the page shows their email, API keys, session list etc.).
+            state.audit("admin.user.view")
+                .actor(&account)
+                .target(format!("user:{user_id} ({})", acc.name))
+                .ip_opt(client_ip)
+                .fire();
+            Ok(Redirect::to(&format!("/user/{}", acc.name)))
+        }
         None => Ok(Redirect::to("/")),
     }
 }

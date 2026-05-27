@@ -121,6 +121,7 @@ async fn history(State(state): State<AppState>, account: Account) -> Response {
 
 async fn delete_scan(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Path(id): Path<i64>,
 ) -> Response {
@@ -132,7 +133,14 @@ async fn delete_scan(
         .execute("DELETE FROM file_scan WHERE id = ?", boxed_params![id])
         .await
     {
-        Ok(_) => StatusCode::NO_CONTENT.into_response(),
+        Ok(_) => {
+            state.audit("sanitizer.scan.delete")
+                .actor(&account)
+                .target(format!("scan:{id}"))
+                .ip_opt(client_ip)
+                .fire();
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({ "error": e.to_string() }))).into_response(),
     }

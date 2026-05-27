@@ -20,9 +20,10 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use crate::filters::canonical_url;
-use crate::headers::Referrer;
+use crate::headers::{ClientIp, Referrer};
 use crate::ratelimit::RateLimit;
 use crate::utils::get_new_image_id;
+use std::net::IpAddr;
 
 // ---------------------------------------------------------------------------
 // Allowed MIME types
@@ -156,6 +157,7 @@ impl DeleteResult {
 pub async fn raw_upload_file(
     state: AppState,
     account: Account,
+    client_ip: Option<IpAddr>,
     multipart: Multipart,
     api: bool,
 ) -> Result<UploadResult, ApiError> {
@@ -215,6 +217,24 @@ pub async fn raw_upload_file(
         format!("Image Upload: {} files", total)
     };
 
+    // Audit log so /admin/audit shows who uploaded what, from where, and
+    // how it went. Image IDs go in meta (target stays human-readable as a
+    // count); for the common case of one upload the ID is enough to
+    // round-trip to the /gallery URL. Fired BEFORE send_alert because
+    // the latter consumes `account` by value.
+    state.audit("image.upload")
+        .actor(&account)
+        .target(format!("{total} image{}", if total == 1 { "" } else { "s" }))
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({
+            "total":   total,
+            "errors":  errors,
+            "skipped": skipped,
+            "via_api": api,
+            "links":   links,
+        }))
+        .fire();
+
     state.send_alert(
         crate::discord::Alert::success(title)
             .account(account)
@@ -232,6 +252,7 @@ pub async fn raw_upload_file(
 pub async fn delete_image(
     state: AppState,
     account: Account,
+    client_ip: Option<IpAddr>,
     id: String,
     api: bool,
 ) -> Result<DeleteResult, ApiError> {
@@ -257,6 +278,16 @@ pub async fn delete_image(
         state.invalidate_image_caches().await;
     }
 
+    state.audit("image.delete")
+        .actor(&account)
+        .target(id.clone())
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({
+            "failed":  failed,
+            "via_api": api,
+        }))
+        .fire();
+
     let title = if api { "[API] Deleted Image" } else { "Deleted Image" };
     state.send_alert(
         crate::discord::Alert::error(title)
@@ -274,13 +305,14 @@ pub async fn delete_image(
 
 async fn upload_file(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     referrer: Option<Referrer>,
     account: Account,
     flasher: Flasher,
     multipart: Multipart,
 ) -> Response {
     let url = referrer.map(|r| r.0).unwrap_or_else(|| "/images".to_string());
-    match raw_upload_file(state, account, multipart, false).await {
+    match raw_upload_file(state, account, client_ip, multipart, false).await {
         Err(msg) => flasher.add(msg.error.as_ref()).bail(&url),
         Ok(result) => {
             let message = if result.is_success() {
@@ -314,6 +346,7 @@ struct BulkFileOperationResponse {
 
 async fn bulk_delete_files(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     Json(payload): Json<BulkFilesPayload>,
 ) -> Result<Json<BulkFileOperationResponse>, ApiError> {
@@ -324,6 +357,7 @@ async fn bulk_delete_files(
         "\n",
         payload.files.iter().map(|x| format!("- {x}")).take(25),
     );
+    let files_audit: Vec<String> = payload.files.clone(); // for audit meta
 
     for file in payload.files {
         // Strip extension to get the bare ID.
@@ -348,6 +382,18 @@ async fn bulk_delete_files(
     }
 
     state.invalidate_image_caches().await;
+
+    state.audit("image.bulk_delete")
+        .actor(&account)
+        .target(format!("{success} of {total} image{}", if total == 1 { "" } else { "s" }))
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({
+            "total":   total,
+            "success": success,
+            "failed":  failed,
+            "files":   files_audit,
+        }))
+        .fire();
 
     state.send_alert(
         crate::discord::Alert::error("Deleted Images")

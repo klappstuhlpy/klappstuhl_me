@@ -1,7 +1,7 @@
 use axum::extract::{Multipart, Path, State};
 use utoipa::ToSchema;
 
-use crate::{error::ApiError, routes::image::{UploadResult, DeleteResult}, AppState};
+use crate::{error::ApiError, headers::ClientIp, routes::image::{UploadResult, DeleteResult}, AppState};
 use crate::routes::image::{delete_image, raw_upload_file};
 use super::{
     auth::ApiToken,
@@ -47,6 +47,7 @@ struct UploadedFiles {
 )]
 pub async fn upload_files(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     auth: ApiToken,
     multipart: Multipart,
 ) -> Result<Json<UploadResult>, ApiError> {
@@ -54,7 +55,7 @@ pub async fn upload_files(
         return Err(ApiError::unauthorized());
     };
 
-    let result = raw_upload_file(state, account, multipart, true).await?;
+    let result = raw_upload_file(state, account, client_ip, multipart, true).await?;
     if result.is_error() {
         return Err(ApiError::new("Upload failed"));
     }
@@ -85,6 +86,7 @@ pub async fn upload_files(
 )]
 pub async fn delete_image_by_id(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     auth: ApiToken,
     Path(id): Path<String>,
 ) -> Result<Json<DeleteResult>, ApiError> {
@@ -92,7 +94,7 @@ pub async fn delete_image_by_id(
         return Err(ApiError::unauthorized());
     };
 
-    let result = delete_image(state, account, id.clone(), true).await?;
+    let result = delete_image(state, account, client_ip, id.clone(), true).await?;
     if result.is_error() {
         return Err(ApiError::new("Delete failed"));
     }
