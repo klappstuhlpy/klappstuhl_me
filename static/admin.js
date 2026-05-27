@@ -224,78 +224,6 @@ function getTopApiUsers(requests) {
   }
 }
 
-// ── Recent admin activity ────────────────────────────────────────────
-// Fetches the last 10 /admin/audit entries and renders them into the
-// dashboard's #recent-audit table. Mirrors the cell layout in
-// static/admin_audit.js so the action-pill classes from admin_audit.css
-// (auth, ssh, docker, …) reuse without duplication.
-
-function dashAuditEscape(s) {
-  if (s == null) return "";
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function dashAuditFmtRelative(iso) {
-  if (!iso) return "—";
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "—";
-  const diff = Math.max(0, Math.floor((Date.now() - t) / 1000));
-  if (diff < 60)    return diff + "s ago";
-  if (diff < 3600)  return Math.floor(diff / 60) + "m ago";
-  if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
-  return Math.floor(diff / 86400) + "d ago";
-}
-
-// Same prefix → class map used on /admin/audit so the pill colours
-// match. Kept duplicated (rather than importing) because admin.js
-// runs on the dashboard and admin_audit.js on the audit page — they
-// never co-load.
-function dashAuditActionClass(action) {
-  if (!action) return "";
-  if (action.startsWith("auth."))     return "auth";
-  if (action.startsWith("ssh."))      return "ssh";
-  if (action.startsWith("docker."))   return "docker";
-  if (action.startsWith("admin."))    return "admin";
-  if (action.startsWith("image."))    return "image";
-  if (action.startsWith("invite."))   return "invite";
-  if (action.startsWith("secret."))   return "secret";
-  if (action.startsWith("postgres.")) return "postgres";
-  if (action.startsWith("sanitizer."))return "sanitizer";
-  return "";
-}
-
-async function getRecentAuditEvents() {
-  const tbody = document.querySelector("#recent-audit tbody");
-  let data;
-  try {
-    const res = await fetch("/admin/audit/data?limit=10");
-    if (!res.ok) {
-      tbody.innerHTML = `<tr><td colspan="5" class="muted">Failed to load — HTTP ${res.status}.</td></tr>`;
-      return;
-    }
-    data = await res.json();
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Failed to load — ${dashAuditEscape(e.message || String(e))}.</td></tr>`;
-    return;
-  }
-  const entries = (data && data.entries) || [];
-  if (entries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">No audit events yet.</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = entries.map((r) => {
-    const cls = dashAuditActionClass(r.action);
-    const target = r.target ? `<code>${dashAuditEscape(r.target)}</code>` : "";
-    return `<tr>
-      <td data-th="When"><span class="audit-when" title="${dashAuditEscape(r.ts)}">${dashAuditFmtRelative(r.ts)}</span></td>
-      <td data-th="Actor">${dashAuditEscape(r.actor_label)}</td>
-      <td data-th="Action"><a href="/admin/audit?action=${encodeURIComponent(r.action)}"><span class="action-pill ${cls}">${dashAuditEscape(r.action)}</span></a></td>
-      <td data-th="Target">${target}</td>
-      <td data-th="IP"><code>${dashAuditEscape(r.ip || "")}</code></td>
-    </tr>`;
-  }).join("");
-}
-
 async function getRecentServerLogs() {
   const formatValue = (x) => typeof x === 'string' ? JSON.stringify(x) : x.toString();
 
@@ -342,7 +270,6 @@ function updateGraphs() {
   getPopularApiRoutes(requests);
   getTopApiUsers(requests);
   getRecentServerLogs();
-  getRecentAuditEvents();
 }
 
 function backfillLogSearch() {

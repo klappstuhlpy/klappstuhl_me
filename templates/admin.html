@@ -4,7 +4,6 @@
 
 {% block admin_css %}
 <link rel="stylesheet" href="/static/admin_metrics.css">
-<link rel="stylesheet" href="/static/admin_audit.css">
 {% endblock %}
 
 {% block admin_body %}
@@ -43,32 +42,6 @@
         <div class="tile-sub">2xx / 3xx responses</div>
     </div>
 </div>
-
-<!-- ── Recent admin activity ────────────────────────────────────────────
-     Inline view of the last few /admin/audit entries so an operator
-     opening the dashboard sees "what's been happening" at a glance,
-     without bouncing to /admin/audit for a full read.
-     Backed by the same /admin/audit/data endpoint — see admin.js. -->
-<section class="admin-section">
-    <div class="section-header-row">
-        <h2 style="margin:0; flex:1">Recent admin activity</h2>
-        <a class="button outline small" href="/admin/audit">Full audit log →</a>
-    </div>
-    <div class="container-table-wrap">
-        <table class="container-table" id="recent-audit">
-            <thead>
-                <tr>
-                    <th>When</th>
-                    <th>Actor</th>
-                    <th>Action</th>
-                    <th>Target</th>
-                    <th>IP</th>
-                </tr>
-            </thead>
-            <tbody><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
-        </table>
-    </div>
-</section>
 
 <section class="admin-section">
     <h2>Recent server logs</h2>
