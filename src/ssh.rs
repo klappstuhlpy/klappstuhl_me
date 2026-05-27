@@ -554,25 +554,44 @@ fn write_user_authorized_keys(user: &str, body: &[u8]) -> Result<std::path::Path
 
 // ─── sshd auth log watcher ───────────────────────────────────────────────────
 
-/// Parse one sshd log line. Returns the fingerprint (`SHA256:...`) iff the
-/// line is a successful publickey authentication. Tolerant of leading
+/// Everything we extract from one successful `Accepted publickey` line.
+#[derive(Debug, PartialEq, Eq)]
+struct ParsedAccept<'a> {
+    /// SHA-256 fingerprint of the key, in OpenSSH `SHA256:<base64>` form.
+    fingerprint: &'a str,
+    /// Algorithm string sshd printed, e.g. `ED25519`, `RSA`, `ECDSA`.
+    algo: &'a str,
+    /// Host user that was logged in as (`Accepted publickey for <X>`).
+    user: &'a str,
+    /// Client IP (`from <X> port N`). May be IPv4, IPv6, or rarely a hostname.
+    ip: &'a str,
+}
+
+/// Parse one sshd log line. Returns the extracted fields iff the line is
+/// a successful publickey authentication. Tolerant of leading
 /// timestamp/hostname prefixes and rsyslog vs journald formats.
 ///
 /// Matches OpenSSH's default `Accepted publickey` format:
 ///   `... sshd[1234]: Accepted publickey for user from 1.2.3.4 port 22 ssh2: ED25519 SHA256:abc…`
-fn parse_publickey_accept(line: &str) -> Option<&str> {
+fn parse_publickey_accept(line: &str) -> Option<ParsedAccept<'_>> {
     let idx = line.find("Accepted publickey ")?;
-    let rest = &line[idx..];
+    let rest = &line[idx + "Accepted publickey ".len()..];
+
+    // `for <user> from <ip> port <n> ssh2: <algo> <fingerprint>`
+    let rest = rest.strip_prefix("for ")?;
+    let (user, rest) = rest.split_once(' ')?;
+    let rest = rest.strip_prefix("from ")?;
+    let (ip, rest) = rest.split_once(' ')?;
+
     let ssh2_idx = rest.find(" ssh2: ")?;
     let after = &rest[ssh2_idx + " ssh2: ".len()..];
     let mut parts = after.split_whitespace();
-    let _algo = parts.next()?;
-    let fp = parts.next()?;
-    if fp.starts_with("SHA256:") {
-        Some(fp)
-    } else {
-        None
+    let algo = parts.next()?;
+    let fingerprint = parts.next()?;
+    if !fingerprint.starts_with("SHA256:") {
+        return None;
     }
+    Some(ParsedAccept { fingerprint, algo, user, ip })
 }
 
 /// Background task: tail the configured sshd auth log and update
@@ -665,8 +684,23 @@ fn run_auth_log_watcher(
                     Ok(0) => break, // EOF — wait for more
                     Ok(n) => {
                         last_pos += n as u64;
-                        if let Some(fp) = parse_publickey_accept(line.trim_end()) {
-                            record_key_use(&state, fp.to_owned());
+                        if let Some(parsed) = parse_publickey_accept(line.trim_end()) {
+                            // Synthesize a "user-agent" so the SSH audit page
+                            // has something concrete to show in that column —
+                            // SSH itself has no UA, so we encode the algo +
+                            // the host user that was logged in as. Mirrors
+                            // how web routes record actual User-Agent strings.
+                            let user_agent = format!(
+                                "ssh-publickey/{algo} target={user}",
+                                algo = parsed.algo,
+                                user = parsed.user,
+                            );
+                            record_key_use(
+                                &state,
+                                parsed.fingerprint.to_owned(),
+                                Some(parsed.ip.to_owned()),
+                                Some(user_agent),
+                            );
                         }
                     }
                     Err(e) => {
@@ -699,7 +733,12 @@ fn inode_of_meta(m: &std::fs::Metadata) -> Option<u64> {
 fn inode_of_meta(_m: &std::fs::Metadata) -> Option<u64> { None }
 
 /// Update last_used_at for the matching key (if any) and fire an audit entry.
-fn record_key_use(state: &AppState, fingerprint: String) {
+fn record_key_use(
+    state: &AppState,
+    fingerprint: String,
+    ip: Option<String>,
+    user_agent: Option<String>,
+) {
     let state = state.clone();
     tokio::spawn(async move {
         // Atomic: update + look up the key id/account in one DB hop so we
@@ -728,8 +767,8 @@ fn record_key_use(state: &AppState, fingerprint: String) {
 
         match result {
             Ok(Some((key_id, account_id))) => {
-                tracing::debug!(fingerprint = %fingerprint, key_id, "ssh key used");
-                audit(&state, Some(account_id), Some(key_id), "ssh.key.use", None, None);
+                tracing::debug!(fingerprint = %fingerprint, key_id, ?ip, "ssh key used");
+                audit(&state, Some(account_id), Some(key_id), "ssh.key.use", ip, user_agent);
             }
             Ok(None) => {
                 tracing::debug!(fingerprint = %fingerprint,
@@ -802,14 +841,27 @@ mod tests {
         let line = "May 27 10:12:34 host sshd[1234]: Accepted publickey for parzival from 1.2.3.4 port 51234 ssh2: ED25519 SHA256:abcDEF123/xyz";
         assert_eq!(
             parse_publickey_accept(line),
-            Some("SHA256:abcDEF123/xyz")
+            Some(ParsedAccept {
+                fingerprint: "SHA256:abcDEF123/xyz",
+                algo: "ED25519",
+                user: "parzival",
+                ip: "1.2.3.4",
+            }),
         );
     }
 
     #[test]
     fn parse_publickey_accept_journald() {
         let line = "sshd[1234]: Accepted publickey for root from ::1 port 51234 ssh2: RSA SHA256:ZZZ";
-        assert_eq!(parse_publickey_accept(line), Some("SHA256:ZZZ"));
+        assert_eq!(
+            parse_publickey_accept(line),
+            Some(ParsedAccept {
+                fingerprint: "SHA256:ZZZ",
+                algo: "RSA",
+                user: "root",
+                ip: "::1",
+            }),
+        );
     }
 
     #[test]

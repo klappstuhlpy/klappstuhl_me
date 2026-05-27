@@ -7,7 +7,7 @@
 
 use std::time::Duration;
 
-use crate::{boxed_params, database::Table, models::Account, AppState};
+use crate::{boxed_params, database::Table, headers::ClientIp, models::Account, AppState};
 use askama::Template;
 use axum::{
     extract::{Multipart, Path, State},
@@ -142,6 +142,7 @@ async fn delete_scan(
 
 async fn scan(
     State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
     account: Account,
     mut multipart: Multipart,
 ) -> Response {
@@ -255,9 +256,30 @@ async fn scan(
         }
     };
 
+    // Derive a coarse overall verdict so the audit-log "meta" column has a
+    // single field an operator can scan visually, plus the per-backend
+    // detail underneath. Keys mirror the JSON returned to the client.
+    let overall = if clamav_clean == Some(0) || vt_status.as_deref() == Some("detected") {
+        "infected"
+    } else if clamav_clean == Some(1) || vt_status.as_deref() == Some("clean") {
+        "clean"
+    } else {
+        "unknown"
+    };
     state.audit("sanitizer.scan")
         .actor(&account)
         .target(filename.clone())
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({
+            "verdict":      overall,
+            "file_size":    file_size,
+            "sha256":       sha256,
+            "clamav_clean": clamav_clean,
+            "clamav_virus": clamav_virus,
+            "vt_status":    vt_status,
+            "vt_positives": vt_positives,
+            "vt_total":     vt_total,
+        }))
         .fire();
 
     Json(serde_json::json!({
