@@ -336,9 +336,22 @@ fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
         // API-token scopes: comma-separated list. Empty string means
         // "legacy / unrestricted" so pre-existing API keys keep working.
         "ALTER TABLE session ADD COLUMN scopes TEXT NOT NULL DEFAULT ''",
+        // SSH key per-row target host user — added to sql/6.sql after the
+        // table was first shipped, so databases that ran the original
+        // migration are missing it and any SELECT on /admin/ssh/data
+        // 500s with "no such column: target_user".
+        "ALTER TABLE ssh_key ADD COLUMN target_user TEXT",
     ] {
         let _ = connection.execute(ddl, []);
     }
+    // Index for the new ssh_key.target_user column. CREATE INDEX is
+    // idempotent via IF NOT EXISTS, but it needs the column to exist
+    // first — that's why this runs after the ALTER above rather than
+    // alongside the schema-creation block in sql/6.sql.
+    let _ = connection.execute(
+        "CREATE INDEX IF NOT EXISTS ssh_key_target_user_idx ON ssh_key (target_user)",
+        [],
+    );
 
     Ok(())
 }
