@@ -1,0 +1,327 @@
+/* ── Spotlight / Ctrl+K palette ─────────────────────────────────────────── */
+
+/* ── Sidebar trigger button ─────────────────────────────────────────────── */
+
+.admin-sidebar-footer {
+    padding: 0.75rem 0.5rem 0.6rem;
+    border-top: 1px solid var(--box-border);
+    margin-top: auto;
+}
+
+.spotlight-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding: 0.35rem 0.6rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.35rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.spotlight-trigger:hover {
+    background: var(--box);
+    border-color: var(--branding);
+    color: var(--foreground);
+}
+
+.spotlight-trigger-icon {
+    font-size: 0.9rem;
+}
+
+.spotlight-trigger-label {
+    flex: 1;
+    text-align: left;
+}
+
+.spotlight-trigger-kbd {
+    font-size: 0.65rem;
+    padding: 0.05rem 0.3rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.2rem;
+    white-space: nowrap;
+}
+
+/* ── Overlay backdrop ────────────────────────────────────────────────────── */
+
+.spotlight-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 12vh;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(3px);
+    animation: spotlight-fade-in 0.12s ease;
+}
+
+.spotlight-overlay[hidden] {
+    display: none;
+}
+
+@keyframes spotlight-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ── Modal panel ─────────────────────────────────────────────────────────── */
+
+.spotlight-modal {
+    width: min(640px, 92vw);
+    background: var(--background);
+    border: 1px solid var(--box-border);
+    border-radius: 0.75rem;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: spotlight-slide-in 0.14s ease;
+    max-height: 70vh;
+}
+
+@keyframes spotlight-slide-in {
+    from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)     scale(1); }
+}
+
+/* ── Search row ──────────────────────────────────────────────────────────── */
+
+.spotlight-search-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--box-border);
+}
+
+.spotlight-search-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    color: var(--text-muted);
+}
+
+.spotlight-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 1rem;
+    color: var(--foreground);
+    caret-color: var(--branding);
+}
+
+.spotlight-input::placeholder {
+    color: var(--text-muted);
+}
+
+.spotlight-esc-hint {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.35rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.25rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+/* ── Results list ────────────────────────────────────────────────────────── */
+
+.spotlight-results {
+    overflow-y: auto;
+    flex: 1;
+    padding: 0.4rem 0;
+}
+
+.spotlight-results:empty::after {
+    content: 'No results';
+    display: block;
+    padding: 1.2rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+/* ── Section header ──────────────────────────────────────────────────────── */
+
+.spotlight-section {
+    padding: 0.3rem 1rem 0.1rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+/* ── Individual result item ──────────────────────────────────────────────── */
+
+.spotlight-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 1rem;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background 0.08s;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    text-decoration: none;
+    color: inherit;
+}
+
+.spotlight-item:hover,
+.spotlight-item.active {
+    background: var(--box-shade);
+}
+
+.spotlight-item.active {
+    background: color-mix(in srgb, var(--branding) 12%, transparent);
+}
+
+.spotlight-item-icon {
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 0.35rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.spotlight-item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.spotlight-item-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.spotlight-item-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.spotlight-item-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 9999px;
+    border: 1px solid var(--box-border);
+    background: var(--box-shade);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.spotlight-item-badge.kind-script   { border-color: var(--branding); color: var(--branding); background: color-mix(in srgb, var(--branding) 10%, transparent); }
+.spotlight-item-badge.kind-audit    { border-color: var(--warning-border); color: var(--warning-text); background: var(--warning-bg); }
+.spotlight-item-badge.kind-scan     { border-color: var(--success-border); color: var(--success-text); background: var(--success-bg); }
+.spotlight-item-badge.kind-ssh      { border-color: var(--box-border); color: var(--text-muted); background: var(--box-shade); }
+.spotlight-item-badge.kind-container{ border-color: var(--box-border); color: var(--text-muted); background: var(--box-shade); }
+
+/* ── Script run output ───────────────────────────────────────────────────── */
+
+.spotlight-run-wrap {
+    padding: 0.6rem 1rem 0.75rem;
+    border-top: 1px solid var(--box-border);
+}
+
+.spotlight-run-header {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.spotlight-run-status {
+    font-size: 0.7rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 9999px;
+    border: 1px solid;
+}
+
+.spotlight-run-status.ok  { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
+.spotlight-run-status.err { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
+
+.spotlight-run-pre {
+    font-family: monospace;
+    font-size: 0.75rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.35rem;
+    padding: 0.5rem 0.75rem;
+    max-height: 180px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--foreground);
+    margin: 0;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+
+.spotlight-spinner {
+    display: flex;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.spotlight-spinner::after {
+    content: '';
+    width: 1.2rem;
+    height: 1.2rem;
+    border: 2px solid var(--box-border);
+    border-top-color: var(--branding);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Footer hints ────────────────────────────────────────────────────────── */
+
+.spotlight-footer {
+    display: flex;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--box-border);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+
+.spotlight-footer kbd {
+    font-size: 0.65rem;
+    padding: 0.05rem 0.3rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.2rem;
+}

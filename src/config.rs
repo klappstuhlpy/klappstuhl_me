@@ -49,6 +49,23 @@ pub struct ServiceConfig {
     pub path: Option<String>,
 }
 
+/// A pre-defined script the Spotlight palette can invoke.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SpotlightScript {
+    /// Unique identifier used by the run endpoint.
+    pub id: String,
+    /// Human-readable name shown in the palette.
+    pub name: String,
+    /// Shell command to execute (passed to `sh -c` on Unix, `cmd /C` on Windows).
+    pub command: String,
+    /// Optional description shown as subtitle.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Working directory for the command. Defaults to the process cwd.
+    #[serde(default)]
+    pub cwd: Option<String>,
+}
+
 /// The server configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -107,6 +124,18 @@ pub struct Config {
     /// query runner unless the operator explicitly opts in to danger mode.
     #[serde(default)]
     pub postgres_url: Option<String>,
+    /// ClamAV daemon address (e.g. `"127.0.0.1:3310"`).
+    /// When set, the file sanitizer page connects to clamd for virus scanning.
+    #[serde(default)]
+    pub clamav_addr: Option<String>,
+    /// VirusTotal public API key.
+    /// When set, the file sanitizer checks each file's SHA-256 against VT.
+    #[serde(default)]
+    pub virustotal_api_key: Option<String>,
+    /// Pre-defined scripts the Spotlight palette can run.
+    /// Each entry needs a unique `id`, a display `name`, and a shell `command`.
+    #[serde(default)]
+    pub spotlight_scripts: Vec<SpotlightScript>,
     /// The secret key used for all crypto related functionality in the server.
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
@@ -126,6 +155,9 @@ impl Config {
             cloudflare_zone_id: None,
             secret_scan_paths: Vec::new(),
             postgres_url: None,
+            clamav_addr: None,
+            virustotal_api_key: None,
+            spotlight_scripts: Vec::new(),
             secret_key: SecretKey::random()?,
         })
     }

@@ -16,7 +16,9 @@
     background: var(--box);
     border: 1px solid var(--box-border);
     border-radius: 0.625rem;
-    padding: 1rem 0.75rem;
+    padding: 1rem 0.75rem 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .admin-sidebar-title {

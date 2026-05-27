@@ -11,6 +11,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/admin.css" type="text/css">
+<link rel="stylesheet" href="/static/spotlight.css" type="text/css">
 {% block admin_css %}{% endblock %}
 {% endblock %}
 
@@ -52,10 +53,46 @@
             <a href="/admin/docker/snapshots" class="admin-nav-item{% if active_page == "snapshots" %} active{% endif %}">
                 <span>Snapshots</span>
             </a>
+            <a href="/admin/sanitizer" class="admin-nav-item{% if active_page == "sanitizer" %} active{% endif %}">
+                <span>Sanitizer</span>
+            </a>
         </nav>
+        <div class="admin-sidebar-footer">
+            <button class="spotlight-trigger" id="spotlight-btn" title="Search (Ctrl+K)">
+                <span class="spotlight-trigger-icon">⌘</span>
+                <span class="spotlight-trigger-label">Search</span>
+                <kbd class="spotlight-trigger-kbd">Ctrl K</kbd>
+            </button>
+        </div>
     </aside>
     <section class="admin-content">
         {% block admin_body %}{% endblock %}
     </section>
 </div>
+
+<!-- ── Spotlight overlay ─────────────────────────────────────────────────── -->
+<div id="spotlight-overlay" class="spotlight-overlay" hidden aria-modal="true" role="dialog" aria-label="Command palette">
+    <div class="spotlight-modal">
+        <div class="spotlight-search-row">
+            <span class="spotlight-search-icon">🔍</span>
+            <input
+                id="spotlight-input"
+                class="spotlight-input"
+                type="text"
+                placeholder="Search pages, scripts, audit log…"
+                autocomplete="off"
+                spellcheck="false"
+            >
+            <kbd class="spotlight-esc-hint">Esc</kbd>
+        </div>
+        <div id="spotlight-results" class="spotlight-results" role="listbox"></div>
+        <div class="spotlight-footer">
+            <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+            <span><kbd>↵</kbd> open / run</span>
+            <span><kbd>Esc</kbd> close</span>
+        </div>
+    </div>
+</div>
+
+<script src="/static/spotlight.js" defer></script>
 {% endblock %}

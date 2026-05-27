@@ -19,7 +19,9 @@ mod image;
 mod api;
 mod metrics;
 mod postgres;
+mod sanitizer;
 mod secrets;
+mod spotlight;
 mod security;
 mod services;
 mod ssh;
@@ -82,6 +84,8 @@ pub fn all() -> Router<AppState> {
         .merge(services::routes())
         .merge(ssh::routes())
         .merge(docker::routes())
+        .merge(sanitizer::routes())
+        .merge(spotlight::routes())
         .merge(ws::routes())
         .nest("/api", api::routes())
 }

@@ -1,0 +1,217 @@
+/* ── File sanitizer admin page ──────────────────────────────── */
+
+/* ── Backend status pills ───────────────────────────────────── */
+
+.san-badges {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.san-backend {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.55rem;
+    border-radius: 9999px;
+    border: 1px solid var(--box-border);
+    color: var(--text-muted);
+    background: var(--box-shade);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.san-backend.active {
+    color: var(--success-text);
+    border-color: var(--success-border);
+    background: var(--success-bg);
+}
+
+/* ── Configuration notice ───────────────────────────────────── */
+
+.san-notice {
+    padding: 0.75rem 1rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 1.25rem;
+}
+
+.san-notice code {
+    font-family: monospace;
+    font-size: 0.8rem;
+    background: var(--box);
+    padding: 0.05rem 0.3rem;
+    border-radius: 0.2rem;
+    border: 1px solid var(--box-border);
+}
+
+/* ── Drop zone ──────────────────────────────────────────────── */
+
+.san-drop-zone {
+    border: 2px dashed var(--box-border);
+    border-radius: 0.6rem;
+    background: var(--box-shade);
+    padding: 2.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 1rem;
+}
+
+.san-drop-zone.drag-over,
+.san-drop-zone:hover {
+    border-color: var(--branding);
+    background: var(--box);
+}
+
+.san-drop-inner { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+
+.san-drop-icon  { font-size: 2rem; }
+
+.san-drop-text  {
+    font-size: 0.9rem;
+    color: var(--foreground);
+}
+
+.san-browse-link {
+    color: var(--branding);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.san-drop-hint  { font-size: 0.75rem; color: var(--text-muted); }
+
+.san-file-hidden { display: none; }
+
+/* ── Progress bar ───────────────────────────────────────────── */
+
+.san-progress {
+    height: 3px;
+    background: var(--box-border);
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.san-progress-bar {
+    height: 100%;
+    background: var(--branding);
+    border-radius: 9999px;
+    transition: width 0.1s linear;
+    width: 0%;
+}
+
+/* ── Result card ────────────────────────────────────────────── */
+
+.san-result-card {
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.san-result-card.clean    { border-color: var(--success-border); background: var(--success-bg); }
+.san-result-card.infected { border-color: var(--error-border);   background: var(--error-bg); }
+.san-result-card.unknown  { border-color: var(--box-border);     background: var(--box); }
+
+.san-result-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.san-result-icon  { font-size: 1.1rem; }
+
+.san-result-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    flex: 1;
+    word-break: break-all;
+}
+
+.san-result-size {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.san-result-hash {
+    font-family: monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    word-break: break-all;
+}
+
+.san-result-backends {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.san-result-backend {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.san-result-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.san-virus-name {
+    font-size: 0.72rem;
+    font-family: monospace;
+    color: var(--error-text);
+}
+
+.san-result-error {
+    padding: 0.6rem 0.85rem;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: 0.4rem;
+    color: var(--error-text);
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
+}
+
+/* ── Scan result badges (also used in table) ────────────────── */
+
+.san-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border-radius: 9999px;
+    border: 1px solid;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.san-badge.clean    { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
+.san-badge.infected { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
+.san-badge.unknown  { color: var(--text-muted);   border-color: var(--box-border);     background: var(--box-shade); }
+.san-badge.error    { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
+.san-badge.na       { color: var(--text-muted);   border-color: transparent;           background: transparent; }
+
+a.san-badge:hover { opacity: 0.85; }
+
+/* ── History table ──────────────────────────────────────────── */
+
+.san-fname { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.san-size  { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+.san-hash  { font-family: monospace; font-size: 0.72rem; color: var(--text-muted); cursor: default; }
+.san-date  { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+.col-actions { text-align: right; white-space: nowrap; }
