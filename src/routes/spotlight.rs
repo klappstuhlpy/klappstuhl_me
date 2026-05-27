@@ -1,7 +1,8 @@
 //! Spotlight (Ctrl+K) backend routes.
 //!
-//! GET  /admin/spotlight/search?q=  — fuzzy search across audit log, containers,
-//!                                    file scans, SSH keys, and static nav items
+//! GET  /admin/spotlight/search?q=  — fuzzy search across all browseable routes,
+//!                                    images, audit log, containers, file scans,
+//!                                    SSH keys, and static nav items
 //! POST /admin/spotlight/run        — execute a pre-defined script from config
 //! GET  /admin/spotlight/scripts    — list configured scripts (for the palette)
 
@@ -35,6 +36,10 @@ impl SpotlightItem {
         Self { kind: "navigate", title: title.into(), subtitle: subtitle.into(),
                url: Some(url.into()), script_id: None }
     }
+    fn page(title: impl Into<String>, subtitle: impl Into<String>, url: impl Into<String>) -> Self {
+        Self { kind: "page", title: title.into(), subtitle: subtitle.into(),
+               url: Some(url.into()), script_id: None }
+    }
     fn result(kind: &'static str, title: impl Into<String>, subtitle: impl Into<String>, url: impl Into<String>) -> Self {
         Self { kind, title: title.into(), subtitle: subtitle.into(),
                url: Some(url.into()), script_id: None }
@@ -49,22 +54,60 @@ fn contains_ci(haystack: &str, needle: &str) -> bool {
     haystack.to_lowercase().contains(&needle.to_lowercase())
 }
 
-// ─── Static nav items ─────────────────────────────────────────────────────────
+// ─── Admin nav items ──────────────────────────────────────────────────────────
 
 fn static_nav() -> Vec<SpotlightItem> {
     vec![
-        SpotlightItem::nav("Dashboard",       "Admin overview",                      "/admin"),
-        SpotlightItem::nav("Invites",         "Manage invite codes",                 "/admin/invites"),
-        SpotlightItem::nav("Docker",          "Services, graph, start/stop/restart", "/admin/docker"),
-        SpotlightItem::nav("Snapshots",       "Capture and restore containers",      "/admin/docker/snapshots"),
-        SpotlightItem::nav("Metrics",         "CPU, memory, network charts",         "/admin/metrics"),
-        SpotlightItem::nav("Security",        "Requests, GeoIP, Cloudflare",         "/admin/security"),
-        SpotlightItem::nav("Secrets",         "Secret scanner findings",             "/admin/secrets"),
-        SpotlightItem::nav("Audit log",       "All admin actions",                   "/admin/audit"),
-        SpotlightItem::nav("Postgres",        "Query the database",                  "/admin/postgres"),
-        SpotlightItem::nav("SSH Keys",        "Keys, tokens, session audit",         "/admin/ssh"),
-        SpotlightItem::nav("File Sanitizer",  "ClamAV + VirusTotal scanning",       "/admin/sanitizer"),
+        SpotlightItem::nav("Dashboard",        "Admin overview",                      "/admin"),
+        SpotlightItem::nav("Invites",          "Manage invite codes",                 "/admin/invites"),
+        SpotlightItem::nav("Docker",           "Services, graph, start/stop/restart", "/admin/docker"),
+        SpotlightItem::nav("Snapshots",        "Capture and restore containers",      "/admin/docker/snapshots"),
+        SpotlightItem::nav("Metrics",          "CPU, memory, network charts",         "/admin/metrics"),
+        SpotlightItem::nav("Security",         "Requests, GeoIP, Cloudflare",         "/admin/security"),
+        SpotlightItem::nav("Secrets",          "Secret scanner findings",             "/admin/secrets"),
+        SpotlightItem::nav("Audit log",        "All admin actions",                   "/admin/audit"),
+        SpotlightItem::nav("Postgres",         "Query the database",                  "/admin/postgres"),
+        SpotlightItem::nav("SSH Keys",         "Keys, tokens, session audit",         "/admin/ssh"),
+        SpotlightItem::nav("SSH Session Audit","Active sessions and logins",          "/admin/ssh/audit"),
+        SpotlightItem::nav("File Sanitizer",   "ClamAV + VirusTotal scanning",        "/admin/sanitizer"),
     ]
+}
+
+// ─── Site pages (all browseable non-admin routes) ─────────────────────────────
+
+fn static_pages() -> Vec<SpotlightItem> {
+    vec![
+        SpotlightItem::page("Home",         "Landing page",                    "/"),
+        SpotlightItem::page("Projects",     "Project portfolio",               "/projects"),
+        SpotlightItem::page("Images",       "Uploaded image gallery",          "/images"),
+        SpotlightItem::page("Account",      "Profile, API tokens, settings",   "/account"),
+        SpotlightItem::page("API Docs",     "OpenAPI 3.0 reference (Scalar)",  "/api/docs"),
+        SpotlightItem::page("Login",        "Sign in to your account",         "/login"),
+    ]
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Human-readable file size (B / KB / MB).
+fn fmt_size(bytes: i64) -> String {
+    if bytes < 1_024 {
+        return format!("{bytes} B");
+    }
+    if bytes < 1_048_576 {
+        return format!("{:.1} KB", bytes as f64 / 1_024.0);
+    }
+    format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+}
+
+/// Returns the subtype of a MIME string in upper-case (e.g. `"image/png"` → `"PNG"`).
+fn mime_short(mime: &str) -> String {
+    mime.split('/')
+        .nth(1)
+        .unwrap_or(mime)
+        .split('+')     // e.g. "svg+xml" → "SVG"
+        .next()
+        .unwrap_or(mime)
+        .to_uppercase()
 }
 
 // ─── Search endpoint ──────────────────────────────────────────────────────────
@@ -87,7 +130,7 @@ async fn search(
     let q = params.q.trim().to_owned();
     let mut items: Vec<SpotlightItem> = Vec::new();
 
-    // ── Static nav ────────────────────────────────────────────────────────────
+    // ── Admin nav ─────────────────────────────────────────────────────────────
     for item in static_nav() {
         if q.is_empty()
             || contains_ci(&item.title, &q)
@@ -98,8 +141,18 @@ async fn search(
         if items.len() >= 6 && !q.is_empty() { break; }
     }
 
+    // ── Site pages ────────────────────────────────────────────────────────────
+    for item in static_pages() {
+        if q.is_empty()
+            || contains_ci(&item.title, &q)
+            || contains_ci(&item.subtitle, &q)
+        {
+            items.push(item);
+        }
+    }
+
     if q.is_empty() {
-        // For empty query just return nav + scripts — no DB queries.
+        // For empty query return nav + site pages + scripts — no DB queries.
         append_scripts(&state, &q, &mut items);
         return Json(serde_json::json!({ "items": items })).into_response();
     }
@@ -107,8 +160,33 @@ async fn search(
     // ── Scripts ───────────────────────────────────────────────────────────────
     append_scripts(&state, &q, &mut items);
 
-    // ── Audit log ─────────────────────────────────────────────────────────────
+    // ── Images ────────────────────────────────────────────────────────────────
     let like = format!("%{q}%");
+    if let Ok(rows) = state
+        .database()
+        .call({
+            let like = like.clone();
+            move |conn| -> rusqlite::Result<Vec<(String, String, i64)>> {
+                let mut stmt = conn.prepare_cached(
+                    "SELECT id, mimetype, size FROM images
+                     WHERE id LIKE ?1 OR mimetype LIKE ?1
+                     ORDER BY uploaded_at DESC LIMIT 5",
+                )?;
+                let rows = stmt.query_map([&like], |r| {
+                    Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?))
+                })?.collect::<rusqlite::Result<Vec<_>>>()?;
+                Ok(rows)
+            }
+        })
+        .await
+    {
+        for (id, mimetype, size) in rows {
+            let subtitle = format!("{} · {}", mime_short(&mimetype), fmt_size(size));
+            items.push(SpotlightItem::result("image", id.clone(), subtitle, format!("/gallery/{id}")));
+        }
+    }
+
+    // ── Audit log ─────────────────────────────────────────────────────────────
     if let Ok(rows) = state
         .database()
         .call({
@@ -120,7 +198,7 @@ async fn search(
                      ORDER BY id DESC LIMIT 5",
                 )?;
                 let rows = stmt.query_map([&like], |r| {
-                    Ok((r.get::<_,String>(0)?, r.get::<_,String>(1)?, r.get::<_,String>(2)?))
+                    Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
                 })?.collect::<rusqlite::Result<Vec<_>>>()?;
                 Ok(rows)
             }
@@ -149,7 +227,7 @@ async fn search(
                      ORDER BY id DESC LIMIT 3",
                 )?;
                 let rows = stmt.query_map([&like], |r| {
-                    Ok((r.get::<_,String>(0)?, r.get::<_,String>(1)?))
+                    Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
                 })?.collect::<rusqlite::Result<Vec<_>>>()?;
                 Ok(rows)
             }
@@ -179,7 +257,7 @@ async fn search(
                      ORDER BY id DESC LIMIT 3",
                 )?;
                 let rows = stmt.query_map([&like], |r| {
-                    Ok((r.get::<_,String>(0)?, r.get::<_,String>(1)?))
+                    Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
                 })?.collect::<rusqlite::Result<Vec<_>>>()?;
                 Ok(rows)
             }
@@ -187,12 +265,7 @@ async fn search(
         .await
     {
         for (name, fp) in rows {
-            items.push(SpotlightItem::result(
-                "ssh",
-                name,
-                fp,
-                "/admin/ssh",
-            ));
+            items.push(SpotlightItem::result("ssh", name, fp, "/admin/ssh"));
         }
     }
 

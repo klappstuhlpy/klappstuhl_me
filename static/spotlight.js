@@ -134,7 +134,9 @@
 
     const KIND_ICONS = {
         navigate:  '🔗',
+        page:      '🌐',
         script:    '⚡',
+        image:     '🖼',
         audit:     '📋',
         scan:      '🛡',
         ssh:       '🔑',
@@ -142,8 +144,10 @@
     };
 
     const KIND_LABELS = {
-        navigate:  '',          // no badge for nav items
+        navigate:  '',          // no badge for admin nav items
+        page:      '',          // no badge for site pages
         script:    'Script',
+        image:     'Image',
         audit:     'Audit',
         scan:      'Scan',
         ssh:       'SSH',
@@ -152,8 +156,10 @@
 
     // Group items by kind for section headers
     const SECTION_TITLES = {
-        navigate:  'Pages',
+        navigate:  'Admin',
+        page:      'Site',
         script:    'Scripts',
+        image:     'Images',
         audit:     'Audit log',
         scan:      'File scans',
         ssh:       'SSH keys',
@@ -181,7 +187,7 @@
         let html = '';
         let flatIdx = 0;
 
-        const kindOrder = ['navigate', 'script', 'audit', 'scan', 'ssh', 'container'];
+        const kindOrder = ['navigate', 'page', 'script', 'image', 'audit', 'scan', 'ssh', 'container'];
         for (const kind of kindOrder) {
             if (!groups[kind]) continue;
             const sectionTitle = SECTION_TITLES[kind] || kind;
