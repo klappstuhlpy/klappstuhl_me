@@ -126,6 +126,10 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // Sweep expired SSH tokens every hour.
     klappstuhl_me::ssh::spawn_token_sweeper(state.clone());
 
+    // Tail sshd auth log → update ssh_key.last_used_at on successful publickey
+    // auth (no-op if `sshd_auth_log_path` is unset in config.json).
+    klappstuhl_me::ssh::spawn_auth_log_watcher(state.clone());
+
     // Stream Docker daemon events → live "docker" WS topic.
     klappstuhl_me::docker::spawn_event_watcher(state.clone());
 

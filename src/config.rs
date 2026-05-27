@@ -137,6 +137,21 @@ pub struct Config {
     /// to `/host-ssh/authorized_keys`.
     #[serde(default)]
     pub authorized_keys_path: Option<PathBuf>,
+    /// Optional path to an sshd auth log (typically `/var/log/auth.log` on
+    /// Debian/Ubuntu, or `/var/log/secure` on RHEL). When set, a background
+    /// task tails the file and updates `ssh_key.last_used_at` whenever a
+    /// successful publickey authentication line is observed whose
+    /// `SHA256:<fingerprint>` matches a stored key.
+    ///
+    /// Requires sshd to log fingerprints (default on modern OpenSSH; if your
+    /// logs only show the user/IP without `ssh2: <algo> SHA256:<fp>`, raise
+    /// `LogLevel` to `VERBOSE` in `/etc/ssh/sshd_config`).
+    ///
+    /// In the default Docker setup, bind-mount the host log read-only
+    /// (e.g. `- /var/log/auth.log:/host-log/auth.log:ro`) and set this to
+    /// `/host-log/auth.log`. When unset, `last_used_at` stays NULL.
+    #[serde(default)]
+    pub sshd_auth_log_path: Option<PathBuf>,
     /// The secret key used for all crypto related functionality in the server.
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
@@ -160,6 +175,7 @@ impl Config {
             virustotal_api_key: None,
             spotlight_scripts: Vec::new(),
             authorized_keys_path: None,
+            sshd_auth_log_path: None,
             secret_key: SecretKey::random()?,
         })
     }

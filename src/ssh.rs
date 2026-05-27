@@ -333,6 +333,180 @@ pub fn sync_authorized_keys(state: &AppState) {
     });
 }
 
+// ─── sshd auth log watcher ───────────────────────────────────────────────────
+
+/// Parse one sshd log line. Returns the fingerprint (`SHA256:...`) iff the
+/// line is a successful publickey authentication. Tolerant of leading
+/// timestamp/hostname prefixes and rsyslog vs journald formats.
+///
+/// Matches OpenSSH's default `Accepted publickey` format:
+///   `... sshd[1234]: Accepted publickey for user from 1.2.3.4 port 22 ssh2: ED25519 SHA256:abc…`
+fn parse_publickey_accept(line: &str) -> Option<&str> {
+    let idx = line.find("Accepted publickey ")?;
+    let rest = &line[idx..];
+    let ssh2_idx = rest.find(" ssh2: ")?;
+    let after = &rest[ssh2_idx + " ssh2: ".len()..];
+    let mut parts = after.split_whitespace();
+    let _algo = parts.next()?;
+    let fp = parts.next()?;
+    if fp.starts_with("SHA256:") {
+        Some(fp)
+    } else {
+        None
+    }
+}
+
+/// Background task: tail the configured sshd auth log and update
+/// `ssh_key.last_used_at` (+ write `ssh.key.use` to `ssh_session_audit`)
+/// whenever a successful publickey auth matches a stored fingerprint.
+///
+/// No-op when `sshd_auth_log_path` is not configured. Resilient to log
+/// rotation (detects inode change on Unix and file truncation everywhere)
+/// and to the log file being temporarily absent. Runs on its own blocking
+/// thread to keep the std::io BufReader code straightforward.
+pub fn spawn_auth_log_watcher(state: AppState) {
+    let Some(path) = state.config().sshd_auth_log_path.clone() else {
+        tracing::info!("SSH auth log watcher disabled (sshd_auth_log_path not set)");
+        return;
+    };
+    std::thread::Builder::new()
+        .name("ssh-auth-log-watcher".into())
+        .spawn(move || run_auth_log_watcher(state, path))
+        .expect("failed to spawn ssh-auth-log-watcher thread");
+}
+
+fn run_auth_log_watcher(state: AppState, path: std::path::PathBuf) {
+    use std::io::{BufRead, BufReader, Seek, SeekFrom};
+
+    let mut reader: Option<BufReader<std::fs::File>> = None;
+    let mut last_pos: u64 = 0;
+    let mut current_inode: Option<u64> = None;
+
+    loop {
+        // (Re)open if we don't have an active reader.
+        if reader.is_none() {
+            match std::fs::File::open(&path) {
+                Ok(mut f) => {
+                    let end = f.seek(SeekFrom::End(0)).unwrap_or(0);
+                    last_pos = end;
+                    current_inode = inode_of(&f);
+                    reader = Some(BufReader::new(f));
+                    tracing::info!(path = %path.display(), "SSH auth log watcher attached");
+                }
+                Err(e) => {
+                    tracing::warn!(path = %path.display(), error = %e,
+                        "SSH auth log open failed; retrying in 10s");
+                    std::thread::sleep(Duration::from_secs(10));
+                    continue;
+                }
+            }
+        }
+
+        // Detect rotation: inode change (rename+create) or file shrank (truncate).
+        let rotated = match std::fs::metadata(&path) {
+            Ok(meta) => {
+                let inode_changed = matches!(
+                    (current_inode, inode_of_meta(&meta)),
+                    (Some(a), Some(b)) if a != b
+                );
+                inode_changed || meta.len() < last_pos
+            }
+            Err(_) => true,
+        };
+        if rotated {
+            tracing::info!(path = %path.display(), "SSH auth log rotated; reopening");
+            reader = None;
+            last_pos = 0;
+            current_inode = None;
+            continue;
+        }
+
+        // Drain any new lines.
+        if let Some(r) = reader.as_mut() {
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match r.read_line(&mut line) {
+                    Ok(0) => break, // EOF — wait for more
+                    Ok(n) => {
+                        last_pos += n as u64;
+                        if let Some(fp) = parse_publickey_accept(line.trim_end()) {
+                            record_key_use(&state, fp.to_owned());
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "SSH auth log read error; reopening");
+                        reader = None;
+                        break;
+                    }
+                }
+            }
+        }
+
+        std::thread::sleep(Duration::from_secs(2));
+    }
+}
+
+#[cfg(unix)]
+fn inode_of(f: &std::fs::File) -> Option<u64> {
+    use std::os::unix::fs::MetadataExt;
+    f.metadata().ok().map(|m| m.ino())
+}
+#[cfg(not(unix))]
+fn inode_of(_f: &std::fs::File) -> Option<u64> { None }
+
+#[cfg(unix)]
+fn inode_of_meta(m: &std::fs::Metadata) -> Option<u64> {
+    use std::os::unix::fs::MetadataExt;
+    Some(m.ino())
+}
+#[cfg(not(unix))]
+fn inode_of_meta(_m: &std::fs::Metadata) -> Option<u64> { None }
+
+/// Update last_used_at for the matching key (if any) and fire an audit entry.
+fn record_key_use(state: &AppState, fingerprint: String) {
+    let state = state.clone();
+    tokio::spawn(async move {
+        // Atomic: update + look up the key id/account in one DB hop so we
+        // can attribute the audit entry properly.
+        let fp_for_call = fingerprint.clone();
+        let result = state
+            .database()
+            .call(move |conn| -> rusqlite::Result<Option<(i64, i64)>> {
+                let rows = conn.execute(
+                    "UPDATE ssh_key
+                     SET    last_used_at = CURRENT_TIMESTAMP
+                     WHERE  fingerprint = ? AND revoked_at IS NULL",
+                    rusqlite::params![fp_for_call],
+                )?;
+                if rows == 0 {
+                    return Ok(None);
+                }
+                let row = conn.query_row(
+                    "SELECT id, account_id FROM ssh_key WHERE fingerprint = ?",
+                    rusqlite::params![fp_for_call],
+                    |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)),
+                )?;
+                Ok(Some(row))
+            })
+            .await;
+
+        match result {
+            Ok(Some((key_id, account_id))) => {
+                tracing::debug!(fingerprint = %fingerprint, key_id, "ssh key used");
+                audit(&state, Some(account_id), Some(key_id), "ssh.key.use", None, None);
+            }
+            Ok(None) => {
+                tracing::debug!(fingerprint = %fingerprint,
+                    "sshd accept for unknown or revoked key");
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to update ssh_key.last_used_at");
+            }
+        }
+    });
+}
+
 /// Atomic write: temp sibling + rename, with 0600 perms on Unix.
 fn write_atomic(path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
     let parent = path.parent().ok_or_else(|| {
@@ -386,5 +560,39 @@ mod tests {
     #[test]
     fn parse_empty_fails() {
         assert!(parse_public_key("").is_err());
+    }
+
+    #[test]
+    fn parse_publickey_accept_rsyslog() {
+        let line = "May 27 10:12:34 host sshd[1234]: Accepted publickey for parzival from 1.2.3.4 port 51234 ssh2: ED25519 SHA256:abcDEF123/xyz";
+        assert_eq!(
+            parse_publickey_accept(line),
+            Some("SHA256:abcDEF123/xyz")
+        );
+    }
+
+    #[test]
+    fn parse_publickey_accept_journald() {
+        let line = "sshd[1234]: Accepted publickey for root from ::1 port 51234 ssh2: RSA SHA256:ZZZ";
+        assert_eq!(parse_publickey_accept(line), Some("SHA256:ZZZ"));
+    }
+
+    #[test]
+    fn parse_publickey_accept_ignores_password() {
+        let line = "sshd[1234]: Accepted password for parzival from 1.2.3.4 port 22 ssh2";
+        assert_eq!(parse_publickey_accept(line), None);
+    }
+
+    #[test]
+    fn parse_publickey_accept_ignores_failed() {
+        let line = "sshd[1234]: Failed publickey for root from 1.2.3.4 port 22 ssh2: ED25519 SHA256:xyz";
+        assert_eq!(parse_publickey_accept(line), None);
+    }
+
+    #[test]
+    fn parse_publickey_accept_missing_fingerprint() {
+        // sshd with LogLevel below VERBOSE — no fp in line.
+        let line = "sshd[1234]: Accepted publickey for parzival from 1.2.3.4 port 22 ssh2";
+        assert_eq!(parse_publickey_accept(line), None);
     }
 }
