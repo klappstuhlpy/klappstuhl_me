@@ -5,7 +5,6 @@
 .admin-shell {
     display: flex;
     gap: 2rem;
-    align-items: flex-start;
 }
 
 .admin-sidebar {
