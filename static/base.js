@@ -253,12 +253,15 @@ function __labelTableCells(table) {
     }
 }
 
+const __tableLabelObservers = new WeakSet();
+
 function __setupTableLabels() {
     const tables = document.querySelectorAll('table');
     for (const table of tables) {
         __labelTableCells(table);
         const tbody = table.tBodies[0];
-        if (!tbody) continue;
+        if (!tbody || __tableLabelObservers.has(tbody)) continue;
+        __tableLabelObservers.add(tbody);
         new MutationObserver(() => __labelTableCells(table))
             .observe(tbody, { childList: true, subtree: true });
     }
@@ -269,3 +272,6 @@ if (document.readyState === 'loading') {
 } else {
     __setupTableLabels();
 }
+// Re-run on bfcache restores (back/forward / "soft reload") since
+// DOMContentLoaded does not fire when the page is resurrected.
+window.addEventListener('pageshow', __setupTableLabels);

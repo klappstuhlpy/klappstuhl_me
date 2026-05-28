@@ -376,19 +376,32 @@ table tbody tr:hover {
 @media (max-width: 480px) {
     table th { display: none; }
 
-    table td {
+    table td,
+    table td.numeric,
+    table td.col-actions {
         display: block;
         padding: 0.25rem;
         border-top: none;
         border-bottom: 1px solid var(--box-border);
         overflow-wrap: anywhere;
+        text-align: left;
     }
 
     table td:last-child { border-bottom: none; }
 
-    table td::before {
+    /* Only render the column-name prefix when a non-empty label exists.
+       Reset font/color so the label stays consistent even when the cell
+       itself uses a smaller, muted, or monospace style for the value. */
+    table td[data-th]:not([data-th=""])::before {
         content: attr(data-th) ": ";
         font-weight: bold;
+        font-size: 1rem;
+        font-style: normal;
+        font-variant-numeric: normal;
+        color: var(--foreground);
+        text-transform: none;
+        letter-spacing: normal;
+        white-space: normal;
         width: 45%;
         display: inline-block;
     }
