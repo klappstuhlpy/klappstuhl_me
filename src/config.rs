@@ -97,6 +97,14 @@ pub struct Config {
     /// Recursive: subdirectories are walked.  Binary files, files larger
     /// than 1 MB, and common build directories (.git, node_modules, target,
     /// dist) are skipped automatically.
+    ///
+    /// **Docker note:** paths are resolved from inside the container, so
+    /// host paths like `/home/alice/code` don't work directly. The default
+    /// compose file already bind-mounts `/home` and `/root` (for the SSH
+    /// admin page); reuse those by prefixing with `/host-home` or
+    /// `/host-root`, e.g. `"/host-home/alice/code"`. For paths elsewhere
+    /// on the host, add a corresponding `:ro` bind mount in
+    /// `docker-compose.yml` and reference the in-container path here.
     #[serde(default)]
     pub secret_scan_paths: Vec<PathBuf>,
     /// PostgreSQL connection string for the `/admin/postgres` page.
