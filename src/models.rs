@@ -18,7 +18,7 @@ pub struct ImageFile {
     /// The mime type of the image.
     #[schema(example = "image/png")]
     pub(crate) mimetype: String,
-    /// The representable image bytes. Not serialized — loaded lazily via /gallery/:id/raw.
+    /// The representable image bytes. Not serialized — loaded lazily via /gallery/raw/:id.
     #[serde(skip_serializing)]
     pub(crate) image_data: Vec<u8>,
     /// The file's size in bytes.

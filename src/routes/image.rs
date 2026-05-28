@@ -621,7 +621,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/images", get(get_images_page))
         .route("/gallery/:id", get(get_image_page))
-        .route("/gallery/:id/raw", get(get_image_raw))
+        .route("/gallery/raw/:id", get(get_image_raw))
         .route("/images/bulk", delete(bulk_delete_files))
         .route("/images/bulk/download", post(bulk_download_files))
         .route(
