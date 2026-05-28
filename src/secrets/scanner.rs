@@ -15,6 +15,7 @@ use std::{
     io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
 };
+use tracing::warn;
 
 use super::rules::{rules, Severity};
 
@@ -73,7 +74,22 @@ pub fn scan(roots: &[PathBuf]) -> (Vec<Finding>, ScanCounters) {
     let mut out = Vec::new();
     let mut counters = ScanCounters::default();
     for root in roots {
-        walk(root, &mut out, &mut counters);
+        // For roots specifically we surface errors loudly — silent "0
+        // files scanned" after a manual click is the worst UX.  Per-file
+        // / per-subdir errors below stay silent to avoid spam.
+        match std::fs::metadata(root) {
+            Ok(m) if m.is_dir() || m.is_file() => walk(root, &mut out, &mut counters),
+            Ok(m) => warn!(
+                root = %root.display(),
+                file_type = ?m.file_type(),
+                "secret scan: configured root is neither a file nor a directory, skipping",
+            ),
+            Err(e) => warn!(
+                root = %root.display(),
+                error = %e,
+                "secret scan: cannot access configured root (does the path exist inside the runtime / does the service user have read access?)",
+            ),
+        }
     }
     out
         .sort_by(|a, b| a.file_path.cmp(&b.file_path).then(a.line.cmp(&b.line)));
