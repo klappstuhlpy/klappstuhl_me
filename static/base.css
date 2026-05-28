@@ -376,18 +376,33 @@ table tbody tr:hover {
 @media (max-width: 480px) {
     table th { display: none; }
 
-    table td,
-    table td.numeric,
-    table td.col-actions {
-        display: block;
+    /* Flex layout puts the label (::before) next to the cell content
+       even when that content is itself a block element like a bar-cell
+       or button row. !important defeats page-specific text-align rules
+       (e.g. .container-table .numeric { text-align: right }) that would
+       otherwise re-align the value in the stacked layout. */
+    table td {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: flex-start;
+        column-gap: 0.5rem;
         padding: 0.25rem;
         border-top: none;
         border-bottom: 1px solid var(--box-border);
         overflow-wrap: anywhere;
-        text-align: left;
+        text-align: left !important;
     }
 
     table td:last-child { border-bottom: none; }
+
+    /* Direct children become flex items that share the row with the
+       label and fill the remaining space rather than dropping below. */
+    table td > * {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-align: left;
+    }
 
     /* Only render the column-name prefix when a non-empty label exists.
        Reset font/color so the label stays consistent even when the cell
@@ -402,8 +417,7 @@ table tbody tr:hover {
         text-transform: none;
         letter-spacing: normal;
         white-space: normal;
-        width: 45%;
-        display: inline-block;
+        flex: 0 0 40%;
     }
 }
 
