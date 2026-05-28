@@ -575,15 +575,29 @@ async fn get_image_page(
 /// Serves raw image bytes with the correct `Content-Type`.
 ///
 /// Used by the image grid to load thumbnails without a full page load.
+/// Mirrors the canonicalization behavior of [`get_image_page`]: requests
+/// for `/gallery/raw/abc` or `/gallery/raw/abc.wrong-ext` get a 308
+/// redirect to `/gallery/raw/abc.{canonical-ext}`.
 async fn get_image_raw(
     State(state): State<AppState>,
     Path(image_id): Path<String>,
 ) -> Result<Response, StatusCode> {
     let id = image_id.split('.').next().unwrap_or(&image_id).to_string();
 
-    let Some(entry) = state.get_image(id).await else {
+    let Some(entry) = state.get_image(id.clone()).await else {
         return Err(StatusCode::NOT_FOUND);
     };
+
+    let canonical_ext = entry.ext();
+    let provided_ext = image_id
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_ascii_lowercase());
+    if provided_ext.as_deref() != Some(canonical_ext.as_str()) {
+        return Ok(
+            Redirect::permanent(&format!("/gallery/raw/{}.{}", id, canonical_ext))
+                .into_response(),
+        );
+    }
 
     let mime = entry.mimetype.clone();
     Ok((
