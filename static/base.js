@@ -229,3 +229,43 @@ function sleep(ms) {
 
 const initialSortBy = 'name';
 const initialSortOrder = 'ascending';
+
+/* ── Mobile table labels ─────────────────────────────────────────
+   On narrow viewports each <td> is stacked and prefixed with its
+   column header via CSS `attr(data-th)`. This helper sets data-th
+   from the corresponding <th> in the table head so we don't have
+   to repeat the label in every template. Re-runs on DOM mutations
+   so dynamically-populated tables (e.g. metrics, audit) work too. */
+function __labelTableCells(table) {
+    const headers = Array.from(table.querySelectorAll(':scope > thead > tr > th'))
+        .map(th => th.textContent.trim());
+    if (headers.length === 0) return;
+    for (const row of table.querySelectorAll(':scope > tbody > tr')) {
+        const cells = row.children;
+        for (let i = 0; i < cells.length; i++) {
+            const cell = cells[i];
+            if (cell.tagName !== 'TD') continue;
+            if (cell.hasAttribute('data-th')) continue;
+            if (cell.hasAttribute('colspan')) continue;
+            const label = headers[i];
+            if (label) cell.setAttribute('data-th', label);
+        }
+    }
+}
+
+function __setupTableLabels() {
+    const tables = document.querySelectorAll('table');
+    for (const table of tables) {
+        __labelTableCells(table);
+        const tbody = table.tBodies[0];
+        if (!tbody) continue;
+        new MutationObserver(() => __labelTableCells(table))
+            .observe(tbody, { childList: true, subtree: true });
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', __setupTableLabels);
+} else {
+    __setupTableLabels();
+}
