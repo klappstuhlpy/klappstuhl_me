@@ -102,7 +102,12 @@ pub struct FindingRow {
     pub line: i64,
     pub snippet: String,
     pub status: String,
+    // Force RFC 3339 so JS `new Date(...)` can parse it. Without `with`,
+    // the time crate's default serde format is space-separated and JS
+    // returns NaN, so the dashboard can't compute "Xm ago".
+    #[serde(with = "time::serde::rfc3339")]
     pub first_seen: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
     pub last_seen: OffsetDateTime,
 }
 
@@ -200,7 +205,10 @@ pub async fn status_counts(state: &AppState) -> rusqlite::Result<StatusCounts> {
 
 #[derive(Debug, Serialize, Default)]
 pub struct LastScan {
+    // See FindingRow above — RFC 3339 needed for JS `new Date()`.
+    #[serde(with = "time::serde::rfc3339::option")]
     pub started_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339::option")]
     pub finished_at: Option<OffsetDateTime>,
     pub files_scanned: i64,
     pub findings_new: i64,
@@ -221,8 +229,8 @@ pub async fn last_scan(state: &AppState) -> rusqlite::Result<Option<LastScan>> {
             )?;
             let result = stmt.query_row([], |row| {
                 Ok(LastScan {
-                    started_at: row.get(0).ok(),
-                    finished_at: row.get(1).ok(),
+                    started_at: row.get(0)?,
+                    finished_at: row.get(1)?,
                     files_scanned: row.get(2)?,
                     findings_new: row.get(3)?,
                     findings_total: row.get(4)?,
