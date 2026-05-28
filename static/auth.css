@@ -478,24 +478,5 @@
 /* ── Change-password dialog (extends base dialog styles) ─────── */
 
 #change-password-modal {
-    width: min(480px, 90vw);
-}
-
-#change-password-modal::backdrop { background: rgba(0, 0, 0, 0.6); }
-
-#change-password-modal > form { display: flex; flex-direction: column; }
-
-#change-password-modal h1 {
-    font-size: 1.1rem;
-    font-weight: 600;
-}
-
-#change-password-modal .form-container {
-    padding: 1.5rem;
-    gap: 0.25rem;
-}
-
-#change-password-modal footer {
-    justify-content: flex-end;
-    flex-direction: row;
+    width: min(440px, 92vw);
 }

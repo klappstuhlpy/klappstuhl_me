@@ -600,50 +600,69 @@ a.nav-item.active { font-weight: bold; }
 
 /* ── Modals / dialogs ────────────────────────────────────────── */
 
-::backdrop { background-color: rgba(0, 0, 0, 40%); }
+::backdrop { background-color: rgba(0, 0, 0, 60%); }
 
 dialog {
     background-color: var(--box);
     color: var(--foreground);
     border: 1px solid var(--box-border);
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     padding: 0;
+    box-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.65);
 }
 
 dialog > form {
     margin: auto;
     background-color: var(--box);
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
     max-width: 30rem;
+    display: flex;
+    flex-direction: column;
 }
 
 dialog .form-container {
-    padding: 1rem;
+    padding: 0.5rem 1.5rem 1.25rem;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
 }
 
 dialog > form > h1 {
-    border-bottom: 1px solid var(--box-border);
-    padding: 1.25rem 1.25rem 0.25rem;
-    font-size: 1.5rem;
+    padding: 1.5rem 1.5rem 0.25rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0;
+    border-bottom: none;
+}
+
+dialog > form > p {
+    padding: 0 1.5rem;
+    margin: 0 0 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.5;
 }
 
 dialog > form > footer {
     display: flex;
     flex-direction: row-reverse;
     justify-content: flex-start;
-    gap: 0.75rem;
-    padding: 1rem;
-    background-color: var(--header);
+    gap: 0.5rem;
+    padding: 1rem 1.5rem 1.25rem;
+    background: none;
+    border-top: 1px solid var(--box-border);
+    margin-top: 0.5rem;
 }
 
-dialog > form > p {
-    padding: 0 1.25rem;
-    margin-bottom: 0;
+dialog > form > p ~ footer { margin-top: 0.5rem; }
+
+dialog > form > .alert { margin: 0 1.5rem 0.5rem; }
+
+dialog > form > footer .button {
+    padding: 0.4rem 1rem;
+    font-size: 0.85rem;
 }
-
-dialog > form > p ~ footer { margin-top: 0.75rem; }
-
-dialog > form > .alert { margin: 0 1rem; }
 
 /* ── Close button ────────────────────────────────────────────── */
 

@@ -172,23 +172,28 @@
 
 <dialog id="change-password-modal">
     <form autocomplete="off" method="POST" action="/account/change_password">
-        <h1>Change Password</h1>
+        <h1>Change password</h1>
+        <p>Pick a new password of at least 8 characters. You'll stay signed in on this device.</p>
         <div class="form-container">
-            <label for="old-password">Current Password</label>
-            <div class="password-container form-field">
-                <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="old_password" id="old-password" type="password">
-                <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="24px" height="24px"/></span>
+            <div class="field-group">
+                <label class="field-label" for="old-password">Current password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="old_password" id="old-password" type="password" autocomplete="current-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
             </div>
-            <label for="new-password">New Password</label>
-            <div class="password-container form-field">
-                <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="new_password" id="new-password" type="password">
-                <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="24px" height="24px"/></span>
+            <div class="field-group">
+                <label class="field-label" for="new-password">New password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="new_password" id="new-password" type="password" autocomplete="new-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
             </div>
             <input type="hidden" id="session-description" name="session_description" value="">
         </div>
         <footer>
-            <button id="confirm" class="button primary">Save</button>
-            <button class="button danger" formmethod="dialog">Cancel</button>
+            <button id="confirm" class="button primary">Save password</button>
+            <button class="button" formmethod="dialog">Cancel</button>
         </footer>
     </form>
 </dialog>
