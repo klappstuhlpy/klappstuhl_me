@@ -181,7 +181,7 @@
 .container-table td.numeric,
 .container-table th.numeric {
     font-variant-numeric: tabular-nums;
-    text-align: right;
+    /*text-align: right;*/
 }
 
 /* Inline mini-bar for CPU/mem in the container table */
@@ -207,5 +207,5 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    justify-content: flex-end;
+    /*justify-content: flex-end;*/
 }
