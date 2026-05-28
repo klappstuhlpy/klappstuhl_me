@@ -399,9 +399,12 @@ table tbody tr:hover {
     /* Direct children become flex items that share the row with the
        label and fill the remaining space rather than dropping below. */
     table td > * {
-        flex: 1 1 auto;
         min-width: 0;
         text-align: left;
+    }
+
+    button {
+        justify-content: center;
     }
 
     /* Only render the column-name prefix when a non-empty label exists.
