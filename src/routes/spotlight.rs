@@ -391,6 +391,19 @@ async fn run_script(
 fn build_command(command: &str) -> tokio::process::Command {
     let mut cmd = tokio::process::Command::new("sh");
     cmd.arg("-c").arg(command);
+    // systemd units often launch with a stripped PATH, which makes
+    // `sh -c "curl …"` fail with "curl: not found" even when curl is
+    // installed in /usr/bin. Make sure the standard system locations
+    // are searched, while still honouring whatever the parent set.
+    let path = match std::env::var_os("PATH") {
+        Some(p) if !p.is_empty() => {
+            let mut combined = p.into_string().unwrap_or_default();
+            combined.push_str(":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+            combined
+        }
+        _ => "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".to_string(),
+    };
+    cmd.env("PATH", path);
     cmd
 }
 
