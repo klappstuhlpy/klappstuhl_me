@@ -1,7 +1,7 @@
 use quick_cache::sync::Cache;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{broadcast, RwLockReadGuard};
-use crate::{auth::hash_password, boxed_params, cached::TimedCachedValue, cloudflare::Cloudflare, database::Table, docker::DockerClient, geoip::GeoIp, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
+use crate::{auth::hash_password, boxed_params, cached::TimedCachedValue, cloudflare::Cloudflare, database::Table, docker::DockerClient, firewall::Backend as FirewallBackend, geoip::GeoIp, logging::RequestLogger, models::{Account, ImageEntry, Session}, token::MAX_TOKEN_AGE, Config, Database};
 use crate::models::ImageFile;
 
 /// One live event pushed over WebSocket subscribers.
@@ -58,6 +58,9 @@ struct InnerState {
     live_tx: broadcast::Sender<LiveEvent>,
     /// Docker introspection client. `None` when Docker socket is unavailable.
     docker: Option<Arc<DockerClient>>,
+    /// Firewall backend (nftables / ufw / iptables). `None` when none of
+    /// the supported binaries is available at startup.
+    firewall_backend: Option<FirewallBackend>,
 }
 
 /// Global application state for the axum Router.
@@ -159,6 +162,19 @@ impl AppState {
 
         let (live_tx, _) = broadcast::channel(64);
         let docker = DockerClient::connect();
+        let firewall_backend = {
+            let override_kind = config
+                .firewall_backend
+                .as_deref()
+                .filter(|s| !s.is_empty());
+            let backend = FirewallBackend::detect(override_kind).await;
+            tracing::info!(backend = %backend.kind.label(), "firewall backend detected");
+            if matches!(backend.kind, crate::firewall::BackendKind::Disabled) {
+                None
+            } else {
+                Some(backend)
+            }
+        };
 
         Self {
             inner: Arc::new(InnerState {
@@ -172,6 +188,7 @@ impl AppState {
                 cloudflare,
                 live_tx,
                 docker,
+                firewall_backend,
             }),
             client,
             requests,
@@ -190,6 +207,14 @@ impl AppState {
     /// Returns the Docker introspection client, if available.
     pub fn docker(&self) -> Option<&Arc<DockerClient>> {
         self.inner.docker.as_ref()
+    }
+
+    /// Returns the configured firewall backend, if any.  `None` means
+    /// neither `nft`, `ufw`, nor `iptables` was found at startup, in
+    /// which case rule edits still persist to the DB but no kernel
+    /// changes are applied.
+    pub fn firewall_backend(&self) -> Option<&FirewallBackend> {
+        self.inner.firewall_backend.as_ref()
     }
 
     /// Returns a fresh receiver for live events. Each WS connection

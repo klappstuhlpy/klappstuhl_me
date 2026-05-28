@@ -109,6 +109,7 @@ async fn authenticate(
                     .ip_opt(client_ip)
                     .meta(serde_json::json!({ "reason": "unknown_user" }))
                     .fire();
+                register_failure(&state, client_ip).await;
                 Err(ApiError::incorrect_login())
             }
         }
@@ -119,7 +120,23 @@ async fn authenticate(
             .ip_opt(client_ip)
             .meta(serde_json::json!({ "reason": "bad_password" }))
             .fire();
+        register_failure(&state, client_ip).await;
         Err(ApiError::incorrect_login())
+    }
+}
+
+/// Forward the failed-login to the firewall lockout counter.  Best-effort
+/// — never blocks the login response and errors are swallowed (the audit
+/// log row above is the source of truth for an incident review).
+async fn register_failure(state: &AppState, ip: Option<std::net::IpAddr>) {
+    if let Some(ip) = ip {
+        let ip_str = ip.to_string();
+        let state = state.clone();
+        tokio::spawn(async move {
+            if let Err(e) = crate::firewall::lockout::register_failure(&state, &ip_str).await {
+                tracing::warn!(error = %e, ip = %ip_str, "firewall lockout registration failed");
+            }
+        });
     }
 }
 

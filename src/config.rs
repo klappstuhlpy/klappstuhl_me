@@ -149,6 +149,31 @@ pub struct Config {
     /// `/host-log/auth.log`. When unset, `last_used_at` stays NULL.
     #[serde(default)]
     pub sshd_auth_log_path: Option<PathBuf>,
+    /// Forces a specific firewall backend at start-up. Valid values:
+    /// `"nftables"`, `"ufw"`, `"iptables"`, `"disabled"`. When unset, the
+    /// `/admin/firewall` page probes each backend in order and uses the
+    /// first one that responds.  Set to `"disabled"` to keep the UI but
+    /// stop the server from issuing real packet-filter commands (useful
+    /// in dev or when running without `NET_ADMIN`).
+    #[serde(default)]
+    pub firewall_backend: Option<String>,
+    /// Directory that proxy configuration is written into. When set, the
+    /// `/admin/proxy` page renders an nginx (or caddy) server block per
+    /// route and writes it to `<dir>/<subdomain>.conf`.  When unset, the
+    /// page still manages routes in the DB but does not touch disk —
+    /// useful when the proxy is hand-managed and you just want a record
+    /// of which subdomain maps to which container.
+    #[serde(default)]
+    pub proxy_config_dir: Option<PathBuf>,
+    /// Which proxy syntax to emit.  `"nginx"` (default) writes nginx
+    /// `server { ... }` blocks; `"caddy"` writes Caddyfile entries.
+    #[serde(default)]
+    pub proxy_kind: Option<String>,
+    /// Shell command run after the config files are regenerated. Typical
+    /// values: `"nginx -s reload"`, `"systemctl reload nginx"`,
+    /// `"caddy reload --config /etc/caddy/Caddyfile"`. Skipped when unset.
+    #[serde(default)]
+    pub proxy_reload_command: Option<String>,
     /// The secret key used for all crypto related functionality in the server.
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
@@ -172,6 +197,10 @@ impl Config {
             virustotal_api_key: None,
             spotlight_scripts: Vec::new(),
             sshd_auth_log_path: None,
+            firewall_backend: None,
+            proxy_config_dir: None,
+            proxy_kind: None,
+            proxy_reload_command: None,
             secret_key: SecretKey::random()?,
         })
     }

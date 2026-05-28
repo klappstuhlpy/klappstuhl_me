@@ -1,0 +1,55 @@
+/* ── Firewall dashboard ─────────────────────────────────────── */
+
+.backend-chip {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.7rem;
+    border-radius: 9999px;
+    border: 1px solid var(--box-border);
+    background: var(--box-shade);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+    margin-left: 0.4rem;
+}
+
+.action-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.05rem 0.55rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    border: 1px solid;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.action-pill.allow      { color: var(--success-text, #34d399); border-color: var(--success-border, #065f46); background: var(--success-bg, rgba(16,185,129,0.12)); }
+.action-pill.deny       { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
+.action-pill.rate_limit { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
+.action-pill.geo_block  { color: var(--info-text);    border-color: var(--info-border);    background: var(--info-bg); }
+
+.lockout-controls {
+    margin: 0.4rem 0 0.8rem;
+}
+
+.inline-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.inline-form input {
+    padding: 0.4rem 0.55rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.35rem;
+    color: var(--foreground);
+    font-size: 0.85rem;
+}
+
+.inline-form input[type=number] { width: 12rem; }
+.inline-form input[type=text]:first-of-type { width: 13rem; }

@@ -133,6 +133,12 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // Stream Docker daemon events → live "docker" WS topic.
     klappstuhl_me::docker::spawn_event_watcher(state.clone());
 
+    // Periodic health/uptime probes for configured targets.
+    klappstuhl_me::health::spawn_monitor(state.clone());
+
+    // Firewall lockout reaper.
+    klappstuhl_me::firewall::spawn_workers(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()
@@ -279,7 +285,7 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 9] = [
+const MIGRATIONS: [&str; 11] = [
     include_str!("../sql/0.sql"),
     include_str!("../sql/1.sql"),
     include_str!("../sql/2.sql"),
@@ -289,6 +295,8 @@ const MIGRATIONS: [&str; 9] = [
     include_str!("../sql/6.sql"),
     include_str!("../sql/7.sql"),
     include_str!("../sql/8.sql"),
+    include_str!("../sql/9.sql"),
+    include_str!("../sql/10.sql"),
 ];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {

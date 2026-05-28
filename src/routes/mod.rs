@@ -15,6 +15,8 @@ mod admin;
 mod audit;
 mod auth;
 mod docker;
+mod firewall;
+mod health;
 mod image;
 mod api;
 mod metrics;
@@ -82,6 +84,8 @@ pub fn all() -> Router<AppState> {
         .merge(security::routes())
         .merge(ssh::routes())
         .merge(docker::routes())
+        .merge(firewall::routes())
+        .merge(health::routes())
         .merge(sanitizer::routes())
         .merge(spotlight::routes())
         .merge(ws::routes())
