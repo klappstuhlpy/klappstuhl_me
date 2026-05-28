@@ -546,9 +546,23 @@ async fn get_image_page(
     // Strip extension if present (e.g. "abc.png" → "abc").
     let id = image_id.split('.').next().unwrap_or(&image_id).to_string();
 
-    let Some(entry) = state.get_image(id).await else {
+    let Some(entry) = state.get_image(id.clone()).await else {
         return Ok(Redirect::to("/").into_response());
     };
+
+    // Canonical URL is always "/gallery/{id}.{ext}". If the request came in
+    // without an extension (or with the wrong one) bounce the user to the
+    // canonical form via a 308 so bookmarks / shared links normalize.
+    let canonical_ext = entry.ext();
+    let provided_ext = image_id
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_ascii_lowercase());
+    if provided_ext.as_deref() != Some(canonical_ext.as_str()) {
+        return Ok(
+            Redirect::permanent(&format!("/gallery/{}.{}", id, canonical_ext))
+                .into_response(),
+        );
+    }
 
     let data = ResolvedImageData {
         bytes: general_purpose::STANDARD.encode(&entry.image_data),
