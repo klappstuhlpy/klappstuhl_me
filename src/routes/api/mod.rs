@@ -34,6 +34,7 @@ pub use auth::{copy_api_token, ApiToken};
     paths(
         images::upload_files,
         images::delete_image_by_id,
+        images::download_images,
     ),
     components(
         schemas(
@@ -41,6 +42,7 @@ pub use auth::{copy_api_token, ApiToken};
             crate::models::ImageEntry,
             crate::routes::image::UploadResult,
             crate::routes::image::DeleteResult,
+            crate::routes::image::BulkFilesPayload,
         ),
         responses(utils::RateLimitResponse),
     ),
@@ -88,6 +90,7 @@ pub fn routes() -> Router<AppState> {
         .route("/openapi.json", get(spec))
         .route("/docs", get(docs))
         .route("/images/upload", post(images::upload_files))
+        .route("/images/download", post(images::download_images))
         .route("/images/{id}", delete(images::delete_image_by_id))
         .route_layer(RateLimit::default().quota(25, 60.0).build())
         .route_layer(

@@ -1,7 +1,9 @@
 use axum::extract::{Multipart, Path, State};
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
 use utoipa::ToSchema;
 
-use crate::{error::ApiError, headers::ClientIp, routes::image::{UploadResult, DeleteResult}, AppState};
+use crate::{error::ApiError, headers::ClientIp, routes::image::{UploadResult, DeleteResult, BulkFilesPayload, build_images_zip}, AppState};
 use crate::routes::image::{delete_image, raw_upload_file};
 use super::{
     auth::ApiToken,
@@ -100,4 +102,79 @@ pub async fn delete_image_by_id(
     }
 
     Ok(Json(result))
+}
+
+/// Download
+///
+/// Bundle one or more of your images into a ZIP archive.
+///
+/// The request body is a JSON object with a `files` array of image IDs.
+/// Each ID may include the file extension (e.g. `abc123.png`) or be the
+/// bare ID; the server strips the extension before lookup. Pass an empty
+/// array to receive every image you own.
+///
+/// Only images owned by the authenticated account are included; unknown
+/// or foreign IDs are silently skipped. If no requested image resolves
+/// to one you own, the endpoint returns 404.
+///
+/// The response is a `application/zip` payload with a
+/// `Content-Disposition: attachment` header.
+#[utoipa::path(
+    post,
+    path = "/api/images/download",
+    request_body(
+        content = inline(BulkFilesPayload),
+        content_type = "application/json",
+        description = "The IDs of the images to bundle. Empty list = all your images."
+    ),
+    responses(
+        (status = 200, description = "ZIP archive of the requested images", content_type = "application/zip", body = Vec<u8>),
+        (status = 401, description = "User is unauthenticated", body = ApiError),
+        (status = 404, description = "No matching images found", body = ApiError),
+        (status = 429, response = RateLimitResponse),
+    ),
+    security(
+        ("api_key" = [])
+    ),
+    tag = "images"
+)]
+pub async fn download_images(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    auth: ApiToken,
+    Json(payload): Json<BulkFilesPayload>,
+) -> Result<Response, ApiError> {
+    let Some(account) = state.get_account(auth.id).await else {
+        return Err(ApiError::unauthorized());
+    };
+
+    let total = payload.files.len();
+    let (bytes, count) = build_images_zip(&state, &account, &payload.files).await?;
+
+    state.audit("image.bulk_download")
+        .actor(&account)
+        .target(format!("{count} image{}", if count == 1 { "" } else { "s" }))
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({
+            "requested": total,
+            "delivered": count,
+            "via_api":   true,
+        }))
+        .fire();
+
+    let filename = format!(
+        "klappstuhl-images-{}.zip",
+        time::OffsetDateTime::now_utc().unix_timestamp(),
+    );
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/zip".to_string()),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{filename}\""),
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
 }

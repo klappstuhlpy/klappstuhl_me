@@ -13,6 +13,7 @@ class BulkFilesOperations {
         {
             deleteFiles = null,
             deleteModal = null,
+            downloadFiles = null,
             totalFileCount = null,
             selectedFileCount = null,
         } = {},
@@ -21,6 +22,7 @@ class BulkFilesOperations {
         this.checkboxAnchor = null;
         this.bulkCheck = table?.querySelector('.bulk-check');
         this.deleteFilesButton = deleteFiles;
+        this.downloadFilesButton = downloadFiles;
         this.totalFileCount = totalFileCount;
         this.selectedFileCount = selectedFileCount;
         this.deleteModal = deleteModal;
@@ -41,6 +43,8 @@ class BulkFilesOperations {
         this.deleteModal?.querySelector('button[formmethod=dialog]')?.addEventListener('click', (e) => this.closeModal(e, this.deleteModal));
 
         this.deleteFilesButton?.addEventListener('click', () => this.showConfirmFileModal(this.deleteModal));
+
+        this.downloadFilesButton?.addEventListener('click', () => this.downloadFiles());
 
         document.addEventListener('entries-filtered', () => this.setCheckboxState());
         this.parent?.querySelectorAll('.file-bulk > input[type="checkbox"]').forEach(ch => {
@@ -123,6 +127,8 @@ class BulkFilesOperations {
             this.selectedFileCount.textContent = `${checked} file${checked !== 1 ? 's' : ''} selected`;
         }
 
+        this.downloadFilesButton?.classList.toggle('hidden', checked === 0);
+
         if(this.totalFileCount) {
             let total = [...this.parent.querySelectorAll('.entry:not(.hidden)')].length;
             this.totalFileCount.textContent = `${total} file${total !== 1 ? 's' : ''}`;
@@ -156,6 +162,42 @@ class BulkFilesOperations {
             this.bulkCheck.indeterminate = true;
             this.bulkCheck.setAttribute('tribool', 'yes');
             this.bulkCheck.checked = false;
+        }
+    }
+
+    async downloadFiles() {
+        let files = this.getSelectedFiles().map(e => e.textContent);
+        let btn = this.downloadFilesButton;
+        let originalText = btn?.textContent;
+        if(btn) {
+            btn.disabled = true;
+            btn.textContent = 'Preparing…';
+        }
+
+        try {
+            let blob = await callApi(`/images/bulk/download`, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({ files }),
+            }, undefined, true);
+
+            if(blob === null) return;
+
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `klappstuhl-images-${Date.now()}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } finally {
+            if(btn) {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
         }
     }
 
@@ -215,6 +257,7 @@ uploadInput?.addEventListener('change', () => {
 const __bulk = new BulkFilesOperations(document.querySelector('.files'), {
     deleteFiles: document.getElementById('delete-files'),
     deleteModal: document.getElementById('confirm-delete-modal'),
+    downloadFiles: document.getElementById('download-files'),
     totalFileCount: document.getElementById('total-file-count'),
     selectedFileCount: document.getElementById('selected-file-count'),
 });

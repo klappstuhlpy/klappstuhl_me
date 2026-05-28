@@ -333,15 +333,95 @@ async fn upload_file(
     }
 }
 
-#[derive(Deserialize)]
-struct BulkFilesPayload {
-    files: Vec<String>,
+#[derive(Deserialize, ToSchema)]
+pub struct BulkFilesPayload {
+    /// Image IDs to operate on. May include the file extension (e.g. `abc123.png`)
+    /// or just the bare ID. Pass an empty list to operate on every image
+    /// owned by the authenticated user.
+    pub files: Vec<String>,
 }
 
 #[derive(Serialize)]
 struct BulkFileOperationResponse {
     success: usize,
     failed: usize,
+}
+
+/// Builds a ZIP archive of the requested images for an account.
+///
+/// Returns the raw bytes of the archive together with the count of files
+/// included. Only images owned by `account` are eligible; unknown or
+/// foreign IDs are silently skipped. If `requested` is empty, every image
+/// owned by the account is included.
+pub async fn build_images_zip(
+    state: &AppState,
+    account: &Account,
+    requested: &[String],
+) -> Result<(Vec<u8>, usize), ApiError> {
+    let owned: Vec<ImageFile> = state
+        .resolve_image_files()
+        .await
+        .iter()
+        .filter(|e| e.uploader_id == Some(account.id))
+        .cloned()
+        .collect();
+
+    let selected: Vec<ImageFile> = if requested.is_empty() {
+        owned
+    } else {
+        let wanted: std::collections::HashSet<String> = requested
+            .iter()
+            .map(|s| s.split('.').next().unwrap_or(s).to_string())
+            .collect();
+        owned
+            .into_iter()
+            .filter(|f| {
+                let bare = f.id.split('.').next().unwrap_or(&f.id);
+                wanted.contains(bare)
+            })
+            .collect()
+    };
+
+    if selected.is_empty() {
+        return Err(ApiError::not_found("No matching images were found"));
+    }
+
+    let mut entries: Vec<(String, Vec<u8>)> = Vec::with_capacity(selected.len());
+    for f in &selected {
+        // The cached ImageFile may carry empty image_data because the
+        // cache stores metadata only. Fetch the bytes on demand.
+        let data = match state.resolve_image_data_for(f.id.split('.').next().unwrap_or(&f.id)).await {
+            Some(d) => d,
+            None => continue,
+        };
+        entries.push((f.id.clone(), data));
+    }
+
+    if entries.is_empty() {
+        return Err(ApiError::not_found("No matching images were found"));
+    }
+
+    let count = entries.len();
+    let bytes = tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
+        use std::io::Write;
+        let buf = std::io::Cursor::new(Vec::<u8>::with_capacity(1024 * 1024));
+        let mut zip = zip::ZipWriter::new(buf);
+        // Images are already compressed (PNG/JPG/AVIF/GIF), so store rather
+        // than re-deflate. This is faster and keeps archive size honest.
+        let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for (name, data) in entries {
+            zip.start_file(name, opts)?;
+            zip.write_all(&data)?;
+        }
+        let cursor = zip.finish()?;
+        Ok(cursor.into_inner())
+    })
+    .await
+    .map_err(|_| ApiError::new("Failed to build archive"))?
+    .map_err(|_| ApiError::new("Failed to build archive"))?;
+
+    Ok((bytes, count))
 }
 
 async fn bulk_delete_files(
@@ -404,6 +484,43 @@ async fn bulk_delete_files(
     );
 
     Ok(Json(BulkFileOperationResponse { success, failed }))
+}
+
+async fn bulk_download_files(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    account: Account,
+    Json(payload): Json<BulkFilesPayload>,
+) -> Result<Response, ApiError> {
+    let (bytes, count) = build_images_zip(&state, &account, &payload.files).await?;
+    let total = payload.files.len();
+
+    state.audit("image.bulk_download")
+        .actor(&account)
+        .target(format!("{count} image{}", if count == 1 { "" } else { "s" }))
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({
+            "requested": total,
+            "delivered": count,
+            "via_api":   false,
+        }))
+        .fire();
+
+    let filename = format!(
+        "klappstuhl-images-{}.zip",
+        time::OffsetDateTime::now_utc().unix_timestamp(),
+    );
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/zip".to_string()),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{filename}\""),
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
 }
 
 // ---------------------------------------------------------------------------
@@ -492,6 +609,7 @@ pub fn routes() -> Router<AppState> {
         .route("/gallery/:id", get(get_image_page))
         .route("/gallery/:id/raw", get(get_image_raw))
         .route("/images/bulk", delete(bulk_delete_files))
+        .route("/images/bulk/download", post(bulk_download_files))
         .route(
             "/images/bulk",
             post(upload_file).layer(RateLimit::default().build()),

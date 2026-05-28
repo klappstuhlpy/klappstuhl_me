@@ -51,3 +51,4 @@ bollard = { version = "0.17", default-features = false, features = ["ssl"] }
 maxminddb = "0.24.0"
 tokio-postgres = { version = "0.7", features = ["with-time-0_3", "with-serde_json-1", "with-uuid-1"] }
 uuid = { version = "1", features = ["v4"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }

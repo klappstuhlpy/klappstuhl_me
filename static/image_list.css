@@ -132,11 +132,21 @@ h1 {
     border: 1px solid var(--box-border);
     border-radius: 8px;
     overflow: hidden;
-    transition: border-color 150ms ease;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
 .entry:hover {
     border-color: var(--branding);
+    box-shadow: 0 4px 18px -8px rgba(124, 58, 237, 0.45);
+}
+
+.entry:has(.file-bulk input[type="checkbox"]:checked) {
+    border-color: var(--branding);
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.55), 0 4px 18px -8px rgba(124, 58, 237, 0.55);
+}
+
+.entry:has(.file-bulk input[type="checkbox"]:checked) .card-thumb {
+    opacity: 0.72;
 }
 
 .entry.hidden {
@@ -191,24 +201,79 @@ h1 {
     color: var(--text-muted);
 }
 
-/* Checkbox: hidden until hover or checked */
+/* Select pill: always visible, sleek modern look */
 
 .file-bulk {
     position: absolute;
-    top: 0.4rem;
-    left: 0.4rem;
+    top: 0.5rem;
+    left: 0.5rem;
     z-index: 2;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.55rem 0.2rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(9, 9, 11, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--foreground);
+    font-size: 0.7rem;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    user-select: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.file-bulk::after {
+    content: 'Select';
+}
+
+.file-bulk:hover {
+    background: rgba(9, 9, 11, 0.92);
+    border-color: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
 }
 
 .file-bulk input[type="checkbox"] {
-    opacity: 0;
-    transition: opacity 150ms ease;
+    width: 0.95rem;
+    height: 0.95rem;
+    border-width: 1.5px;
+    border-color: var(--foreground);
+    background-color: transparent;
+    margin: 0;
+    flex-shrink: 0;
+    transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 
-.entry:hover .file-bulk input[type="checkbox"],
-.entry .file-bulk input[type="checkbox"]:checked {
-    opacity: 1;
+.file-bulk input[type="checkbox"]:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+}
+
+.file-bulk input[type="checkbox"]:checked::after {
+    top: 1px;
+    left: 1px;
+    width: 0.55rem;
+    height: 0.55rem;
+}
+
+.file-bulk:has(input[type="checkbox"]:checked) {
+    background: rgb(var(--primary-button-rgb));
+    border-color: rgb(var(--primary-button-rgb));
+    color: var(--button-text);
+    box-shadow: 0 2px 10px rgba(124, 58, 237, 0.45);
+}
+
+.file-bulk:has(input[type="checkbox"]:checked)::after {
+    content: 'Selected';
+}
+
+.file-bulk:has(input[type="checkbox"]:checked) input[type="checkbox"] {
+    border-color: var(--button-text);
+    background-color: transparent;
 }
 
 /* Bottom bar */
