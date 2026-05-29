@@ -82,6 +82,16 @@ impl Backend {
         }
     }
 
+    /// Command that dumps the current live ruleset for import/sync.
+    /// Only ufw is supported for now (its status output is stable and
+    /// human-parsable); the others return None.
+    pub fn import_command(&self) -> Option<Vec<String>> {
+        match self.kind {
+            BackendKind::Ufw => Some(self.wrap(vec!["ufw", "status"])),
+            _ => None,
+        }
+    }
+
     /// Generate the matching remove command.
     pub fn remove_command(&self, rule: &FirewallRule) -> Option<Vec<String>> {
         match self.kind {

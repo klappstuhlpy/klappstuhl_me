@@ -23,7 +23,7 @@ management, security analytics, virus scanning, and an invite-only user system.
   - **Metrics** — live host stats (CPU, RAM, disk usage, disk I/O, network throughput) plus per-container Docker stats. uPlot charts with selectable ranges (1h / 6h / 24h / 7d / 30d). Threshold alerts fire a Discord webhook on `OK → ALERT` transitions with a 30-minute cooldown.
   - **Health** — internal uptime monitoring (a self-hosted Uptime-Kuma). Define targets of four kinds — **HTTP** (status-code / keyword assertions, redirect following), **TCP** (port reachability), **keyword** (substring present/absent in an HTTP body), and **SSL** (certificate expiry, with a configurable "warn N days before" threshold). A background monitor probes each target on its own interval, records latency, classifies each sample as up / degraded (slower than the per-target `degraded_ms` threshold) / down, and opens/closes incidents automatically. Per-target uptime %s (24h / 7d / 30d), average + p95 latency, an incident timeline, and a sample history sparkline. Run a probe on demand, and get a Discord webhook on down→up / up→down transitions. Old samples are pruned after 30 days.
   - **Security** — failed logins, top offending IPs (with GeoIP country/city), reason breakdown, country distribution, recent activity feed. Optional Cloudflare panels (zone analytics + WAF events) when an API token + zone ID are configured.
-  - **Firewall** — visual frontend for **nftables**, **ufw**, or **iptables** (auto-detected at startup, overridable via `firewall_backend`). Create allow / deny / rate-limit / geo-block rules (source CIDR, port, protocol, country, requests-per-second); each rule is mirrored in SQLite and applied to the kernel by shelling out to the detected backend. Manual IP lockouts with optional expiry, plus **automatic lockout** — after 8 failed logins from an IP within 10 minutes the address is blocked for an hour (driven off the existing audit log) and the block is pushed to the backend. A background reaper releases expired lockouts. "Re-apply all" re-pushes every enabled rule. When no backend binary is present the page still manages rules in the DB (handy in dev / without `NET_ADMIN`).
+  - **Firewall** — visual frontend for **nftables**, **ufw**, or **iptables** (auto-detected at startup, overridable via `firewall_backend`). Create allow / deny / rate-limit / geo-block rules (source CIDR, port, protocol, country, requests-per-second); each rule is mirrored in SQLite and applied to the kernel by shelling out to the detected backend. On ufw hosts the dashboard also **imports the live ruleset** — `ufw status` is parsed and reconciled into the mirror on each load, so rules created out-of-band (`ufw allow OpenSSH` from a shell) appear automatically. Manual IP lockouts with optional expiry, plus **automatic lockout** — after 8 failed logins from an IP within 10 minutes the address is blocked for an hour (driven off the existing audit log) and the block is pushed to the backend. A background reaper releases expired lockouts. "Re-apply all" re-pushes every enabled rule. When no backend binary is present the page still manages rules in the DB (handy in dev / without `NET_ADMIN`).
   - **Proxy** — reverse-proxy / domain manager. Map a subdomain (`jellyfin.klappstuhl.me`) to an upstream container or `host:port`, pick the scheme, and toggle managed TLS, Cloudflare-proxied real-IP handling, HTTP basic auth (password hashed with bcrypt), a requests-per-second rate limit, and JSON allow/deny access rules. From the route list the server renders an nginx `server { … }` block (or a Caddyfile fragment, per `proxy_kind`) per enabled route, writes it to `proxy_config_dir/<subdomain>.conf` (plus an htpasswd sidecar for nginx auth), prunes stale managed files, and runs `proxy_reload_command`. Preview the generated config before saving. Container targets are populated from `config.services`. With no `proxy_config_dir` set, routes are still tracked in the DB as a record of which subdomain points where.
   - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI / Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
   - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, signup, password change, logout), invite create/revoke, service/snapshot/script actions, secret status changes, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
@@ -309,6 +309,22 @@ A background task releases expired lockouts every minute and removes the
 corresponding kernel rule. nftables lockouts assume an `inet filter` table with
 an `input` chain.
 
+**Live ruleset import (ufw).** The `firewall_rule` table is normally a one-way
+mirror — the UI writes rows and they're pushed to the kernel — which means a host
+configured out-of-band shows an empty dashboard even though rules are live. To
+close that gap, each time `/admin/firewall` loads its data the server runs
+`ufw status`, parses it, and reconciles the result into the mirror: live rules
+not yet present are inserted (tagged `{"source":"ufw"}` in their `meta_json`),
+and previously-imported rows that no longer appear live are pruned.
+Hand-made rows created in the UI carry no marker and are never touched. This is
+ufw-only for now (its status output is stable and parsable; nft/iptables have no
+equivalent import). A few accepted caveats: a UI-created rule that's also live in
+ufw can appear twice (once as the UI row, once as an imported one); imported rows
+are a read-only reflection, so deleting or toggling one in the UI may not map
+cleanly to a `ufw delete` and it will simply re-import on the next load. The
+import is best-effort — any failure (no backend, command error, parse miss) is
+logged and swallowed so the dashboard still renders.
+
 ### Reverse proxy / domain manager
 
 `/admin/proxy` keeps a row per managed subdomain in SQLite and (optionally)
@@ -392,7 +408,7 @@ src/
 ├── config.rs         — Config struct + JSON load/save
 ├── database.rs       — async SQLite worker pool with prepared-stmt cache
 ├── docker.rs         — bollard Docker client wrapper + event watcher background task
-├── firewall/         — Firewall backend abstraction (nft/ufw/iptables), rule + lockout storage, auto-lockout
+├── firewall/         — Firewall backend abstraction (nft/ufw/iptables), rule + lockout storage, auto-lockout, live ufw ruleset import
 ├── geoip.rs          — Optional MaxMind reader wrapper
 ├── health/           — Uptime monitoring (checker probes, sample/incident storage, background monitor)
 ├── logging.rs        — Request log middleware + writer

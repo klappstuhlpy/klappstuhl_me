@@ -69,6 +69,9 @@ async fn data(
         return Err(StatusCode::FORBIDDEN);
     }
     let backend = state.firewall_backend().map(|b| b.kind.label()).unwrap_or("disabled");
+    // Reconcile the live ufw ruleset into the mirror so rules created
+    // out-of-band still show up. Best-effort; never blocks the dashboard.
+    firewall::sync::sync_live(&state).await;
     let rules = firewall::storage::list_rules(&state)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

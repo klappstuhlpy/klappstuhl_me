@@ -11,6 +11,7 @@
 pub mod backend;
 pub mod lockout;
 pub mod storage;
+pub mod sync;
 
 pub use backend::{Backend, BackendKind};
 pub use storage::{FirewallRule, LockoutRow, NewRule};

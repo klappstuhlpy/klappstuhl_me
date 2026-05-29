@@ -168,11 +168,21 @@ async fn run_reload(state: &AppState) -> Option<String> {
 
     match command.output().await {
         Ok(o) if o.status.success() => Some(format!("{cmd} → ok")),
-        Ok(o) => Some(format!(
-            "{cmd} → exit {} :: {}",
-            o.status,
-            String::from_utf8_lossy(&o.stderr).trim()
-        )),
+        Ok(o) => {
+            // Prefer stderr for the failure detail, fall back to stdout.
+            // `ExitStatus` already Displays as "exit status: N", so don't
+            // prefix another "exit".
+            let detail = {
+                let err = String::from_utf8_lossy(&o.stderr);
+                let err = err.trim();
+                if err.is_empty() {
+                    String::from_utf8_lossy(&o.stdout).trim().to_string()
+                } else {
+                    err.to_string()
+                }
+            };
+            Some(format!("{cmd} → {} :: {detail}", o.status))
+        }
         Err(e) => Some(format!("{cmd} → {e}")),
     }
 }

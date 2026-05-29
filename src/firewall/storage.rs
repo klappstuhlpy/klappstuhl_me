@@ -141,6 +141,60 @@ pub async fn create_rule(state: &AppState, rule: NewRule) -> rusqlite::Result<i6
         .await
 }
 
+/// Insert a rule that was imported from the live backend ruleset.  Unlike
+/// [`create_rule`] this also records `meta_json` so the sync reconciler can
+/// recognise (and later prune) rows it owns.
+pub async fn create_imported_rule(
+    state: &AppState,
+    rule: NewRule,
+    meta_json: String,
+) -> rusqlite::Result<i64> {
+    state
+        .database()
+        .call(move |conn| -> rusqlite::Result<i64> {
+            conn.execute(
+                "INSERT INTO firewall_rule
+                   (action, direction, proto, source, port, country,
+                    rate_per_s, note, enabled, meta_json)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                rusqlite::params![
+                    rule.action,
+                    rule.direction,
+                    rule.proto,
+                    rule.source,
+                    rule.port,
+                    rule.country,
+                    rule.rate_per_s,
+                    rule.note,
+                    if rule.enabled { 1 } else { 0 },
+                    meta_json,
+                ],
+            )?;
+            Ok(conn.last_insert_rowid())
+        })
+        .await
+}
+
+/// List rows previously imported from ufw, returning `(id, meta_json)` so the
+/// reconciler can compare signatures and prune stale entries.
+pub async fn list_imported_ufw(
+    state: &AppState,
+) -> rusqlite::Result<Vec<(i64, Option<String>)>> {
+    state
+        .database()
+        .call(|conn| -> rusqlite::Result<Vec<(i64, Option<String>)>> {
+            let mut stmt = conn.prepare_cached(
+                "SELECT id, meta_json FROM firewall_rule
+                 WHERE meta_json LIKE '%\"source\":\"ufw\"%'",
+            )?;
+            let rows: rusqlite::Result<Vec<_>> = stmt
+                .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, Option<String>>(1)?)))?
+                .collect();
+            rows
+        })
+        .await
+}
+
 pub async fn delete_rule(state: &AppState, id: i64) -> rusqlite::Result<usize> {
     state
         .database()
