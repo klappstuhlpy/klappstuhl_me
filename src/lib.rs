@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod auth;
+pub mod backup;
 pub mod cached;
 pub mod docker;
 pub mod firewall;

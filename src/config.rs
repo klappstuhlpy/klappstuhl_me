@@ -174,6 +174,14 @@ pub struct Config {
     /// `"caddy reload --config /etc/caddy/Caddyfile"`. Skipped when unset.
     #[serde(default)]
     pub proxy_reload_command: Option<String>,
+    /// Hours between automatic SQLite backups (`VACUUM INTO`). `0` disables
+    /// the scheduler. Defaults to 24 when unset.
+    #[serde(default)]
+    pub backup_interval_hours: Option<u64>,
+    /// Number of automatic backups to retain; older ones are pruned.
+    /// Defaults to 14 when unset.
+    #[serde(default)]
+    pub backup_keep: Option<usize>,
     /// The secret key used for all crypto related functionality in the server.
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
@@ -201,6 +209,8 @@ impl Config {
             proxy_config_dir: None,
             proxy_kind: None,
             proxy_reload_command: None,
+            backup_interval_hours: None,
+            backup_keep: None,
             secret_key: SecretKey::random()?,
         })
     }

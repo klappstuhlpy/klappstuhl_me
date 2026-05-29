@@ -139,6 +139,9 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // Firewall lockout reaper.
     klappstuhl_me::firewall::spawn_workers(state.clone());
 
+    // Scheduled SQLite backups (VACUUM INTO) + retention pruning.
+    klappstuhl_me::backup::spawn_scheduler(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()

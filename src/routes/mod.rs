@@ -14,6 +14,7 @@ use crate::{AppState};
 mod admin;
 mod audit;
 mod auth;
+mod backups;
 mod docker;
 mod firewall;
 mod health;
@@ -90,7 +91,20 @@ pub fn all() -> Router<AppState> {
         .merge(health::routes())
         .merge(proxy::routes())
         .merge(sanitizer::routes())
+        .merge(backups::routes())
         .merge(spotlight::routes())
         .merge(ws::routes())
         .nest("/api", api::routes())
+}
+
+#[cfg(test)]
+mod tests {
+    /// Building the whole router exercises matchit's route registration,
+    /// which panics on conflicting paths (e.g. a static segment overlapping a
+    /// `:param` on axum 0.7). This catches such conflicts as a test failure
+    /// rather than at server start-up.
+    #[test]
+    fn full_router_builds() {
+        let _ = super::all();
+    }
 }
