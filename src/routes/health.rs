@@ -33,6 +33,88 @@ struct AdminHealthTemplate {
     active_page: &'static str,
 }
 
+// ─── Public status page ─────────────────────────────────────────────────────
+
+/// A monitor as shown on the public status page. Deliberately omits the raw
+/// target address, kind config, and any internal detail — only the display
+/// name and a coarse status/uptime are exposed.
+struct PublicService {
+    name: String,
+    /// Machine status used as a CSS class: `up`, `down`, `degraded`, `unknown`.
+    status: String,
+    status_label: &'static str,
+    uptime: String,
+    last_check: String,
+}
+
+#[derive(Template)]
+#[template(path = "status.html")]
+struct StatusTemplate {
+    account: Option<Account>,
+    services: Vec<PublicService>,
+    overall: &'static str,
+    overall_label: &'static str,
+    up: usize,
+    total: usize,
+}
+
+fn status_label(status: &str) -> &'static str {
+    match status {
+        "up" => "Operational",
+        "degraded" => "Degraded",
+        "down" => "Down",
+        _ => "Unknown",
+    }
+}
+
+/// Public, unauthenticated uptime status page built from the health monitors.
+async fn status_page(
+    State(state): State<AppState>,
+    account: Option<Account>,
+) -> Result<StatusTemplate, StatusCode> {
+    let summaries = health::storage::list_summaries(&state)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut services = Vec::new();
+    let (mut up, mut down, mut degraded) = (0usize, 0usize, 0usize);
+    for s in summaries.into_iter().filter(|s| s.target.enabled) {
+        let status = s.last_status.clone().unwrap_or_else(|| "unknown".to_string());
+        match status.as_str() {
+            "up" => up += 1,
+            "down" => down += 1,
+            "degraded" => degraded += 1,
+            _ => {}
+        }
+        let last_check = s
+            .last_check
+            .and_then(|t| t.format(&time::format_description::well_known::Rfc3339).ok())
+            .unwrap_or_else(|| "—".to_string());
+        services.push(PublicService {
+            name: s.target.name,
+            status_label: status_label(&status),
+            status,
+            uptime: format!("{:.2}%", s.uptime_24h),
+            last_check,
+        });
+    }
+
+    let total = services.len();
+    let (overall, overall_label) = if total == 0 {
+        ("unknown", "No monitors configured")
+    } else if down > 0 {
+        ("down", "Major outage")
+    } else if degraded > 0 {
+        ("degraded", "Degraded performance")
+    } else if up == total {
+        ("up", "All systems operational")
+    } else {
+        ("unknown", "Status unknown")
+    };
+
+    Ok(StatusTemplate { account, services, overall, overall_label, up, total })
+}
+
 async fn page(account: Account) -> Result<AdminHealthTemplate, StatusCode> {
     if !account.flags.is_admin() {
         return Err(StatusCode::FORBIDDEN);
@@ -327,6 +409,7 @@ async fn check_now(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .route("/status", get(status_page))
         .route("/admin/health", get(page))
         .route("/admin/health/data", get(data))
         .route("/admin/health/incidents", get(incidents))

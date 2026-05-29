@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+
+{% block title %}Status | Klappstuhl.me{% endblock %}
+
+{% block css %}
+<link href="/static/status.css" rel="stylesheet">
+<meta property="og:title" content="Status | Klappstuhl.me">
+{% endblock %}
+
+{% block body %}
+<section class="status">
+    <header class="status-banner {{ overall }}">
+        <span class="status-dot"></span>
+        <div>
+            <h1>{{ overall_label }}</h1>
+            {% if total > 0 %}
+            <p class="status-sub">{{ up }} of {{ total }} services operational</p>
+            {% endif %}
+        </div>
+    </header>
+
+    {% if services.is_empty() %}
+    <p class="status-empty">No public monitors are configured yet.</p>
+    {% else %}
+    <ul class="status-list">
+        {% for s in services %}
+        <li class="status-row" title="Last checked: {{ s.last_check }}">
+            <span class="status-dot {{ s.status }}"></span>
+            <span class="status-name">{{ s.name }}</span>
+            <span class="status-uptime" title="24h uptime">{{ s.uptime }}</span>
+            <span class="status-badge {{ s.status }}">{{ s.status_label }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+    <p class="status-foot">Uptime shown is for the last 24 hours.</p>
+    {% endif %}
+</section>
+{% endblock %}

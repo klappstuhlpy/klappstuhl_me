@@ -85,6 +85,7 @@ fn static_pages() -> Vec<SpotlightItem> {
         SpotlightItem::page("Images",       "Uploaded image gallery",          "/images"),
         SpotlightItem::page("Account",      "Profile, API tokens, settings",   "/account"),
         SpotlightItem::page("API Docs",     "OpenAPI 3.0 reference (Scalar)",  "/api/docs"),
+        SpotlightItem::page("Status",       "Public uptime / service status",  "/status"),
         SpotlightItem::page("Login",        "Sign in to your account",         "/login"),
     ]
 }
