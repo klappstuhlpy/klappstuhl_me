@@ -58,14 +58,14 @@ function renderRules(rows) {
     }
     tbody.innerHTML = rows.map(r => {
         return `<tr data-id="${r.id}">
-            <td><span class="action-pill ${r.action}">${r.action.replace('_', ' ')}</span></td>
+            <td><span class="pill ${r.action}">${r.action.replace('_', ' ')}</span></td>
             <td>${escapeHtml(r.source || "any")}</td>
             <td>${r.port ?? "any"}</td>
             <td>${r.proto}</td>
             <td>${escapeHtml(r.country || "")}</td>
             <td>${r.rate_per_s ? r.rate_per_s + "/s" : ""}</td>
             <td>${escapeHtml(r.note || "")}</td>
-            <td>${r.enabled ? '<span class="status-pill up">enabled</span>' : '<span class="status-pill pending">disabled</span>'}</td>
+            <td>${r.enabled ? '<span class="pill dot up">enabled</span>' : '<span class="pill dot pending">disabled</span>'}</td>
             <td><div class="row-actions">
                 <button class="button outline" data-action="toggle">${r.enabled ? "Disable" : "Enable"}</button>
                 <button class="button danger" data-action="delete">Delete</button>
@@ -92,7 +92,7 @@ function renderLockouts(rows) {
     }
     tbody.innerHTML = rows.map(l => {
         return `<tr data-id="${l.id}">
-            <td><span class="status-pill ${l.status === 'active' ? 'down' : 'pending'}">${l.status}</span></td>
+            <td><span class="pill dot ${l.status === 'active' ? 'down' : 'pending'}">${l.status}</span></td>
             <td>${escapeHtml(l.ip)}</td>
             <td>${escapeHtml(l.reason)}</td>
             <td>${fmtNumber(l.hit_count)}</td>

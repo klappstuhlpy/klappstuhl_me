@@ -532,3 +532,65 @@ td.error {
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
+
+/* ── Status / severity pill ───────────────────────────────────────
+   Shared inline status indicator. Replaces the near-identical
+   .status-pill (SSH/health), .sev-pill (secrets), .action-pill
+   (firewall) and .san-badge (sanitizer) definitions, which each carried
+   their own copy of these declarations. The colour modifiers keep the
+   original variant names so the JS that renders them is unchanged; add
+   .dot for a leading status dot, .na for a borderless placeholder. */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--box-border);
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    color: var(--text-muted);
+    background: var(--box-shade);
+    text-decoration: none;
+}
+
+a.pill:hover { opacity: 0.85; }
+
+/* Colour variants — grouped so each semantic triplet is written once. */
+.pill.active,
+.pill.up,
+.pill.allow,
+.pill.clean    { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
+
+.pill.down,
+.pill.critical,
+.pill.deny,
+.pill.infected { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
+
+.pill.degraded,
+.pill.high,
+.pill.rate_limit,
+.pill.error    { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
+
+.pill.medium,
+.pill.geo_block { color: var(--info-text);   border-color: var(--info-border);    background: var(--info-bg); }
+
+.pill.revoked,
+.pill.pending,
+.pill.unknown  { color: var(--text-muted);   border-color: var(--box-border);     background: var(--box-shade); }
+
+.pill.na { border-color: transparent; background: transparent; }
+
+/* Leading status dot (health checks / firewall + proxy state). */
+.pill.dot::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+    display: inline-block;
+    flex-shrink: 0;
+}

@@ -344,6 +344,12 @@ input[type="checkbox"]:checked::after {
     opacity: 0.9;
 }
 
+/* Compact button modifier (toolbars, table actions, drawers). */
+.button.small {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+}
+
 /* ── Tables ──────────────────────────────────────────────────── */
 
 table {

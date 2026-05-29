@@ -184,29 +184,9 @@
     margin-bottom: 1rem;
 }
 
-/* ── Scan result badges (also used in table) ────────────────── */
-
-.san-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.1rem 0.5rem;
-    font-size: 0.68rem;
-    font-weight: 700;
-    border-radius: 9999px;
-    border: 1px solid;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-    text-decoration: none;
-}
-
-.san-badge.clean    { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
-.san-badge.infected { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
-.san-badge.unknown  { color: var(--text-muted);   border-color: var(--box-border);     background: var(--box-shade); }
-.san-badge.error    { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
-.san-badge.na       { color: var(--text-muted);   border-color: transparent;           background: transparent; }
-
-a.san-badge:hover { opacity: 0.85; }
+/* ── Scan result badges (also used in table) ───────────────────
+   Use the shared .pill base in admin.css; the JS renders them as
+   `pill clean|infected|unknown|error|na`. */
 
 /* ── History table ──────────────────────────────────────────── */
 

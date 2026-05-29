@@ -68,7 +68,7 @@ function renderFindings(rows) {
             : `<button class="button outline" data-id="${r.id}" data-status="open">Reopen</button>`;
 
         return `<tr>
-            <td><span class="sev-pill ${sevCls}">${sevCls}</span></td>
+            <td><span class="pill ${sevCls}">${sevCls}</span></td>
             <td>${escapeHtml(r.rule)}</td>
             <td><div class="finding-file"><code>${escapeHtml(r.file_path)}</code>
                 <span class="line">:${r.line}</span></div></td>

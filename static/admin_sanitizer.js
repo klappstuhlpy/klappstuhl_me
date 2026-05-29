@@ -33,29 +33,29 @@
     // ── Result badges ─────────────────────────────────────────────────────────
 
     function clamBadge(clean, virus) {
-        if (clean === null || clean === undefined) return '<span class="san-badge na">—</span>';
-        if (clean === 1) return '<span class="san-badge clean">Clean</span>';
-        return `<span class="san-badge infected" title="${escHtml(virus || '')}">Infected</span>`;
+        if (clean === null || clean === undefined) return '<span class="pill na">—</span>';
+        if (clean === 1) return '<span class="pill clean">Clean</span>';
+        return `<span class="pill infected" title="${escHtml(virus || '')}">Infected</span>`;
     }
 
     function vtBadge(status, positives, total, url) {
-        if (!status) return '<span class="san-badge na">—</span>';
+        if (!status) return '<span class="pill na">—</span>';
         if (status === 'clean') {
             const label = total ? `${positives}/${total}` : 'Clean';
             const tag = url
-                ? `<a href="${escHtml(url)}" target="_blank" rel="noopener" class="san-badge clean">${label}</a>`
-                : `<span class="san-badge clean">${label}</span>`;
+                ? `<a href="${escHtml(url)}" target="_blank" rel="noopener" class="pill clean">${label}</a>`
+                : `<span class="pill clean">${label}</span>`;
             return tag;
         }
         if (status === 'detected') {
             const label = total ? `${positives}/${total}` : 'Detected';
             const tag = url
-                ? `<a href="${escHtml(url)}" target="_blank" rel="noopener" class="san-badge infected">${label}</a>`
-                : `<span class="san-badge infected">${label}</span>`;
+                ? `<a href="${escHtml(url)}" target="_blank" rel="noopener" class="pill infected">${label}</a>`
+                : `<span class="pill infected">${label}</span>`;
             return tag;
         }
-        if (status === 'unknown') return '<span class="san-badge unknown">Not in VT</span>';
-        return '<span class="san-badge error">Error</span>';
+        if (status === 'unknown') return '<span class="pill unknown">Not in VT</span>';
+        return '<span class="pill error">Error</span>';
     }
 
     // ── Drop zone ─────────────────────────────────────────────────────────────

@@ -14,22 +14,8 @@
     margin-left: 0.4rem;
 }
 
-.action-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.05rem 0.55rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    border-radius: 9999px;
-    border: 1px solid;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.action-pill.allow      { color: var(--success-text, #34d399); border-color: var(--success-border, #065f46); background: var(--success-bg, rgba(16,185,129,0.12)); }
-.action-pill.deny       { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
-.action-pill.rate_limit { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
-.action-pill.geo_block  { color: var(--info-text);    border-color: var(--info-border);    background: var(--info-bg); }
+/* Rule-action pills use the shared .pill base in admin.css; the JS
+   renders them as `pill allow|deny|rate_limit|geo_block`. */
 
 .lockout-controls {
     margin: 0.4rem 0 0.8rem;

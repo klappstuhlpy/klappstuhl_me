@@ -50,7 +50,7 @@ function renderRoutes(rows) {
             <td>${yn(r.cloudflare_proxied)}</td>
             <td>${yn(r.has_auth)}</td>
             <td>${r.rate_limit_rps ? r.rate_limit_rps + "/s" : "—"}</td>
-            <td>${r.enabled ? '<span class="status-pill up">enabled</span>' : '<span class="status-pill pending">disabled</span>'}</td>
+            <td>${r.enabled ? '<span class="pill dot up">enabled</span>' : '<span class="pill dot pending">disabled</span>'}</td>
             <td><div class="row-actions">
                 <button class="button outline" data-action="edit">Edit</button>
                 <button class="button outline" data-action="toggle">${r.enabled ? "Disable" : "Enable"}</button>

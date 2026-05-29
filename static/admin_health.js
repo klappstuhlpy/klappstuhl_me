@@ -82,7 +82,7 @@ function renderTargets(rows) {
             : "";
 
         return `<tr data-id="${r.id}">
-            <td><span class="status-pill ${statusCls}">${escapeHtml(status)}</span></td>
+            <td><span class="pill dot ${statusCls}">${escapeHtml(status)}</span></td>
             <td>
                 <strong>${escapeHtml(r.name)}</strong>
                 ${!r.enabled ? '<span class="muted" style="margin-left:.4rem">(disabled)</span>' : ''}
@@ -127,7 +127,7 @@ function renderIncidents(summaries) {
         tbody.innerHTML = rows.map(i => {
             const ongoing = !i.ended_at;
             return `<tr>
-                <td><span class="status-pill ${i.status}">${escapeHtml(i.status)}</span></td>
+                <td><span class="pill dot ${i.status}">${escapeHtml(i.status)}</span></td>
                 <td>${escapeHtml(i.target_name || ("#" + i.target_id))}</td>
                 <td title="${escapeHtml(i.started_at)}">${fmtRelative(i.started_at)}</td>
                 <td>${ongoing ? '<span class="ongoing">ongoing</span>' : fmtRelative(i.ended_at)}</td>

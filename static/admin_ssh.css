@@ -86,30 +86,11 @@
     color: var(--text-muted);
 }
 
-.status-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.1rem 0.5rem;
-    font-size: 0.68rem;
-    font-weight: 600;
-    border-radius: 9999px;
-    border: 1px solid;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-}
+/* Status pills use the shared .pill base in admin.css
+   (.pill.active / .pill.revoked). */
 
-.status-pill.active  { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
-.status-pill.revoked { color: var(--text-muted);   border-color: var(--box-border);     background: var(--box-shade); }
-
-/* .row-actions and .row-actions .button live in admin.css. */
-
-/* ── Shared small button modifier ───────────────────────────── */
-
-.button.small {
-    padding: 0.2rem 0.55rem;
-    font-size: 0.75rem;
-}
+/* .row-actions and .row-actions .button live in admin.css.
+   .button.small lives in base.css. */
 
 /* ── Section header with inline action button ───────────────── */
 

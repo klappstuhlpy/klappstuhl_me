@@ -10,34 +10,8 @@
     margin: 1.25rem 0 0.5rem 0;
 }
 
-/* Status pill — visual parity with .sev-pill from admin_secrets. */
-.status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.1rem 0.55rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    border-radius: 9999px;
-    border: 1px solid;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-}
-
-.status-pill.up        { color: var(--success-text, #34d399); border-color: var(--success-border, #065f46); background: var(--success-bg, rgba(16,185,129,0.12)); }
-.status-pill.degraded  { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
-.status-pill.down      { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
-.status-pill.pending   { color: var(--text-muted);   border-color: var(--box-border);     background: var(--box-shade); }
-
-.status-pill::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: currentColor;
-    display: inline-block;
-}
+/* Status pills use the shared .pill base in admin.css; the JS renders
+   them as `pill dot up|degraded|down|pending`. */
 
 .health-target {
     font-family: monospace;

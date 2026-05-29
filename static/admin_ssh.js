@@ -296,7 +296,7 @@ function renderKeys(keys) {
             targetCell.textContent = k.target_user;
         } else {
             targetCell = document.createElement("span");
-            targetCell.className = "status-pill revoked";
+            targetCell.className = "pill revoked";
             targetCell.title = "Legacy key with no target_user — not synced to any authorized_keys file. Re-add to fix.";
             targetCell.textContent = "not synced";
         }
@@ -313,7 +313,7 @@ function renderKeys(keys) {
 
         // ── Cell 7: status pill ──
         const statusCell = document.createElement("span");
-        statusCell.className = "status-pill " + (isActive ? "active" : "revoked");
+        statusCell.className = "pill " + (isActive ? "active" : "revoked");
         statusCell.textContent = isActive ? "Active" : "Revoked";
 
         // ── Cell 8: action buttons ──
@@ -491,7 +491,7 @@ function renderTokens(tokens) {
 
         // ── Cell 6: status ──
         const statusCell = document.createElement("span");
-        statusCell.className = "status-pill " + (isActive ? "active" : "revoked");
+        statusCell.className = "pill " + (isActive ? "active" : "revoked");
         statusCell.textContent = isActive ? "Active" : "Revoked";
 
         // ── Cell 7: actions ──
