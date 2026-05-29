@@ -8,6 +8,16 @@ Klappstuhl.me uses API keys to allow access to the API. Authentication is done u
 
 If you have not generated an API key yet, you can do so on your [account page](/account).
 
+### Endpoint groups
+
+- **Images** — upload, delete, and bulk-download your hosted images.
+- **Media** — apply visual effects (`/api/image/{op}`) or transcode between
+  raster formats (`/api/convert`). Each accepts either a multipart `file`
+  upload or a public image `url` that the server fetches on your behalf
+  (private/reserved addresses are refused).
+- **Scan** — check an uploaded file for malware via ClamAV and VirusTotal
+  (`/api/scan`).
+
 ### Rate Limits
 
 Rate limits are enforced at an IP level to prevent abuse and spam on the service. When a rate limit is hit, an HTTP 429 status code is returned with some header information telling you how to proceed.

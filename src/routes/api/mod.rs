@@ -1,5 +1,7 @@
 mod auth;
 mod images;
+mod media;
+mod scan;
 pub mod utils;
 
 use crate::{models::Account, ratelimit::RateLimit, AppState};
@@ -35,6 +37,9 @@ pub use auth::{copy_api_token, ApiToken};
         images::upload_files,
         images::delete_image_by_id,
         images::download_images,
+        media::manipulate_image,
+        media::convert_file,
+        scan::scan_file,
     ),
     components(
         schemas(
@@ -43,12 +48,15 @@ pub use auth::{copy_api_token, ApiToken};
             crate::routes::image::UploadResult,
             crate::routes::image::DeleteResult,
             crate::routes::image::BulkFilesPayload,
+            crate::scan::ScanReport,
         ),
         responses(utils::RateLimitResponse),
     ),
     modifiers(&RequiredAuthentication),
     tags(
-        (name = "images", description = "Endpoints for uploading/deleting and getting images at the server.")
+        (name = "images", description = "Endpoints for uploading/deleting and getting images at the server."),
+        (name = "media", description = "Image manipulation and format conversion. Accepts a `file` upload or a public image `url`."),
+        (name = "scan", description = "Scan uploaded files for malware via ClamAV and VirusTotal.")
     )
 )]
 pub struct Schema;
@@ -85,13 +93,32 @@ async fn docs(State(state): State<AppState>, account: Option<Account>) -> ApiDoc
     ApiDocumentation { api_key }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn openapi_spec_builds_with_new_paths() {
+        // utoipa assembles the document at runtime; this catches duplicate
+        // operation ids or malformed path specs that compile but panic.
+        let spec = Schema::openapi();
+        let paths = &spec.paths.paths;
+        for expected in ["/api/scan", "/api/convert", "/api/image/{op}"] {
+            assert!(paths.contains_key(expected), "missing {expected} in OpenAPI spec");
+        }
+    }
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/openapi.json", get(spec))
         .route("/docs", get(docs))
         .route("/images/upload", post(images::upload_files))
         .route("/images/download", post(images::download_images))
-        .route("/images/{id}", delete(images::delete_image_by_id))
+        .route("/images/:id", delete(images::delete_image_by_id))
+        .route("/scan", post(scan::scan_file))
+        .route("/image/:op", post(media::manipulate_image))
+        .route("/convert", post(media::convert_file))
         .route_layer(RateLimit::default().quota(25, 60.0).build())
         .route_layer(
             CorsLayer::new()

@@ -21,6 +21,7 @@ pub mod postgres;
 pub mod proxy;
 pub mod ratelimit;
 pub mod routes;
+pub mod scan;
 pub mod scope;
 pub mod secrets;
 pub mod ssh;

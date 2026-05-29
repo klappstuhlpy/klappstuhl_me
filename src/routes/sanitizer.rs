@@ -5,8 +5,6 @@
 //! GET    /admin/sanitizer/history  — JSON scan history
 //! DELETE /admin/sanitizer/:id      — delete a history entry
 
-use std::time::Duration;
-
 use crate::{boxed_params, database::Table, headers::ClientIp, models::Account, AppState};
 use askama::Template;
 use axum::{
@@ -17,10 +15,7 @@ use axum::{
     Router,
 };
 use serde::Serialize;
-use sha2::{Digest, Sha256};
-use std::fmt::Write as FmtWrite;
 use time::OffsetDateTime;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 // ─── Model ───────────────────────────────────────────────────────────────────
 
@@ -182,56 +177,22 @@ async fn scan(
         }
     };
 
-    let file_size = data.len() as i64;
-    let sha256 = {
-        let digest = Sha256::digest(&data);
-        let mut s = String::with_capacity(64);
-        for b in digest.iter() { write!(&mut s, "{b:02x}").unwrap(); }
-        s
-    };
+    // ── Scan (ClamAV + VirusTotal) ─────────────────────────────────────────────
 
-    // ── ClamAV ───────────────────────────────────────────────────────────────
-
-    let (clamav_clean, clamav_virus) =
-        if let Some(addr) = state.config().clamav_addr.as_deref() {
-            match tokio::time::timeout(Duration::from_secs(60), clamav_scan(addr, &data)).await {
-                Ok(Ok(ClamResult::Clean)) => (Some(1i64), None),
-                Ok(Ok(ClamResult::Found(v))) => (Some(0i64), Some(v)),
-                Ok(Err(e)) => {
-                    tracing::warn!(error = %e, "ClamAV scan error");
-                    (None, Some(format!("scan error: {e}")))
-                }
-                Err(_) => (None, Some("scan timed out".into())),
-            }
-        } else {
-            (None, None)
-        };
-
-    // ── VirusTotal ───────────────────────────────────────────────────────────
-
-    let (vt_status, vt_positives, vt_total, vt_url) =
-        if let Some(key) = state.config().virustotal_api_key.as_deref() {
-            match tokio::time::timeout(
-                Duration::from_secs(30),
-                vt_lookup(&state.client, key, &sha256),
-            )
-            .await
-            {
-                Ok(Ok(VtResult::Clean { positives, total, url })) =>
-                    (Some("clean".to_owned()), Some(positives), Some(total), Some(url)),
-                Ok(Ok(VtResult::Detected { positives, total, url })) =>
-                    (Some("detected".to_owned()), Some(positives), Some(total), Some(url)),
-                Ok(Ok(VtResult::Unknown)) =>
-                    (Some("unknown".to_owned()), None, None, None),
-                Ok(Err(e)) => {
-                    tracing::warn!(error = %e, "VirusTotal lookup error");
-                    (Some("error".to_owned()), None, None, None)
-                }
-                Err(_) => (Some("error".to_owned()), None, None, None),
-            }
-        } else {
-            (None, None, None, None)
-        };
+    let report = crate::scan::scan_bytes(&state, &data).await;
+    let crate::scan::ScanReport {
+        sha256,
+        file_size,
+        clamav_clean,
+        clamav_virus,
+        vt_status,
+        vt_positives,
+        vt_total,
+        vt_url,
+        verdict: overall,
+    } = report;
+    // The file_scan table stores clamav_clean as an INTEGER (1/0/NULL).
+    let clamav_clean = clamav_clean.map(|b| b as i64);
 
     // ── Persist ──────────────────────────────────────────────────────────────
 
@@ -264,16 +225,9 @@ async fn scan(
         }
     };
 
-    // Derive a coarse overall verdict so the audit-log "meta" column has a
-    // single field an operator can scan visually, plus the per-backend
-    // detail underneath. Keys mirror the JSON returned to the client.
-    let overall = if clamav_clean == Some(0) || vt_status.as_deref() == Some("detected") {
-        "infected"
-    } else if clamav_clean == Some(1) || vt_status.as_deref() == Some("clean") {
-        "clean"
-    } else {
-        "unknown"
-    };
+    // `overall` (the coarse verdict) comes from the shared scanner; it gives
+    // the audit-log "meta" column a single field an operator can scan
+    // visually, plus the per-backend detail underneath.
     state.audit("sanitizer.scan")
         .actor(&account)
         .target(filename.clone())
@@ -302,95 +256,6 @@ async fn scan(
         "vt_total": vt_total,
         "vt_url": vt_url,
     })).into_response()
-}
-
-// ─── ClamAV client ────────────────────────────────────────────────────────────
-
-enum ClamResult {
-    Clean,
-    Found(String),
-}
-
-async fn clamav_scan(addr: &str, data: &[u8]) -> anyhow::Result<ClamResult> {
-    let mut sock = tokio::net::TcpStream::connect(addr)
-        .await
-        .map_err(|e| anyhow::anyhow!("connect to clamd ({addr}): {e}"))?;
-
-    sock.write_all(b"zINSTREAM\0").await?;
-
-    const CHUNK: usize = 65536;
-    for chunk in data.chunks(CHUNK) {
-        let len = chunk.len() as u32;
-        sock.write_all(&len.to_be_bytes()).await?;
-        sock.write_all(chunk).await?;
-    }
-    sock.write_all(&[0u8; 4]).await?;
-
-    let mut resp = Vec::with_capacity(64);
-    sock.read_to_end(&mut resp).await?;
-
-    let resp = std::str::from_utf8(&resp)
-        .unwrap_or("")
-        .trim_end_matches('\0')
-        .trim()
-        .to_owned();
-
-    if resp.ends_with(": OK") {
-        Ok(ClamResult::Clean)
-    } else if resp.ends_with(" FOUND") {
-        let virus = resp
-            .strip_prefix("stream: ")
-            .and_then(|s| s.strip_suffix(" FOUND"))
-            .unwrap_or(&resp)
-            .to_owned();
-        Ok(ClamResult::Found(virus))
-    } else {
-        Err(anyhow::anyhow!("unexpected clamd response: {resp}"))
-    }
-}
-
-// ─── VirusTotal client ────────────────────────────────────────────────────────
-
-enum VtResult {
-    Clean    { positives: i64, total: i64, url: String },
-    Detected { positives: i64, total: i64, url: String },
-    Unknown,
-}
-
-async fn vt_lookup(
-    client: &reqwest::Client,
-    api_key: &str,
-    sha256: &str,
-) -> anyhow::Result<VtResult> {
-    let url = format!("https://www.virustotal.com/api/v3/files/{sha256}");
-    let resp = client
-        .get(&url)
-        .header("x-apikey", api_key)
-        .send()
-        .await?;
-
-    if resp.status() == reqwest::StatusCode::NOT_FOUND {
-        return Ok(VtResult::Unknown);
-    }
-    if !resp.status().is_success() {
-        return Err(anyhow::anyhow!("VT API returned {}", resp.status()));
-    }
-
-    let json: serde_json::Value = resp.json().await?;
-    let stats      = &json["data"]["attributes"]["last_analysis_stats"];
-    let malicious  = stats["malicious"].as_i64().unwrap_or(0);
-    let suspicious = stats["suspicious"].as_i64().unwrap_or(0);
-    let harmless   = stats["harmless"].as_i64().unwrap_or(0);
-    let undetected = stats["undetected"].as_i64().unwrap_or(0);
-    let total      = malicious + suspicious + harmless + undetected;
-    let positives  = malicious + suspicious;
-    let vt_url     = format!("https://www.virustotal.com/gui/file/{sha256}");
-
-    if positives > 0 {
-        Ok(VtResult::Detected { positives, total, url: vt_url })
-    } else {
-        Ok(VtResult::Clean { positives, total, url: vt_url })
-    }
 }
 
 // ─── Router ──────────────────────────────────────────────────────────────────
