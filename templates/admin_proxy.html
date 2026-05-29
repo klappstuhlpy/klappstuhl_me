@@ -1,0 +1,142 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}Proxy | Admin | Klappstuhl.me{% endblock %}
+
+{% block admin_css %}
+<link rel="stylesheet" href="/static/admin_metrics.css">
+<link rel="stylesheet" href="/static/admin_health.css">
+<link rel="stylesheet" href="/static/admin_firewall.css">
+<link rel="stylesheet" href="/static/admin_proxy.css">
+{% endblock %}
+
+{% block admin_body %}
+<div class="admin-page-header">
+    <h1>Reverse Proxy <span class="backend-chip">{{ proxy_kind }}</span></h1>
+    <div style="display:flex; gap: 0.5rem;">
+        <button class="button outline" id="reapply-btn" type="button">Regenerate &amp; reload</button>
+        <button class="button primary" id="new-route-btn" type="button">+ New route</button>
+    </div>
+</div>
+
+<div class="admin-empty" id="nodir-banner" style="margin-bottom: 1rem; display:none;">
+    No <code>proxy_config_dir</code> set in <code>config.json</code>. Routes are
+    still saved here as a record of which subdomain maps to which container,
+    but no config files are written to disk. Set <code>proxy_config_dir</code>
+    (and optionally <code>proxy_kind</code> / <code>proxy_reload_command</code>)
+    to emit real nginx / Caddy config.
+</div>
+
+<div class="metric-tiles">
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Proxy</span></div>
+        <div class="tile-value tile-value-text"><span id="tile-kind">{{ proxy_kind }}</span></div>
+        <div class="tile-sub">config syntax</div>
+    </div>
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Routes</span></div>
+        <div class="tile-value"><span id="tile-routes">—</span></div>
+        <div class="tile-sub">enabled / total</div>
+    </div>
+    <div class="metric-tile">
+        <div class="tile-head"><span class="tile-label">Output dir</span></div>
+        <div class="tile-value tile-value-text"><span id="tile-dir" title="">—</span></div>
+        <div class="tile-sub">where config is written</div>
+    </div>
+</div>
+
+<section class="admin-section">
+    <h2 class="section-h">Routes</h2>
+    <div class="container-table-wrap">
+        <table class="container-table" id="routes-table">
+            <thead>
+                <tr>
+                    <th>Subdomain</th>
+                    <th>Target</th>
+                    <th>TLS</th>
+                    <th>CF</th>
+                    <th>Auth</th>
+                    <th>Rate</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ── Route modal ─────────────────────────────────────────────── -->
+<div id="route-modal" class="health-modal" hidden>
+    <div class="health-modal-card">
+        <div class="health-modal-head">
+            <h2 id="route-modal-title">New route</h2>
+            <button class="button outline" id="route-modal-close" type="button">✕</button>
+        </div>
+        <form id="route-form" autocomplete="off">
+            <input type="hidden" id="r-id">
+            <label>Subdomain
+                <input type="text" id="r-subdomain" placeholder="jellyfin.klappstuhl.me" required>
+            </label>
+            <div class="row">
+                <label>Container (optional)
+                    <select id="r-container">
+                        <option value="">— raw host:port —</option>
+                    </select>
+                </label>
+                <label>Scheme
+                    <select id="r-scheme">
+                        <option value="http">http</option>
+                        <option value="https">https</option>
+                    </select>
+                </label>
+            </div>
+            <div class="row">
+                <label>Target host
+                    <input type="text" id="r-host" placeholder="jellyfin  ·  127.0.0.1" required>
+                </label>
+                <label>Target port
+                    <input type="number" id="r-port" min="1" max="65535" placeholder="8096" required>
+                </label>
+            </div>
+            <div class="checkbox-row-group">
+                <label class="checkbox-row">
+                    <input type="checkbox" id="r-ssl" checked> Managed TLS (terminate HTTPS)
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="r-cf"> Cloudflare proxied
+                </label>
+            </div>
+            <div class="row">
+                <label>HTTP auth user (optional)
+                    <input type="text" id="r-auth-user" placeholder="admin">
+                </label>
+                <label>HTTP auth password
+                    <input type="password" id="r-auth-pass" placeholder="(blank = keep / none)">
+                </label>
+            </div>
+            <label>Rate limit (requests / second, optional)
+                <input type="number" id="r-rate" min="1" placeholder="20">
+            </label>
+            <label>Access rules (JSON, optional)
+                <input type="text" id="r-access" placeholder='{"allow":["10.0.0.0/8"],"deny":["*"]}'>
+            </label>
+            <label>Extra config (verbatim, optional)
+                <textarea id="r-extra" rows="3" placeholder="client_max_body_size 0;"></textarea>
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" id="r-enabled" checked> Enabled
+            </label>
+            <div class="modal-actions">
+                <button class="button outline" type="button" id="route-modal-cancel">Cancel</button>
+                <button class="button outline" type="button" id="route-preview-btn">Preview</button>
+                <button class="button primary" type="submit">Save route</button>
+            </div>
+            <pre id="route-preview" class="proxy-preview" hidden></pre>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/admin_proxy.js"></script>
+{% endblock %}

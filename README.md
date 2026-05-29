@@ -21,7 +21,10 @@ management, security analytics, virus scanning, and an invite-only user system.
     - Quick link to the Snapshots page.
   - **Snapshots** — point-in-time container image snapshots via `docker commit`. Capture any running container from the graph side-panel, give it an optional description; later restore it as a new named container in one click. Stored in SQLite; the committed image tag is a nanoid-generated string. Deletion removes both the DB row and the image (`docker rmi`).
   - **Metrics** — live host stats (CPU, RAM, disk usage, disk I/O, network throughput) plus per-container Docker stats. uPlot charts with selectable ranges (1h / 6h / 24h / 7d / 30d). Threshold alerts fire a Discord webhook on `OK → ALERT` transitions with a 30-minute cooldown.
+  - **Health** — internal uptime monitoring (a self-hosted Uptime-Kuma). Define targets of four kinds — **HTTP** (status-code / keyword assertions, redirect following), **TCP** (port reachability), **keyword** (substring present/absent in an HTTP body), and **SSL** (certificate expiry, with a configurable "warn N days before" threshold). A background monitor probes each target on its own interval, records latency, classifies each sample as up / degraded (slower than the per-target `degraded_ms` threshold) / down, and opens/closes incidents automatically. Per-target uptime %s (24h / 7d / 30d), average + p95 latency, an incident timeline, and a sample history sparkline. Run a probe on demand, and get a Discord webhook on down→up / up→down transitions. Old samples are pruned after 30 days.
   - **Security** — failed logins, top offending IPs (with GeoIP country/city), reason breakdown, country distribution, recent activity feed. Optional Cloudflare panels (zone analytics + WAF events) when an API token + zone ID are configured.
+  - **Firewall** — visual frontend for **nftables**, **ufw**, or **iptables** (auto-detected at startup, overridable via `firewall_backend`). Create allow / deny / rate-limit / geo-block rules (source CIDR, port, protocol, country, requests-per-second); each rule is mirrored in SQLite and applied to the kernel by shelling out to the detected backend. Manual IP lockouts with optional expiry, plus **automatic lockout** — after 8 failed logins from an IP within 10 minutes the address is blocked for an hour (driven off the existing audit log) and the block is pushed to the backend. A background reaper releases expired lockouts. "Re-apply all" re-pushes every enabled rule. When no backend binary is present the page still manages rules in the DB (handy in dev / without `NET_ADMIN`).
+  - **Proxy** — reverse-proxy / domain manager. Map a subdomain (`jellyfin.klappstuhl.me`) to an upstream container or `host:port`, pick the scheme, and toggle managed TLS, Cloudflare-proxied real-IP handling, HTTP basic auth (password hashed with bcrypt), a requests-per-second rate limit, and JSON allow/deny access rules. From the route list the server renders an nginx `server { … }` block (or a Caddyfile fragment, per `proxy_kind`) per enabled route, writes it to `proxy_config_dir/<subdomain>.conf` (plus an htpasswd sidecar for nginx auth), prunes stale managed files, and runs `proxy_reload_command`. Preview the generated config before saving. Container targets are populated from `config.services`. With no `proxy_config_dir` set, routes are still tracked in the DB as a record of which subdomain points where.
   - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI / Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
   - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, signup, password change, logout), invite create/revoke, service/snapshot/script actions, secret status changes, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
   - **Postgres** — browse databases, tables, and roles on a separate PostgreSQL server. Safe-mode query runner wraps every statement in `BEGIN TRANSACTION READ ONLY` so even a superuser credential can't accidentally mutate state; explicit danger-mode toggle for `INSERT` / `UPDATE` / `DELETE` / DDL when needed. Every query writes an audit entry (including blocked-by-safe-mode attempts).
@@ -106,7 +109,11 @@ A default `config.json` is written on first start. Full layout with all optional
   "clamav_addr": null,
   "virustotal_api_key": null,
   "spotlight_scripts": [],
-  "sshd_auth_log_path": null
+  "sshd_auth_log_path": null,
+  "firewall_backend": null,
+  "proxy_config_dir": null,
+  "proxy_kind": null,
+  "proxy_reload_command": null
 }
 ```
 
@@ -128,6 +135,10 @@ A default `config.json` is written on first start. Full layout with all optional
 | `virustotal_api_key`     | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.              |
 | `spotlight_scripts`      | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                        |
 | `sshd_auth_log_path`     | string \| null    | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below. |
+| `firewall_backend`       | string \| null    | Force the firewall backend: `"nftables"`, `"ufw"`, `"iptables"`, or `"disabled"`. Unset = auto-detect by probing each binary. `"disabled"` keeps the UI but issues no kernel commands. See below. |
+| `proxy_config_dir`       | string \| null    | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy). Unset = DB-only, nothing written to disk. See below. |
+| `proxy_kind`             | string \| null    | Config syntax to emit: `"nginx"` (default) or `"caddy"`.                                        |
+| `proxy_reload_command`   | string \| null    | Shell command run after config is regenerated, e.g. `"nginx -s reload"` or `"systemctl reload nginx"`. Skipped when unset. |
 
 ### Docker services configuration
 
@@ -278,6 +289,57 @@ If the host runs systemd-only (no rsyslog / no `/var/log/auth.log`), the simples
 
 Unknown / revoked fingerprints in the log are ignored at DEBUG level — a noisy log from brute-force attempts will not flood the audit table.
 
+### Firewall backend
+
+`/admin/firewall` auto-detects a packet-filter backend at startup by probing
+`nft`, then `ufw`, then `iptables` (the first one whose status command succeeds
+wins). Set `firewall_backend` to pin a specific one, or `"disabled"` to keep the
+UI working without touching the kernel — rule edits still persist to SQLite so
+the page is usable in dev or in a container started without `--cap-add=NET_ADMIN`.
+
+Applying rules and lockouts shells out to the backend, which needs root or
+`CAP_NET_ADMIN`. If `sudo` is present the commands are prefixed with `sudo -n`
+(non-interactive); otherwise the process must already be privileged. Each rule
+create / toggle / delete and every lockout is recorded in the audit log
+(`firewall.rule.*`, `firewall.lockout.*`, `firewall.apply_all`).
+
+Automatic lockout reads the existing `auth.login.fail` audit entries: 8 failures
+from one IP within 10 minutes triggers a 1-hour block (`firewall.lockout.auto`).
+A background task releases expired lockouts every minute and removes the
+corresponding kernel rule. nftables lockouts assume an `inet filter` table with
+an `input` chain.
+
+### Reverse proxy / domain manager
+
+`/admin/proxy` keeps a row per managed subdomain in SQLite and (optionally)
+renders real proxy config from it. Set `proxy_config_dir` to the directory your
+proxy includes route files from, `proxy_kind` to `"nginx"` (default) or
+`"caddy"`, and `proxy_reload_command` to whatever reloads the proxy:
+
+```json
+"proxy_config_dir": "/etc/nginx/conf.d",
+"proxy_kind": "nginx",
+"proxy_reload_command": "nginx -s reload"
+```
+
+On any route change (and via the "Regenerate & reload" button) the server writes
+one file per enabled route — `<subdomain>.conf` for nginx, `<subdomain>.caddy`
+for Caddy — prunes managed files that no longer map to an enabled route (only
+files carrying the `# Managed by klappstuhl.me` marker are removed, so
+hand-written config sharing the directory is left alone), then runs the reload
+command. For nginx routes with HTTP basic auth an `<subdomain>.htpasswd` sidecar
+is written alongside and referenced via `auth_basic_user_file`; Caddy embeds the
+bcrypt hash inline. Use the per-route **Preview** to see the exact output before
+it touches disk.
+
+The emitted nginx config references conventional certbot cert paths
+(`/etc/letsencrypt/live/<subdomain>/…`) and, for rate limits, a `limit_req_zone`
+you must declare once in the `http {}` block (the per-route `limit_req` line and
+a commented template are emitted for you). Anything in the route's **Extra
+config** field is appended verbatim inside the server/site block. When
+`proxy_config_dir` is unset the page is purely a record-keeping view — no files
+are written. All changes are audited (`proxy.route.*`, `proxy.apply`).
+
 ## Metric alert thresholds
 
 Hard-coded (`src/metrics/alerts.rs`). On the `OK → ALERT` transition, a red Discord embed fires via `discord_webhook_url` with a 30-minute cooldown per metric:
@@ -330,18 +392,24 @@ src/
 ├── config.rs         — Config struct + JSON load/save
 ├── database.rs       — async SQLite worker pool with prepared-stmt cache
 ├── docker.rs         — bollard Docker client wrapper + event watcher background task
+├── firewall/         — Firewall backend abstraction (nft/ufw/iptables), rule + lockout storage, auto-lockout
 ├── geoip.rs          — Optional MaxMind reader wrapper
+├── health/           — Uptime monitoring (checker probes, sample/incident storage, background monitor)
 ├── logging.rs        — Request log middleware + writer
 ├── metrics/          — Live metrics (host parsers, docker stats, alerts)
 ├── models.rs         — DB row types (Account, Session, Invite, ImageEntry)
+├── proxy/            — Reverse proxy manager (route storage, nginx/caddy config renderer, reload)
 ├── routes/
 │   ├── admin.rs      — Dashboard
 │   ├── audit.rs      — Audit log
 │   ├── auth.rs       — Login / signup / password change
 │   ├── docker.rs     — Docker services + graph + snapshots + log SSE
+│   ├── firewall.rs   — Firewall rules + lockouts dashboard
+│   ├── health.rs     — Uptime monitoring dashboard
 │   ├── image.rs      — Image upload and gallery
 │   ├── metrics.rs    — Metrics charts + stats data
 │   ├── postgres.rs   — Postgres browser + query runner
+│   ├── proxy.rs      — Reverse proxy / domain manager dashboard
 │   ├── sanitizer.rs  — File sanitizer (ClamAV + VirusTotal)
 │   ├── secrets.rs    — Secret scanner
 │   ├── security.rs   — Security dashboard + GeoIP + Cloudflare
@@ -352,7 +420,7 @@ src/
 
 templates/            — Askama HTML templates
 static/               — CSS, JS, images served verbatim
-sql/                  — Numbered migration files (0.sql … 8.sql)
+sql/                  — Numbered migration files (0.sql … 11.sql)
 ```
 
 ## License

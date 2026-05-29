@@ -285,7 +285,7 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 11] = [
+const MIGRATIONS: [&str; 12] = [
     include_str!("../sql/0.sql"),
     include_str!("../sql/1.sql"),
     include_str!("../sql/2.sql"),
@@ -297,6 +297,7 @@ const MIGRATIONS: [&str; 11] = [
     include_str!("../sql/8.sql"),
     include_str!("../sql/9.sql"),
     include_str!("../sql/10.sql"),
+    include_str!("../sql/11.sql"),
 ];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
