@@ -14,7 +14,7 @@ use std::net::IpAddr;
 use std::time::Duration;
 
 use axum::extract::{Multipart, Path, Query, State};
-use axum::http::header;
+use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use image::imageops::FilterType;
@@ -303,6 +303,9 @@ pub(crate) struct ManipulateParams {
     /// `deepfry` → intensity 1–100 (default 50). Ignored by `invert` and
     /// `grayscale`.
     amount: Option<f32>,
+    /// When `true`, store the result and return a JSON `ShareResult` with a
+    /// short shareable `/m/:id` link instead of the raw image bytes.
+    share: Option<bool>,
 }
 
 #[derive(Deserialize, IntoParams)]
@@ -312,6 +315,20 @@ pub(crate) struct ConvertParams {
     to: String,
     /// JPEG quality, 1–100. Only used when `to=jpeg`. Defaults to 85.
     quality: Option<u8>,
+    /// When `true`, store the result and return a JSON `ShareResult` with a
+    /// short shareable `/m/:id` link instead of the raw image bytes.
+    share: Option<bool>,
+}
+
+/// Returned (instead of raw bytes) when an endpoint is called with `share=true`.
+#[derive(Serialize, ToSchema)]
+pub struct ShareResult {
+    /// The short id of the stored result.
+    pub id: String,
+    /// Absolute URL where the result can be viewed (`/m/:id`).
+    pub url: String,
+    /// The MIME type of the stored result.
+    pub content_type: String,
 }
 
 // ─── Handlers ──────────────────────────────────────────────────────────────────
@@ -329,7 +346,8 @@ pub(crate) struct ConvertParams {
 /// - `grayscale` — desaturate to gray.
 ///
 /// Supply the source as a multipart `file` upload or a `url` form field. The
-/// result is always returned as `image/png`.
+/// result is returned as `image/png`, or — with `share=true` — as a JSON
+/// `ShareResult` carrying a short `/m/:id` link to the stored image.
 #[utoipa::path(
     post,
     path = "/api/image/{op}",
@@ -374,6 +392,7 @@ pub async fn manipulate_image(
 
     let bytes = read_image_input(multipart).await?;
     let amount = params.amount;
+    let share = params.share.unwrap_or(false);
     let op_for_task = op.clone();
     let out = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ApiError> {
         let img = decode_image(&bytes)?;
@@ -390,6 +409,9 @@ pub async fn manipulate_image(
         .ip_opt(client_ip)
         .fire();
 
+    if share {
+        return Ok(Json(share_result(&state, out, "image/png")).into_response());
+    }
     Ok(([(header::CONTENT_TYPE, "image/png".to_string())], out).into_response())
 }
 
@@ -403,7 +425,8 @@ pub async fn manipulate_image(
 ///
 /// Supply the source as a multipart `file` upload or a `url` form field. The
 /// response carries the matching `Content-Type` and a `Content-Disposition`
-/// filename.
+/// filename, or — with `share=true` — a JSON `ShareResult` with a short
+/// `/m/:id` link to the converted image.
 #[utoipa::path(
     post,
     path = "/api/convert",
@@ -438,6 +461,7 @@ pub async fn convert_file(
     let bytes = read_image_input(multipart).await?;
     let to = params.to.to_ascii_lowercase();
     let quality = params.quality.unwrap_or(85).clamp(1, 100);
+    let share = params.share.unwrap_or(false);
     let to_for_task = to.clone();
     let (data, mime, ext) = tokio::task::spawn_blocking(move || decode_image(&bytes).and_then(|img| encode_to(&img, &to_for_task, quality)))
         .await
@@ -449,6 +473,10 @@ pub async fn convert_file(
         .target(to)
         .ip_opt(client_ip)
         .fire();
+
+    if share {
+        return Ok(Json(share_result(&state, data, mime)).into_response());
+    }
 
     Ok((
         [
@@ -544,6 +572,31 @@ pub async fn image_info(
     .map_err(|_| ApiError::new("image inspection task failed"))??;
 
     Ok(Json(info))
+}
+
+/// Stores `bytes` in the shareable-media cache and builds the JSON result
+/// with an absolute `/m/:id` URL.
+fn share_result(state: &AppState, bytes: Vec<u8>, content_type: &str) -> ShareResult {
+    let id = state.store_media(bytes, content_type.to_string());
+    let url = state.config().url_to(format!("/m/{id}"));
+    ShareResult { id, url, content_type: content_type.to_string() }
+}
+
+/// Serves a previously shared processed image by its short id. Public (no
+/// auth) so the `/m/:id` links can be embedded anywhere. Returns 404 once the
+/// entry has been evicted from the bounded cache.
+pub async fn serve_media(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+    match state.get_media(&id) {
+        Some(media) => (
+            [
+                (header::CONTENT_TYPE, media.content_type),
+                (header::CACHE_CONTROL, "public, max-age=86400".to_string()),
+            ],
+            media.bytes,
+        )
+            .into_response(),
+        None => (StatusCode::NOT_FOUND, "media not found or expired").into_response(),
+    }
 }
 
 #[cfg(test)]

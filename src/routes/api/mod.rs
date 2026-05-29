@@ -25,6 +25,7 @@ use utoipa::{
 use crate::error::ApiError;
 use crate::filters;
 pub use auth::{copy_api_token, ApiToken};
+pub use media::serve_media;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -51,6 +52,7 @@ pub use auth::{copy_api_token, ApiToken};
             crate::routes::image::BulkFilesPayload,
             crate::scan::ScanReport,
             media::ImageInfo,
+            media::ShareResult,
         ),
         responses(utils::RateLimitResponse),
     ),

@@ -75,6 +75,7 @@ pub fn all() -> Router<AppState> {
     Router::new()
         .route("/", get(index))
         .route("/projects", get(projects))
+        .route("/m/:id", get(api::serve_media))
         .merge(auth::routes())
         .merge(image::routes())
         .merge(admin::routes())

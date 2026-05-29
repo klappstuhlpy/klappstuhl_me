@@ -17,6 +17,13 @@ pub struct LiveEvent {
     pub data: serde_json::Value,
 }
 
+/// A processed media result kept around for a shareable short link.
+#[derive(Debug, Clone)]
+pub struct ProcessedMedia {
+    pub bytes: Vec<u8>,
+    pub content_type: String,
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct SessionInfo {
     pub id: i64,
@@ -48,6 +55,10 @@ struct InnerState {
     cached_image_files: TimedCachedValue<Vec<ImageFile>>,
     cached_users: Cache<i64, Account>,
     valid_sessions: Cache<String, SessionInfo>,
+    /// Bounded LRU of processed media (from /api/convert, /api/image/:op) that
+    /// callers asked to share via a short link. Capacity-bounded rather than
+    /// TTL'd — old entries are evicted as new ones arrive.
+    processed_media: Cache<String, ProcessedMedia>,
     geoip: GeoIp,
     cloudflare: Option<Cloudflare>,
     /// Broadcast hub for live updates pushed to /ws subscribers. Each
@@ -184,6 +195,7 @@ impl AppState {
                 cached_image_files: TimedCachedValue::new(Duration::from_secs(60 * 30)),
                 cached_users: Cache::new(1000),
                 valid_sessions: Cache::new(1000),
+                processed_media: Cache::new(512),
                 geoip,
                 cloudflare,
                 live_tx,
@@ -207,6 +219,22 @@ impl AppState {
     /// Returns the Docker introspection client, if available.
     pub fn docker(&self) -> Option<&Arc<DockerClient>> {
         self.inner.docker.as_ref()
+    }
+
+    /// Stores a processed media blob for sharing and returns its short id.
+    /// The id is URL-safe and used by the public `/m/:id` view route.
+    pub fn store_media(&self, bytes: Vec<u8>, content_type: impl Into<String>) -> String {
+        let id = nanoid::nanoid!(12);
+        self.inner.processed_media.insert(
+            id.clone(),
+            ProcessedMedia { bytes, content_type: content_type.into() },
+        );
+        id
+    }
+
+    /// Looks up a previously shared media blob by id.
+    pub fn get_media(&self, id: &str) -> Option<ProcessedMedia> {
+        self.inner.processed_media.get(id)
     }
 
     /// Returns the configured firewall backend, if any.  `None` means
