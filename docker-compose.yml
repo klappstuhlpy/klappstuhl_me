@@ -5,14 +5,12 @@ services:
     image: klappstuhl_me:latest
     restart: unless-stopped
 
-    ports:
-      # Production (TLS via rustls-acme / Let's Encrypt).
-      # Port 443 must be reachable from the public internet for ACME
-      # TLS-ALPN-01 domain validation to succeed.
-      - "443:443"
-      # Uncomment the line below when running in non-production mode
-      # (config.json: "production": false) on a non-standard port.
-      - "9510:9510"
+    # Host networking: the container shares the host's network namespace so
+    # the firewall backend (ufw/iptables/nftables) sees and controls the
+    # real host rules rather than an isolated container namespace.
+    # Port mappings are ignored with host networking — the app binds
+    # directly to the host's ports (9510 in dev, 443 in production).
+    network_mode: host
 
     volumes:
       # Persistent data: config, database, logs, ACME cert cache.
@@ -68,27 +66,12 @@ services:
       #   "sshd_auth_log_path": "/host-log/auth.log"
       - /var/log/auth.log:/host-log/auth.log:ro
 
-    # NET_BIND_SERVICE lets the non-root process inside the container
-    # bind to port 443 without running as root.
+    # NET_ADMIN is required so ufw/iptables/nftables commands issued from
+    # inside the container can actually modify the host's kernel packet
+    # filter tables (network namespace is shared via host networking above).
     cap_add:
+      - NET_ADMIN
       - NET_BIND_SERVICE
-
-    # Map the magic hostname `host.docker.internal` to the host's gateway
-    # IP from inside the container. Needed to reach services running on
-    # the host (like clamd at host.docker.internal:3310). On Docker
-    # Desktop this hostname resolves automatically; on Linux Docker
-    # Engine it does not — `host-gateway` is the Docker-supplied alias
-    # that fills the gap.
-    #
-    # Required companion settings:
-    #   - config.json: "clamav_addr": "host.docker.internal:3310"
-    #   - /etc/clamav/clamd.conf on the host: `TCPAddr 0.0.0.0`
-    #     (or the Docker bridge IP — clamd's default `LocalSocketGroup`
-    #     listens on 127.0.0.1 only, which the container cannot reach).
-    #   - host firewall must allow port 3310 from the docker0 bridge
-    #     (usually 172.17.0.0/16). UFW: `sudo ufw allow from 172.17.0.0/16 to any port 3310`.
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
     # HOST_PROC / HOST_SYS tell the metrics collector where the host
     # filesystem is mounted (see the read-only bind mounts above).

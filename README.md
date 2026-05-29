@@ -81,10 +81,12 @@ After that, log in at `https://yourdomain.com/login`, then visit `/admin` to acc
 | `/var/run/docker.sock`                      | So `/admin/docker` can run `docker ps` / `docker compose up -d`.                             |
 | `/proc:/host/proc:ro`                       | So `/admin/metrics` reports the **host's** CPU/RAM/network.                                  |
 | `/sys:/host/sys:ro`                         | Same — for `/sys/block/*` (disk I/O counters).                                               |
-| `/home/<user>/.ssh:/host-ssh`               | (Optional) Target user's `.ssh` dir, so the SSH admin page can write `authorized_keys` here. |
+| `/home:/host-home`, `/root:/host-root`      | (Optional) Host home roots, so the SSH admin page can write `authorized_keys` files.         |
 | `/var/log/auth.log:/host-log/auth.log:ro`   | (Optional) Host sshd log, so the SSH admin page can populate `last_used_at`.                 |
 
 `HOST_PROC=/host/proc` and `HOST_SYS=/host/sys` are pre-set in the compose file so the metrics collector picks up the host filesystem.
+
+The compose file uses **`network_mode: host`** so the container shares the host's network namespace. This is required for the firewall backend (`ufw`/`iptables`/`nftables`) to see and modify the real host packet-filter rules. As a side effect, port mappings are not used — the app binds directly to the host's ports (`:9510` in dev, `:443` in production). Services on `localhost` (e.g. ClamAV at `127.0.0.1:3310`) are reachable directly without the `host.docker.internal` alias.
 
 ## Configuration
 
@@ -219,27 +221,22 @@ When the app runs in Docker and `clamd` runs on the host, there are three traps 
    ```
    Then `sudo systemctl restart clamav-daemon`. Verify with `sudo ss -tlnp | grep clamd` — you should see `LISTEN ... 0.0.0.0:3310`. If `systemd` co-owns the FD (you'll see `("systemd",pid=1,...)` next to `("clamd",pid=N,...)` in the `users:` column), that's fine — socket activation works as long as `clamd` itself is healthy.
 
-2. **Let the container resolve the host.** The bind mount in `docker-compose.yml` already adds `host.docker.internal:host-gateway` to `extra_hosts` so the container can reach the host's gateway IP. Set `clamav_addr` in `config.json` to:
+2. **Let the container reach clamd.** Because the compose file uses `network_mode: host`, the container shares the host's network stack — `localhost` inside the container *is* the host. Set `clamav_addr` in `config.json` to:
    ```json
-   "clamav_addr": "host.docker.internal:3310"
+   "clamav_addr": "127.0.0.1:3310"
    ```
+   No `host.docker.internal` alias or `extra_hosts` entry is needed.
 
-3. **Open the UFW rule for the *correct* source range.** This is the one that bites everyone. The intuitive `sudo ufw allow from 172.17.0.0/16 to any port 3310` covers `docker0` only — but a `docker compose` project gets its own bridge network (`klappstuhl_me_default`, IP range typically `172.18.0.0/16` or higher). Use the full Docker default range instead:
-   ```bash
-   sudo ufw allow from 172.16.0.0/12 to any port 3310 proto tcp comment 'clamd from docker containers'
-   sudo ufw reload
-   ```
-   Default-deny on your public interface still protects port 3310 from the outside world.
+3. **No extra UFW rule required for clamd.** With host networking the traffic never crosses a Docker bridge, so the old `ufw allow from 172.16.0.0/12 to any port 3310` rule is unnecessary (though harmless to keep).
 
-Quick end-to-end test from inside the container (install `nc` first if missing: `apt-get install -y --no-install-recommends netcat-openbsd`):
+Quick end-to-end test (install `nc` first if missing: `apt-get install -y --no-install-recommends netcat-openbsd`):
 
 ```bash
-docker compose exec klappstuhl_me sh -c \
-  'printf "zPING\0" | nc -w 3 host.docker.internal 3310'
+printf "zPING\0" | nc -w 3 127.0.0.1 3310
 # expected output: PONG
 ```
 
-If that prints `PONG`, the File Sanitizer page will return a scan verdict in under a second. If it hangs silently with no output, `sudo journalctl -kf | grep "UFW BLOCK"` while the test runs — UFW will log the dropped SYN with the actual `SRC=` IP and `IN=br-XXXX` bridge name, which tells you exactly which range/interface your container is using if it's not the default.
+Because the container uses host networking you can run this from either the host shell or `docker compose exec klappstuhl_me sh -c '...'` — both hit the same `127.0.0.1:3310`. If it hangs, check that clamd is listening (`ss -tlnp | grep 3310`) and that `TCPAddr 0.0.0.0` is set in `/etc/clamav/clamd.conf`.
 
 **VirusTotal** — set `virustotal_api_key` to a free public API key. The File Sanitizer computes the SHA-256 of each upload and does a hash-only lookup against VT v3 — no file data is ever sent to VirusTotal. Files not yet in the VT database show as "Not in VT".
 
