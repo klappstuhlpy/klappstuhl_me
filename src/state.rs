@@ -24,11 +24,15 @@ pub struct ProcessedMedia {
     pub content_type: String,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SessionInfo {
     pub id: i64,
     pub api_key: bool,
     pub created_at: time::OffsetDateTime,
+    /// Comma-separated granted scopes for API keys (empty = legacy full
+    /// access / browser session). Carried so API-header auth can enforce
+    /// per-token permissions without a second DB lookup.
+    pub scopes: String,
 }
 
 impl From<Session> for SessionInfo {
@@ -37,6 +41,7 @@ impl From<Session> for SessionInfo {
             id: value.account_id,
             api_key: value.api_key,
             created_at: value.created_at,
+            scopes: value.scopes,
         }
     }
 }
@@ -344,7 +349,7 @@ impl AppState {
                         self.invalidate_session(session).await;
                         None
                     } else {
-                        let _ = guard.insert(info);
+                        let _ = guard.insert(info.clone());
                         Some(info)
                     }
                 }
@@ -387,6 +392,9 @@ impl AppState {
                                 id: account.id,
                                 api_key: row.get("api_key")?,
                                 created_at: row.get("created_at")?,
+                                // Browser-session path: scopes are irrelevant
+                                // (cookie sessions bypass scope checks).
+                                scopes: String::new(),
                             };
                             Ok((account, info))
                         },

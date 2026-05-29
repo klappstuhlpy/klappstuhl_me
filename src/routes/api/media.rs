@@ -22,7 +22,7 @@ use image::{DynamicImage, ImageFormat};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::{error::ApiError, headers::ClientIp, AppState};
+use crate::{error::ApiError, headers::ClientIp, models::Scope, AppState};
 
 use super::auth::ApiToken;
 use super::utils::RateLimitResponse;
@@ -367,7 +367,7 @@ pub struct ShareResult {
         (status = 429, response = RateLimitResponse),
     ),
     security(
-        ("api_key" = [])
+        ("api_key" = ["images:read"])
     ),
     tag = "media"
 )]
@@ -379,6 +379,7 @@ pub async fn manipulate_image(
     Query(params): Query<ManipulateParams>,
     multipart: Multipart,
 ) -> Result<Response, ApiError> {
+    auth.require(Scope::ImagesRead)?;
     let Some(account) = state.get_account(auth.id).await else {
         return Err(ApiError::unauthorized());
     };
@@ -443,7 +444,7 @@ pub async fn manipulate_image(
         (status = 429, response = RateLimitResponse),
     ),
     security(
-        ("api_key" = [])
+        ("api_key" = ["images:read"])
     ),
     tag = "media"
 )]
@@ -454,6 +455,7 @@ pub async fn convert_file(
     Query(params): Query<ConvertParams>,
     multipart: Multipart,
 ) -> Result<Response, ApiError> {
+    auth.require(Scope::ImagesRead)?;
     let Some(account) = state.get_account(auth.id).await else {
         return Err(ApiError::unauthorized());
     };
@@ -538,7 +540,7 @@ fn format_name(fmt: Option<ImageFormat>) -> String {
         (status = 429, response = RateLimitResponse),
     ),
     security(
-        ("api_key" = [])
+        ("api_key" = ["images:read"])
     ),
     tag = "media"
 )]
@@ -547,6 +549,7 @@ pub async fn image_info(
     auth: ApiToken,
     multipart: Multipart,
 ) -> Result<Json<ImageInfo>, ApiError> {
+    auth.require(Scope::ImagesRead)?;
     if state.get_account(auth.id).await.is_none() {
         return Err(ApiError::unauthorized());
     }

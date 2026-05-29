@@ -146,6 +146,12 @@ impl ApiError {
         self
     }
 
+    /// Replaces the human-readable error message, keeping the code.
+    pub fn with_message(mut self, message: impl Into<Cow<'static, str>>) -> Self {
+        self.error = message.into();
+        self
+    }
+
     pub fn incorrect_login() -> Self {
         Self {
             error: "incorrect username or password".into(),

@@ -2,7 +2,7 @@ use axum::extract::{Multipart, State};
 use utoipa::ToSchema;
 
 use crate::scan::ScanReport;
-use crate::{error::ApiError, headers::ClientIp, AppState};
+use crate::{error::ApiError, headers::ClientIp, models::Scope, AppState};
 
 use super::{
     auth::ApiToken,
@@ -47,7 +47,7 @@ struct ScanUpload {
         (status = 429, response = RateLimitResponse),
     ),
     security(
-        ("api_key" = [])
+        ("api_key" = ["images:read"])
     ),
     tag = "scan"
 )]
@@ -57,6 +57,7 @@ pub async fn scan_file(
     auth: ApiToken,
     mut multipart: Multipart,
 ) -> Result<Json<ScanReport>, ApiError> {
+    auth.require(Scope::ImagesRead)?;
     let Some(account) = state.get_account(auth.id).await else {
         return Err(ApiError::unauthorized());
     };

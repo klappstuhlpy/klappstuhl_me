@@ -3,7 +3,7 @@ use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use utoipa::ToSchema;
 
-use crate::{error::ApiError, headers::ClientIp, routes::image::{UploadResult, DeleteResult, BulkFilesPayload, build_images_zip}, AppState};
+use crate::{error::ApiError, headers::ClientIp, models::Scope, routes::image::{UploadResult, DeleteResult, BulkFilesPayload, build_images_zip}, AppState};
 use crate::routes::image::{delete_image, raw_upload_file};
 use super::{
     auth::ApiToken,
@@ -39,11 +39,11 @@ struct UploadedFiles {
         (status = 200, description = "Upload processed", body = UploadResult),
         (status = 400, description = "An error occurred", body = ApiError),
         (status = 401, description = "User is unauthenticated", body = ApiError),
-        (status = 403, description = "The user does not have permission to do this", body = ApiError),
+        (status = 403, description = "The API key is missing the images:write scope", body = ApiError),
         (status = 429, response = RateLimitResponse),
     ),
     security(
-        ("api_key" = [])
+        ("api_key" = ["images:write"])
     ),
     tag = "images"
 )]
@@ -53,6 +53,7 @@ pub async fn upload_files(
     auth: ApiToken,
     multipart: Multipart,
 ) -> Result<Json<UploadResult>, ApiError> {
+    auth.require(Scope::ImagesWrite)?;
     let Some(account) = state.get_account(auth.id).await else {
         return Err(ApiError::unauthorized());
     };
@@ -82,7 +83,7 @@ pub async fn upload_files(
         ("id" = String, Path, description = "The images's ID")
     ),
     security(
-        ("api_key" = [])
+        ("api_key" = ["images:write"])
     ),
     tag = "images"
 )]
@@ -92,6 +93,7 @@ pub async fn delete_image_by_id(
     auth: ApiToken,
     Path(id): Path<String>,
 ) -> Result<Json<DeleteResult>, ApiError> {
+    auth.require(Scope::ImagesWrite)?;
     let Some(account) = state.get_account(auth.id).await else {
         return Err(ApiError::unauthorized());
     };
@@ -134,7 +136,7 @@ pub async fn delete_image_by_id(
         (status = 429, response = RateLimitResponse),
     ),
     security(
-        ("api_key" = [])
+        ("api_key" = ["images:read"])
     ),
     tag = "images"
 )]
@@ -144,6 +146,7 @@ pub async fn download_images(
     auth: ApiToken,
     Json(payload): Json<BulkFilesPayload>,
 ) -> Result<Response, ApiError> {
+    auth.require(Scope::ImagesRead)?;
     let Some(account) = state.get_account(auth.id).await else {
         return Err(ApiError::unauthorized());
     };
