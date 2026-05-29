@@ -235,6 +235,7 @@
 }
 
 .spotlight-item-badge.kind-script   { border-color: var(--branding); color: var(--branding); background: color-mix(in srgb, var(--branding) 10%, transparent); }
+.spotlight-item-badge.kind-api      { border-color: var(--branding); color: var(--branding); background: color-mix(in srgb, var(--branding) 14%, transparent); }
 .spotlight-item-badge.kind-audit    { border-color: var(--warning-border); color: var(--warning-text); background: var(--warning-bg); }
 .spotlight-item-badge.kind-scan     { border-color: var(--success-border); color: var(--success-text); background: var(--success-bg); }
 .spotlight-item-badge.kind-ssh      { border-color: var(--box-border); color: var(--text-muted); background: var(--box-shade); }

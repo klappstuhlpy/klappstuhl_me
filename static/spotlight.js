@@ -135,6 +135,7 @@
     const KIND_ICONS = {
         navigate:  '🔗',
         page:      '🌐',
+        api:       '🧩',
         script:    '⚡',
         image:     '🖼',
         audit:     '📋',
@@ -146,6 +147,7 @@
     const KIND_LABELS = {
         navigate:  '',          // no badge for admin nav items
         page:      '',          // no badge for site pages
+        api:       'API',
         script:    'Script',
         image:     'Image',
         audit:     'Audit',
@@ -158,6 +160,7 @@
     const SECTION_TITLES = {
         navigate:  'Admin',
         page:      'Site',
+        api:       'API',
         script:    'Scripts',
         image:     'Images',
         audit:     'Audit log',
@@ -187,7 +190,7 @@
         let html = '';
         let flatIdx = 0;
 
-        const kindOrder = ['navigate', 'page', 'script', 'image', 'audit', 'scan', 'ssh', 'container'];
+        const kindOrder = ['navigate', 'page', 'api', 'script', 'image', 'audit', 'scan', 'ssh', 'container'];
         for (const kind of kindOrder) {
             if (!groups[kind]) continue;
             const sectionTitle = SECTION_TITLES[kind] || kind;

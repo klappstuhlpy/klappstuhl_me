@@ -1,8 +1,8 @@
 //! Spotlight (Ctrl+K) backend routes.
 //!
 //! GET  /admin/spotlight/search?q=  — fuzzy search across all browseable routes,
-//!                                    images, audit log, containers, file scans,
-//!                                    SSH keys, and static nav items
+//!                                    API endpoints, images, audit log, containers,
+//!                                    file scans, SSH keys, and static nav items
 //! POST /admin/spotlight/run        — execute a pre-defined script from config
 //! GET  /admin/spotlight/scripts    — list configured scripts (for the palette)
 
@@ -62,8 +62,11 @@ fn static_nav() -> Vec<SpotlightItem> {
         SpotlightItem::nav("Invites",          "Manage invite codes",                 "/admin/invites"),
         SpotlightItem::nav("Docker",           "Services, graph, start/stop/restart", "/admin/docker"),
         SpotlightItem::nav("Snapshots",        "Capture and restore containers",      "/admin/docker/snapshots"),
+        SpotlightItem::nav("Proxy",            "Reverse-proxy route mapping",         "/admin/proxy"),
         SpotlightItem::nav("Metrics",          "CPU, memory, network charts",         "/admin/metrics"),
+        SpotlightItem::nav("Health",           "Uptime monitors and incidents",       "/admin/health"),
         SpotlightItem::nav("Security",         "Requests, GeoIP, Cloudflare",         "/admin/security"),
+        SpotlightItem::nav("Firewall",         "Packet-filter rules and lockouts",    "/admin/firewall"),
         SpotlightItem::nav("Secrets",          "Secret scanner findings",             "/admin/secrets"),
         SpotlightItem::nav("Audit log",        "All admin actions",                   "/admin/audit"),
         SpotlightItem::nav("Postgres",         "Query the database",                  "/admin/postgres"),
@@ -83,6 +86,37 @@ fn static_pages() -> Vec<SpotlightItem> {
         SpotlightItem::page("Account",      "Profile, API tokens, settings",   "/account"),
         SpotlightItem::page("API Docs",     "OpenAPI 3.0 reference (Scalar)",  "/api/docs"),
         SpotlightItem::page("Login",        "Sign in to your account",         "/login"),
+    ]
+}
+
+// ─── API endpoints (all documented at /api/docs) ──────────────────────────────
+
+fn static_api() -> Vec<SpotlightItem> {
+    vec![
+        SpotlightItem::result(
+            "api",
+            "File Scan API",
+            "POST /api/scan · malware scan via ClamAV + VirusTotal",
+            "/api/docs",
+        ),
+        SpotlightItem::result(
+            "api",
+            "Image Effects API",
+            "POST /api/image/:op · blur, pixelate, deepfry, invert, grayscale",
+            "/api/docs",
+        ),
+        SpotlightItem::result(
+            "api",
+            "Image Convert API",
+            "POST /api/convert · PNG→WebP, JPEG, GIF, BMP, TIFF",
+            "/api/docs",
+        ),
+        SpotlightItem::result(
+            "api",
+            "Image Upload / Download API",
+            "POST /api/images/upload · /api/images/download · DELETE /api/images/:id",
+            "/api/docs",
+        ),
     ]
 }
 
@@ -151,8 +185,18 @@ async fn search(
         }
     }
 
+    // ── API endpoints ───────────────────────────────────────────────────────────
+    for item in static_api() {
+        if q.is_empty()
+            || contains_ci(&item.title, &q)
+            || contains_ci(&item.subtitle, &q)
+        {
+            items.push(item);
+        }
+    }
+
     if q.is_empty() {
-        // For empty query return nav + site pages + scripts — no DB queries.
+        // For empty query return nav + site pages + API + scripts — no DB queries.
         append_scripts(&state, &q, &mut items);
         return Json(serde_json::json!({ "items": items })).into_response();
     }
