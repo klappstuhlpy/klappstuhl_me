@@ -417,3 +417,11 @@ td.error {
 }
 
 .admin-grid-2 .admin-section { margin-bottom: 0; }
+
+/* ── Inline action buttons in table rows ─────────────────────── */
+
+.row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}

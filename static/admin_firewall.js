@@ -68,7 +68,7 @@ function renderRules(rows) {
             <td>${r.enabled ? '<span class="status-pill up">enabled</span>' : '<span class="status-pill pending">disabled</span>'}</td>
             <td><div class="row-actions">
                 <button class="button outline" data-action="toggle">${r.enabled ? "Disable" : "Enable"}</button>
-                <button class="button outline" data-action="delete">Delete</button>
+                <button class="button danger" data-action="delete">Delete</button>
             </div></td>
         </tr>`;
     }).join("");
