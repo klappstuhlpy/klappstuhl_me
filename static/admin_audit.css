@@ -21,13 +21,7 @@
     min-width: 12rem;
 }
 
-.audit-filter label {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
+/* .audit-filter label is part of the shared form-label rule in admin.css. */
 
 .audit-filter input {
     padding: 0.4rem 0.65rem;

@@ -6,41 +6,8 @@
 
 /* ── Capture drawer ─────────────────────────────────────────── */
 
-.snap-drawer {
-    background: var(--box);
-    border: 1px solid var(--box-border);
-    border-radius: 0.5rem;
-    padding: 1.25rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.snap-drawer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.snap-drawer-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-.snap-form-row {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.snap-form-row label {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
+/* .snap-drawer / -header / -title and .snap-form-row (+ label) are the
+   shared drawer rules in admin.css. */
 
 .label-optional {
     text-transform: none;
@@ -48,10 +15,7 @@
     font-size: 0.68rem;
 }
 
-.snap-drawer-actions {
-    display: flex;
-    justify-content: flex-end;
-}
+/* .snap-drawer-actions lives in admin.css. */
 
 /* ── Error / success banners ────────────────────────────────── */
 
@@ -99,23 +63,7 @@
     white-space: nowrap;
 }
 
-.col-actions {
-    text-align: right;
-    white-space: nowrap;
-}
-
-.row-actions {
-    display: flex;
-    gap: 0.3rem;
-    justify-content: flex-end;
-    flex-wrap: nowrap;
-}
-
-.row-actions .button {
-    padding: 0.2rem 0.55rem;
-    font-size: 0.7rem;
-    white-space: nowrap;
-}
+/* .col-actions, .row-actions and .row-actions .button live in admin.css. */
 
 /* ── Docker unavailable — .docker-unavailable* live in admin.css ── */
 

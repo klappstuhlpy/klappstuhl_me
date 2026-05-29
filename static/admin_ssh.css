@@ -3,43 +3,9 @@
 /* Reuses .summary / .statistic-box (incl. .value.success / .value.muted)
    from admin.css */
 
-/* ── Add-key drawer ─────────────────────────────────────────── */
-
-.ssh-add-drawer {
-    background: var(--box);
-    border: 1px solid var(--box-border);
-    border-radius: 0.5rem;
-    padding: 1.25rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.ssh-drawer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.ssh-drawer-title {
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-.ssh-form-row {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.ssh-form-row label {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
+/* ── Add-key drawer ───────────────────────────────────────────
+   .ssh-add-drawer / -header / -title and .ssh-form-row (+ label) are
+   the shared drawer rules in admin.css. */
 
 .ssh-key-label-row {
     display: flex;
@@ -102,12 +68,7 @@
     font-size: 0.82rem;
 }
 
-/* ── Drawer footer ──────────────────────────────────────────── */
-
-.ssh-drawer-actions {
-    display: flex;
-    justify-content: flex-end;
-}
+/* ── Drawer footer — .ssh-drawer-actions lives in admin.css ───── */
 
 /* ── Key table ──────────────────────────────────────────────── */
 
@@ -141,18 +102,7 @@
 .status-pill.active  { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
 .status-pill.revoked { color: var(--text-muted);   border-color: var(--box-border);     background: var(--box-shade); }
 
-.row-actions {
-    display: flex;
-    gap: 0.3rem;
-    justify-content: flex-end;
-    flex-wrap: nowrap;
-}
-
-.row-actions .button {
-    padding: 0.2rem 0.55rem;
-    font-size: 0.7rem;
-    white-space: nowrap;
-}
+/* .row-actions and .row-actions .button live in admin.css. */
 
 /* ── Shared small button modifier ───────────────────────────── */
 

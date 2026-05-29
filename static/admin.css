@@ -202,13 +202,7 @@
     min-width: 0;
 }
 
-.invite-create-form label {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
+/* .invite-create-form label is part of the shared form-label rule below. */
 
 .invite-create-form button { white-space: nowrap; }
 
@@ -462,4 +456,79 @@ td.error {
 .docker-unavailable-sub {
     font-size: 0.82rem;
     color: var(--text-muted);
+}
+
+/* ── Compact table-action buttons ─────────────────────────────────
+   Small buttons sitting inside a .row-actions flex wrapper or directly
+   in a .col-actions cell. inline-flex is a no-op for the flex-item case
+   (blockified back to flex) and keeps buttons inline in a plain cell, so
+   one rule serves both. Previously recreated in admin_ssh / _secrets /
+   _docker_snapshots / _health / _sanitizer. */
+.row-actions .button,
+.col-actions .button {
+    display: inline-flex;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+/* Action column (header + cell) alignment. */
+.col-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* ── Capture / add drawer ─────────────────────────────────────────
+   Identical markup on the SSH-keys and Docker-snapshots pages, formerly
+   duplicated as .ssh-add-drawer* and .snap-drawer*. */
+.ssh-add-drawer,
+.snap-drawer {
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.ssh-drawer-header,
+.snap-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ssh-drawer-title,
+.snap-drawer-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.ssh-form-row,
+.snap-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.ssh-drawer-actions,
+.snap-drawer-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* ── Compact uppercase form-field labels ──────────────────────────
+   Shared by the invite form, audit filters and the SSH / snapshot
+   drawers. */
+.invite-create-form label,
+.audit-filter label,
+.ssh-form-row label,
+.snap-form-row label {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }

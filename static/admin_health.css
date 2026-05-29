@@ -85,12 +85,7 @@
     font-variant-numeric: tabular-nums;
 }
 
-.row-actions .button {
-    display: inline-flex;
-    padding: 0.2rem 0.55rem;
-    font-size: 0.7rem;
-    white-space: nowrap;
-}
+/* .row-actions .button lives in admin.css. */
 
 /* ── Editor modal ───────────────────────────────────────────── */
 
