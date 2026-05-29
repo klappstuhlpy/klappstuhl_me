@@ -213,12 +213,26 @@ pub struct Account {
     pub password: String,
     /// The account flags associated with this account.
     pub flags: AccountFlags,
+    /// Encrypted TOTP shared secret (base64 nonce‖ciphertext), or `None` when
+    /// 2FA has never been set up. See [`crate::totp`].
+    pub totp_secret: Option<String>,
+    /// Whether TOTP two-factor authentication is currently active. Only ever
+    /// set after the user verifies a code during enrollment.
+    pub totp_enabled: bool,
+}
+
+impl Account {
+    /// Whether the account has verified, active 2FA.
+    pub fn has_totp(&self) -> bool {
+        self.totp_enabled && self.totp_secret.is_some()
+    }
 }
 
 impl Table for Account {
     const NAME: &'static str = "account";
 
-    const COLUMNS: &'static [&'static str] = &["id", "name", "password", "flags"];
+    const COLUMNS: &'static [&'static str] =
+        &["id", "name", "password", "flags", "totp_secret", "totp_enabled"];
 
     type Id = i64;
 
@@ -228,6 +242,11 @@ impl Table for Account {
             name: row.get("name")?,
             password: row.get("password")?,
             flags: row.get("flags")?,
+            // Tolerant of result sets that don't select these columns (e.g. the
+            // explicit-column session JOIN): a missing column yields the
+            // default rather than an error.
+            totp_secret: row.get::<_, Option<String>>("totp_secret").unwrap_or(None),
+            totp_enabled: row.get::<_, bool>("totp_enabled").unwrap_or(false),
         })
     }
 }

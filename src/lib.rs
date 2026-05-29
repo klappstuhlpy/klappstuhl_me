@@ -29,6 +29,7 @@ pub mod secrets;
 pub mod ssh;
 mod state;
 pub mod token;
+pub mod totp;
 pub mod utils;
 pub mod filters;
 

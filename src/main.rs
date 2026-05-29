@@ -288,7 +288,7 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 12] = [
+const MIGRATIONS: [&str; 13] = [
     include_str!("../sql/0.sql"),
     include_str!("../sql/1.sql"),
     include_str!("../sql/2.sql"),
@@ -301,6 +301,7 @@ const MIGRATIONS: [&str; 12] = [
     include_str!("../sql/9.sql"),
     include_str!("../sql/10.sql"),
     include_str!("../sql/11.sql"),
+    include_str!("../sql/12.sql"),
 ];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
@@ -353,6 +354,10 @@ fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
         // migration are missing it and any SELECT on /admin/ssh/data
         // 500s with "no such column: target_user".
         "ALTER TABLE ssh_key ADD COLUMN target_user TEXT",
+        // TOTP 2FA columns (sql/12.sql) — defensive in case a database landed
+        // at user_version 12 without them.
+        "ALTER TABLE account ADD COLUMN totp_secret TEXT",
+        "ALTER TABLE account ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
     ] {
         let _ = connection.execute(ddl, []);
     }
