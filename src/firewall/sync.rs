@@ -19,7 +19,7 @@
 //!     the next sync.
 //!   * Only ufw is supported; nft/iptables imports return early.
 
-use tracing::{debug, warn};
+use tracing::{info, warn};
 
 use super::storage::{self, NewRule};
 use crate::AppState;
@@ -37,31 +37,39 @@ struct ParsedRule {
 /// is logged and swallowed so the dashboard still renders.
 pub async fn sync_live(state: &AppState) {
     let Some(backend) = state.firewall_backend() else {
+        info!("firewall sync: no backend configured, skipping");
         return;
     };
+    info!(backend = %backend.kind.label(), "firewall sync: starting");
+
     // Only ufw exposes a stable, parsable status dump for now.
     let Some(argv) = backend.import_command() else {
+        info!(backend = %backend.kind.label(), "firewall sync: backend has no import command, skipping");
         return;
     };
 
+    info!(cmd = %crate::firewall::Backend::render(&argv), "firewall sync: running import command");
     let output = match backend.exec(argv).await {
         Ok(o) if o.status.success() => o,
         Ok(o) => {
-            debug!(
+            warn!(
                 status = %o.status,
                 stderr = %String::from_utf8_lossy(&o.stderr).trim(),
+                stdout = %String::from_utf8_lossy(&o.stdout).trim(),
                 "firewall sync: ufw status exited non-zero"
             );
             return;
         }
         Err(e) => {
-            debug!(error = %e, "firewall sync: failed to run ufw status");
+            warn!(error = %e, "firewall sync: failed to run ufw status");
             return;
         }
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    info!(raw_output = %stdout.trim(), "firewall sync: raw ufw output");
     let parsed = parse_ufw_status(&stdout);
+    info!(count = parsed.len(), "firewall sync: parsed rules from ufw output");
 
     // What's currently in the mirror under our marker.
     let existing = match storage::list_imported_ufw(state).await {
@@ -71,6 +79,7 @@ pub async fn sync_live(state: &AppState) {
             return;
         }
     };
+    info!(existing_count = existing.len(), "firewall sync: existing imported rows in DB");
 
     // Map existing signature -> row id (extracted from the stored meta_json).
     let mut existing_by_sig: std::collections::HashMap<String, i64> =
@@ -85,24 +94,32 @@ pub async fn sync_live(state: &AppState) {
         parsed.iter().map(|p| p.signature.as_str()).collect();
 
     // Insert rules that are live but not yet mirrored.
+    let mut inserted = 0usize;
     for p in &parsed {
         if existing_by_sig.contains_key(&p.signature) {
             continue;
         }
+        info!(sig = %p.signature, "firewall sync: inserting new imported rule");
         let meta = serde_json::json!({ "source": "ufw", "raw": p.signature }).to_string();
-        if let Err(e) = storage::create_imported_rule(state, p.rule.clone(), meta).await {
-            warn!(error = %e, "firewall sync: failed to insert imported rule");
+        match storage::create_imported_rule(state, p.rule.clone(), meta).await {
+            Ok(id) => { info!(id, sig = %p.signature, "firewall sync: inserted rule"); inserted += 1; }
+            Err(e) => warn!(error = %e, sig = %p.signature, "firewall sync: failed to insert imported rule"),
         }
     }
 
     // Prune imported rows whose signature no longer appears live.
+    let mut pruned = 0usize;
     for (sig, id) in &existing_by_sig {
         if !live_sigs.contains(sig.as_str()) {
-            if let Err(e) = storage::delete_rule(state, *id).await {
-                warn!(error = %e, "firewall sync: failed to prune stale imported rule");
+            info!(id, sig = %sig, "firewall sync: pruning stale imported rule");
+            match storage::delete_rule(state, *id).await {
+                Ok(_) => pruned += 1,
+                Err(e) => warn!(error = %e, "firewall sync: failed to prune stale imported rule"),
             }
         }
     }
+
+    info!(inserted, pruned, "firewall sync: done");
 }
 
 /// Pull the `"raw"` signature back out of a stored meta_json blob.

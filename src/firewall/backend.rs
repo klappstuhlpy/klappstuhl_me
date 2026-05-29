@@ -87,7 +87,7 @@ impl Backend {
     /// human-parsable); the others return None.
     pub fn import_command(&self) -> Option<Vec<String>> {
         match self.kind {
-            BackendKind::Ufw => Some(self.wrap(vec!["ufw", "status"])),
+            BackendKind::Ufw => Some(self.wrap(vec!["ufw", "status", "numbered"])),
             _ => None,
         }
     }
