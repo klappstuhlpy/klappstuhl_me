@@ -81,12 +81,16 @@ After that, log in at `https://yourdomain.com/login`, then visit `/admin` to acc
 | `/var/run/docker.sock`                      | So `/admin/docker` can run `docker ps` / `docker compose up -d`.                             |
 | `/proc:/host/proc:ro`                       | So `/admin/metrics` reports the **host's** CPU/RAM/network.                                  |
 | `/sys:/host/sys:ro`                         | Same — for `/sys/block/*` (disk I/O counters).                                               |
+| `/etc/ufw:/etc/ufw`                         | So the firewall dashboard reads and writes the **host's** ufw rule database.                  |
+| `/var/lib/ufw:/var/lib/ufw`                 | ufw runtime state (required alongside `/etc/ufw` for `ufw status` to show host rules).       |
 | `/home:/host-home`, `/root:/host-root`      | (Optional) Host home roots, so the SSH admin page can write `authorized_keys` files.         |
 | `/var/log/auth.log:/host-log/auth.log:ro`   | (Optional) Host sshd log, so the SSH admin page can populate `last_used_at`.                 |
 
 `HOST_PROC=/host/proc` and `HOST_SYS=/host/sys` are pre-set in the compose file so the metrics collector picks up the host filesystem.
 
 The compose file uses **`network_mode: host`** so the container shares the host's network namespace. This is required for the firewall backend (`ufw`/`iptables`/`nftables`) to see and modify the real host packet-filter rules. As a side effect, port mappings are not used — the app binds directly to the host's ports (`:9510` in dev, `:443` in production). Services on `localhost` (e.g. ClamAV at `127.0.0.1:3310`) are reachable directly without the `host.docker.internal` alias.
+
+Additionally, `/etc/ufw` and `/var/lib/ufw` are bind-mounted from the host. Host networking shares the kernel's iptables tables but `ufw status` reads its rule list from the filesystem (`/etc/ufw/user.rules`, `/etc/ufw/user6.rules`). Without these mounts the container would see its own empty ufw install instead of the host's configured rules. The mounts are read-write so that rules created through the UI are persisted back to the host's ufw database.
 
 ## Configuration
 

@@ -24,6 +24,17 @@ services:
       # Remove this mount if you are not using the services feature.
       - /var/run/docker.sock:/var/run/docker.sock
 
+      # Host ufw configuration and rule database.  network_mode: host shares
+      # the kernel's iptables tables, but ufw reads its rule list from
+      # /etc/ufw/ (user.rules, user6.rules, …) and its runtime state from
+      # /var/lib/ufw/.  Without these mounts `ufw status` inside the container
+      # sees the container image's empty ufw install instead of the host's
+      # configured rules.  Mounting them lets the firewall dashboard sync and
+      # display the real host ruleset, and lets apply/delete commands persist
+      # changes back to the host's ufw database.
+      - /etc/ufw:/etc/ufw
+      - /var/lib/ufw:/var/lib/ufw
+
       # Host /proc and /sys (read-only) so the live metrics dashboard
       # (/admin/metrics) reports the real machine instead of the
       # container's cgroup-limited view. Required for accurate CPU,
