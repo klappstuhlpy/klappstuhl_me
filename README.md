@@ -117,28 +117,28 @@ A default `config.json` is written on first start. Full layout with all optional
 }
 ```
 
-| Key                      | Type              | Notes                                                                                          |
-|--------------------------|-------------------|------------------------------------------------------------------------------------------------|
-| `production`             | bool              | `true` switches the server to TLS via Let's Encrypt on port 443.                               |
-| `domains`                | string[]          | Hostnames that ACME will request certificates for.                                             |
-| `server.port`            | u16               | Listen port (`443` in production, anything else for dev).                                      |
-| `server.ip`              | string            | The IP the server listens on (default `0.0.0.0`).                                              |
-| `secret_key`             | string            | Auto-generated; used for HMAC signing of session tokens and flash cookies.                     |
-| `discord_webhook_url`    | string \| null    | Discord incoming webhook URL for metric alerts and secret findings.                            |
-| `services`               | ServiceConfig[]   | Docker services shown on `/admin/docker`. See below.                                           |
-| `geoip_db_path`          | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.          |
-| `cloudflare_api_token`   | string \| null    | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                  |
-| `cloudflare_zone_id`     | string \| null    | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels. |
-| `secret_scan_paths`      | string[]          | Directory paths the secrets scanner walks recursively.                                         |
-| `postgres_url`           | string \| null    | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                 |
-| `clamav_addr`            | string \| null    | TCP address of a `clamd` daemon, e.g. `"host.docker.internal:3310"`. Enables ClamAV scanning.  |
-| `virustotal_api_key`     | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.              |
-| `spotlight_scripts`      | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                        |
-| `sshd_auth_log_path`     | string \| null    | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below. |
+| Key                      | Type              | Notes                                                                                                                                                                                             |
+|--------------------------|-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `production`             | bool              | `true` switches the server to TLS via Let's Encrypt on port 443.                                                                                                                                  |
+| `domains`                | string[]          | Hostnames that ACME will request certificates for.                                                                                                                                                |
+| `server.port`            | u16               | Listen port (`443` in production, anything else for dev).                                                                                                                                         |
+| `server.ip`              | string            | The IP the server listens on (default `0.0.0.0`).                                                                                                                                                 |
+| `secret_key`             | string            | Auto-generated; used for HMAC signing of session tokens and flash cookies.                                                                                                                        |
+| `discord_webhook_url`    | string \| null    | Discord incoming webhook URL for metric alerts and secret findings.                                                                                                                               |
+| `services`               | ServiceConfig[]   | Docker services shown on `/admin/docker`. See below.                                                                                                                                              |
+| `geoip_db_path`          | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.                                                                                                             |
+| `cloudflare_api_token`   | string \| null    | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                                                                                                                     |
+| `cloudflare_zone_id`     | string \| null    | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels.                                                                                                    |
+| `secret_scan_paths`      | string[]          | Directory paths the secrets scanner walks recursively.                                                                                                                                            |
+| `postgres_url`           | string \| null    | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                                                                                                                    |
+| `clamav_addr`            | string \| null    | TCP address of a `clamd` daemon, e.g. `"host.docker.internal:3310"`. Enables ClamAV scanning.                                                                                                     |
+| `virustotal_api_key`     | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.                                                                                                                 |
+| `spotlight_scripts`      | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                                                                                                                           |
+| `sshd_auth_log_path`     | string \| null    | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below.                                                                                                    |
 | `firewall_backend`       | string \| null    | Force the firewall backend: `"nftables"`, `"ufw"`, `"iptables"`, or `"disabled"`. Unset = auto-detect by probing each binary. `"disabled"` keeps the UI but issues no kernel commands. See below. |
-| `proxy_config_dir`       | string \| null    | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy). Unset = DB-only, nothing written to disk. See below. |
-| `proxy_kind`             | string \| null    | Config syntax to emit: `"nginx"` (default) or `"caddy"`.                                        |
-| `proxy_reload_command`   | string \| null    | Shell command run after config is regenerated, e.g. `"nginx -s reload"` or `"systemctl reload nginx"`. Skipped when unset. |
+| `proxy_config_dir`       | string \| null    | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy). Unset = DB-only, nothing written to disk. See below.                |
+| `proxy_kind`             | string \| null    | Config syntax to emit: `"nginx"` (default) or `"caddy"`.                                                                                                                                          |
+| `proxy_reload_command`   | string \| null    | Shell command run after config is regenerated, e.g. `"nginx -s reload"` or `"systemctl reload nginx"`. Skipped when unset.                                                                        |
 
 ### Docker services configuration
 
