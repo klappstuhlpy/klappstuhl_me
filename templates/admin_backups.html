@@ -23,7 +23,7 @@
     <p class="admin-empty">No backups yet — they appear here once the scheduler runs or you take one manually.</p>
     {% else %}
     <div class="container-table-wrap">
-        <table class="container-table">
+        <table class="container-table" id="c-table">
             <thead>
                 <tr>
                     <th>File</th>
@@ -38,12 +38,9 @@
                     <td><code>{{ b.name }}</code></td>
                     <td>{{ b.size_human }}</td>
                     <td>{{ b.modified }}</td>
-                    <td class="inline">
+                    <td class="col-actions">
                         <a class="button outline" href="/admin/backups/{{ b.name }}/download">Download</a>
-                        <form method="post" action="/admin/backups/{{ b.name }}/delete"
-                              onsubmit="return confirm('Delete {{ b.name }}?');">
-                            <button type="submit" class="button danger outline">Delete</button>
-                        </form>
+                        <button class="button danger small" data-id="{{ b.name }}">Delete</button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -56,4 +53,23 @@
     </p>
     {% endif %}
 </section>
+
+<script>
+    const ctable = document.getElementById('c-table');
+
+    if (ctable) {
+        ctable.addEventListener('click', async e => {
+            const btn = e.target.closest('[data-id]');
+            if (!btn) return;
+            const name = btn.dataset.id;
+            btn.disabled = true;
+            try {
+                const r = await fetch(`/admin/backups/${name}/delete`, { method: 'POST' });
+                if (r.ok) // reload page
+                    location.reload();
+                else btn.disabled = false;
+            } catch (_) { btn.disabled = false; }
+        });
+    }
+</script>
 {% endblock %}
