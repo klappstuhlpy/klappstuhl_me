@@ -214,4 +214,17 @@ a.san-badge:hover { opacity: 0.85; }
 .san-size  { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
 .san-hash  { font-family: monospace; font-size: 0.72rem; color: var(--text-muted); cursor: default; }
 .san-date  { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
-.col-actions { text-align: right; white-space: nowrap; }
+.col-actions {
+    text-align: right;
+    white-space: nowrap;
+    gap: 0.3rem;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+}
+
+.col-actions .button {
+    display: inline-flex;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}

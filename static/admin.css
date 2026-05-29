@@ -422,6 +422,9 @@ td.error {
 
 .row-actions {
     display: flex;
-    flex-wrap: wrap;
+    text-align: right;
+    white-space: nowrap;
     gap: 0.35rem;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
 }
