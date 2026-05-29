@@ -1,22 +1,7 @@
 /* Reuses metric-tiles + container-table from admin.css / admin_metrics.css */
 
-.audit-filters {
-    display: flex;
-    gap: 0.25rem;
-    flex-wrap: wrap;
-}
-
-.audit-filters .button {
-    padding: 0.35rem 0.7rem;
-    font-size: 0.8rem;
-    border-color: var(--box-border);
-}
-
-.audit-filters .button.active {
-    background: var(--branding);
-    color: #fff;
-    border-color: var(--branding);
-}
+/* .audit-filters .button / .button.active live in admin.css (shared
+   with .range-picker and .filter-tabs). */
 
 .audit-filters {
     display: flex;

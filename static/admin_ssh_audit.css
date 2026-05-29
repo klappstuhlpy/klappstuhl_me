@@ -9,9 +9,7 @@
 .action-pill.ssh-token  { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-bg); }
 .action-pill.ssh-export { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
 
-/* ── Stat boxes (shared muted modifier) ─────────────────────── */
-
-.statistic-box > .value.muted { color: var(--text-muted); }
+/* .statistic-box > .value.muted lives in admin.css */
 
 /* ── User-agent truncation ──────────────────────────────────── */
 

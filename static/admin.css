@@ -303,14 +303,20 @@
     gap: 0.25rem;
 }
 
-.range-picker .button {
+/* Shared button row used by the range picker, audit filters and filter
+   tabs — identical styling, kept here so each page need not redefine it. */
+.range-picker .button,
+.audit-filters .button,
+.filter-tabs .button {
     padding: 0.35rem 0.7rem;
     font-size: 0.8rem;
 
     border-color: var(--box-border);  /* default border, also used for the active state to avoid shifting */
 }
 
-.range-picker .button.active {
+.range-picker .button.active,
+.audit-filters .button.active,
+.filter-tabs .button.active {
     background: var(--branding);
     color: #fff;
     border-color: var(--branding);
@@ -358,6 +364,9 @@
   line-height: 1;
   color: var(--foreground);
 }
+
+.statistic-box > .value.success { color: var(--success-text); }
+.statistic-box > .value.muted   { color: var(--text-muted); }
 
 /* ── Charts ──────────────────────────────────────────────────── */
 
@@ -427,4 +436,30 @@ td.error {
     gap: 0.35rem;
     justify-content: flex-end;
     flex-wrap: nowrap;
+}
+
+/* ── Docker "unavailable" empty state ─────────────────────────────
+   Shared by the Docker and Docker-snapshots pages. */
+
+.docker-unavailable {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 4rem 2rem;
+    text-align: center;
+}
+
+.docker-unavailable-icon { font-size: 2.5rem; }
+
+.docker-unavailable-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+.docker-unavailable-sub {
+    font-size: 0.82rem;
+    color: var(--text-muted);
 }

@@ -335,30 +335,7 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* ── Unavailable state ──────────────────────────────────────────── */
-
-.docker-unavailable {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 4rem 2rem;
-    text-align: center;
-}
-
-.docker-unavailable-icon { font-size: 2.5rem; }
-
-.docker-unavailable-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--foreground);
-}
-
-.docker-unavailable-sub {
-    font-size: 0.82rem;
-    color: var(--text-muted);
-}
+/* ── Unavailable state — .docker-unavailable* live in admin.css ──── */
 
 /* ── Services grid ──────────────────────────────────────────────── */
 

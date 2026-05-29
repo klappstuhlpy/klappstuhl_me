@@ -1,9 +1,7 @@
 /* ── SSH Keys admin page ────────────────────────────────────── */
 
-/* Reuses .summary / .statistic-box from admin.css */
-
-.statistic-box > .value.success { color: var(--success-text); }
-.statistic-box > .value.muted   { color: var(--text-muted); }
+/* Reuses .summary / .statistic-box (incl. .value.success / .value.muted)
+   from admin.css */
 
 /* ── Add-key drawer ─────────────────────────────────────────── */
 
