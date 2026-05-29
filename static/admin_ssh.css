@@ -219,16 +219,14 @@
 
 /* ── Token table extras ─────────────────────────────────────── */
 
+/* .chip base lives in admin.css; scope tags are square-ish + lowercase. */
 .scope-pill {
-    display: inline-block;
     padding: 0.1rem 0.4rem;
     font-size: 0.65rem;
     font-weight: 600;
     border-radius: 0.25rem;
-    background: var(--box-shade);
-    border: 1px solid var(--box-border);
-    color: var(--text-muted);
-    white-space: nowrap;
+    text-transform: none;
+    letter-spacing: normal;
     margin: 0.1rem 0.1rem 0 0;
 }
 

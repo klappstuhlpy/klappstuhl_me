@@ -465,7 +465,7 @@ function renderTokens(tokens) {
         if (t.scopes) {
             for (const s of t.scopes.split(",").filter(Boolean)) {
                 const pill = document.createElement("span");
-                pill.className = "scope-pill";
+                pill.className = "chip scope-pill";
                 pill.textContent = s;
                 scopesCell.appendChild(pill);
             }

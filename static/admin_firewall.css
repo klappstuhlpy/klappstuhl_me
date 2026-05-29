@@ -1,15 +1,7 @@
 /* ── Firewall dashboard ─────────────────────────────────────── */
 
+/* .chip base lives in admin.css; this only adds the header placement. */
 .backend-chip {
-    display: inline-block;
-    padding: 0.15rem 0.55rem;
-    font-size: 0.7rem;
-    border-radius: 9999px;
-    border: 1px solid var(--box-border);
-    background: var(--box-shade);
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
     vertical-align: middle;
     margin-left: 0.4rem;
 }

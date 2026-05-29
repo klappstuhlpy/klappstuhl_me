@@ -39,15 +39,13 @@
     font-size: 0.82rem;
 }
 
-.target-cell .container-tag {
-    display: inline-block;
+/* .chip base lives in admin.css; container tags are lowercase + smaller. */
+.container-tag {
     margin-left: 0.35rem;
     padding: 0.02rem 0.4rem;
     font-size: 0.68rem;
-    border-radius: 9999px;
-    border: 1px solid var(--box-border);
-    background: var(--box-shade);
-    color: var(--text-muted);
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 .flag-yes { color: var(--success-text, #34d399); font-weight: 600; }

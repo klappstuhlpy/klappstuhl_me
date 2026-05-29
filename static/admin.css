@@ -594,3 +594,21 @@ a.pill:hover { opacity: 0.85; }
     display: inline-block;
     flex-shrink: 0;
 }
+
+/* ── Chip / tag ────────────────────────────────────────────────────
+   Small bordered label (backend name, resource kind, token scope, …).
+   Defaults to an uppercase muted pill; per-page modifiers
+   (.backend-chip, .san-backend, .kind-chip, .container-tag, .scope-pill)
+   tweak size / shape / colour. */
+.chip {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.7rem;
+    border: 1px solid var(--box-border);
+    border-radius: 9999px;
+    background: var(--box-shade);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}

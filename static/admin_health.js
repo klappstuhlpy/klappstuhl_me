@@ -87,7 +87,7 @@ function renderTargets(rows) {
                 <strong>${escapeHtml(r.name)}</strong>
                 ${!r.enabled ? '<span class="muted" style="margin-left:.4rem">(disabled)</span>' : ''}
             </td>
-            <td><span class="kind-chip">${escapeHtml(r.kind)}</span></td>
+            <td><span class="chip kind-chip">${escapeHtml(r.kind)}</span></td>
             <td><div class="health-target" title="${escapeHtml(r.target)}">${escapeHtml(r.target)}</div></td>
             <td>${latency}${sslExtra}</td>
             <td>

@@ -40,7 +40,7 @@ function renderRoutes(rows) {
     }
     tbody.innerHTML = rows.map(r => {
         const container = r.container
-            ? `<span class="container-tag">${escapeHtml(r.container)}</span>` : "";
+            ? `<span class="chip container-tag">${escapeHtml(r.container)}</span>` : "";
         const target = `${escapeHtml(r.target_scheme)}://${escapeHtml(r.target_host)}:${r.target_port}${container}`;
         const yn = (v) => v ? `<span class="flag-yes">yes</span>` : `<span class="flag-no">no</span>`;
         return `<tr data-id="${r.id}">

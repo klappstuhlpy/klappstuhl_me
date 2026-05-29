@@ -23,16 +23,12 @@
     white-space: nowrap;
 }
 
+/* .chip base lives in admin.css; kind chips are square-ish and use the
+   foreground colour. */
 .kind-chip {
-    display: inline-block;
     padding: 0.05rem 0.5rem;
     border-radius: 0.3rem;
-    background: var(--box-shade);
-    border: 1px solid var(--box-border);
-    font-size: 0.7rem;
     color: var(--foreground);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
 }
 
 .uptime-bar {
