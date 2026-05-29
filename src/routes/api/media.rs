@@ -16,9 +16,10 @@ use std::time::Duration;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
+use axum::Json;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageFormat};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::{error::ApiError, headers::ClientIp, AppState};
@@ -457,6 +458,92 @@ pub async fn convert_file(
         data,
     )
         .into_response())
+}
+
+/// Metadata about a decoded image.
+#[derive(Serialize, ToSchema)]
+pub struct ImageInfo {
+    /// Image width in pixels.
+    pub width: u32,
+    /// Image height in pixels.
+    pub height: u32,
+    /// Detected container format (e.g. `png`, `jpeg`, `webp`).
+    pub format: String,
+    /// Pixel color type (e.g. `Rgb8`, `Rgba8`, `L8`).
+    pub color: String,
+    /// Size of the supplied bytes.
+    pub file_size: usize,
+}
+
+fn format_name(fmt: Option<ImageFormat>) -> String {
+    match fmt {
+        Some(ImageFormat::Png) => "png",
+        Some(ImageFormat::Jpeg) => "jpeg",
+        Some(ImageFormat::Gif) => "gif",
+        Some(ImageFormat::WebP) => "webp",
+        Some(ImageFormat::Bmp) => "bmp",
+        Some(ImageFormat::Tiff) => "tiff",
+        Some(_) => "other",
+        None => "unknown",
+    }
+    .to_owned()
+}
+
+/// Info
+///
+/// Inspect an image and return its dimensions, format, color type, and byte
+/// size — without storing anything.
+///
+/// Supply the source as a multipart `file` upload or a `url` form field.
+#[utoipa::path(
+    post,
+    path = "/api/metadata",
+    request_body(
+        content = inline(ImageInput),
+        content_type = "multipart/form-data",
+        description = "The source image, as a `file` upload or a `url` field."
+    ),
+    responses(
+        (status = 200, description = "Image metadata", body = ImageInfo),
+        (status = 400, description = "Bad input or undecodable image", body = ApiError),
+        (status = 401, description = "User is unauthenticated", body = ApiError),
+        (status = 429, response = RateLimitResponse),
+    ),
+    security(
+        ("api_key" = [])
+    ),
+    tag = "media"
+)]
+pub async fn image_info(
+    State(state): State<AppState>,
+    auth: ApiToken,
+    multipart: Multipart,
+) -> Result<Json<ImageInfo>, ApiError> {
+    if state.get_account(auth.id).await.is_none() {
+        return Err(ApiError::unauthorized());
+    }
+
+    let bytes = read_image_input(multipart).await?;
+    let info = tokio::task::spawn_blocking(move || -> Result<ImageInfo, ApiError> {
+        let reader = image::ImageReader::new(std::io::Cursor::new(&bytes))
+            .with_guessed_format()
+            .map_err(|e| ApiError::new(format!("could not read image: {e}")))?;
+        let format = format_name(reader.format());
+        let img = reader
+            .decode()
+            .map_err(|e| ApiError::new(format!("could not decode image: {e}")))?;
+        Ok(ImageInfo {
+            width: img.width(),
+            height: img.height(),
+            format,
+            color: format!("{:?}", img.color()),
+            file_size: bytes.len(),
+        })
+    })
+    .await
+    .map_err(|_| ApiError::new("image inspection task failed"))??;
+
+    Ok(Json(info))
 }
 
 #[cfg(test)]

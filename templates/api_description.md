@@ -11,10 +11,10 @@ If you have not generated an API key yet, you can do so on your [account page](/
 ### Endpoint groups
 
 - **Images** — upload, delete, and bulk-download your hosted images.
-- **Media** — apply visual effects (`/api/image/{op}`) or transcode between
-  raster formats (`/api/convert`). Each accepts either a multipart `file`
-  upload or a public image `url` that the server fetches on your behalf
-  (private/reserved addresses are refused).
+- **Media** — apply visual effects (`/api/image/{op}`), transcode between
+  raster formats (`/api/convert`), or inspect an image (`/api/metadata`).
+  Each accepts either a multipart `file` upload or a public image `url` that
+  the server fetches on your behalf (private/reserved addresses are refused).
 - **Scan** — check an uploaded file for malware via ClamAV and VirusTotal
   (`/api/scan`).
 

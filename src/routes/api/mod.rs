@@ -39,6 +39,7 @@ pub use auth::{copy_api_token, ApiToken};
         images::download_images,
         media::manipulate_image,
         media::convert_file,
+        media::image_info,
         scan::scan_file,
     ),
     components(
@@ -49,6 +50,7 @@ pub use auth::{copy_api_token, ApiToken};
             crate::routes::image::DeleteResult,
             crate::routes::image::BulkFilesPayload,
             crate::scan::ScanReport,
+            media::ImageInfo,
         ),
         responses(utils::RateLimitResponse),
     ),
@@ -103,9 +105,17 @@ mod tests {
         // operation ids or malformed path specs that compile but panic.
         let spec = Schema::openapi();
         let paths = &spec.paths.paths;
-        for expected in ["/api/scan", "/api/convert", "/api/image/{op}"] {
+        for expected in ["/api/scan", "/api/convert", "/api/image/{op}", "/api/metadata"] {
             assert!(paths.contains_key(expected), "missing {expected} in OpenAPI spec");
         }
+    }
+
+    #[test]
+    fn router_builds_without_route_conflicts() {
+        // matchit panics at registration on conflicting paths (e.g. a static
+        // segment overlapping a `:param` on axum 0.7). Building the router
+        // here surfaces that as a test failure rather than at server start.
+        let _ = routes();
     }
 }
 
@@ -117,6 +127,7 @@ pub fn routes() -> Router<AppState> {
         .route("/images/download", post(images::download_images))
         .route("/images/:id", delete(images::delete_image_by_id))
         .route("/scan", post(scan::scan_file))
+        .route("/metadata", post(media::image_info))
         .route("/image/:op", post(media::manipulate_image))
         .route("/convert", post(media::convert_file))
         .route_layer(RateLimit::default().quota(25, 60.0).build())

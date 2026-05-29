@@ -15,6 +15,7 @@ pub mod headers;
 pub mod health;
 pub mod key;
 pub mod logging;
+pub mod metadata;
 pub mod metrics;
 pub mod models;
 pub mod postgres;

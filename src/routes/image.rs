@@ -73,6 +73,10 @@ async fn validate_field(field: Field<'_>) -> anyhow::Result<ValidatedFile> {
         anyhow::bail!("empty file");
     }
 
+    // Strip EXIF/XMP/text metadata (GPS, camera, etc.) before the bytes are
+    // stored or served. Pixel data and animation are preserved.
+    let bytes = Bytes::from(crate::metadata::strip(&ext, &bytes));
+
     let mimetype = tree_magic::from_u8(&bytes);
 
     Ok(ValidatedFile {
@@ -113,21 +117,24 @@ pub struct UploadResult {
     pub total: usize,
     /// Number of files skipped due to unsupported type or missing filename.
     pub skipped: usize,
+    /// Number of files rejected because a malware scan flagged them.
+    #[serde(default)]
+    pub infected: usize,
     /// Canonical URLs of the successfully uploaded files.
     pub links: Vec<String>,
 }
 
 impl UploadResult {
     pub fn is_success(&self) -> bool {
-        self.total > 0 && self.errors == 0 && self.skipped == 0
+        self.total > 0 && self.errors == 0 && self.skipped == 0 && self.infected == 0
     }
 
     pub fn is_error(&self) -> bool {
-        self.total > 0 && self.total == self.errors
+        self.total > 0 && self.total == self.errors + self.infected
     }
 
     pub fn successful(&self) -> usize {
-        self.total.saturating_sub(self.errors)
+        self.total.saturating_sub(self.errors).saturating_sub(self.infected)
     }
 }
 
@@ -169,9 +176,49 @@ pub async fn raw_upload_file(
 
     let total = files.len();
     let mut errors = 0usize;
+    let mut infected = 0usize;
     let mut links = Vec::with_capacity(total);
 
+    // Only pay the scanning cost when a backend is actually configured.
+    let scan_enabled =
+        state.config().clamav_addr.is_some() || state.config().virustotal_api_key.is_some();
+
     for mut file in files {
+        // Malware gate: run the configured scanners (ClamAV + VirusTotal) over
+        // the bytes before they ever touch the database. A definite hit on
+        // either backend ("infected") is rejected; "unknown"/"clean" pass.
+        if scan_enabled {
+            let report = crate::scan::scan_bytes(&state, &file.bytes).await;
+            if report.verdict == "infected" {
+                infected += 1;
+                tracing::warn!(
+                    sha256 = %report.sha256,
+                    virus = ?report.clamav_virus,
+                    vt = ?report.vt_status,
+                    "rejected infected upload"
+                );
+                state.audit("image.upload.rejected")
+                    .actor(&account)
+                    .target(format!("{}.{}", file.id, file.ext))
+                    .ip_opt(client_ip)
+                    .meta(serde_json::json!({
+                        "reason":       "infected",
+                        "sha256":       report.sha256,
+                        "clamav_virus": report.clamav_virus,
+                        "vt_status":    report.vt_status,
+                        "vt_positives": report.vt_positives,
+                    }))
+                    .fire();
+                state.send_alert(
+                    crate::discord::Alert::error("Blocked Infected Upload")
+                        .field("SHA-256", report.sha256)
+                        .field("ClamAV", report.clamav_virus.unwrap_or_else(|| "—".into()))
+                        .field("VirusTotal", report.vt_status.unwrap_or_else(|| "—".into())),
+                );
+                continue;
+            }
+        }
+
         // Resolve ID conflicts by appending a suffix.
         let insert_result = state
             .database()
@@ -227,11 +274,12 @@ pub async fn raw_upload_file(
         .target(format!("{total} image{}", if total == 1 { "" } else { "s" }))
         .ip_opt(client_ip)
         .meta(serde_json::json!({
-            "total":   total,
-            "errors":  errors,
-            "skipped": skipped,
-            "via_api": api,
-            "links":   links,
+            "total":    total,
+            "errors":   errors,
+            "skipped":  skipped,
+            "infected": infected,
+            "via_api":  api,
+            "links":    links,
         }))
         .fire();
 
@@ -240,10 +288,11 @@ pub async fn raw_upload_file(
             .account(account)
             .field("Total", total)
             .field("Errors", errors)
+            .field("Infected", infected)
             .field("Links", links.join("\n")),
     );
 
-    Ok(UploadResult { errors, total, skipped, links })
+    Ok(UploadResult { errors, total, skipped, infected, links })
 }
 
 /// Deletes a single image by ID.
@@ -318,14 +367,19 @@ async fn upload_file(
             let message = if result.is_success() {
                 FlashMessage::success("Upload successful.")
             } else if result.is_error() {
-                FlashMessage::error("Upload failed.")
+                if result.infected > 0 && result.errors == 0 {
+                    FlashMessage::error("Upload blocked: file failed a malware scan.")
+                } else {
+                    FlashMessage::error("Upload failed.")
+                }
             } else {
                 let ok = result.successful();
                 FlashMessage::warning(format!(
-                    "Uploaded {ok} file{}, {} skipped, {} failed.",
+                    "Uploaded {ok} file{}, {} skipped, {} failed, {} blocked by malware scan.",
                     if ok == 1 { "" } else { "s" },
                     result.skipped,
                     result.errors,
+                    result.infected,
                 ))
             };
             flasher.add(message).bail(&url)
