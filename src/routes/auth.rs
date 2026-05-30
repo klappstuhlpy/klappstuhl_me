@@ -18,7 +18,7 @@ use axum::{
     http::{header::SET_COOKIE, HeaderValue, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
-    Form, Json, Router,
+    Extension, Form, Json, Router,
 };
 use cookie::Cookie;
 use serde::{Deserialize, Serialize};
@@ -87,8 +87,30 @@ async fn authenticate(
         match account {
             Some(acc) => {
                 state.invalidate_account_cache(acc.id);
-                let token = Token::new(acc.id)?;
                 let key = &state.config().secret_key;
+
+                // Second factor: if the account has verified TOTP, defer
+                // session creation until the code is checked. We hand back a
+                // short-lived signed "pending" cookie and bounce to /login/2fa.
+                if acc.has_totp() {
+                    let pending = PendingTotp {
+                        account_id: acc.id,
+                        remember: credentials.remember_me.is_some(),
+                        description: credentials.session_description.clone(),
+                        exp: (OffsetDateTime::now_utc() + time::Duration::minutes(5)).unix_timestamp(),
+                    };
+                    let Ok(signed) = key.sign(&pending) else {
+                        return Err(ApiError::new("could not start the 2FA challenge"));
+                    };
+                    state
+                        .audit("auth.login.2fa_challenge")
+                        .actor(&acc)
+                        .ip_opt(client_ip)
+                        .fire();
+                    return Ok(pending_totp_response(signed));
+                }
+
+                let token = Token::new(acc.id)?;
                 let cookie = if credentials.remember_me.is_some() {
                     token.to_cookie(key)
                 } else {
@@ -498,6 +520,8 @@ struct AccountInfoTemplate {
     /// (empty for legacy / unscoped keys). Used to pre-check the boxes
     /// in the scopes selection UI.
     api_key_scopes: String,
+    /// Whether this account has TOTP 2FA enabled (drives the account-page UI).
+    totp_enabled: bool,
     key: SecretKey,
 }
 
@@ -520,6 +544,7 @@ impl AccountInfoTemplate {
             Vec::<Session>::new()
         };
 
+        let totp_enabled = user.totp_enabled;
         let session_id = current_token.base64();
         let current_session = sessions
             .iter()
@@ -546,6 +571,7 @@ impl AccountInfoTemplate {
             current_session,
             api_key,
             api_key_scopes,
+            totp_enabled,
             key,
         }
     }
@@ -622,12 +648,324 @@ async fn generate_api_key(
     Ok(Json(GeneratedApiKey { token }))
 }
 
+// ─── Two-factor (TOTP) ──────────────────────────────────────────────────────
+
+/// Signed, short-lived payload bridging the password step and the TOTP step of
+/// login. Stored in the `totp_pending` cookie; never written to the database.
+#[derive(Serialize, Deserialize)]
+struct PendingTotp {
+    account_id: i64,
+    remember: bool,
+    description: Option<String>,
+    exp: i64,
+}
+
+const PENDING_COOKIE: &str = "totp_pending";
+
+fn pending_totp_cookie(signed: String) -> Cookie<'static> {
+    Cookie::build((PENDING_COOKIE, signed))
+        .path("/")
+        .http_only(true)
+        .same_site(cookie::SameSite::Lax)
+        .max_age(time::Duration::minutes(5))
+        .build()
+}
+
+fn clear_pending_cookie() -> Cookie<'static> {
+    Cookie::build((PENDING_COOKIE, ""))
+        .path("/")
+        .expires(cookie::time::OffsetDateTime::UNIX_EPOCH)
+        .build()
+}
+
+/// 303 to /login/2fa carrying the pending-challenge cookie.
+fn pending_totp_response(signed: String) -> Response {
+    let mut resp = Redirect::to("/login/2fa").into_response();
+    resp.headers_mut().insert(
+        SET_COOKIE,
+        HeaderValue::from_str(&pending_totp_cookie(signed).to_string()).unwrap(),
+    );
+    resp
+}
+
+/// Loads an account by id with all columns (so `totp_secret` is populated even
+/// if a cached/JOINed copy wouldn't be).
+async fn load_full_account(state: &AppState, id: i64) -> Option<Account> {
+    state
+        .database()
+        .get::<Account, _, _>("SELECT * FROM account WHERE id = ?", [id])
+        .await
+        .ok()
+        .flatten()
+}
+
+/// Marks a matching unused recovery code as used. Returns true if one was
+/// consumed.
+async fn consume_recovery_code(state: &AppState, account_id: i64, code: &str) -> bool {
+    let hash = crate::totp::hash_recovery_code(code);
+    state
+        .database()
+        .execute(
+            "UPDATE totp_recovery_code
+                SET used_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+              WHERE account_id = ? AND code_hash = ? AND used_at IS NULL",
+            (account_id, hash),
+        )
+        .await
+        .unwrap_or(0)
+        > 0
+}
+
+#[derive(Template)]
+#[template(path = "login_2fa.html")]
+struct Login2faTemplate {
+    account: Option<Account>,
+    flashes: Flashes,
+}
+
+async fn login_totp_page(
+    account: Option<Account>,
+    flashes: Flashes,
+    Extension(cookies): Extension<Vec<Cookie<'static>>>,
+) -> Response {
+    if account.is_some() {
+        return Redirect::to("/").into_response();
+    }
+    // No pending challenge → nothing to verify; send back to login.
+    if !cookies.iter().any(|c| c.name() == PENDING_COOKIE) {
+        return Redirect::to("/login").into_response();
+    }
+    Login2faTemplate { account: None, flashes }.into_response()
+}
+
+#[derive(Deserialize)]
+struct TotpCodeForm {
+    code: String,
+}
+
+async fn login_totp_verify(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    flasher: Flasher,
+    Extension(cookies): Extension<Vec<Cookie<'static>>>,
+    Form(form): Form<TotpCodeForm>,
+) -> Response {
+    let key = state.config().secret_key;
+    let Some(signed) = cookies
+        .iter()
+        .find(|c| c.name() == PENDING_COOKIE)
+        .map(|c| c.value().to_string())
+    else {
+        return flasher.add("Your 2FA session expired. Please log in again.").bail("/login");
+    };
+    let Some(pending) = key.verify::<PendingTotp>(&signed) else {
+        return flasher.add("Your 2FA session was invalid. Please log in again.").bail("/login");
+    };
+    if OffsetDateTime::now_utc().unix_timestamp() > pending.exp {
+        return flasher.add("Your 2FA session expired. Please log in again.").bail("/login");
+    }
+
+    let Some(acc) = load_full_account(&state, pending.account_id).await else {
+        return flasher.add("Account not found.").bail("/login");
+    };
+    let secret = acc
+        .totp_secret
+        .as_deref()
+        .and_then(|enc| crate::totp::decrypt_secret(&key, enc));
+    let Some(secret) = secret else {
+        return flasher.add("Two-factor is not configured for this account.").bail("/login");
+    };
+
+    let code = form.code.trim();
+    let ok = crate::totp::verify(&secret, code)
+        || consume_recovery_code(&state, acc.id, code).await;
+    if !ok {
+        state
+            .audit("auth.login.2fa_fail")
+            .actor(&acc)
+            .ip_opt(client_ip)
+            .fire();
+        register_failure(&state, client_ip).await;
+        return flasher.add("Invalid code. Please try again.").bail("/login/2fa");
+    }
+
+    // Second factor cleared — issue the real session.
+    let Ok(token) = Token::new(acc.id) else {
+        return flasher.add("Could not create a session. Try again.").bail("/login");
+    };
+    let session_cookie = if pending.remember {
+        token.to_cookie(&key)
+    } else {
+        token.to_session_cookie(&key)
+    };
+    state.save_session(&token, pending.description.clone()).await;
+    state
+        .audit("auth.login.success")
+        .actor(&acc)
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({ "second_factor": "totp" }))
+        .fire();
+
+    let mut resp = Redirect::to("/").into_response();
+    let headers = resp.headers_mut();
+    headers.append(SET_COOKIE, HeaderValue::from_str(&session_cookie.to_string()).unwrap());
+    headers.append(SET_COOKIE, HeaderValue::from_str(&clear_pending_cookie().to_string()).unwrap());
+    resp
+}
+
+#[derive(Template)]
+#[template(path = "account_2fa.html")]
+struct Totp2faSetupTemplate {
+    account: Option<Account>,
+    qr_svg: String,
+    secret_base32: String,
+    recovery_codes: Vec<String>,
+}
+
+/// Begins enrollment: generates and stores a fresh (still-disabled) secret and
+/// recovery codes, then shows the QR + codes. Enabling requires verifying a
+/// code via [`totp_enable`], so a misconfigured authenticator can never lock
+/// the user out.
+async fn totp_setup(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    account: Account,
+    flasher: Flasher,
+) -> Response {
+    let key = state.config().secret_key;
+    let secret = crate::totp::generate_secret();
+    let Ok(encrypted) = crate::totp::encrypt_secret(&key, &secret) else {
+        return flasher.add("Could not generate a 2FA secret.").bail("/account");
+    };
+
+    if state
+        .database()
+        .execute(
+            "UPDATE account SET totp_secret = ?, totp_enabled = 0 WHERE id = ?",
+            (encrypted, account.id),
+        )
+        .await
+        .is_err()
+    {
+        return flasher.add("Could not store the 2FA secret.").bail("/account");
+    }
+
+    // Fresh recovery codes (replace any prior set).
+    let codes = crate::totp::generate_recovery_codes();
+    let _ = state
+        .database()
+        .execute("DELETE FROM totp_recovery_code WHERE account_id = ?", [account.id])
+        .await;
+    for code in &codes {
+        let _ = state
+            .database()
+            .execute(
+                "INSERT INTO totp_recovery_code (account_id, code_hash) VALUES (?, ?)",
+                (account.id, crate::totp::hash_recovery_code(code)),
+            )
+            .await;
+    }
+    state.invalidate_account_cache(account.id);
+    state
+        .audit("auth.2fa.setup")
+        .actor(&account)
+        .ip_opt(client_ip)
+        .fire();
+
+    let uri = crate::totp::otpauth_uri(&secret, &account.name);
+    let qr_svg = crate::totp::qr_svg(&uri).unwrap_or_default();
+    Totp2faSetupTemplate {
+        account: Some(account),
+        qr_svg,
+        secret_base32: crate::totp::base32_secret(&secret),
+        recovery_codes: codes,
+    }
+    .into_response()
+}
+
+async fn totp_enable(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    account: Account,
+    flasher: Flasher,
+    Form(form): Form<TotpCodeForm>,
+) -> Response {
+    let key = state.config().secret_key;
+    let Some(acc) = load_full_account(&state, account.id).await else {
+        return flasher.add("Account not found.").bail("/account");
+    };
+    let secret = acc
+        .totp_secret
+        .as_deref()
+        .and_then(|enc| crate::totp::decrypt_secret(&key, enc));
+    let Some(secret) = secret else {
+        return flasher.add("Start 2FA setup first.").bail("/account");
+    };
+    if !crate::totp::verify(&secret, form.code.trim()) {
+        return flasher.add("That code didn't match. Try again.").bail("/account");
+    }
+    if state
+        .database()
+        .execute("UPDATE account SET totp_enabled = 1 WHERE id = ?", [account.id])
+        .await
+        .is_err()
+    {
+        return flasher.add("Could not enable 2FA.").bail("/account");
+    }
+    state.invalidate_account_cache(account.id);
+    state.audit("auth.2fa.enable").actor(&account).ip_opt(client_ip).fire();
+    flasher.add(FlashMessage::success("Two-factor authentication is now enabled.")).bail("/account")
+}
+
+#[derive(Deserialize)]
+struct TotpDisableForm {
+    password: String,
+}
+
+async fn totp_disable(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    account: Account,
+    flasher: Flasher,
+    Form(form): Form<TotpDisableForm>,
+) -> Response {
+    let Some(acc) = load_full_account(&state, account.id).await else {
+        return flasher.add("Account not found.").bail("/account");
+    };
+    if validate_password(&form.password, &acc.password).is_err() {
+        return flasher.add("Invalid password.").bail("/account");
+    }
+    let _ = state
+        .database()
+        .execute(
+            "UPDATE account SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?",
+            [account.id],
+        )
+        .await;
+    let _ = state
+        .database()
+        .execute("DELETE FROM totp_recovery_code WHERE account_id = ?", [account.id])
+        .await;
+    state.invalidate_account_cache(account.id);
+    state.audit("auth.2fa.disable").actor(&account).ip_opt(client_ip).fire();
+    flasher.add(FlashMessage::success("Two-factor authentication disabled.")).bail("/account")
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route(
             "/account/authenticate",
             post(login_form).layer(RateLimit::default().quota(10, 60.0).build()),
         )
+        .route(
+            "/login/2fa",
+            get(login_totp_page)
+                .post(login_totp_verify)
+                .layer(RateLimit::default().quota(10, 60.0).build()),
+        )
+        .route("/account/2fa/setup", post(totp_setup))
+        .route("/account/2fa/enable", post(totp_enable))
+        .route("/account/2fa/disable", post(totp_disable))
         .route("/login", get(login))
         .route("/logout", get(logout))
         .route("/logout/all", get(logout_all))

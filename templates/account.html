@@ -129,6 +129,26 @@
 </section>
 {% endif %}
 
+{# ─── Two-factor authentication ──────────────────────────────── #}
+{% if account.id == user.id %}
+<section class="account-section">
+    <h2>Two-factor authentication</h2>
+    {% if totp_enabled %}
+    <p>2FA is <strong>enabled</strong>. You'll be asked for a code from your authenticator app when you log in.</p>
+    <form method="POST" action="/account/2fa/disable" class="form-row">
+        <input class="form-field" required name="password" type="password"
+               placeholder="Confirm your password" autocomplete="current-password">
+        <button class="button danger outline" type="submit">Disable 2FA</button>
+    </form>
+    {% else %}
+    <p>Add a second factor (TOTP) for stronger account security. Recommended for admins.</p>
+    <form method="POST" action="/account/2fa/setup">
+        <button class="button primary" type="submit">Set up 2FA</button>
+    </form>
+    {% endif %}
+</section>
+{% endif %}
+
 {# ─── Sessions ────────────────────────────────────────────────── #}
 {% if current_session.is_some() || !sessions.is_empty() %}
 <section class="account-section" id="session-section">
