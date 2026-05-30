@@ -3,6 +3,7 @@ pub mod audit;
 pub mod auth;
 pub mod backup;
 pub mod cached;
+pub mod codeimage;
 pub mod docker;
 pub mod firewall;
 pub mod cli;

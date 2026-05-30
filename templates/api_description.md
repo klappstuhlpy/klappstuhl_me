@@ -15,6 +15,8 @@ If you have not generated an API key yet, you can do so on your [account page](/
   raster formats (`/api/convert`), or inspect an image (`/api/metadata`).
   Each accepts either a multipart `file` upload or a public image `url` that
   the server fetches on your behalf (private/reserved addresses are refused).
+- **Render** — turn content into images, e.g. a syntax-highlighted code
+  screenshot (`/api/render/code`).
 - **Scan** — check an uploaded file for malware via ClamAV and VirusTotal
   (`/api/scan`).
 

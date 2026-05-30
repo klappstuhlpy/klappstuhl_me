@@ -1,4 +1,5 @@
 mod auth;
+mod code;
 mod images;
 mod media;
 mod scan;
@@ -41,6 +42,7 @@ pub use media::serve_media;
         media::manipulate_image,
         media::convert_file,
         media::image_info,
+        code::render_code,
         scan::scan_file,
     ),
     components(
@@ -53,6 +55,7 @@ pub use media::serve_media;
             crate::scan::ScanReport,
             media::ImageInfo,
             media::ShareResult,
+            code::CodeImageRequest,
         ),
         responses(utils::RateLimitResponse),
     ),
@@ -60,6 +63,7 @@ pub use media::serve_media;
     tags(
         (name = "images", description = "Endpoints for uploading/deleting and getting images at the server."),
         (name = "media", description = "Image manipulation and format conversion. Accepts a `file` upload or a public image `url`."),
+        (name = "render", description = "Render content to images (syntax-highlighted code screenshots, …)."),
         (name = "scan", description = "Scan uploaded files for malware via ClamAV and VirusTotal.")
     )
 )]
@@ -107,7 +111,7 @@ mod tests {
         // operation ids or malformed path specs that compile but panic.
         let spec = Schema::openapi();
         let paths = &spec.paths.paths;
-        for expected in ["/api/scan", "/api/convert", "/api/image/{op}", "/api/metadata"] {
+        for expected in ["/api/scan", "/api/convert", "/api/image/{op}", "/api/metadata", "/api/render/code"] {
             assert!(paths.contains_key(expected), "missing {expected} in OpenAPI spec");
         }
     }
@@ -132,6 +136,7 @@ pub fn routes() -> Router<AppState> {
         .route("/metadata", post(media::image_info))
         .route("/image/:op", post(media::manipulate_image))
         .route("/convert", post(media::convert_file))
+        .route("/render/code", post(code::render_code))
         .route_layer(RateLimit::default().quota(25, 60.0).build())
         .route_layer(
             CorsLayer::new()
