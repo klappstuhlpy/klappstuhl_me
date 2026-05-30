@@ -475,8 +475,9 @@
     color: var(--text-muted);
 }
 
-/* ── Change-password dialog (extends base dialog styles) ─────── */
+/* ── Change-password / disable-2FA dialogs (extend base dialog styles) ─────── */
 
-#change-password-modal {
+#change-password-modal,
+#disable-2fa-modal {
     width: min(440px, 92vw);
 }

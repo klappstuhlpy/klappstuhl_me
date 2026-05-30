@@ -135,11 +135,7 @@
     <h2>Two-factor authentication</h2>
     {% if totp_enabled %}
     <p>2FA is <strong>enabled</strong>. You'll be asked for a code from your authenticator app when you log in.</p>
-    <form method="POST" action="/account/2fa/disable" class="form-row">
-        <input class="form-field" required name="password" type="password"
-               placeholder="Confirm your password" autocomplete="current-password">
-        <button class="button danger outline" type="submit">Disable 2FA</button>
-    </form>
+    <button class="button danger outline" id="disable-2fa" type="button">Deactivate</button>
     {% else %}
     <p>Add a second factor (TOTP) for stronger account security. Recommended for admins.</p>
     <form method="POST" action="/account/2fa/setup">
@@ -217,4 +213,26 @@
         </footer>
     </form>
 </dialog>
+
+{% if account.id == user.id && totp_enabled %}
+<dialog id="disable-2fa-modal">
+    <form autocomplete="off" method="POST" action="/account/2fa/disable">
+        <h1>Disable two-factor</h1>
+        <p>Confirm your password to turn off 2FA. Your recovery codes will be deleted.</p>
+        <div class="form-container">
+            <div class="field-group">
+                <label class="field-label" for="disable-2fa-password">Password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="password" id="disable-2fa-password" type="password" autocomplete="current-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+        </div>
+        <footer>
+            <button class="button danger" type="submit">Deactivate</button>
+            <button class="button" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+{% endif %}
 {% endblock %}

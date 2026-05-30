@@ -49,6 +49,13 @@ document.querySelector('#change-password-modal .button[formmethod="dialog"]')?.a
   document.getElementById('change-password-modal').close();
 });
 
+document.getElementById('disable-2fa')?.addEventListener('click', () => {
+  document.getElementById('disable-2fa-modal').showModal();
+});
+document.querySelector('#disable-2fa-modal .button[formmethod="dialog"]')?.addEventListener('click', () => {
+  document.getElementById('disable-2fa-modal').close();
+});
+
 document.getElementById('session-description')?.setAttribute('value', deviceDescription());
 
 document.querySelectorAll('.created[data-timestamp]').forEach(el => {
