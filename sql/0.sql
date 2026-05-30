@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS account
     password    TEXT        NOT NULL,
     created_at  TEXT        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     flags       INTEGER     NOT NULL DEFAULT 0,
-    invite_code TEXT        NOT NULL DEFAULT '_console'
+    invite_code TEXT        NOT NULL DEFAULT '_console',
+    totp_secret TEXT,
+    totp_enabled INTEGER    NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS account_name_idx ON account (name);
