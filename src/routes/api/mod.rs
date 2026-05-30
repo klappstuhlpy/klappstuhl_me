@@ -1,5 +1,6 @@
 mod auth;
 mod code;
+mod external;
 mod images;
 mod media;
 mod scan;
@@ -43,6 +44,9 @@ pub use media::serve_media;
         media::convert_file,
         media::image_info,
         code::render_code,
+        external::screenshot,
+        external::markdown_pdf,
+        external::transcode,
         scan::scan_file,
     ),
     components(
@@ -56,6 +60,8 @@ pub use media::serve_media;
             media::ImageInfo,
             media::ShareResult,
             code::CodeImageRequest,
+            external::ScreenshotRequest,
+            external::MarkdownRequest,
         ),
         responses(utils::RateLimitResponse),
     ),
@@ -111,7 +117,16 @@ mod tests {
         // operation ids or malformed path specs that compile but panic.
         let spec = Schema::openapi();
         let paths = &spec.paths.paths;
-        for expected in ["/api/scan", "/api/convert", "/api/image/{op}", "/api/metadata", "/api/render/code"] {
+        for expected in [
+            "/api/scan",
+            "/api/convert",
+            "/api/image/{op}",
+            "/api/metadata",
+            "/api/render/code",
+            "/api/render/screenshot",
+            "/api/render/markdown-pdf",
+            "/api/convert/transcode",
+        ] {
             assert!(paths.contains_key(expected), "missing {expected} in OpenAPI spec");
         }
     }
@@ -137,6 +152,9 @@ pub fn routes() -> Router<AppState> {
         .route("/image/:op", post(media::manipulate_image))
         .route("/convert", post(media::convert_file))
         .route("/render/code", post(code::render_code))
+        .route("/render/screenshot", post(external::screenshot))
+        .route("/render/markdown-pdf", post(external::markdown_pdf))
+        .route("/convert/transcode", post(external::transcode))
         .route_layer(RateLimit::default().quota(25, 60.0).build())
         .route_layer(
             CorsLayer::new()

@@ -190,6 +190,16 @@ pub struct Config {
     /// Defaults to 14 when unset.
     #[serde(default)]
     pub backup_keep: Option<usize>,
+    /// Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF
+    /// render endpoints. When unset, common names on `PATH` are tried; if none
+    /// is found those endpoints return 503.
+    #[serde(default)]
+    pub chromium_path: Option<String>,
+    /// Path to an `ffmpeg` binary for the video/HEIC conversion endpoints.
+    /// When unset, `ffmpeg` on `PATH` is used; otherwise those endpoints
+    /// return 503.
+    #[serde(default)]
+    pub ffmpeg_path: Option<String>,
     /// The secret key used for all crypto related functionality in the server.
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
@@ -221,6 +231,8 @@ impl Config {
             proxy_reload_command: None,
             backup_interval_hours: None,
             backup_keep: None,
+            chromium_path: None,
+            ffmpeg_path: None,
             secret_key: SecretKey::random()?,
         })
     }

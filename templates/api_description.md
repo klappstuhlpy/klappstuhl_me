@@ -15,8 +15,12 @@ If you have not generated an API key yet, you can do so on your [account page](/
   raster formats (`/api/convert`), or inspect an image (`/api/metadata`).
   Each accepts either a multipart `file` upload or a public image `url` that
   the server fetches on your behalf (private/reserved addresses are refused).
-- **Render** — turn content into images, e.g. a syntax-highlighted code
-  screenshot (`/api/render/code`).
+- **Render** — turn content into images/documents: a syntax-highlighted code
+  screenshot (`/api/render/code`, pure Rust), a web-page screenshot
+  (`/api/render/screenshot`), or Markdown → PDF (`/api/render/markdown-pdf`).
+  The latter two need a Chromium binary on the server and return `500
+  (not available)` until one is installed. `/api/convert/transcode` converts
+  MOV→MP4 / HEIC→JPG via `ffmpeg` under the same arrangement.
 - **Scan** — check an uploaded file for malware via ClamAV and VirusTotal
   (`/api/scan`).
 
