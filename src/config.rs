@@ -71,6 +71,14 @@ pub struct Config {
     #[serde(rename = "discord_webhook_url")]
     #[serde(default)]
     pub webhook: Option<Webhook>,
+    /// ntfy topic URL (e.g. `https://ntfy.sh/my-topic`). When set, alerts are
+    /// also delivered as plain-text push notifications via ntfy.
+    #[serde(default)]
+    pub ntfy_url: Option<String>,
+    /// Generic webhook URL. When set, alerts are also POSTed here as a neutral
+    /// JSON body `{title, level, body, fields}`.
+    #[serde(default)]
+    pub alert_webhook_url: Option<String>,
     /// Services to monitor on the `/admin/services` admin page.
     #[serde(default)]
     pub services: Vec<ServiceConfig>,
@@ -194,6 +202,8 @@ impl Config {
             production: false,
             domains: Vec::new(),
             webhook: None,
+            ntfy_url: None,
+            alert_webhook_url: None,
             services: Vec::new(),
             server: ServerConfig::default(),
             geoip_db_path: None,

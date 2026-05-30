@@ -191,7 +191,7 @@ fn broadcast_event(state: &AppState, target_id: i64, event: &'static str, outcom
 }
 
 fn fire_down_webhook(state: &AppState, target: &HealthTarget, outcome: &CheckOutcome) {
-    if state.config().webhook.is_none() {
+    if !state.has_any_alert_sink() {
         return;
     }
     let payload = json!({
@@ -211,7 +211,7 @@ fn fire_down_webhook(state: &AppState, target: &HealthTarget, outcome: &CheckOut
 }
 
 fn fire_recovery_webhook(state: &AppState, target: &HealthTarget) {
-    if state.config().webhook.is_none() {
+    if !state.has_any_alert_sink() {
         return;
     }
     let payload = json!({

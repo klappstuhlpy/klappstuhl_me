@@ -276,14 +276,44 @@ impl AppState {
         &self.inner.database
     }
 
-    /// Sends an alert webhook with the given webhook payload.
+    /// Returns true if at least one alert sink (Discord, ntfy, or generic
+    /// webhook) is configured. Callers use this to skip building alert
+    /// payloads when nothing would consume them.
+    pub fn has_any_alert_sink(&self) -> bool {
+        let cfg = self.config();
+        cfg.webhook.is_some() || cfg.ntfy_url.is_some() || cfg.alert_webhook_url.is_some()
+    }
+
+    /// Fans an alert out to every configured sink (Discord, ntfy, generic
+    /// webhook). The payload is the Discord webhook shape; a neutral
+    /// notification is derived from it for the non-Discord sinks.
     ///
-    /// This sends the request in the background so there's no way to detect
-    /// if it failed or not.
+    /// All deliveries happen in the background — failures are not surfaced.
     pub fn send_alert<T: serde::Serialize + Send + 'static>(&self, payload: T) {
-        if let Some(wh) = self.config().webhook.clone() {
+        let Ok(value) = serde_json::to_value(&payload) else {
+            return;
+        };
+        let cfg = self.config();
+
+        if let Some(wh) = cfg.webhook.clone() {
             let client = self.client.clone();
-            tokio::spawn(async move { wh.prepare(payload).send(&client).await });
+            let v = value.clone();
+            tokio::spawn(async move { wh.prepare(v).send(&client).await });
+        }
+
+        if cfg.ntfy_url.is_none() && cfg.alert_webhook_url.is_none() {
+            return;
+        }
+        let note = crate::alerts::AlertNotification::from_discord_value(&value);
+        if let Some(url) = cfg.ntfy_url.clone() {
+            let client = self.client.clone();
+            let note = note.clone();
+            tokio::spawn(async move { crate::alerts::send_ntfy(&client, &url, &note).await });
+        }
+        if let Some(url) = cfg.alert_webhook_url.clone() {
+            let client = self.client.clone();
+            let note = note.clone();
+            tokio::spawn(async move { crate::alerts::send_webhook(&client, &url, &note).await });
         }
     }
 

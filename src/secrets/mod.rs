@@ -79,7 +79,7 @@ pub async fn run_scan(state: &AppState) -> anyhow::Result<()> {
     );
 
     // Alert on *new* critical findings only.
-    if new_count > 0 && critical > 0 && state.config().webhook.is_some() {
+    if new_count > 0 && critical > 0 && state.has_any_alert_sink() {
         let payload = json!({
             "username": "klappstuhl secrets",
             "embeds": [{

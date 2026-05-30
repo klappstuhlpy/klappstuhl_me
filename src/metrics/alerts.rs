@@ -82,7 +82,7 @@ pub async fn check_and_fire(state: &AppState, alerts: &AlertState, sample: &Samp
     if fires.is_empty() {
         return;
     }
-    if state.config().webhook.is_none() {
+    if !state.has_any_alert_sink() {
         return; // nowhere to send
     }
 
