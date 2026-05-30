@@ -34,6 +34,7 @@
     --box:        #18181b;
     --box-shade:  #1e1e21;
     --box-border: #27272a;
+    --box-border-light: #a0a0a1;
 
     /* Forms */
     --form-input-background:    #1c1c1f;
@@ -306,7 +307,7 @@ input[type="checkbox"]:checked::after {
 }
 
 .button.outline {
-    border: 1px solid var(--foreground);
+    border: 2px solid var(--box-border-light);
 }
 
 .button.primary:not(.outline) {
