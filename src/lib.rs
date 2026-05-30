@@ -1,48 +1,28 @@
-pub mod alerts;
-pub mod audit;
+// Modules are grouped into domains so the source tree stays navigable as the
+// project grows. The flat `pub use` aliases below preserve the historical
+// `crate::<module>` paths, so call sites don't need to spell out the domain.
 pub mod auth;
-pub mod backup;
-pub mod cached;
-pub mod codeimage;
-pub mod docker;
-pub mod firewall;
-pub mod cli;
-pub mod cloudflare;
-mod config;
-pub mod database;
-pub mod discord;
-pub mod error;
-pub mod exttools;
-pub mod flash;
-pub mod geoip;
-pub mod headers;
-pub mod health;
-pub mod key;
-pub mod logging;
-pub mod metadata;
-pub mod metrics;
-pub mod models;
-pub mod postgres;
-pub mod proxy;
-pub mod ratelimit;
-pub mod routes;
-pub mod scan;
-pub mod scope;
-pub mod secrets;
-pub mod ssh;
-mod state;
-pub mod token;
-pub mod totp;
-pub mod utils;
-pub mod filters;
+pub mod core;
+pub mod integrations;
+pub mod media;
+pub mod services;
+pub mod web;
 
-pub use cli::{Command, PROGRAM_NAME};
-pub use config::{Config, CONFIG};
-pub use database::Database;
-pub use routes::{copy_api_token, ApiToken};
-pub use state::AppState;
-pub use utils::MAX_BODY_SIZE;
-pub use utils::MAX_UPLOAD_SIZE;
+// Flat aliases: keep every `crate::<module>` path working after the regrouping.
+pub use auth::{key, token, totp};
+pub use core::{cli, config, database, error, filters, logging, models, state, utils};
+pub use integrations::{cloudflare, discord, exttools, geoip};
+pub use media::{codeimage, metadata, scan};
+pub use services::{alerts, audit, backup, docker, firewall, health, metrics, postgres, proxy, secrets, ssh};
+pub use web::{cached, flash, headers, ratelimit, routes, scope};
+
+// Curated value re-exports (the crate's public API surface).
+pub use core::cli::{Command, PROGRAM_NAME};
+pub use core::config::{Config, CONFIG};
+pub use core::database::Database;
+pub use core::state::AppState;
+pub use core::utils::{MAX_BODY_SIZE, MAX_UPLOAD_SIZE};
+pub use web::routes::{copy_api_token, ApiToken};
 
 /// A middleware responsible for parsing cookies into a Vec<Cookie> extension for use
 /// for other cookie-related middleware.

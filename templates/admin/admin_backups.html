@@ -1,0 +1,75 @@
+{% extends "admin/admin_layout.html" %}
+
+{% block title %}Backups | Admin | Klappstuhl.me{% endblock %}
+
+{% block admin_body %}
+<div class="admin-page-header">
+    <h1>Backups</h1>
+    <p class="admin-page-sub">
+        Automatic SQLite snapshots via <code>VACUUM INTO</code>, keeping the
+        newest {{ keep }}. Total on disk: {{ total_size_human }}.
+    </p>
+</div>
+
+<section class="admin-section">
+    <form method="post" action="/admin/backups">
+        <button type="submit" class="button primary">Backup now</button>
+    </form>
+</section>
+
+<section class="admin-section">
+    <h2>Snapshots <span class="count-badge">{{ backups.len() }}</span></h2>
+    {% if backups.is_empty() %}
+    <p class="admin-empty">No backups yet — they appear here once the scheduler runs or you take one manually.</p>
+    {% else %}
+    <div class="container-table-wrap">
+        <table class="container-table" id="c-table">
+            <thead>
+                <tr>
+                    <th>File</th>
+                    <th>Size</th>
+                    <th>Created (UTC)</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in backups %}
+                <tr>
+                    <td><code>{{ b.name }}</code></td>
+                    <td>{{ b.size_human }}</td>
+                    <td>{{ b.modified }}</td>
+                    <td class="col-actions">
+                        <a class="button outline" href="/admin/backups/{{ b.name }}/download">Download</a>
+                        <button class="button danger small" data-id="{{ b.name }}">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="admin-page-sub">
+        To restore: stop the server, replace <code>main.db</code> with a
+        downloaded backup, then start it again.
+    </p>
+    {% endif %}
+</section>
+
+<script>
+    const ctable = document.getElementById('c-table');
+
+    if (ctable) {
+        ctable.addEventListener('click', async e => {
+            const btn = e.target.closest('[data-id]');
+            if (!btn) return;
+            const name = btn.dataset.id;
+            btn.disabled = true;
+            try {
+                const r = await fetch(`/admin/backups/${name}/delete`, { method: 'POST' });
+                if (r.ok) // reload page
+                    location.reload();
+                else btn.disabled = false;
+            } catch (_) { btn.disabled = false; }
+        });
+    }
+</script>
+{% endblock %}

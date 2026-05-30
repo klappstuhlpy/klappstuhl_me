@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/auth.css" type="text/css"/>
+{% endblock %}
+
+{% block title %}Login | Klappstuhl.me{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/auth.js"></script>
+{% endblock %}
+
+{% block body %}
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-brand">
+            <span class="login-brand-mark">K</span>
+        </div>
+        <h1 class="login-title">Welcome back</h1>
+        <p class="login-subtitle">Sign in to your account</p>
+
+        <form id="login-form" method="POST" action="/account/authenticate">
+            {% for flash in flashes %}
+            {{ flash.html()|safe }}
+            {% endfor %}
+
+            <div class="field-group">
+                <label class="field-label" for="username">Username</label>
+                <input class="form-field" required placeholder=" "
+                       pattern="[a-z0-9._\-]{0,32}"
+                       name="username" id="username"
+                       type="text" autocomplete="username">
+            </div>
+
+            <div class="field-group">
+                <label class="field-label" for="password">Password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" "
+                           minlength="8" maxlength="128"
+                           name="password" id="password"
+                           type="password" autocomplete="current-password">
+                    <span class="password-icon">
+                        <img alt="" src="/static/img/visibility.svg" width="20" height="20"/>
+                    </span>
+                </div>
+            </div>
+
+            <div class="remember-me-row">
+                <label class="toggle-label" for="remember-me">
+                    <input type="checkbox" name="remember_me" id="remember-me" value="true">
+                    <span class="toggle-track">
+                        <span class="toggle-thumb"></span>
+                    </span>
+                    <span class="toggle-text">Eingeloggt bleiben</span>
+                </label>
+            </div>
+
+            <input type="hidden" id="session-description" name="session_description" value="">
+            <button class="button primary login-submit" type="submit">Login</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

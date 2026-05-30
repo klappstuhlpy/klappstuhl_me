@@ -153,14 +153,21 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         .nest_service("/sw.js", ServeFile::new("static/sw.js"))
         .nest_service("/robots.txt", ServeFile::new("static/robots.txt"))
         .nest_service("/static", ServeDir::new("static"))
-        .layer(middleware::from_fn_with_state(state.clone(), klappstuhl_me::copy_api_token))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            klappstuhl_me::copy_api_token,
+        ))
         .layer(klappstuhl_me::logging::HttpTrace::new(state.requests.clone()))
         .layer(middleware::from_fn(klappstuhl_me::flash::process_flash_messages))
         .layer(middleware::from_fn(klappstuhl_me::parse_cookies))
         .layer(Extension(secret_key))
-        .layer(Extension(klappstuhl_me::cached::BodyCache::new(Duration::from_secs(120))))
+        .layer(Extension(klappstuhl_me::cached::BodyCache::new(Duration::from_secs(
+            120,
+        ))))
         .layer(DefaultBodyLimit::max(klappstuhl_me::MAX_BODY_SIZE))
-        .layer(tower_http::limit::RequestBodyLimitLayer::new(klappstuhl_me::MAX_BODY_SIZE))
+        .layer(tower_http::limit::RequestBodyLimitLayer::new(
+            klappstuhl_me::MAX_BODY_SIZE,
+        ))
         .layer(CompressionLayer::new())
         .layer(TimeoutLayer::new(Duration::from_secs(30)))
         .layer(GlobalConcurrencyLimitLayer::new(512))
@@ -186,9 +193,7 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         let cache_dir = dirs::cache_dir()
             .map(|p| p.join(klappstuhl_me::PROGRAM_NAME).join("rustls_acme_cache"))
             .context("Could not find appropriate cache location for ACME")?;
-        let mut state = AcmeConfig::new(config.domains)
-            .cache(DirCache::new(cache_dir))
-            .state();
+        let mut state = AcmeConfig::new(config.domains).cache(DirCache::new(cache_dir)).state();
 
         let supported_alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
         let mut challenge_config = state.challenge_rustls_config();

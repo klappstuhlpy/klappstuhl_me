@@ -1,0 +1,179 @@
+{% extends "admin/admin_layout.html" %}
+
+{% block title %}SSH Keys | Admin | Klappstuhl.me{% endblock %}
+
+{% block admin_css %}
+<link rel="stylesheet" href="/static/css/admin/admin_ssh.css">
+{% endblock %}
+
+{% block admin_body %}
+<div class="admin-page-header">
+    <div>
+        <h1>SSH Keys</h1>
+        <p class="admin-page-sub">Manage authorized public keys and temporary access tokens.</p>
+    </div>
+    <div style="display:flex; gap:0.5rem;">
+        <a href="/admin/ssh/audit" class="button outline">Audit log</a>
+        <button class="button primary" id="add-key-btn" type="button">Add key</button>
+    </div>
+</div>
+
+<div class="summary">
+    <div class="statistic-box">
+        <span class="title">Total</span>
+        <span class="value" id="stat-total">—</span>
+    </div>
+    <div class="statistic-box">
+        <span class="title">Active</span>
+        <span class="value success" id="stat-active">—</span>
+    </div>
+    <div class="statistic-box">
+        <span class="title">Revoked</span>
+        <span class="value muted" id="stat-revoked">—</span>
+    </div>
+</div>
+
+<!-- ── Add key drawer ───────────────────────────────────────── -->
+<div class="ssh-add-drawer" id="add-drawer" hidden>
+    <div class="ssh-drawer-header">
+        <span class="ssh-drawer-title">Add public key</span>
+        <button class="button outline small" id="close-drawer-btn" type="button">Cancel</button>
+    </div>
+
+    <div class="ssh-form-row">
+        <label for="key-name">Label</label>
+        <input type="text" id="key-name" class="form-input" placeholder="e.g. MacBook Pro, CI runner" maxlength="100">
+    </div>
+
+    <div class="ssh-form-row">
+        <div class="ssh-key-label-row">
+            <label for="key-content">Public key</label>
+            <label class="button outline small ssh-file-label" title="Upload .pub file">
+                Upload .pub
+                <input type="file" id="key-file" accept=".pub,text/plain" style="display:none">
+            </label>
+        </div>
+        <textarea id="key-content" class="form-input ssh-key-textarea"
+                  placeholder="ssh-ed25519 AAAA… user@host" spellcheck="false" rows="3"></textarea>
+    </div>
+
+    <!-- fingerprint preview (shown once content is pasted / uploaded) -->
+    <div id="key-preview" class="ssh-key-preview" hidden>
+        <span class="ssh-preview-label">Fingerprint</span>
+        <code id="key-fingerprint" class="ssh-preview-fp"></code>
+        <span class="ssh-preview-label" style="margin-left:1rem">Type</span>
+        <code id="key-algo" class="ssh-preview-algo"></code>
+    </div>
+
+    <div id="add-error" class="ssh-error" hidden></div>
+
+    <div class="ssh-drawer-actions">
+        <button class="button primary" id="submit-key-btn" type="button" disabled>Add key</button>
+    </div>
+</div>
+
+<!-- ── Key list ─────────────────────────────────────────────── -->
+<section class="admin-section">
+    <h2>Authorized keys <span class="count-badge muted" id="key-count">0</span></h2>
+
+    <div class="container-table-wrap">
+        <table class="container-table" id="keys-table">
+            <thead>
+                <tr>
+                    <th>Label</th>
+                    <th>Fingerprint</th>
+                    <th>Type</th>
+                    <th>Target</th>
+                    <th>Added</th>
+                    <th>Last used</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</section>
+
+<!-- ── Copy-once token banner ────────────────────────────────── -->
+<div class="token-reveal" id="token-reveal" hidden>
+    <div class="token-reveal-header">
+        <span class="token-reveal-title">Token issued — copy it now</span>
+        <span class="token-reveal-warn">This value will not be shown again.</span>
+    </div>
+    <div class="token-reveal-body">
+        <code class="token-reveal-value" id="token-reveal-value"></code>
+        <button class="button outline small" id="token-copy-btn" type="button">Copy</button>
+    </div>
+    <button class="token-reveal-dismiss" id="token-reveal-dismiss" type="button">Dismiss</button>
+</div>
+
+<!-- ── Temporary access tokens ──────────────────────────────── -->
+<section class="admin-section">
+    <div class="admin-page-header">
+        <div>
+            <h1>Temporary access tokens</h1>
+            <p class="admin-page-sub">Manage active API tokens across accounts. Currently active tokens: <span class="count-badge muted" id="token-count">0</span></p>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+            <button class="button outline small" id="issue-token-btn" type="button">Issue token</button>
+        </div>
+    </div>
+
+    <!-- Issue form (hidden by default) -->
+    <div class="ssh-add-drawer" id="issue-drawer" hidden>
+        <div class="ssh-drawer-header">
+            <span class="ssh-drawer-title">Issue access token</span>
+            <button class="button outline small" id="close-issue-btn" type="button">Cancel</button>
+        </div>
+
+        <div class="token-form-grid">
+            <div class="ssh-form-row">
+                <label for="token-label">Label</label>
+                <input type="text" id="token-label" class="form-input" placeholder="e.g. CI runner, deploy script" maxlength="100">
+            </div>
+            <div class="ssh-form-row">
+                <label for="token-expires">Expires in (hours)</label>
+                <input type="number" id="token-expires" class="form-input" placeholder="Leave blank for never" min="1" max="8760">
+            </div>
+        </div>
+
+        <div class="ssh-form-row">
+            <label>Scopes <span class="muted">(all selected = full access)</span></label>
+            <div class="scope-checkboxes">
+                <label class="scope-check"><input type="checkbox" value="images:read" checked> images:read</label>
+                <label class="scope-check"><input type="checkbox" value="images:write" checked> images:write</label>
+                <label class="scope-check"><input type="checkbox" value="admin:read" checked> admin:read</label>
+                <label class="scope-check"><input type="checkbox" value="admin:write" checked> admin:write</label>
+            </div>
+        </div>
+
+        <div id="issue-error" class="ssh-error" hidden></div>
+
+        <div class="ssh-drawer-actions">
+            <button class="button primary" id="submit-token-btn" type="button">Issue token</button>
+        </div>
+    </div>
+
+    <div class="container-table-wrap">
+        <table class="container-table" id="tokens-table">
+            <thead>
+                <tr>
+                    <th>Label</th>
+                    <th>Scopes</th>
+                    <th>Created</th>
+                    <th>Expires</th>
+                    <th>Last used</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody><tr><td colspan="7" class="muted">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/admin/admin_ssh.js"></script>
+{% endblock %}

@@ -1,0 +1,220 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/auth.css" type="text/css"/>
+{% endblock %}
+
+{% block title %}Account | Klappstuhl.me{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/auth.js"></script>
+{% endblock %}
+
+{% block body %}
+{% let account = account.as_ref().unwrap() %}
+
+{# ─── Header ──────────────────────────────────────────────────── #}
+<div class="account-header">
+    <div class="account-identity">
+        <h1 class="account-name">{{ user.name }}</h1>
+        {% if user.flags.is_admin() %}
+        <span class="badge branding">Admin</span>
+        {% endif %}
+    </div>
+    {% if account.id == user.id %}
+    <div class="account-header-actions">
+        <button class="button danger outline" id="change-password">Change Password</button>
+    </div>
+    {% endif %}
+</div>
+
+{# ─── Quick-links (admin only) ───────────────────────────────── #}
+{% if user.flags.is_admin() %}
+<section class="quick-links-section">
+    <div class="quick-links-group">
+        <div class="quick-links-heading">Admin tools - quick access</div>
+        <div class="quick-links">
+            <a href="/admin"          class="quick-link"><span>Dashboard</span></a>
+            <a href="/admin/metrics"  class="quick-link"><span>Metrics</span></a>
+            <a href="/admin/security" class="quick-link"><span>Security</span></a>
+            <a href="/admin/audit"    class="quick-link"><span>Audit log</span></a>
+            <a href="/admin/docker"        class="quick-link"><span>Docker</span></a>
+        </div>
+    </div>
+    <div class="quick-links-group">
+        <div class="quick-links-heading">Apps</div>
+        <div class="quick-links">
+            <a href="https://ssh.klappstuhl.me"         class="quick-link external" rel="noopener"><span>SSH Terminal</span></a>
+            <a href="https://vaultwarden.klappstuhl.me" class="quick-link external" rel="noopener"><span>Vaultwarden</span></a>
+            <a href="https://cloud.klappstuhl.me"       class="quick-link external" rel="noopener"><span>Nextcloud</span></a>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{# ─── Images ──────────────────────────────────────────────────── #}
+{% if !entries.is_empty() %}
+<section class="account-section">
+    <h2>Images</h2>
+    <p>{{ entries.len() }} image{% if entries.len() != 1 %}s{% endif %} uploaded. <a href="/images">Manage your images →</a></p>
+</section>
+{% endif %}
+
+{# ─── API access ──────────────────────────────────────────────── #}
+{% if account.id == user.id %}
+<section class="account-section">
+    <h2>API Access</h2>
+    <p>Use an API token to access the <a href="/api/docs">REST API</a>.</p>
+    <form id="api-section">
+        {% match api_key %}
+        {% when Some with (api) %}
+        <div class="api-key-row">
+            <div class="api-key-field">
+                <input type="password" id="api-key" class="api-key-input" readonly value="{{ api }}" autocomplete="off" spellcheck="false">
+                <button type="button" class="api-key-toggle" id="api-key-reveal" aria-label="Show or hide API key" title="Show / hide">
+                    <img src="/static/img/visibility.svg" alt="" width="20" height="20">
+                </button>
+            </div>
+        </div>
+        <p class="api-key-hint">Treat this token like a password. Anyone with it can act as you via the API.</p>
+        {% when None %}
+        {% endmatch %}
+
+        <fieldset class="scope-fieldset">
+            <legend>Scopes</legend>
+            <p class="api-key-hint" style="margin-top: 0;">
+                Tick the permissions this token should have. Leaving every
+                box unticked grants legacy full access (matches old, scope-less
+                keys). To narrow an existing key, tick the boxes you want and
+                hit Regenerate — the old token is invalidated.
+            </p>
+            <div class="scope-grid">
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="images:read"
+                        {% if api_key_scopes.contains("images:read") %}checked{% endif %}>
+                    <span class="scope-name">images:read</span>
+                    <span class="scope-desc">Download images + use the media tools (convert, effects, metadata, scan)</span>
+                </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="images:write"
+                        {% if api_key_scopes.contains("images:write") %}checked{% endif %}>
+                    <span class="scope-name">images:write</span>
+                    <span class="scope-desc">Upload and delete images</span>
+                </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="admin:read"
+                        {% if api_key_scopes.contains("admin:read") %}checked{% endif %}>
+                    <span class="scope-name">admin:read</span>
+                    <span class="scope-desc">Read-only admin dashboards (metrics / security / audit)</span>
+                </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="admin:write"
+                        {% if api_key_scopes.contains("admin:write") %}checked{% endif %}>
+                    <span class="scope-name">admin:write</span>
+                    <span class="scope-desc">Mutate admin state (invites, services, secrets)</span>
+                </label>
+            </div>
+        </fieldset>
+
+        <div class="section-actions">
+            {% match api_key %}
+            {% when Some with (_) %}
+            <button type="button" id="copy-api-key" class="button primary">Copy</button>
+            <button type="submit" name="new" value="false" class="button danger outline">Regenerate</button>
+            {% when None %}
+            <button type="submit" name="new" value="true" class="button primary">Generate Token</button>
+            {% endmatch %}
+        </div>
+    </form>
+</section>
+{% endif %}
+
+{# ─── Two-factor authentication ──────────────────────────────── #}
+{% if account.id == user.id %}
+<section class="account-section">
+    <h2>Two-factor authentication</h2>
+    {% if totp_enabled %}
+    <p>2FA is <strong>enabled</strong>. You'll be asked for a code from your authenticator app when you log in.</p>
+    <form method="POST" action="/account/2fa/disable" class="form-row">
+        <input class="form-field" required name="password" type="password"
+               placeholder="Confirm your password" autocomplete="current-password">
+        <button class="button danger outline" type="submit">Disable 2FA</button>
+    </form>
+    {% else %}
+    <p>Add a second factor (TOTP) for stronger account security. Recommended for admins.</p>
+    <form method="POST" action="/account/2fa/setup">
+        <button class="button primary" type="submit">Set up 2FA</button>
+    </form>
+    {% endif %}
+</section>
+{% endif %}
+
+{# ─── Sessions ────────────────────────────────────────────────── #}
+{% if current_session.is_some() || !sessions.is_empty() %}
+<section class="account-section" id="session-section">
+    <h2>Sessions</h2>
+    <p>All active logins on your account. Revoke anything you don't recognise.</p>
+
+    {% match current_session %}
+    {% when Some with (session) %}
+    <h3>Current session</h3>
+    <div class="session-list">
+        <div class="session">
+            <div class="session-info">
+                <span class="session-label">{{ session.label() }}</span>
+                <span class="session-time created" data-timestamp="{{ session.created_at.unix_timestamp() }}" title="{{ session.created_at|isoformat }}">{{ session.created_at|isoformat }}</span>
+            </div>
+            <a class="button danger outline invalidate" href="/logout">Logout</a>
+        </div>
+    </div>
+    {% when None %}
+    {% endmatch %}
+
+    {% if !sessions.is_empty() %}
+    <h3>Other sessions</h3>
+    <div class="session-list">
+        {% for session in sessions %}
+        <div class="session">
+            <div class="session-info">
+                <span class="session-label">{{ session.label() }}</span>
+                <span class="session-time created" data-timestamp="{{ session.created_at.unix_timestamp() }}" title="{{ session.created_at|isoformat }}">{{ session.created_at|isoformat }}</span>
+            </div>
+            <button class="button danger outline invalidate" data-token="{{ session.signed(key)|as_ref|maybe_display }}">Logout</button>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="section-actions">
+        <a class="button danger outline" href="/logout/all">Logout all sessions</a>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+<dialog id="change-password-modal">
+    <form autocomplete="off" method="POST" action="/account/change_password">
+        <h1>Change password</h1>
+        <p>Pick a new password of at least 8 characters. You'll stay signed in on this device.</p>
+        <div class="form-container">
+            <div class="field-group">
+                <label class="field-label" for="old-password">Current password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="old_password" id="old-password" type="password" autocomplete="current-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="new-password">New password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="new_password" id="new-password" type="password" autocomplete="new-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+            <input type="hidden" id="session-description" name="session_description" value="">
+        </div>
+        <footer>
+            <button id="confirm" class="button primary">Save password</button>
+            <button class="button" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+{% endblock %}

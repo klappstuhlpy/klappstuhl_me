@@ -17,7 +17,7 @@
 // version bump guarantees stale entries (e.g. an old admin_*.js that
 // got opportunistically cached under a previous, broader fetch rule)
 // get purged on the user's next reload.
-const SHELL_CACHE = "klappstuhl-shell-v2";
+const SHELL_CACHE = "klappstuhl-shell-v3";
 
 // Set of paths we'll serve cache-first. Anything not in this set goes
 // straight to the network even if it lives under /static/, so admin
@@ -29,9 +29,9 @@ const SHELL_ASSET_SET = new Set();
 // (well, just /login since that's the only useful no-auth page) plus
 // the bare-essentials assets every page pulls in.
 const SHELL_ASSETS = [
-  "/static/base.css",
-  "/static/base.js",
-  "/static/live.js",
+  "/static/css/base.css",
+  "/static/js/base.js",
+  "/static/js/live.js",
   "/static/img/logo.jpg",
   "/static/img/favicon.ico",
   "/static/img/visibility.svg",

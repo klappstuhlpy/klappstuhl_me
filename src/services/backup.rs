@@ -1,0 +1,186 @@
+//! On-disk SQLite backups via `VACUUM INTO`, plus a scheduled snapshot task.
+//!
+//! `VACUUM INTO` writes a consistent, fully-checkpointed copy of the database
+//! to a new file without needing an exclusive lock on the live database, so it
+//! is safe to run while the server is serving requests. Backups land in
+//! `<data>/<program>/backups/` as `backup-<unix-ts>.db`.
+//!
+//! Restore is intentionally a manual, offline operation: swapping the live
+//! database file while the process holds WAL connections is unsafe, so the
+//! admin UI offers download (and the operator restores by stopping the server
+//! and replacing `main.db`).
+
+use std::path::PathBuf;
+use std::time::Duration;
+
+use anyhow::Context;
+use serde::Serialize;
+use time::OffsetDateTime;
+
+use crate::AppState;
+
+const PREFIX: &str = "backup-";
+const SUFFIX: &str = ".db";
+
+/// Default hours between scheduled backups when unconfigured.
+const DEFAULT_INTERVAL_HOURS: u64 = 24;
+/// Default number of backups to retain when unconfigured.
+const DEFAULT_KEEP: usize = 14;
+
+/// Returns (creating if needed) the directory backups are stored in:
+/// `<data>/<program>/backups`.
+pub fn directory() -> anyhow::Result<PathBuf> {
+    let db = crate::database::directory()?; // <data>/<program>/main.db
+    let dir = db
+        .parent()
+        .context("database path has no parent directory")?
+        .join("backups");
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        if e.kind() != std::io::ErrorKind::AlreadyExists {
+            return Err(e).context("could not create backups directory");
+        }
+    }
+    Ok(dir)
+}
+
+/// Metadata about a single on-disk backup file.
+#[derive(Debug, Clone, Serialize)]
+pub struct BackupInfo {
+    pub name: String,
+    pub size: u64,
+    pub size_human: String,
+    pub modified_unix: i64,
+    pub modified: String,
+}
+
+/// Human-readable byte size (B / KB / MB / GB).
+pub fn human_size(bytes: u64) -> String {
+    if bytes < 1_024 {
+        format!("{bytes} B")
+    } else if bytes < 1_048_576 {
+        format!("{:.1} KB", bytes as f64 / 1_024.0)
+    } else if bytes < 1_073_741_824 {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+    } else {
+        format!("{:.2} GB", bytes as f64 / 1_073_741_824.0)
+    }
+}
+
+/// Creates a new backup via `VACUUM INTO`, returning the written file path.
+pub async fn create(state: &AppState) -> anyhow::Result<PathBuf> {
+    let dir = directory()?;
+    let ts = OffsetDateTime::now_utc().unix_timestamp();
+    let target = dir.join(format!("{PREFIX}{ts}{SUFFIX}"));
+    // VACUUM INTO refuses to overwrite an existing file.
+    if target.exists() {
+        anyhow::bail!("backup target already exists: {}", target.display());
+    }
+    let path_str = target.to_string_lossy().to_string();
+    state
+        .database()
+        .call(move |conn| conn.execute("VACUUM INTO ?1", rusqlite::params![path_str]))
+        .await
+        .context("VACUUM INTO failed")?;
+    Ok(target)
+}
+
+/// Lists existing backups, newest first.
+pub fn list() -> Vec<BackupInfo> {
+    let Ok(dir) = directory() else {
+        return Vec::new();
+    };
+    let Ok(read_dir) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for entry in read_dir.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !(name.starts_with(PREFIX) && name.ends_with(SUFFIX)) {
+            continue;
+        }
+        let Ok(meta) = entry.metadata() else { continue };
+        if !meta.is_file() {
+            continue;
+        }
+        let size = meta.len();
+        let modified_unix = meta
+            .modified()
+            .ok()
+            .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let modified = OffsetDateTime::from_unix_timestamp(modified_unix)
+            .ok()
+            .and_then(|t| t.format(&time::format_description::well_known::Rfc3339).ok())
+            .unwrap_or_default();
+        out.push(BackupInfo {
+            name,
+            size,
+            size_human: human_size(size),
+            modified_unix,
+            modified,
+        });
+    }
+    out.sort_by_key(|b| std::cmp::Reverse(b.modified_unix));
+    out
+}
+
+/// Deletes backups beyond the newest `keep`. `keep == 0` disables pruning.
+pub fn prune(keep: usize) {
+    if keep == 0 {
+        return;
+    }
+    for b in list().into_iter().skip(keep) {
+        if let Some(path) = resolve(&b.name) {
+            if let Err(e) = std::fs::remove_file(&path) {
+                tracing::warn!(error = %e, file = %b.name, "could not prune old backup");
+            }
+        }
+    }
+}
+
+/// Resolves a user-supplied backup name to a safe path inside the backups
+/// directory, or `None` if the name is unsafe or the file doesn't exist.
+pub fn resolve(name: &str) -> Option<PathBuf> {
+    // Reject path separators / traversal — only bare backup file names allowed.
+    if name.contains('/') || name.contains('\\') || name.contains("..") {
+        return None;
+    }
+    if !(name.starts_with(PREFIX) && name.ends_with(SUFFIX)) {
+        return None;
+    }
+    let path = directory().ok()?.join(name);
+    path.is_file().then_some(path)
+}
+
+/// The configured retention count (number of backups to keep).
+pub fn keep_count(state: &AppState) -> usize {
+    state.config().backup_keep.unwrap_or(DEFAULT_KEEP)
+}
+
+/// Background scheduler: takes a backup every `backup_interval_hours` and
+/// prunes to `backup_keep`. A value of 0 hours disables the scheduler. The
+/// first backup runs one interval after start-up (so frequent restarts don't
+/// spam backups).
+pub fn spawn_scheduler(state: AppState) {
+    let interval_hours = state.config().backup_interval_hours.unwrap_or(DEFAULT_INTERVAL_HOURS);
+    if interval_hours == 0 {
+        tracing::info!("scheduled backups disabled (backup_interval_hours = 0)");
+        return;
+    }
+    let keep = keep_count(&state);
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(Duration::from_secs(interval_hours * 3600));
+        ticker.tick().await; // consume the immediate first tick
+        loop {
+            ticker.tick().await;
+            match create(&state).await {
+                Ok(path) => {
+                    tracing::info!(path = %path.display(), "scheduled backup created");
+                    prune(keep);
+                }
+                Err(e) => tracing::warn!(error = %e, "scheduled backup failed"),
+            }
+        }
+    });
+}
