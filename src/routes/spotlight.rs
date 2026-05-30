@@ -74,6 +74,7 @@ fn static_nav() -> Vec<SpotlightItem> {
         SpotlightItem::nav("SSH Session Audit","Active sessions and logins",          "/admin/ssh/audit"),
         SpotlightItem::nav("File Sanitizer",   "ClamAV + VirusTotal scanning",        "/admin/sanitizer"),
         SpotlightItem::nav("Backups",          "SQLite snapshots, download/restore",  "/admin/backups"),
+        SpotlightItem::nav("Logs",             "Tail and filter application logs",    "/admin/logs/view"),
     ]
 }
 

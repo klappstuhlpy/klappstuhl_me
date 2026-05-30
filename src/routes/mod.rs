@@ -19,6 +19,7 @@ mod docker;
 mod firewall;
 mod health;
 mod image;
+mod logs;
 mod api;
 mod metrics;
 mod postgres;
@@ -92,6 +93,7 @@ pub fn all() -> Router<AppState> {
         .merge(proxy::routes())
         .merge(sanitizer::routes())
         .merge(backups::routes())
+        .merge(logs::routes())
         .merge(spotlight::routes())
         .merge(ws::routes())
         .nest("/api", api::routes())
