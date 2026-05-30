@@ -228,7 +228,7 @@ async function getRecentServerLogs() {
   const formatValue = (x) => typeof x === 'string' ? JSON.stringify(x) : x.toString();
 
   let serverLogs = await callApi('/admin/logs/server');
-  let filtered = serverLogs.reverse().slice(0, 25);
+  let filtered = serverLogs.reverse().slice(0, 15);
   let tbody = recentLogs.querySelector('tbody');
   tbody.innerHTML = '';
   for (const log of filtered) {
