@@ -10,6 +10,8 @@
     .twofa-codes { list-style: none; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
     .twofa-codes li { font-family: monospace; background: var(--box-shade); border: 1px solid var(--box-border); border-radius: 6px; padding: 0.4rem 0.6rem; text-align: center; }
     .twofa-warn { color: var(--warning-text); }
+    .twofa-actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+    .twofa-codes-actions { margin-top: 0.6rem; }
 </style>
 {% endblock %}
 
@@ -35,6 +37,9 @@
         <li>{{ code }}</li>
         {% endfor %}
     </ul>
+    <div class="twofa-codes-actions">
+        <button type="button" class="button outline" id="dl-codes">Download .txt</button>
+    </div>
 
     <h2>Confirm</h2>
     <p>Enter the current 6-digit code to finish enabling 2FA.</p>
@@ -45,8 +50,31 @@
                    name="code" id="code" inputmode="numeric"
                    autocomplete="one-time-code" autofocus>
         </div>
-        <button class="button primary" type="submit">Enable 2FA</button>
-        <a class="button outline" href="/account">Cancel</a>
+        <div class="twofa-actions">
+            <button class="button primary" type="submit">Enable 2FA</button>
+            <a class="button outline" href="/account">Cancel</a>
+        </div>
     </form>
 </section>
+{% endblock %}
+
+{% block body_end %}
+<script>
+    document.getElementById('dl-codes')?.addEventListener('click', () => {
+        const codes = Array.from(document.querySelectorAll('.twofa-codes li'))
+            .map(li => li.textContent.trim())
+            .filter(Boolean);
+        const text = 'Klappstuhl.me 2FA recovery codes\n'
+            + 'Keep these safe. Each code can be used once.\n\n'
+            + codes.join('\n') + '\n';
+        const blob = new Blob([text], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'klappstuhl-recovery-codes.txt';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+    });
+</script>
 {% endblock %}
