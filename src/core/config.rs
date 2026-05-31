@@ -244,6 +244,11 @@ pub struct Config {
     /// uploaded to an S3-compatible object store. Unset = local-only backups.
     #[serde(default)]
     pub backup_remote: Option<BackupRemoteConfig>,
+    /// Hours between background container image-update checks (queries each
+    /// configured service's registry for a newer digest). `0` disables the
+    /// checker. Defaults to 12 when unset.
+    #[serde(default)]
+    pub update_check_interval_hours: Option<u64>,
     /// Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF
     /// render endpoints. When unset, common names on `PATH` are tried; if none
     /// is found those endpoints return 503.
@@ -286,6 +291,7 @@ impl Config {
             backup_interval_hours: None,
             backup_keep: None,
             backup_remote: None,
+            update_check_interval_hours: None,
             chromium_path: None,
             ffmpeg_path: None,
             secret_key: SecretKey::random()?,

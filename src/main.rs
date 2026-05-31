@@ -142,6 +142,10 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // Scheduled SQLite backups (VACUUM INTO) + retention pruning.
     klappstuhl_me::backup::spawn_scheduler(state.clone());
 
+    // Periodic container image-update checks (queries registries for newer
+    // digests; no-op without Docker or when disabled in config).
+    klappstuhl_me::updates::spawn_update_checker(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()

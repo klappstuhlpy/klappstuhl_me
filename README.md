@@ -38,13 +38,15 @@ management, security analytics, virus scanning, and an invite-only user system.
 - **Two-factor auth (TOTP)** — opt-in RFC 6238 2FA managed from `/account`. Enroll by scanning a QR / entering the secret, confirm with a code, and download one-time recovery codes. On login, accounts with 2FA are bounced to `/login/2fa` (a short-lived signed pending cookie carries the challenge — never persisted) and must supply a TOTP code or a recovery code. The shared secret is encrypted at rest with ChaCha20-Poly1305 keyed by the app secret, so a leaked database (or a downloaded backup) doesn't expose usable 2FA secrets; recovery codes are stored only as SHA-256 hashes. Disabling 2FA requires a password-confirmation modal.
 - **Public status page (`/status`)** — unauthenticated, derived from the Health monitors. Shows an overall banner (all operational / degraded / major outage), per-service up/degraded/down status, 24h uptime %, and last-check time.
 - **Spotlight palette (Ctrl+K)** — macOS-style command palette available on every admin page. Opens with `Ctrl+K` (or the Search button in the sidebar footer). Fuzzy-searches across all admin nav items, configured scripts, audit log entries, file scan history, SSH keys, and live Docker containers. Keyboard-navigable (↑/↓/Enter/Esc). Scripts run inline and show their stdout/stderr output in the palette without leaving the page.
-- **API tokens with scopes** — generated from `/account`, each token can be restricted to a subset of `images:read · images:write · admin:read · admin:write`, and every API endpoint enforces the scope it needs (image processing / render / scan all require `images:read`; upload/delete require `images:write`). Legacy keys (created without selecting scopes) keep full access for back-compat.
+- **API tokens with scopes** — generated from `/account`, each token can be restricted to a subset of `images:read · images:write · admin:read · admin:write`, and every API endpoint enforces the scope it needs (image processing / render / scan all require `images:read`; upload/delete require `images:write`; `GET /api/admin/updates` requires `admin:read`). Legacy keys (created without selecting scopes) keep full access for back-compat.
 - **Live updates over WebSocket** — `/ws` push topic events to dashboards. Metrics tiles refresh on every scrape, audit-log entries appear instantly, and Docker graph updates on container events; polling is the automatic fallback when the socket is closed.
 - **Installable PWA** — `site.webmanifest` + service worker shell-cache the static assets. iOS standalone-mode meta tags + a black theme colour so the app looks native when installed to the home screen. Network-only for everything dynamic; offline access is intentionally **not** a goal for a homelab admin tool.
 - **REST API** — OpenAPI 3.0 documented at `/api/docs` via utoipa + Scalar. All endpoints enforce token scopes (see below). Beyond image upload/download/delete:
   - **Media processing** — `POST /api/image/:op` (blur, pixelate, deepfry, invert, grayscale → PNG), `POST /api/convert` (transcode between raster formats), `POST /api/metadata` (image info). Each accepts a multipart `file` **or** a public `url`; URL fetches are SSRF-guarded (private/reserved addresses refused, redirects disabled, size-capped).
   - **Render** — `POST /api/render/code` renders syntax-highlighted code to an image (syntect; pick `language` + `theme`). `POST /api/render/screenshot` and `POST /api/render/markdown-pdf` drive a headless Chromium; `POST /api/convert/transcode` shells out to ffmpeg (video / HEIC). These three are config-gated and return an error when the backing binary isn't available.
   - **Scan** — `POST /api/scan` runs an uploaded file through ClamAV + VirusTotal and returns a combined report.
+  - **Upload TTL** — `POST /api/images/upload?expires_in=<seconds>` auto-deletes the upload after the given time-to-live (capped at 365 days); omit for a permanent upload.
+  - **Admin** — `GET /api/admin/updates` returns the per-service container image-update status (requires `admin:read`).
   - **Shareable links** — media/render endpoints accept `share=true` to store the result and return a JSON `ShareResult` with a short `/m/:id` link instead of raw bytes; `GET /m/:id` serves it back.
 - **Alert fan-out** — metric, health, and secret alerts deliver to any of a Discord webhook, an [ntfy](https://ntfy.sh) topic, and a generic JSON webhook (`{title, level, body, fields}`), depending on which of `discord_webhook_url` / `ntfy_url` / `alert_webhook_url` are configured.
 - **Automatic TLS** — Let's Encrypt via rustls-acme (TLS-ALPN-01) in production mode.
@@ -523,7 +525,9 @@ src/
 ├── media/                — image manipulation/conversion, metadata, code-to-image, shared SSRF-guarded fetch (scan.rs)
 ├── services/             — background/admin domains:
 │   ├── docker.rs         — bollard client wrapper + event watcher
-│   ├── backup.rs         — VACUUM INTO backups + scheduler
+│   ├── backup/           — VACUUM INTO backups + scheduler (mod.rs) and S3 off-site upload (s3.rs)
+│   ├── updates.rs        — container image-update detection (registry digest checks)
+│   ├── cron.rs           — 5-field cron parser + scheduler for spotlight scripts
 │   ├── alerts.rs         — alert fan-out
 │   ├── audit.rs          — audit-log writer
 │   ├── ssh.rs            — SSH key storage + log tailer

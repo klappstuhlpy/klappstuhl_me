@@ -108,6 +108,25 @@ function updateCardFromView(card, view) {
     restarts.textContent = view.restart_count;
   }
 
+  // Image-update badge (from the background registry checker)
+  const updBadge = card.querySelector("[data-role='update']");
+  if (updBadge) {
+    const u = view.update;
+    if (u && u.state === "update_available") {
+      updBadge.hidden = false;
+      updBadge.className = "update-badge available";
+      updBadge.textContent = "update available";
+      updBadge.title = u.latest_digest ? "Registry digest: " + u.latest_digest : "A newer image is published";
+    } else if (u && u.state === "up_to_date") {
+      updBadge.hidden = false;
+      updBadge.className = "update-badge uptodate";
+      updBadge.textContent = "up to date";
+      updBadge.title = "Running the latest published image";
+    } else {
+      updBadge.hidden = true;
+    }
+  }
+
   // Live CPU / RAM (only Docker services with `docker stats` data)
   const cpuRow = card.querySelector("[data-role='cpu-row']");
   const memRow = card.querySelector("[data-role='mem-row']");
@@ -165,6 +184,24 @@ async function refreshServices() {
 if (refreshState) refreshState.textContent = "auto · 15s";
 refreshServices();
 setInterval(refreshServices, REFRESH_MS);
+
+/* ── On-demand image-update check ───────────────────────────── */
+
+const checkUpdatesBtn = document.getElementById("btn-check-updates");
+checkUpdatesBtn?.addEventListener("click", async () => {
+  const original = checkUpdatesBtn.textContent;
+  checkUpdatesBtn.disabled = true;
+  checkUpdatesBtn.textContent = "Checking…";
+  try {
+    const r = await fetch("/admin/docker/updates/check", { method: "POST" });
+    if (r.ok) await refreshServices();
+  } catch (e) {
+    console.error("update check failed", e);
+  } finally {
+    checkUpdatesBtn.disabled = false;
+    checkUpdatesBtn.textContent = original;
+  }
+});
 
 /* ── Log console ─────────────────────────────────────────────── */
 

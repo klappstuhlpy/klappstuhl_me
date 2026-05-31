@@ -13,6 +13,7 @@
     <h1>Docker</h1>
     <div class="services-toolbar">
         <input id="services-search" type="search" placeholder="Filter services…" autocomplete="off" class="services-search-input">
+        <button class="button outline small" id="btn-check-updates" type="button" title="Query each service's registry for a newer image">Check updates</button>
         <span class="services-refresh-state" id="services-refresh-state" title="Auto-refreshes every 15 seconds">auto · 15s</span>
     </div>
 </div>
@@ -29,6 +30,7 @@
         <div class="service-header">
             <div class="service-name-row">
                 <h2>{{ service.name }}</h2>
+                <span class="update-badge" data-role="update" hidden></span>
             </div>
             {% if service.running %}
             <span class="status-badge running" data-role="status">Running</span>

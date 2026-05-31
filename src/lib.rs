@@ -13,7 +13,9 @@ pub use auth::{key, token, totp};
 pub use core::{cli, config, database, error, filters, logging, models, state, utils};
 pub use integrations::{cloudflare, discord, exttools, geoip};
 pub use media::{codeimage, metadata, scan};
-pub use services::{alerts, audit, backup, docker, firewall, health, metrics, postgres, proxy, secrets, ssh};
+pub use services::{
+    alerts, audit, backup, docker, firewall, health, metrics, postgres, proxy, secrets, ssh, updates,
+};
 pub use web::{cached, flash, headers, ratelimit, routes, scope};
 
 // Curated value re-exports (the crate's public API surface).

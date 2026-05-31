@@ -1,3 +1,4 @@
+mod admin;
 mod auth;
 mod code;
 mod external;
@@ -48,10 +49,13 @@ pub use media::serve_media;
         external::markdown_pdf,
         external::transcode,
         scan::scan_file,
+        admin::list_updates,
     ),
     components(
         schemas(
             ApiError,
+            crate::updates::ImageUpdate,
+            crate::updates::UpdateState,
             crate::models::ImageEntry,
             crate::routes::image::UploadResult,
             crate::routes::image::DeleteResult,
@@ -70,7 +74,8 @@ pub use media::serve_media;
         (name = "images", description = "Endpoints for uploading/deleting and getting images at the server."),
         (name = "media", description = "Image manipulation and format conversion. Accepts a `file` upload or a public image `url`."),
         (name = "render", description = "Render content to images (syntax-highlighted code screenshots, …)."),
-        (name = "scan", description = "Scan uploaded files for malware via ClamAV and VirusTotal.")
+        (name = "scan", description = "Scan uploaded files for malware via ClamAV and VirusTotal."),
+        (name = "admin", description = "Admin-scoped homelab state (requires admin:read / admin:write).")
     )
 )]
 pub struct Schema;
@@ -126,6 +131,7 @@ mod tests {
             "/api/render/screenshot",
             "/api/render/markdown-pdf",
             "/api/convert/transcode",
+            "/api/admin/updates",
         ] {
             assert!(paths.contains_key(expected), "missing {expected} in OpenAPI spec");
         }
@@ -155,6 +161,7 @@ pub fn routes() -> Router<AppState> {
         .route("/render/screenshot", post(external::screenshot))
         .route("/render/markdown-pdf", post(external::markdown_pdf))
         .route("/convert/transcode", post(external::transcode))
+        .route("/admin/updates", get(admin::list_updates))
         .route_layer(RateLimit::default().quota(25, 60.0).build())
         .route_layer(
             CorsLayer::new()

@@ -90,6 +90,10 @@ struct InnerState {
     /// Firewall backend (nftables / ufw / iptables). `None` when none of
     /// the supported binaries is available at startup.
     firewall_backend: Option<FirewallBackend>,
+    /// Latest container image-update status, keyed by service name. Derived
+    /// data refreshed by the background checker, so it's kept in memory rather
+    /// than persisted.
+    image_updates: std::sync::Mutex<std::collections::HashMap<String, crate::updates::ImageUpdate>>,
 }
 
 /// Global application state for the axum Router.
@@ -213,6 +217,7 @@ impl AppState {
                 live_tx,
                 docker,
                 firewall_backend,
+                image_updates: std::sync::Mutex::new(std::collections::HashMap::new()),
             }),
             client,
             requests,
@@ -231,6 +236,28 @@ impl AppState {
     /// Returns the Docker introspection client, if available.
     pub fn docker(&self) -> Option<&Arc<DockerClient>> {
         self.inner.docker.as_ref()
+    }
+
+    /// Replaces the stored container image-update results (called by the
+    /// background checker after each run).
+    pub fn set_image_updates(&self, updates: std::collections::HashMap<String, crate::updates::ImageUpdate>) {
+        if let Ok(mut guard) = self.inner.image_updates.lock() {
+            *guard = updates;
+        }
+    }
+
+    /// A snapshot clone of the current image-update map, keyed by service name.
+    pub fn image_updates_map(&self) -> std::collections::HashMap<String, crate::updates::ImageUpdate> {
+        self.inner
+            .image_updates
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_default()
+    }
+
+    /// The current image-update status for one service, if checked.
+    pub fn image_update(&self, service: &str) -> Option<crate::updates::ImageUpdate> {
+        self.inner.image_updates.lock().ok().and_then(|g| g.get(service).cloned())
     }
 
     /// Stores a processed media blob for sharing and returns its short id.

@@ -109,6 +109,20 @@ impl DockerClient {
             .context("inspect_container")
     }
 
+    /// The local `RepoDigests` for an image reference, e.g.
+    /// `["nginx@sha256:abc…"]`. Empty when the image was built locally and
+    /// never pulled/pushed (no registry digest to compare against). Used by
+    /// the image-update checker to compare the pulled digest against what the
+    /// registry currently serves for the same tag.
+    pub async fn image_repo_digests(&self, image: &str) -> anyhow::Result<Vec<String>> {
+        let info = self
+            .docker
+            .inspect_image(image)
+            .await
+            .context("inspect_image")?;
+        Ok(info.repo_digests.unwrap_or_default())
+    }
+
     // ─── Snapshot operations ──────────────────────────────────────────────
 
     /// Commit a container to a new image.  Returns the full image reference

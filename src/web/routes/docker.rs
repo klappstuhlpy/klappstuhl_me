@@ -269,6 +269,9 @@ struct ServiceView {
     cpu_pct: Option<f64>,
     mem_used: Option<u64>,
     mem_limit: Option<u64>,
+    /// Latest image-update status from the background checker, if known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    update: Option<crate::updates::ImageUpdate>,
 }
 
 async fn services_data(State(state): State<AppState>, account: Account) -> Result<Json<Vec<ServiceView>>, StatusCode> {
@@ -304,11 +307,34 @@ async fn services_data(State(state): State<AppState>, account: Account) -> Resul
                 cpu_pct: stat.map(|s| s.cpu_pct),
                 mem_used: stat.map(|s| s.mem_used),
                 mem_limit: stat.map(|s| s.mem_limit),
+                update: state.image_update(&cfg.name),
             }
         })
         .collect();
 
     Ok(Json(views))
+}
+
+/// Runs an image-update check across all services on demand and returns the
+/// fresh results. Synchronous — a homelab has a handful of services, and the
+/// operator clicked "Check" expecting an answer.
+async fn check_updates_now(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    account: Account,
+) -> Response {
+    if !account.flags.is_admin() {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    crate::updates::run_check(&state).await;
+    state
+        .audit("docker.updates.check")
+        .actor(&account)
+        .ip_opt(client_ip)
+        .fire();
+    let mut updates: Vec<crate::updates::ImageUpdate> = state.image_updates_map().into_values().collect();
+    updates.sort_by(|a, b| a.service.cmp(&b.service));
+    Json(serde_json::json!({ "updates": updates })).into_response()
 }
 
 // ─── Container log SSE ────────────────────────────────────────────────────────
@@ -739,6 +765,7 @@ pub fn routes() -> Router<AppState> {
         .route("/admin/docker", get(docker_page))
         .route("/admin/docker/action", post(service_action))
         .route("/admin/docker/services/data", get(services_data))
+        .route("/admin/docker/updates/check", post(check_updates_now))
         .route("/admin/docker/logs/:name", get(container_logs_sse))
         .route("/admin/docker/graph", get(graph_data))
         .route("/admin/docker/inspect/:id", get(inspect_container))

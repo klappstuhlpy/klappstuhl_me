@@ -406,6 +406,28 @@
 .status-badge.running { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
 .status-badge.offline { color: var(--text-muted);   border-color: var(--box-border);     background: transparent; }
 
+/* Image-update badge shown beside the service name. */
+.update-badge {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 9999px;
+    border: 1px solid;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.update-badge.available {
+    color: var(--warning-text, #f59e0b);
+    border-color: var(--warning-border, #f59e0b55);
+    background: var(--warning-bg, #f59e0b18);
+}
+.update-badge.uptodate {
+    color: var(--text-muted);
+    border-color: var(--box-border);
+    background: transparent;
+}
+
 .service-details {
     display: flex;
     flex-direction: column;
