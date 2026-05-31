@@ -90,7 +90,7 @@ impl CfTunnel {
         let parsed: CfResponse<TunnelConfigResult> =
             serde_json::from_str(&text).with_context(|| format!("parse tunnel config response ({status}): {text}"))?;
         if !parsed.success {
-            anyhow::bail!("Cloudflare API error ({status}) reading tunnel config: {}", parsed.errors_str());
+            anyhow::bail!("Cloudflare API error ({status}) reading tunnel config: {}", parsed.detail_with_hint());
         }
         Ok(parsed
             .result
@@ -116,7 +116,7 @@ impl CfTunnel {
         let parsed: CfResponse<serde_json::Value> =
             serde_json::from_str(&text).with_context(|| format!("parse PUT response ({status}): {text}"))?;
         if !parsed.success {
-            anyhow::bail!("Cloudflare API error ({status}) writing tunnel config: {}", parsed.errors_str());
+            anyhow::bail!("Cloudflare API error ({status}) writing tunnel config: {}", parsed.detail_with_hint());
         }
         Ok(())
     }
@@ -150,7 +150,7 @@ impl CfTunnel {
             .await
             .context("parse DNS list")?;
         if !listed.success {
-            anyhow::bail!("Cloudflare API error listing DNS for {hostname}: {}", listed.errors_str());
+            anyhow::bail!("Cloudflare API error listing DNS for {hostname}: {}", listed.detail_with_hint());
         }
 
         let existing = listed.result.unwrap_or_default().into_iter().next();
@@ -174,7 +174,7 @@ impl CfTunnel {
         let parsed: CfResponse<serde_json::Value> =
             serde_json::from_str(&text).with_context(|| format!("parse DNS upsert ({status}): {text}"))?;
         if !parsed.success {
-            anyhow::bail!("Cloudflare API error upserting DNS for {hostname}: {}", parsed.errors_str());
+            anyhow::bail!("Cloudflare API error upserting DNS for {hostname}: {}", parsed.detail_with_hint());
         }
         Ok(())
     }
@@ -202,6 +202,29 @@ impl<T> CfResponse<T> {
                 .map(|e| format!("[{}] {}", e.code, e.message))
                 .collect::<Vec<_>>()
                 .join("; ")
+        }
+    }
+
+    /// True for Cloudflare's generic auth/permission failure (code 10000),
+    /// which almost always means the API token lacks the right scopes.
+    fn is_auth_error(&self) -> bool {
+        self.errors.iter().any(|e| e.code == 10000)
+    }
+
+    /// Returns the error detail, plus an actionable hint when it's an auth
+    /// failure (the most common misconfiguration — a token without the
+    /// account-scoped tunnel permission).
+    fn detail_with_hint(&self) -> String {
+        if self.is_auth_error() {
+            format!(
+                "{} — the API token is missing permissions or the account is wrong. \
+                 A tunnel token needs Account › Cloudflare Tunnel › Read (Edit to push) \
+                 and Zone › DNS › Edit, with the account added under the token's Account \
+                 Resources. Also confirm cloudflare.account_id matches that account.",
+                self.errors_str()
+            )
+        } else {
+            self.errors_str()
         }
     }
 }
@@ -253,6 +276,39 @@ mod tests {
     #[test]
     fn cname_target_format() {
         assert_eq!(tunnel_cname_target("abc-123"), "abc-123.cfargotunnel.com");
+    }
+
+    #[test]
+    fn auth_error_gets_a_permission_hint() {
+        let resp: CfResponse<serde_json::Value> = CfResponse {
+            success: false,
+            errors: vec![CfError {
+                code: 10000,
+                message: "Authentication error".into(),
+            }],
+            result: None,
+        };
+        assert!(resp.is_auth_error());
+        let detail = resp.detail_with_hint();
+        assert!(detail.contains("Authentication error"));
+        assert!(detail.contains("Cloudflare Tunnel"));
+        assert!(detail.contains("account_id"));
+    }
+
+    #[test]
+    fn non_auth_error_has_no_hint() {
+        let resp: CfResponse<serde_json::Value> = CfResponse {
+            success: false,
+            errors: vec![CfError {
+                code: 1003,
+                message: "something else".into(),
+            }],
+            result: None,
+        };
+        assert!(!resp.is_auth_error());
+        let detail = resp.detail_with_hint();
+        assert!(detail.contains("something else"));
+        assert!(!detail.contains("Account Resources"));
     }
 
     #[test]
