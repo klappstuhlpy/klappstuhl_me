@@ -231,9 +231,19 @@ pub struct Config {
     #[serde(default)]
     pub proxy_config_dir: Option<PathBuf>,
     /// Which proxy syntax to emit.  `"nginx"` (default) writes nginx
-    /// `server { ... }` blocks; `"caddy"` writes Caddyfile entries.
+    /// `server { ... }` blocks; `"caddy"` writes Caddyfile entries;
+    /// `"cloudflared"` writes a single Cloudflare Tunnel `config.yml`.
     #[serde(default)]
     pub proxy_kind: Option<String>,
+    /// Cloudflare Tunnel id/name, written as `tunnel:` into the generated
+    /// `config.yml` when `proxy_kind` is `"cloudflared"`. Unset emits an
+    /// editable placeholder.
+    #[serde(default)]
+    pub cloudflared_tunnel: Option<String>,
+    /// Path to the tunnel credentials JSON, written as `credentials-file:`
+    /// into the generated cloudflared `config.yml`. Unset emits a placeholder.
+    #[serde(default)]
+    pub cloudflared_credentials_file: Option<String>,
     /// Shell command run after the config files are regenerated. Typical
     /// values: `"nginx -s reload"`, `"systemctl reload nginx"`,
     /// `"caddy reload --config /etc/caddy/Caddyfile"`. Skipped when unset.
@@ -294,6 +304,8 @@ impl Config {
             firewall_backend: None,
             proxy_config_dir: None,
             proxy_kind: None,
+            cloudflared_tunnel: None,
+            cloudflared_credentials_file: None,
             proxy_reload_command: None,
             backup_interval_hours: None,
             backup_keep: None,

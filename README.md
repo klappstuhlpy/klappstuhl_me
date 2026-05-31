@@ -24,8 +24,8 @@ management, security analytics, virus scanning, and an invite-only user system.
   - **Health** — internal uptime monitoring (a self-hosted Uptime-Kuma). Define targets of four kinds — **HTTP** (status-code / keyword assertions, redirect following), **TCP** (port reachability), **keyword** (substring present/absent in an HTTP body), and **SSL** (certificate expiry, with a configurable "warn N days before" threshold). A background monitor probes each target on its own interval, records latency, classifies each sample as up / degraded (slower than the per-target `degraded_ms` threshold) / down, and opens/closes incidents automatically. Per-target uptime %s (24h / 7d / 30d), average + p95 latency, an incident timeline, and a sample history sparkline. Run a probe on demand, and get a Discord webhook on down→up / up→down transitions. Old samples are pruned after 30 days.
   - **Security** — failed logins, top offending IPs (with GeoIP country/city), reason breakdown, country distribution, recent activity feed. Optional Cloudflare panels (zone analytics + WAF events) when an API token + zone ID are configured.
   - **Firewall** — visual frontend for **nftables**, **ufw**, or **iptables** (auto-detected at startup, overridable via `firewall_backend`). Create allow / deny / rate-limit / geo-block rules (source CIDR, port, protocol, country, requests-per-second); each rule is mirrored in SQLite and applied to the kernel by shelling out to the detected backend. On ufw hosts the dashboard also **imports the live ruleset** — `ufw status` is parsed and reconciled into the mirror on each load, so rules created out-of-band (`ufw allow OpenSSH` from a shell) appear automatically. Manual IP lockouts with optional expiry, plus **automatic lockout** — after 8 failed logins from an IP within 10 minutes the address is blocked for an hour (driven off the existing audit log) and the block is pushed to the backend. A background reaper releases expired lockouts. "Re-apply all" re-pushes every enabled rule. When no backend binary is present the page still manages rules in the DB (handy in dev / without `NET_ADMIN`).
-  - **Proxy** — reverse-proxy / domain manager. Map a subdomain (`jellyfin.klappstuhl.me`) to an upstream container or `host:port`, pick the scheme, and toggle managed TLS, Cloudflare-proxied real-IP handling, HTTP basic auth (password hashed with bcrypt), a requests-per-second rate limit, and JSON allow/deny access rules. From the route list the server renders an nginx `server { … }` block (or a Caddyfile fragment, per `proxy_kind`) per enabled route, writes it to `proxy_config_dir/<subdomain>.conf` (plus an htpasswd sidecar for nginx auth), prunes stale managed files, and runs `proxy_reload_command`. Preview the generated config before saving. Container targets are populated from `config.services`. With no `proxy_config_dir` set, routes are still tracked in the DB as a record of which subdomain points where.
-  - **Certs** — read-only domain overview that joins every managed proxy route with its matching `SSL` health monitor, so each domain the box serves is listed in one place with its certificate expiry (green / amber / red by days remaining), TLS-managed and Cloudflare flags, and upstream. SSL monitors that don't correspond to a proxy route are listed separately. Pure aggregation — add an `SSL` monitor on `/admin/health` for a domain and it appears here.
+  - **Proxy** — reverse-proxy / domain manager. Map a subdomain (`jellyfin.klappstuhl.me`) to an upstream container or `host:port`, pick the scheme, and toggle managed TLS, Cloudflare-proxied real-IP handling, HTTP basic auth (password hashed with bcrypt), a requests-per-second rate limit, and JSON allow/deny access rules. From the route list the server renders an nginx `server { … }` block (or a Caddyfile fragment, per `proxy_kind`) per enabled route, writes it to `proxy_config_dir/<subdomain>.conf` (plus an htpasswd sidecar for nginx auth), prunes stale managed files, and runs `proxy_reload_command`. With `proxy_kind` set to `"cloudflared"` the same routes instead render a single Cloudflare Tunnel `config.yml` (one combined `ingress:` list with the required `http_status:404` catch-all), so the box's services can be published over a tunnel from the same dashboard. Preview the generated config before saving. Container targets are populated from `config.services`. With no `proxy_config_dir` set, routes are still tracked in the DB as a record of which subdomain points where.
+  - **Certs** — read-only domain overview that joins every managed proxy route with its matching `SSL` health monitor, so each domain the box serves is listed in one place with its certificate expiry (green / amber / red by days remaining), TLS-managed and Cloudflare flags, and upstream. Cloudflared-backed or Cloudflare-proxied routes are shown as **Cloudflare edge** TLS (no local certificate to track). SSL monitors that don't correspond to a proxy route are listed separately. Pure aggregation — add an `SSL` monitor on `/admin/health` for a domain and it appears here.
   - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI / Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
   - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, 2FA challenge/fail, signup, password change, logout), invite create/revoke, service/snapshot/script actions, secret status changes, backup create/delete, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
   - **Logs** — interactive viewer over the rolling tracing log files. Parses the JSON application log (one object per line) and the compact bad-request log best-effort, with level/text filtering and tailing. (Separate from the dashboard's request-log panels.)
@@ -134,6 +134,8 @@ A default `config.json` is written on first start. Full layout with all optional
   "firewall_backend": null,
   "proxy_config_dir": null,
   "proxy_kind": null,
+  "cloudflared_tunnel": null,
+  "cloudflared_credentials_file": null,
   "proxy_reload_command": null,
   "backup_interval_hours": null,
   "backup_keep": null,
@@ -166,8 +168,10 @@ A default `config.json` is written on first start. Full layout with all optional
 | `sshd_auth_log_path`     | string \| null    | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below.                                                                                                    |
 | `firewall_backend`       | string \| null    | Force the firewall backend: `"nftables"`, `"ufw"`, `"iptables"`, or `"disabled"`. Unset = auto-detect by probing each binary. `"disabled"` keeps the UI but issues no kernel commands. See below. |
 | `proxy_config_dir`       | string \| null    | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy). Unset = DB-only, nothing written to disk. See below.                |
-| `proxy_kind`             | string \| null    | Config syntax to emit: `"nginx"` (default) or `"caddy"`.                                                                                                                                          |
-| `proxy_reload_command`   | string \| null    | Shell command run after config is regenerated, e.g. `"nginx -s reload"` or `"systemctl reload nginx"`. Skipped when unset.                                                                        |
+| `proxy_kind`             | string \| null    | Config syntax to emit: `"nginx"` (default), `"caddy"`, or `"cloudflared"` (a single Cloudflare Tunnel `config.yml`). See below.                                                                    |
+| `cloudflared_tunnel`     | string \| null    | Cloudflare Tunnel id/name written as `tunnel:` into the generated cloudflared `config.yml`. Unset emits an editable placeholder. Only used when `proxy_kind` is `"cloudflared"`.                   |
+| `cloudflared_credentials_file` | string \| null | Path written as `credentials-file:` into the cloudflared `config.yml`. Unset emits a placeholder. Only used when `proxy_kind` is `"cloudflared"`.                                              |
+| `proxy_reload_command`   | string \| null    | Shell command run after config is regenerated, e.g. `"nginx -s reload"`, `"systemctl reload nginx"`, or `"systemctl restart cloudflared"`. Skipped when unset.                                     |
 | `backup_interval_hours`  | u64 \| null       | Hours between automatic `VACUUM INTO` SQLite backups. `0` disables the scheduler; unset defaults to `24`. See below.                                                                              |
 | `backup_keep`            | usize \| null     | Number of automatic backups to retain (older ones pruned). Unset defaults to `14`.                                                                                                                |
 | `backup_remote`          | object \| null    | Off-site backup target. When set, each new backup is also uploaded to an S3-compatible store (B2 / R2 / AWS / MinIO). See [Off-site backups](#off-site-backups).                                  |
@@ -375,8 +379,8 @@ logged and swallowed so the dashboard still renders.
 
 `/admin/proxy` keeps a row per managed subdomain in SQLite and (optionally)
 renders real proxy config from it. Set `proxy_config_dir` to the directory your
-proxy includes route files from, `proxy_kind` to `"nginx"` (default) or
-`"caddy"`, and `proxy_reload_command` to whatever reloads the proxy:
+proxy includes route files from, `proxy_kind` to `"nginx"` (default), `"caddy"`,
+or `"cloudflared"`, and `proxy_reload_command` to whatever reloads the proxy:
 
 ```json
 "proxy_config_dir": "/etc/nginx/conf.d",
@@ -393,6 +397,33 @@ command. For nginx routes with HTTP basic auth an `<subdomain>.htpasswd` sidecar
 is written alongside and referenced via `auth_basic_user_file`; Caddy embeds the
 bcrypt hash inline. Use the per-route **Preview** to see the exact output before
 it touches disk.
+
+#### Cloudflare Tunnel (cloudflared)
+
+With `proxy_kind` set to `"cloudflared"`, the same route list renders a single
+combined `config.yml` instead of one file per route — a Cloudflare Tunnel
+`ingress:` list with one entry per enabled route and the mandatory
+`http_status:404` catch-all last:
+
+```json
+"proxy_config_dir": "/etc/cloudflared",
+"proxy_kind": "cloudflared",
+"cloudflared_tunnel": "my-tunnel",
+"cloudflared_credentials_file": "/etc/cloudflared/<uuid>.json",
+"proxy_reload_command": "systemctl restart cloudflared"
+```
+
+The file is written to `proxy_config_dir/config.yml` and rewritten wholesale on
+every change (there's nothing per-route to prune). `cloudflared_tunnel` and
+`cloudflared_credentials_file` fill the `tunnel:` / `credentials-file:` headers;
+left unset, editable placeholders are emitted so the file is still hand-offable.
+An `https` upstream gets `originRequest.noTLSVerify: true` (internal services
+are often self-signed), and a route's **Extra config** is appended verbatim
+under that route's `originRequest`. Tunnels terminate TLS at Cloudflare's edge,
+so cloudflared routes carry no local certificate — they show as **Cloudflare
+edge** on the Certs page. Per-route HTTP basic-auth, rate limits, and IP
+allow/deny aren't expressible in a tunnel ingress (enforce them with Cloudflare
+Access / WAF); the generated config notes this inline when those fields are set.
 
 The emitted nginx config references conventional certbot cert paths
 (`/etc/letsencrypt/live/<subdomain>/…`) and, for rate limits, a `limit_req_zone`

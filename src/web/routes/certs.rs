@@ -19,6 +19,9 @@ struct RouteCertView {
     cloudflare_proxied: bool,
     has_auth: bool,
     enabled: bool,
+    /// TLS terminates at Cloudflare's edge (cloudflared backend, or a
+    /// cloudflare-proxied route), so there is no local certificate to track.
+    edge_tls: bool,
     /// Days until the certificate expires, from a matching `ssl` monitor.
     ssl_days_left: Option<i64>,
     /// Name of the matched monitor, for a link back to `/admin/health`.
@@ -72,6 +75,10 @@ async fn page(State(state): State<AppState>, account: Account) -> Result<AdminCe
     let proxy_routes = proxy::storage::list_routes(&state).await.unwrap_or_default();
     let summaries = health::storage::list_summaries(&state).await.unwrap_or_default();
 
+    // With a cloudflared backend every route is fronted by Cloudflare's edge,
+    // which manages TLS — so no local certificate exists to monitor.
+    let backend_is_edge = proxy::configured_kind(&state).label() == "cloudflared";
+
     // SSL monitors keyed by bare host, for the join.
     let ssl_monitors: Vec<&_> = summaries.iter().filter(|s| s.target.kind.eq_ignore_ascii_case("ssl")).collect();
 
@@ -91,6 +98,7 @@ async fn page(State(state): State<AppState>, account: Account) -> Result<AdminCe
             cloudflare_proxied: r.cloudflare_proxied,
             has_auth: r.has_auth(),
             enabled: r.enabled,
+            edge_tls: backend_is_edge || r.cloudflare_proxied,
             ssl_days_left: monitor.and_then(|m| m.last_ssl_days_left),
             monitor_name: monitor.map(|m| m.target.name.clone()),
         });

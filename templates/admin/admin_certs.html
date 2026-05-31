@@ -38,14 +38,18 @@
                         {% if !r.enabled %}<span class="cert-pill unknown">disabled</span>{% endif %}
                     </td>
                     <td><code>{{ r.upstream }}</code>{% match r.container %}{% when Some with (c) %} <span class="muted">({{ c }})</span>{% when None %}{% endmatch %}</td>
-                    <td>{% if r.ssl_managed %}<span class="cert-pill ok">managed</span>{% else %}<span class="cert-pill unknown">—</span>{% endif %}</td>
+                    <td>
+                        {% if r.edge_tls %}<span class="cert-pill ok">Cloudflare edge</span>
+                        {% else if r.ssl_managed %}<span class="cert-pill ok">managed</span>
+                        {% else %}<span class="cert-pill unknown">—</span>{% endif %}
+                    </td>
                     <td>
                         {% match r.ssl_days_left %}
                         {% when Some with (days) %}
                         <span class="cert-pill {{ r.cert_class() }}">{{ days }} days</span>
                         {% match r.monitor_name %}{% when Some with (n) %}<span class="muted"> · {{ n }}</span>{% when None %}{% endmatch %}
                         {% when None %}
-                        <span class="muted">no SSL monitor</span>
+                        {% if r.edge_tls %}<span class="muted">edge-managed</span>{% else %}<span class="muted">no SSL monitor</span>{% endif %}
                         {% endmatch %}
                     </td>
                     <td>

@@ -63,6 +63,12 @@ pub async fn regenerate_all(state: &AppState) -> anyhow::Result<ApplyReport> {
         return Ok(report);
     }
 
+    // cloudflared emits a single combined config.yml rather than one file per
+    // route, so it takes a separate path.
+    if kind.is_single_file() {
+        return regenerate_cloudflared(state, &dir, &routes).await;
+    }
+
     // Track files we expect so we can prune stale ones (disabled / deleted).
     let mut expected: std::collections::HashSet<String> = std::collections::HashSet::new();
 
@@ -108,6 +114,39 @@ pub async fn regenerate_all(state: &AppState) -> anyhow::Result<ApplyReport> {
     Ok(report)
 }
 
+/// Regenerate the single combined cloudflared `config.yml` from every enabled
+/// route, then run the reload command (typically `systemctl restart
+/// cloudflared`). Unlike nginx/caddy there is nothing to prune — the one file
+/// is rewritten wholesale each time.
+async fn regenerate_cloudflared(
+    state: &AppState,
+    dir: &std::path::Path,
+    routes: &[ProxyRoute],
+) -> anyhow::Result<ApplyReport> {
+    let mut report = ApplyReport {
+        dir: Some(dir.display().to_string()),
+        ..Default::default()
+    };
+
+    let enabled: Vec<&ProxyRoute> = routes.iter().filter(|r| r.enabled).collect();
+    let body = render::render_cloudflared_config(
+        &enabled,
+        state.config().cloudflared_tunnel.as_deref(),
+        state.config().cloudflared_credentials_file.as_deref(),
+    );
+
+    let path = dir.join(render::CLOUDFLARED_FILE);
+    match tokio::fs::write(&path, body).await {
+        Ok(()) => report.written = 1,
+        Err(e) => report.errors.push(format!("{}: {e}", path.display())),
+    }
+
+    if let Some(out) = run_reload(state).await {
+        report.reload = Some(out);
+    }
+    Ok(report)
+}
+
 /// Delete config files we previously generated but that no longer map to an
 /// enabled route.  We only touch files matching our naming pattern so we
 /// never clobber hand-written config sharing the directory.
@@ -120,6 +159,8 @@ async fn prune_stale(
     let ext = match kind {
         ProxyKind::Nginx => "conf",
         ProxyKind::Caddy => "caddy",
+        // Single-file backends have nothing per-route to prune.
+        ProxyKind::Cloudflared => return,
     };
     let Ok(mut entries) = tokio::fs::read_dir(dir).await else {
         return;
