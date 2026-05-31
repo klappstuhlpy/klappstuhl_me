@@ -86,6 +86,7 @@ fn static_nav() -> Vec<SpotlightItem> {
         SpotlightItem::nav("Docker", "Services, graph, start/stop/restart", "/admin/docker"),
         SpotlightItem::nav("Snapshots", "Capture and restore containers", "/admin/docker/snapshots"),
         SpotlightItem::nav("Proxy", "Reverse-proxy route mapping", "/admin/proxy"),
+        SpotlightItem::nav("Certs", "Domains and certificate expiry", "/admin/certs"),
         SpotlightItem::nav("Metrics", "CPU, memory, network charts", "/admin/metrics"),
         SpotlightItem::nav("Health", "Uptime monitors and incidents", "/admin/health"),
         SpotlightItem::nav("Security", "Requests, GeoIP, Cloudflare", "/admin/security"),

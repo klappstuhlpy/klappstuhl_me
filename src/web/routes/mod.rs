@@ -8,6 +8,7 @@ mod api;
 mod audit;
 mod auth;
 mod backups;
+mod certs;
 mod docker;
 mod firewall;
 mod health;
@@ -77,6 +78,7 @@ pub fn all() -> Router<AppState> {
         .merge(health::routes())
         .merge(proxy::routes())
         .merge(sanitizer::routes())
+        .merge(certs::routes())
         .merge(backups::routes())
         .merge(logs::routes())
         .merge(spotlight::routes())
