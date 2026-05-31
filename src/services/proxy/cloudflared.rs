@@ -22,15 +22,15 @@ use super::ApplyReport;
 /// Builds the tunnel API client when all three required settings are present.
 pub fn api_client(state: &AppState) -> Option<CfTunnel> {
     let cfg = state.config();
-    let token = cfg.cloudflare_api_token.as_deref().filter(|s| !s.is_empty())?;
-    let account = cfg.cloudflare_account_id.as_deref().filter(|s| !s.is_empty())?;
-    let tunnel = cfg.cloudflared_tunnel_id.as_deref().filter(|s| !s.is_empty())?;
+    let token = cfg.cloudflare.api_token.as_deref().filter(|s| !s.is_empty())?;
+    let account = cfg.cloudflare.account_id.as_deref().filter(|s| !s.is_empty())?;
+    let tunnel = cfg.cloudflare.tunnel_id.as_deref().filter(|s| !s.is_empty())?;
     Some(CfTunnel::new(
         state.client.clone(),
         token.to_string(),
         account.to_string(),
         tunnel.to_string(),
-        cfg.cloudflare_zone_id.clone().filter(|s| !s.is_empty()),
+        cfg.cloudflare.zone_id.clone().filter(|s| !s.is_empty()),
     ))
 }
 
@@ -174,7 +174,8 @@ pub async fn import(state: &AppState) -> anyhow::Result<(usize, usize, usize)> {
 fn short_tunnel(state: &AppState) -> String {
     state
         .config()
-        .cloudflared_tunnel_id
+        .cloudflare
+        .tunnel_id
         .as_deref()
         .map(|t| t.chars().take(8).collect::<String>())
         .unwrap_or_default()

@@ -24,7 +24,7 @@ management, security analytics, virus scanning, and an invite-only user system.
   - **Health** — internal uptime monitoring (a self-hosted Uptime-Kuma). Define targets of four kinds — **HTTP** (status-code / keyword assertions, redirect following), **TCP** (port reachability), **keyword** (substring present/absent in an HTTP body), and **SSL** (certificate expiry, with a configurable "warn N days before" threshold). A background monitor probes each target on its own interval, records latency, classifies each sample as up / degraded (slower than the per-target `degraded_ms` threshold) / down, and opens/closes incidents automatically. Per-target uptime %s (24h / 7d / 30d), average + p95 latency, an incident timeline, and a sample history sparkline. Run a probe on demand, and get a Discord webhook on down→up / up→down transitions. Old samples are pruned after 30 days.
   - **Security** — failed logins, top offending IPs (with GeoIP country/city), reason breakdown, country distribution, recent activity feed. Optional Cloudflare panels (zone analytics + WAF events) when an API token + zone ID are configured.
   - **Firewall** — visual frontend for **nftables**, **ufw**, or **iptables** (auto-detected at startup, overridable via `firewall_backend`). Create allow / deny / rate-limit / geo-block rules (source CIDR, port, protocol, country, requests-per-second); each rule is mirrored in SQLite and applied to the kernel by shelling out to the detected backend. On ufw hosts the dashboard also **imports the live ruleset** — `ufw status` is parsed and reconciled into the mirror on each load, so rules created out-of-band (`ufw allow OpenSSH` from a shell) appear automatically. Manual IP lockouts with optional expiry, plus **automatic lockout** — after 8 failed logins from an IP within 10 minutes the address is blocked for an hour (driven off the existing audit log) and the block is pushed to the backend. A background reaper releases expired lockouts. "Re-apply all" re-pushes every enabled rule. When no backend binary is present the page still manages rules in the DB (handy in dev / without `NET_ADMIN`).
-  - **Proxy** — reverse-proxy / domain manager. Map a subdomain (`jellyfin.klappstuhl.me`) to an upstream container or `host:port`, pick the scheme, and toggle managed TLS, Cloudflare-proxied real-IP handling, HTTP basic auth (password hashed with bcrypt), a requests-per-second rate limit, and JSON allow/deny access rules. From the route list the server renders an nginx `server { … }` block (or a Caddyfile fragment, per `proxy_kind`) per enabled route, writes it to `proxy_config_dir/<subdomain>.conf` (plus an htpasswd sidecar for nginx auth), prunes stale managed files, and runs `proxy_reload_command`. With `proxy_kind` set to `"cloudflared"` the same routes drive a **Cloudflare Tunnel** instead: for a remotely-managed (dashboard) tunnel — which has no local credentials file — the dashboard manages the tunnel's public-hostname **ingress over the Cloudflare API**, with an **Import from Cloudflare** button that pulls existing hostnames into the route table, a push that writes routes back as ingress and upserts the proxied `CNAME → <tunnel>.cfargotunnel.com` DNS records, and no reload/`config.yml`/systemd needed (Cloudflare propagates to the running `cloudflared` automatically); for a locally-managed tunnel it falls back to writing a single combined `config.yml`. Preview the generated config before saving. Container targets are populated from `config.services`. With no `proxy_config_dir` set (and not in tunnel-API mode), routes are still tracked in the DB as a record of which subdomain points where. Every apply is logged and audited (`proxy.apply`, `proxy.import`).
+  - **Proxy** — reverse-proxy / domain manager. Map a subdomain (`jellyfin.klappstuhl.me`) to an upstream container or `host:port`, pick the scheme, and toggle managed TLS, Cloudflare-proxied real-IP handling, HTTP basic auth (password hashed with bcrypt), a requests-per-second rate limit, and JSON allow/deny access rules. From the route list the server renders an nginx `server { … }` block (or a Caddyfile fragment, per `proxy.kind`) per enabled route, writes it to `proxy.config_dir/<subdomain>.conf` (plus an htpasswd sidecar for nginx auth), prunes stale managed files, and runs `proxy.reload_command`. With `proxy.kind` set to `"cloudflared"` the same routes drive a **Cloudflare Tunnel** instead: for a remotely-managed (dashboard) tunnel — which has no local credentials file — the dashboard manages the tunnel's public-hostname **ingress over the Cloudflare API**, with an **Import from Cloudflare** button that pulls existing hostnames into the route table, a push that writes routes back as ingress and upserts the proxied `CNAME → <tunnel>.cfargotunnel.com` DNS records, and no reload/`config.yml`/systemd needed (Cloudflare propagates to the running `cloudflared` automatically); for a locally-managed tunnel it falls back to writing a single combined `config.yml`. Preview the generated config before saving. Container targets are populated from `config.services`. With no `proxy.config_dir` set (and not in tunnel-API mode), routes are still tracked in the DB as a record of which subdomain points where. Every apply is logged and audited (`proxy.apply`, `proxy.import`).
   - **Certs** — read-only domain overview that joins every managed proxy route with its matching `SSL` health monitor, so each domain the box serves is listed in one place with its certificate expiry (green / amber / red by days remaining), TLS-managed and Cloudflare flags, and upstream. Cloudflared-backed or Cloudflare-proxied routes are shown as **Cloudflare edge** TLS (no local certificate to track). SSL monitors that don't correspond to a proxy route are listed separately. Pure aggregation — add an `SSL` monitor on `/admin/health` for a domain and it appears here.
   - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI / Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
   - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, 2FA challenge/fail, signup, password change, logout), invite create/revoke, service/snapshot/script actions, secret status changes, backup create/delete, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
@@ -35,7 +35,7 @@ management, security analytics, virus scanning, and an invite-only user system.
     - **ClamAV** — streams the uploaded file to a local `clamd` daemon over TCP (INSTREAM protocol). Reports virus name on detection.
     - **VirusTotal** — looks up the file's SHA-256 against the VT v3 API (no file upload; hash-only). Shows `N/M engines detected` with a link to the VT report.
     - Scan history table (SQLite) with per-row deletion. Both backends are independent; results combine into a single clean/infected/unknown verdict.
-  - **Backups** — on-disk SQLite backups via `VACUUM INTO` (a consistent, fully-checkpointed copy taken without an exclusive lock, safe while serving). A background scheduler takes one every `backup_interval_hours` and prunes to the most recent `backup_keep`. Take a backup on demand, download any backup file, or delete one. Restore is intentionally a manual, offline operation (stop the server, swap `main.db`) — under WAL it's unsafe to replace the live DB in place.
+  - **Backups** — on-disk SQLite backups via `VACUUM INTO` (a consistent, fully-checkpointed copy taken without an exclusive lock, safe while serving). A background scheduler takes one every `backup.interval_hours` and prunes to the most recent `backup.keep`. Take a backup on demand, download any backup file, or delete one. Restore is intentionally a manual, offline operation (stop the server, swap `main.db`) — under WAL it's unsafe to replace the live DB in place.
 - **Two-factor auth (TOTP)** — opt-in RFC 6238 2FA managed from `/account`. Enroll by scanning a QR / entering the secret, confirm with a code, and download one-time recovery codes. On login, accounts with 2FA are bounced to `/login/2fa` (a short-lived signed pending cookie carries the challenge — never persisted) and must supply a TOTP code or a recovery code. The shared secret is encrypted at rest with ChaCha20-Poly1305 keyed by the app secret, so a leaked database (or a downloaded backup) doesn't expose usable 2FA secrets; recovery codes are stored only as SHA-256 hashes. Disabling 2FA requires a password-confirmation modal.
 - **Public status page (`/status`)** — unauthenticated, derived from the Health monitors. Shows an overall banner (all operational / degraded / major outage), per-service up/degraded/down status, 24h uptime %, and last-check time.
 - **Spotlight palette (Ctrl+K)** — macOS-style command palette available on every admin page. Opens with `Ctrl+K` (or the Search button in the sidebar footer). Fuzzy-searches across all admin nav items, configured scripts, audit log entries, file scan history, SSH keys, and live Docker containers. Keyboard-navigable (↑/↓/Enter/Esc). Scripts run inline and show their stdout/stderr output in the palette without leaving the page.
@@ -49,7 +49,7 @@ management, security analytics, virus scanning, and an invite-only user system.
   - **Upload TTL** — `POST /api/images/upload?expires_in=<seconds>` auto-deletes the upload after the given time-to-live (capped at 365 days); omit for a permanent upload.
   - **Admin** — `GET /api/admin/updates` returns the per-service container image-update status (requires `admin:read`).
   - **Shareable links** — media/render endpoints accept `share=true` to store the result and return a JSON `ShareResult` with a short `/m/:id` link instead of raw bytes; `GET /m/:id` serves it back.
-- **Alert fan-out** — metric, health, and secret alerts deliver to any of a Discord webhook, an [ntfy](https://ntfy.sh) topic, and a generic JSON webhook (`{title, level, body, fields}`), depending on which of `discord_webhook_url` / `ntfy_url` / `alert_webhook_url` are configured.
+- **Alert fan-out** — metric, health, and secret alerts deliver to any of a Discord webhook, an [ntfy](https://ntfy.sh) topic, and a generic JSON webhook (`{title, level, body, fields}`), depending on which of `alerts.discord_webhook_url` / `alerts.ntfy_url` / `alerts.webhook_url` are configured.
 - **Automatic TLS** — Let's Encrypt via rustls-acme (TLS-ALPN-01) in production mode.
 
 ## Tech stack
@@ -107,7 +107,14 @@ Additionally, `/etc/ufw` and `/var/lib/ufw` are bind-mounted from the host. Host
 
 ## Configuration
 
-A default `config.json` is written on first start. Full layout with all optional fields:
+A default `config.json` is written on first start. Related settings are grouped
+into sub-objects (`alerts`, `cloudflare`, `proxy`, `backup`). On every start-up
+the file is **re-normalised to the canonical key order shown below** — so if you
+hand-edit it (or upgrade from the older flat layout, whose keys like
+`cloudflare_api_token` / `proxy_kind` are migrated into their groups
+automatically), it's tidied back into this shape with no settings lost.
+
+Full layout with all optional fields:
 
 ```json
 {
@@ -118,15 +125,31 @@ A default `config.json` is written on first start. Full layout with all optional
     "port": 443
   },
   "secret_key": "<auto-generated — leave this alone>",
-  "discord_webhook_url": null,
-  "ntfy_url": null,
-  "alert_webhook_url": null,
+  "alerts": {
+    "discord_webhook_url": null,
+    "ntfy_url": null,
+    "webhook_url": null
+  },
+  "cloudflare": {
+    "api_token": null,
+    "zone_id": null,
+    "account_id": null,
+    "tunnel_id": null,
+    "tunnel_name": null,
+    "tunnel_credentials_file": null
+  },
+  "proxy": {
+    "kind": null,
+    "config_dir": null,
+    "reload_command": null
+  },
+  "backup": {
+    "interval_hours": null,
+    "keep": null,
+    "remote": null
+  },
   "services": [],
   "geoip_db_path": null,
-  "cloudflare_api_token": null,
-  "cloudflare_zone_id": null,
-  "cloudflare_account_id": null,
-  "cloudflared_tunnel_id": null,
   "secret_scan_paths": [],
   "postgres_url": null,
   "clamav_addr": null,
@@ -134,54 +157,46 @@ A default `config.json` is written on first start. Full layout with all optional
   "spotlight_scripts": [],
   "sshd_auth_log_path": null,
   "firewall_backend": null,
-  "proxy_config_dir": null,
-  "proxy_kind": null,
-  "cloudflared_tunnel": null,
-  "cloudflared_credentials_file": null,
-  "proxy_reload_command": null,
-  "backup_interval_hours": null,
-  "backup_keep": null,
-  "backup_remote": null,
   "update_check_interval_hours": null,
   "chromium_path": null,
   "ffmpeg_path": null
 }
 ```
 
-| Key                            | Type                     | Notes                                                                                                                                                                                             |
-|--------------------------------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `production`                   | bool                     | `true` switches the server to TLS via Let's Encrypt on port 443.                                                                                                                                  |
-| `domains`                      | string[]                 | Hostnames that ACME will request certificates for.                                                                                                                                                |
-| `server.port`                  | u16                      | Listen port (`443` in production, anything else for dev).                                                                                                                                         |
-| `server.ip`                    | string                   | The IP the server listens on (default `0.0.0.0`).                                                                                                                                                 |
-| `secret_key`                   | string                   | Auto-generated; used for HMAC signing of session tokens and flash cookies.                                                                                                                        |
-| `discord_webhook_url`          | string \| null           | Discord incoming webhook URL for metric / health / secret alerts.                                                                                                                                 |
-| `ntfy_url`                     | string \| null           | [ntfy](https://ntfy.sh) topic URL (e.g. `https://ntfy.sh/my-topic`). When set, alerts are also pushed here as plain text.                                                                         |
-| `alert_webhook_url`            | string \| null           | Generic webhook URL. When set, alerts are also POSTed here as JSON `{title, level, body, fields}`.                                                                                                |
-| `services`                     | ServiceConfig[]          | Docker services shown on `/admin/docker`. See below.                                                                                                                                              |
-| `geoip_db_path`                | string \| null           | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.                                                                                                             |
-| `cloudflare_api_token`         | string \| null           | Cloudflare API token. `Zone.Analytics:Read` for the security panels; for tunnel management (see below) it also needs **Account › Cloudflare Tunnel › Edit** and **Zone › DNS › Edit**.              |
-| `cloudflare_zone_id`           | string \| null           | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels (and DNS upserts for tunnel hostnames).                                                             |
-| `cloudflare_account_id`        | string \| null           | Cloudflare account ID. With `cloudflare_api_token` + `cloudflared_tunnel_id`, enables managing a remotely-managed Cloudflare Tunnel's ingress through the API from `/admin/proxy`. See below.     |
-| `cloudflared_tunnel_id`        | string \| null           | UUID of the Cloudflare Tunnel to manage over the API (the right model for a dashboard-created tunnel with no local credentials file). See below.                                                  |
-| `secret_scan_paths`            | string[]                 | Directory paths the secrets scanner walks recursively.                                                                                                                                            |
-| `postgres_url`                 | string \| null           | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                                                                                                                    |
-| `clamav_addr`                  | string \| null           | TCP address of a `clamd` daemon, e.g. `"host.docker.internal:3310"`. Enables ClamAV scanning.                                                                                                     |
-| `virustotal_api_key`           | string \| null           | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.                                                                                                                 |
-| `spotlight_scripts`            | SpotlightScript[]        | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                                                                                                                           |
-| `sshd_auth_log_path`           | string \| null           | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below.                                                                                                    |
-| `firewall_backend`             | string \| null           | Force the firewall backend: `"nftables"`, `"ufw"`, `"iptables"`, or `"disabled"`. Unset = auto-detect by probing each binary. `"disabled"` keeps the UI but issues no kernel commands. See below. |
-| `proxy_config_dir`             | string \| null           | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy, `config.yml` for local-file cloudflared). Unused in tunnel-API mode. Unset = DB-only, nothing written to disk. See below. |
-| `proxy_kind`                   | string \| null           | Config syntax to emit: `"nginx"` (default), `"caddy"`, or `"cloudflared"` (a single Cloudflare Tunnel `config.yml`). See below.                                                                   |
-| `cloudflared_tunnel`           | string \| null           | (Local-file mode only) Tunnel id/name written as `tunnel:` into a generated `config.yml`. Used when `proxy_kind` is `"cloudflared"` **and** the API isn't configured.                             |
-| `cloudflared_credentials_file` | string \| null           | (Local-file mode only) Path written as `credentials-file:` into the generated `config.yml`. Used only when the tunnel API isn't configured.                                                       |
-| `proxy_reload_command`         | string \| null           | Shell command run after config is regenerated, e.g. `"nginx -s reload"`, `"systemctl reload nginx"`, or `"systemctl restart cloudflared"`. Skipped when unset.                                    |
-| `backup_interval_hours`        | u64 \| null              | Hours between automatic `VACUUM INTO` SQLite backups. `0` disables the scheduler; unset defaults to `24`. See below.                                                                              |
-| `backup_keep`                  | usize \| null            | Number of automatic backups to retain (older ones pruned). Unset defaults to `14`.                                                                                                                |
-| `backup_remote`                | object \| null           | Off-site backup target. When set, each new backup is also uploaded to an S3-compatible store (B2 / R2 / AWS / MinIO). See [Off-site backups](#off-site-backups).                                  |
-| `update_check_interval_hours`  | u64 \| null              | Hours between background container image-update checks. `0` disables. Unset defaults to `12`. See [Container image updates](#container-image-update-detection).                                   |
-| `chromium_path`                | string \| null           | Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF render endpoints. Unset = probe common names on `PATH`; if none found those endpoints return an error.                       |
-| `ffmpeg_path`                  | string \| null           | Path to an `ffmpeg` binary for the video/HEIC transcode endpoint. Unset = use `ffmpeg` on `PATH`; if absent the endpoint returns an error.                                                        |
+| Key                            | Type                     | Notes                                                                                                                                                                                                                                                  |
+|--------------------------------|--------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `production`                   | bool                     | `true` switches the server to TLS via Let's Encrypt on port 443.                                                                                                                                                                                       |
+| `domains`                      | string[]                 | Hostnames that ACME will request certificates for.                                                                                                                                                                                                     |
+| `server.port`                  | u16                      | Listen port (`443` in production, anything else for dev).                                                                                                                                                                                              |
+| `server.ip`                    | string                   | The IP the server listens on (default `0.0.0.0`).                                                                                                                                                                                                      |
+| `secret_key`                   | string                   | Auto-generated; used for HMAC signing of session tokens and flash cookies.                                                                                                                                                                             |
+| `alerts.discord_webhook_url`   | string \| null           | Discord incoming webhook URL for metric / health / secret / backup alerts.                                                                                                                                                                                      |
+| `alerts.webhook_url`           | string \| null           | Generic webhook URL. When set, alerts are also POSTed here as JSON `{title, level, body, fields}`.                                                                                                                                                     |
+| `alerts.ntfy_url`              | string \| null           | [ntfy](https://ntfy.sh) topic URL (e.g. `https://ntfy.sh/my-topic`). When set, alerts are also pushed here as plain text.                                                                                                                              |
+| `services`                     | ServiceConfig[]          | Docker services shown on `/admin/docker`. See below.                                                                                                                                                                                                   |
+| `geoip_db_path`                | string \| null           | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.                                                                                                                                                                  |
+| `cloudflare.tunnel_name`       | string \| null           | (Local-file mode only) Tunnel id/name written as `tunnel:` into a generated `config.yml`. Used when `proxy.kind` is `"cloudflared"` **and** the API isn't configured.                                                                                  |
+| `cloudflare.zone_id`           | string \| null           | The zone ID matching `cloudflare.api_token`. Both must be set to enable the Cloudflare panels (and DNS upserts for tunnel hostnames).                                                                                                                  |
+| `cloudflare.tunnel_id`         | string \| null           | UUID of the Cloudflare Tunnel to manage over the API (the right model for a dashboard-created tunnel with no local credentials file). See below.                                                                                                       |
+| `cloudflare.api_token`         | string \| null           | Cloudflare API token. `Zone.Analytics:Read` for the security panels; for tunnel management (see below) it also needs **Account › Cloudflare Tunnel › Edit** and **Zone › DNS › Edit**.                                                                 |
+| `cloudflare.account_id`        | string \| null           | Cloudflare account ID. With `cloudflare.api_token` + `cloudflare.tunnel_id`, enables managing a remotely-managed Cloudflare Tunnel's ingress through the API from `/admin/proxy`. See below.                                                          |
+| `cloudflare.tunnel_credentials_file` | string \| null     | (Local-file mode only) Path written as `credentials-file:` into the generated `config.yml`. Used only when the tunnel API isn't configured.                                                                                                            |
+| `secret_scan_paths`            | string[]                 | Directory paths the secrets scanner walks recursively.                                                                                                                                                                                                 |
+| `postgres_url`                 | string \| null           | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                                                                                                                                                                         |
+| `clamav_addr`                  | string \| null           | TCP address of a `clamd` daemon, e.g. `"host.docker.internal:3310"`. Enables ClamAV scanning.                                                                                                                                                          |
+| `virustotal_api_key`           | string \| null           | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.                                                                                                                                                                      |
+| `spotlight_scripts`            | SpotlightScript[]        | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                                                                                                                                                                                |
+| `sshd_auth_log_path`           | string \| null           | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below.                                                                                                                                                         |
+| `firewall_backend`             | string \| null           | Force the firewall backend: `"nftables"`, `"ufw"`, `"iptables"`, or `"disabled"`. Unset = auto-detect by probing each binary. `"disabled"` keeps the UI but issues no kernel commands. See below.                                                      |
+| `proxy.config_dir`             | string \| null           | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy, `config.yml` for local-file cloudflared). Unused in tunnel-API mode. Unset = DB-only, nothing written to disk. See below. |
+| `proxy.kind`                   | string \| null           | Config syntax to emit: `"nginx"` (default), `"caddy"`, or `"cloudflared"` (a single Cloudflare Tunnel `config.yml`). See below.                                                                                                                        |
+| `proxy.reload_command`         | string \| null           | Shell command run after config is regenerated, e.g. `"nginx -s reload"` or `"docker restart cloudflared"`. Skipped when unset / in tunnel-API mode.                                                                                         |
+| `backup.interval_hours`        | u64 \| null              | Hours between automatic `VACUUM INTO` SQLite backups. `0` disables the scheduler; unset defaults to `24`. See below.                                                                                                                                   |
+| `backup.keep`                  | usize \| null            | Number of automatic backups to retain (older ones pruned). Unset defaults to `14`.                                                                                                                                                                     |
+| `backup.remote`                | object \| null           | Off-site backup target. When set, each new backup is also uploaded to an S3-compatible store (B2 / R2 / AWS / MinIO). See [Off-site backups](#off-site-backups).                                                                                       |
+| `update_check_interval_hours`  | u64 \| null              | Hours between background container image-update checks. `0` disables. Unset defaults to `12`. See [Container image updates](#container-image-update-detection).                                                                                        |
+| `chromium_path`                | string \| null           | Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF render endpoints. Unset = probe common names on `PATH`; if none found those endpoints return an error.                                                                            |
+| `ffmpeg_path`                  | string \| null           | Path to an `ffmpeg` binary for the video/HEIC transcode endpoint. Unset = use `ffmpeg` on `PATH`; if absent the endpoint returns an error.                                                                                                             |
 
 ### Docker services configuration
 
@@ -269,7 +284,7 @@ The expression is standard 5-field cron evaluated in **UTC**, supporting `*`, li
 
 On Windows the data dir and config dir are both `%AppData%\klappstuhl_me\`, so simply dropping the `.mmdb` file alongside your `config.json` works. For Docker that's `./data/geoip/GeoLite2-City.mmdb` on the host (mapped to `/data/geoip/` in the container). If no file is found, the security dashboard still works — country/city columns are simply hidden.
 
-**Cloudflare** — create an API token with `Zone.Analytics:Read` on your zone, paste it as `cloudflare_api_token` along with the `cloudflare_zone_id`. The Cloudflare section appears automatically. Failures are non-fatal — if CF is unreachable, the rest of the dashboard still renders. (To *also* manage a Cloudflare Tunnel from `/admin/proxy`, the same token needs the extra **Account › Cloudflare Tunnel › Edit** + **Zone › DNS › Edit** permissions and the `cloudflare_account_id` / `cloudflared_tunnel_id` settings — see [Cloudflare Tunnel](#cloudflare-tunnel-cloudflared).)
+**Cloudflare** — create an API token with `Zone.Analytics:Read` on your zone, paste it as `cloudflare.api_token` along with the `cloudflare.zone_id`. The Cloudflare section appears automatically. Failures are non-fatal — if CF is unreachable, the rest of the dashboard still renders. (To *also* manage a Cloudflare Tunnel from `/admin/proxy`, the same token needs the extra **Account › Cloudflare Tunnel › Edit** + **Zone › DNS › Edit** permissions and the `cloudflare.account_id` / `cloudflare.tunnel_id` settings — see [Cloudflare Tunnel](#cloudflare-tunnel-cloudflared).)
 
 **ClamAV** — run `clamd` on the same host (or reachable via TCP) and set `clamav_addr` to its address. The File Sanitizer streams uploaded files to clamd using the native INSTREAM protocol — no `clamdscan` binary required.
 
@@ -390,15 +405,17 @@ logged and swallowed so the dashboard still renders.
 ### Reverse proxy / domain manager
 
 `/admin/proxy` keeps a row per managed subdomain in SQLite and (optionally)
-renders real proxy config from it. Set `proxy_config_dir` to the directory your
-proxy includes route files from, `proxy_kind` to `"nginx"` (default), `"caddy"`,
-or `"cloudflared"`, and `proxy_reload_command` to whatever reloads the proxy:
+renders real proxy config from it. Set `proxy.config_dir` to the directory your
+proxy includes route files from, `proxy.kind` to `"nginx"` (default), `"caddy"`,
+or `"cloudflared"`, and `proxy.reload_command` to whatever reloads the proxy:
 
 ```json
 {
-  "proxy_config_dir": "/etc/nginx/conf.d",
-  "proxy_kind": "nginx",
-  "proxy_reload_command": "nginx -s reload"
+  "proxy": {
+    "kind": "nginx",
+    "config_dir": "/etc/nginx/conf.d",
+    "reload_command": "nginx -s reload"
+  }
 }
 ```
 
@@ -414,7 +431,7 @@ it touches disk.
 
 #### Cloudflare Tunnel (cloudflared)
 
-With `proxy_kind` set to `"cloudflared"`, routes map onto a Cloudflare Tunnel's
+With `proxy.kind` set to `"cloudflared"`, routes map onto a Cloudflare Tunnel's
 ingress (one rule per enabled route, plus the mandatory `http_status:404`
 catch-all). There are two modes depending on how your tunnel is run.
 
@@ -426,11 +443,13 @@ Cloudflare API:
 
 ```json
 {
-  "proxy_kind": "cloudflared",
-  "cloudflare_api_token": "<token>",
-  "cloudflare_account_id": "<account id>",
-  "cloudflared_tunnel_id": "ac878d47-ad9c-4699-bcec-a6663ba7802c",
-  "cloudflare_zone_id": "<zone id>"
+  "proxy": { "kind": "cloudflared" },
+  "cloudflare": {
+    "api_token": "<token>",
+    "zone_id": "<zone id>",
+    "account_id": "<account id>",
+    "tunnel_id": "ac878d47-ad9c-4699-bcec-a6663ba7802c"
+  }
 }
 ```
 
@@ -445,8 +464,8 @@ In this mode:
   hostname resolves. Because pushing **replaces** the whole ingress, import
   first so the DB mirrors Cloudflare before you push.
 - **No reload, no config dir, no systemd.** Cloudflare propagates the pushed
-  config to your running `cloudflared` automatically — so `proxy_config_dir` and
-  `proxy_reload_command` are irrelevant here (handy when `cloudflared` runs as a
+  config to your running `cloudflared` automatically — so `proxy.config_dir` and
+  `proxy.reload_command` are irrelevant here (handy when `cloudflared` runs as a
   container with no `systemctl`).
 
 The API token needs **Account › Cloudflare Tunnel › Edit** and (for the DNS
@@ -455,21 +474,25 @@ analytics-only `Zone.Analytics:Read` token.
 
 **Local-file mode (for a locally-managed tunnel).** If the API settings above
 aren't all present, cloudflared falls back to writing a single combined
-`config.yml` to `proxy_config_dir`:
+`config.yml` to `proxy.config_dir`:
 
 ```json
 {
-  "proxy_config_dir": "/etc/cloudflared",
-  "proxy_kind": "cloudflared",
-  "cloudflared_tunnel": "my-tunnel",
-  "cloudflared_credentials_file": "/etc/cloudflared/<uuid>.json",
-  "proxy_reload_command": "docker restart cloudflared"
+  "proxy": {
+    "kind": "cloudflared",
+    "config_dir": "/etc/cloudflared",
+    "reload_command": "docker restart cloudflared"
+  },
+  "cloudflare": {
+    "tunnel_name": "my-tunnel",
+    "tunnel_credentials_file": "/etc/cloudflared/<uuid>.json"
+  }
 }
 ```
 
 The file is rewritten wholesale on every change (nothing per-route to prune);
-`cloudflared_tunnel` / `cloudflared_credentials_file` fill the `tunnel:` /
-`credentials-file:` headers (editable placeholders when unset). For a reload in
+`cloudflare.tunnel_name` / `cloudflare.tunnel_credentials_file` fill the
+`tunnel:` / `credentials-file:` headers (editable placeholders when unset). For a reload in
 a containerized deployment use `docker restart <cloudflared-container>` (the app
 already has the Docker socket) rather than `systemctl`, which isn't available
 inside the container.
@@ -487,14 +510,14 @@ The emitted nginx config references conventional certbot cert paths
 you must declare once in the `http {}` block (the per-route `limit_req` line and
 a commented template are emitted for you). Anything in the route's **Extra
 config** field is appended verbatim inside the server/site block. When
-`proxy_config_dir` is unset the page is purely a record-keeping view — no files
+`proxy.config_dir` is unset the page is purely a record-keeping view — no files
 are written. All changes are audited (`proxy.route.*`, `proxy.apply`).
 
 ### SQLite backups
 
 A background task takes a `VACUUM INTO` snapshot of `main.db` every
-`backup_interval_hours` (default 24; `0` disables the scheduler) and prunes to
-the most recent `backup_keep` files (default 14). Backups land in
+`backup.interval_hours` (default 24; `0` disables the scheduler) and prunes to
+the most recent `backup.keep` files (default 14). Backups land in
 `<data>/backups/` as `backup-<unix-ts>.db`. `VACUUM INTO` produces a consistent,
 fully-checkpointed copy without an exclusive lock, so it's safe while the server
 is serving requests.
@@ -507,21 +530,23 @@ under live WAL connections is unsafe, so the UI deliberately doesn't offer it.
 ### Off-site backups
 
 Local backups share a disk with the live database, so a dead disk takes them
-with it. Set `backup_remote` to also mirror every new backup to an
+with it. Set `backup.remote` to also mirror every new backup to an
 S3-compatible object store. Path-style addressing + AWS Signature V4 are used,
 which AWS S3, Backblaze B2, Cloudflare R2, MinIO, and Wasabi all accept — no
 extra binary or SDK:
 
 ```json
 {
-  "backup_remote": {
-    "kind": "s3",
-    "endpoint": "https://s3.us-west-002.backblazeb2.com",
-    "region": "us-west-002",
-    "bucket": "my-backups",
-    "prefix": "klappstuhl/",
-    "access_key_id": "…",
-    "secret_access_key": "…"
+  "backup": {
+    "remote": {
+      "kind": "s3",
+      "endpoint": "https://s3.us-west-002.backblazeb2.com",
+      "region": "us-west-002",
+      "bucket": "my-backups",
+      "prefix": "klappstuhl/",
+      "access_key_id": "…",
+      "secret_access_key": "…"
+    }
   }
 }
 ```
@@ -577,7 +602,7 @@ in-process `syntect` highlighter.
 
 ## Metric alert thresholds
 
-Hard-coded (`src/services/metrics/alerts.rs`). On the `OK → ALERT` transition, an alert fans out to every configured channel (`discord_webhook_url` / `ntfy_url` / `alert_webhook_url`) with a 30-minute cooldown per metric:
+Hard-coded (`src/services/metrics/alerts.rs`). On the `OK → ALERT` transition, an alert fans out to every configured channel (`alerts.discord_webhook_url` / `alerts.ntfy_url` / `alerts.webhook_url`) with a 30-minute cooldown per metric:
 
 | Metric          | Threshold | Notes                                  |
 |-----------------|-----------|----------------------------------------|

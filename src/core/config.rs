@@ -113,7 +113,91 @@ impl BackupRemoteConfig {
     }
 }
 
+/// Alert delivery sinks. A metric / health / secret / backup alert fans out to
+/// every one of these that is set.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct AlertsConfig {
+    /// Discord incoming-webhook URL.
+    #[serde(default)]
+    pub discord_webhook_url: Option<Webhook>,
+    /// ntfy topic URL (e.g. `https://ntfy.sh/my-topic`) — alerts are pushed as
+    /// plain text.
+    #[serde(default)]
+    pub ntfy_url: Option<String>,
+    /// Generic webhook URL — alerts are POSTed as a neutral JSON body
+    /// `{title, level, body, fields}`.
+    #[serde(default)]
+    pub webhook_url: Option<String>,
+}
+
+/// Cloudflare credentials and tunnel settings. The token + zone power the
+/// security dashboard's Cloudflare panels; the token + `account_id` +
+/// `tunnel_id` additionally let `/admin/proxy` manage a remotely-managed
+/// Cloudflare Tunnel's ingress over the API.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct CloudflareConfig {
+    /// API token. `Zone.Analytics:Read` for the security panels; for tunnel
+    /// management it also needs Account › Cloudflare Tunnel › Edit and
+    /// Zone › DNS › Edit.
+    #[serde(default)]
+    pub api_token: Option<String>,
+    /// Zone ID for the domain this app sits behind.
+    #[serde(default)]
+    pub zone_id: Option<String>,
+    /// Account ID — required for tunnel-API management.
+    #[serde(default)]
+    pub account_id: Option<String>,
+    /// UUID of the Cloudflare Tunnel to manage over the API (the right model
+    /// for a dashboard/remotely-managed tunnel with no local credentials file).
+    #[serde(default)]
+    pub tunnel_id: Option<String>,
+    /// Local-file mode only: tunnel id/name written as `tunnel:` into a
+    /// generated `config.yml`. Used when the tunnel API isn't configured.
+    #[serde(default)]
+    pub tunnel_name: Option<String>,
+    /// Local-file mode only: path written as `credentials-file:` into the
+    /// generated `config.yml`.
+    #[serde(default)]
+    pub tunnel_credentials_file: Option<String>,
+}
+
+/// Reverse-proxy / domain-manager settings for `/admin/proxy`.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct ProxyConfig {
+    /// Config syntax to emit: `"nginx"` (default), `"caddy"`, or
+    /// `"cloudflared"`.
+    #[serde(default)]
+    pub kind: Option<String>,
+    /// Directory generated config is written into. Unset = DB-only (and unused
+    /// in cloudflared tunnel-API mode).
+    #[serde(default)]
+    pub config_dir: Option<PathBuf>,
+    /// Shell command run after config is regenerated, e.g. `"nginx -s reload"`.
+    /// Skipped when unset / in tunnel-API mode.
+    #[serde(default)]
+    pub reload_command: Option<String>,
+}
+
+/// SQLite backup settings.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct BackupConfig {
+    /// Hours between automatic `VACUUM INTO` backups. `0` disables; unset
+    /// defaults to 24.
+    #[serde(default)]
+    pub interval_hours: Option<u64>,
+    /// Number of automatic backups to retain. Unset defaults to 14.
+    #[serde(default)]
+    pub keep: Option<usize>,
+    /// Off-site backup target. Unset = local-only backups.
+    #[serde(default)]
+    pub remote: Option<BackupRemoteConfig>,
+}
+
 /// The server configuration.
+///
+/// Field/declaration order is the canonical on-disk order: `load()` rewrites
+/// `config.json` to match it (and the grouped sub-maps), so a hand-edited file
+/// is normalised on the next start-up.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
     /// Whether the server is running a production build or not
@@ -124,52 +208,33 @@ pub struct Config {
     /// These must *not* have any schemes.
     #[serde(default)]
     pub domains: Vec<String>,
-    /// The Discord webhook URL for audit log announcements.
-    #[serde(rename = "discord_webhook_url")]
-    #[serde(default)]
-    pub webhook: Option<Webhook>,
-    /// ntfy topic URL (e.g. `https://ntfy.sh/my-topic`). When set, alerts are
-    /// also delivered as plain-text push notifications via ntfy.
-    #[serde(default)]
-    pub ntfy_url: Option<String>,
-    /// Generic webhook URL. When set, alerts are also POSTed here as a neutral
-    /// JSON body `{title, level, body, fields}`.
-    #[serde(default)]
-    pub alert_webhook_url: Option<String>,
-    /// Services to monitor on the `/admin/services` admin page.
-    #[serde(default)]
-    pub services: Vec<ServiceConfig>,
     /// The server IP and port configuration
     #[serde(default)]
     pub server: ServerConfig,
+    /// The secret key used for all crypto related functionality in the server.
+    ///
+    /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
+    pub secret_key: SecretKey,
+    /// Alert delivery sinks (Discord / ntfy / generic webhook).
+    #[serde(default)]
+    pub alerts: AlertsConfig,
+    /// Cloudflare credentials + tunnel settings.
+    #[serde(default)]
+    pub cloudflare: CloudflareConfig,
+    /// Reverse-proxy / domain-manager settings.
+    #[serde(default)]
+    pub proxy: ProxyConfig,
+    /// SQLite backup settings.
+    #[serde(default)]
+    pub backup: BackupConfig,
+    /// Services to monitor on the `/admin/docker` admin page.
+    #[serde(default)]
+    pub services: Vec<ServiceConfig>,
     /// Path to a MaxMind GeoLite2-City `.mmdb` file used by `/admin/security`.
     /// Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset. Optional — if
     /// the file is missing, IP lookups quietly degrade to "Unknown".
     #[serde(default)]
     pub geoip_db_path: Option<PathBuf>,
-    /// Cloudflare API token (with read access to zone analytics). When set
-    /// alongside `cloudflare_zone_id`, the security dashboard adds the
-    /// "Cloudflare" section with traffic / threat / WAF panels.
-    #[serde(default)]
-    pub cloudflare_api_token: Option<String>,
-    /// Cloudflare zone ID for the domain this app sits behind.
-    #[serde(default)]
-    pub cloudflare_zone_id: Option<String>,
-    /// Cloudflare account ID. Required (alongside `cloudflare_api_token` and
-    /// `cloudflared_tunnel_id`) to manage a remotely-managed Cloudflare Tunnel
-    /// via the API — i.e. read/write the tunnel's ingress from `/admin/proxy`
-    /// when `proxy_kind` is `"cloudflared"`. Without it, cloudflared falls back
-    /// to writing a local `config.yml`.
-    #[serde(default)]
-    pub cloudflare_account_id: Option<String>,
-    /// The UUID of the Cloudflare Tunnel to manage (e.g.
-    /// `ac878d47-ad9c-4699-bcec-a6663ba7802c`). When set with
-    /// `cloudflare_account_id` + `cloudflare_api_token`, `/admin/proxy` manages
-    /// this tunnel's public-hostname ingress through the Cloudflare API instead
-    /// of a local file — the right model for a dashboard/remotely-managed
-    /// tunnel that has no local credentials file.
-    #[serde(default)]
-    pub cloudflared_tunnel_id: Option<String>,
     /// Directories to scan for leaked secrets (API keys, tokens, private
     /// keys, etc.).  When empty, the scheduled scanner is disabled — the
     /// /admin/secrets page still loads and a manual scan can be triggered.
@@ -237,45 +302,6 @@ pub struct Config {
     /// in dev or when running without `NET_ADMIN`).
     #[serde(default)]
     pub firewall_backend: Option<String>,
-    /// Directory that proxy configuration is written into. When set, the
-    /// `/admin/proxy` page renders an nginx (or caddy) server block per
-    /// route and writes it to `<dir>/<subdomain>.conf`.  When unset, the
-    /// page still manages routes in the DB but does not touch disk —
-    /// useful when the proxy is hand-managed and you just want a record
-    /// of which subdomain maps to which container.
-    #[serde(default)]
-    pub proxy_config_dir: Option<PathBuf>,
-    /// Which proxy syntax to emit.  `"nginx"` (default) writes nginx
-    /// `server { ... }` blocks; `"caddy"` writes Caddyfile entries;
-    /// `"cloudflared"` writes a single Cloudflare Tunnel `config.yml`.
-    #[serde(default)]
-    pub proxy_kind: Option<String>,
-    /// Cloudflare Tunnel id/name, written as `tunnel:` into the generated
-    /// `config.yml` when `proxy_kind` is `"cloudflared"`. Unset emits an
-    /// editable placeholder.
-    #[serde(default)]
-    pub cloudflared_tunnel: Option<String>,
-    /// Path to the tunnel credentials JSON, written as `credentials-file:`
-    /// into the generated cloudflared `config.yml`. Unset emits a placeholder.
-    #[serde(default)]
-    pub cloudflared_credentials_file: Option<String>,
-    /// Shell command run after the config files are regenerated. Typical
-    /// values: `"nginx -s reload"`, `"systemctl reload nginx"`,
-    /// `"caddy reload --config /etc/caddy/Caddyfile"`. Skipped when unset.
-    #[serde(default)]
-    pub proxy_reload_command: Option<String>,
-    /// Hours between automatic SQLite backups (`VACUUM INTO`). `0` disables
-    /// the scheduler. Defaults to 24 when unset.
-    #[serde(default)]
-    pub backup_interval_hours: Option<u64>,
-    /// Number of automatic backups to retain; older ones are pruned.
-    /// Defaults to 14 when unset.
-    #[serde(default)]
-    pub backup_keep: Option<usize>,
-    /// Off-site backup target. When set, each new SQLite backup is also
-    /// uploaded to an S3-compatible object store. Unset = local-only backups.
-    #[serde(default)]
-    pub backup_remote: Option<BackupRemoteConfig>,
     /// Hours between background container image-update checks (queries each
     /// configured service's registry for a newer digest). `0` disables the
     /// checker. Defaults to 12 when unset.
@@ -291,10 +317,6 @@ pub struct Config {
     /// return 503.
     #[serde(default)]
     pub ffmpeg_path: Option<String>,
-    /// The secret key used for all crypto related functionality in the server.
-    ///
-    /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
-    pub secret_key: SecretKey,
 }
 
 impl Config {
@@ -302,16 +324,14 @@ impl Config {
         Ok(Self {
             production: false,
             domains: Vec::new(),
-            webhook: None,
-            ntfy_url: None,
-            alert_webhook_url: None,
-            services: Vec::new(),
             server: ServerConfig::default(),
+            secret_key: SecretKey::random()?,
+            alerts: AlertsConfig::default(),
+            cloudflare: CloudflareConfig::default(),
+            proxy: ProxyConfig::default(),
+            backup: BackupConfig::default(),
+            services: Vec::new(),
             geoip_db_path: None,
-            cloudflare_api_token: None,
-            cloudflare_zone_id: None,
-            cloudflare_account_id: None,
-            cloudflared_tunnel_id: None,
             secret_scan_paths: Vec::new(),
             postgres_url: None,
             clamav_addr: None,
@@ -319,18 +339,9 @@ impl Config {
             spotlight_scripts: Vec::new(),
             sshd_auth_log_path: None,
             firewall_backend: None,
-            proxy_config_dir: None,
-            proxy_kind: None,
-            cloudflared_tunnel: None,
-            cloudflared_credentials_file: None,
-            proxy_reload_command: None,
-            backup_interval_hours: None,
-            backup_keep: None,
-            backup_remote: None,
             update_check_interval_hours: None,
             chromium_path: None,
             ffmpeg_path: None,
-            secret_key: SecretKey::random()?,
         })
     }
 
@@ -344,8 +355,26 @@ impl Config {
     pub fn load() -> anyhow::Result<Self> {
         let path = Self::path()?;
         if path.exists() {
-            let file = std::fs::read_to_string(path).context("could not read config file")?;
-            serde_json::from_str(&file).context("could not parse config file")
+            let text = std::fs::read_to_string(&path).context("could not read config file")?;
+            // Migrate any legacy flat keys (`cloudflare_api_token`, `proxy_kind`,
+            // …) into their grouped sub-maps before deserialising, so existing
+            // configs keep working after the regrouping.
+            let mut value: serde_json::Value =
+                serde_json::from_str(&text).context("could not parse config file")?;
+            migrate_flat_to_grouped(&mut value);
+            let config: Config = serde_json::from_value(value).context("could not parse config file")?;
+
+            // Keep the on-disk file normalised to the canonical key order + the
+            // grouped layout. Rewrite only when it actually differs, so a
+            // tidy file doesn't churn its mtime every start.
+            if let Ok(canonical) = serde_json::to_string_pretty(&config) {
+                if canonical != text {
+                    if let Err(e) = config.save() {
+                        tracing::warn!(error = %e, "could not normalise config file order");
+                    }
+                }
+            }
+            Ok(config)
         } else {
             let config = Self::new()?;
             let parent = path.parent().unwrap();
@@ -408,6 +437,47 @@ impl Config {
     }
 }
 
+/// One-time, in-memory migration from the old flat config keys to the grouped
+/// sub-maps. Each old key is moved into `group.new_key` (without clobbering a
+/// value already present there), so an upgraded install keeps its settings and
+/// the file is rewritten in grouped form by `load()`'s normalisation step.
+fn migrate_flat_to_grouped(value: &mut serde_json::Value) {
+    let Some(obj) = value.as_object_mut() else {
+        return;
+    };
+
+    // (old flat key, group, new key within the group)
+    const MOVES: &[(&str, &str, &str)] = &[
+        ("discord_webhook_url", "alerts", "discord_webhook_url"),
+        ("ntfy_url", "alerts", "ntfy_url"),
+        ("alert_webhook_url", "alerts", "webhook_url"),
+        ("cloudflare_api_token", "cloudflare", "api_token"),
+        ("cloudflare_zone_id", "cloudflare", "zone_id"),
+        ("cloudflare_account_id", "cloudflare", "account_id"),
+        ("cloudflared_tunnel_id", "cloudflare", "tunnel_id"),
+        ("cloudflared_tunnel", "cloudflare", "tunnel_name"),
+        ("cloudflared_credentials_file", "cloudflare", "tunnel_credentials_file"),
+        ("proxy_kind", "proxy", "kind"),
+        ("proxy_config_dir", "proxy", "config_dir"),
+        ("proxy_reload_command", "proxy", "reload_command"),
+        ("backup_interval_hours", "backup", "interval_hours"),
+        ("backup_keep", "backup", "keep"),
+        ("backup_remote", "backup", "remote"),
+    ];
+
+    for (old, group, new) in MOVES {
+        let Some(moved) = obj.remove(*old) else {
+            continue;
+        };
+        let entry = obj
+            .entry(*group)
+            .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
+        if let Some(map) = entry.as_object_mut() {
+            map.entry(*new).or_insert(moved);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServerConfig {
     #[serde(default = "default_ip")]
@@ -443,3 +513,109 @@ impl ServerConfig {
 ///
 /// Currently mainly used for templates
 pub static CONFIG: OnceLock<Config> = OnceLock::new();
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn migrates_legacy_flat_keys_into_groups() {
+        let mut v = json!({
+            "production": true,
+            "cloudflare_api_token": "tok",
+            "cloudflare_zone_id": "zone",
+            "cloudflare_account_id": "acct",
+            "cloudflared_tunnel_id": "uuid",
+            "cloudflared_tunnel": "my-tunnel",
+            "cloudflared_credentials_file": "/etc/cf/x.json",
+            "proxy_kind": "cloudflared",
+            "proxy_config_dir": "/etc/cf",
+            "proxy_reload_command": "true",
+            "backup_interval_hours": 12,
+            "backup_keep": 7,
+            "discord_webhook_url": "https://discord/x",
+            "ntfy_url": "https://ntfy.sh/t",
+            "alert_webhook_url": "https://hook",
+        });
+        migrate_flat_to_grouped(&mut v);
+
+        assert_eq!(v["cloudflare"]["api_token"], "tok");
+        assert_eq!(v["cloudflare"]["zone_id"], "zone");
+        assert_eq!(v["cloudflare"]["account_id"], "acct");
+        assert_eq!(v["cloudflare"]["tunnel_id"], "uuid");
+        assert_eq!(v["cloudflare"]["tunnel_name"], "my-tunnel");
+        assert_eq!(v["cloudflare"]["tunnel_credentials_file"], "/etc/cf/x.json");
+        assert_eq!(v["proxy"]["kind"], "cloudflared");
+        assert_eq!(v["proxy"]["config_dir"], "/etc/cf");
+        assert_eq!(v["proxy"]["reload_command"], "true");
+        assert_eq!(v["backup"]["interval_hours"], 12);
+        assert_eq!(v["backup"]["keep"], 7);
+        assert_eq!(v["alerts"]["discord_webhook_url"], "https://discord/x");
+        assert_eq!(v["alerts"]["ntfy_url"], "https://ntfy.sh/t");
+        assert_eq!(v["alerts"]["webhook_url"], "https://hook");
+
+        // Untouched + old flat keys removed.
+        assert_eq!(v["production"], true);
+        for old in ["cloudflare_api_token", "proxy_kind", "backup_keep", "alert_webhook_url"] {
+            assert!(v.get(old).is_none(), "{old} should have been moved");
+        }
+    }
+
+    #[test]
+    fn migration_preserves_an_already_grouped_value() {
+        let mut v = json!({
+            "cloudflare": { "api_token": "new" },
+            "cloudflare_api_token": "old",
+        });
+        migrate_flat_to_grouped(&mut v);
+        assert_eq!(v["cloudflare"]["api_token"], "new"); // grouped wins
+        assert!(v.get("cloudflare_api_token").is_none());
+    }
+
+    #[test]
+    fn migration_is_noop_for_already_grouped_config() {
+        let mut v = json!({ "cloudflare": { "api_token": "x" }, "proxy": { "kind": "nginx" } });
+        let before = v.clone();
+        migrate_flat_to_grouped(&mut v);
+        assert_eq!(v, before);
+    }
+
+    /// The on-disk key order must match the documented README example. serde
+    /// serialises in field-declaration order, so this guards the two from
+    /// drifting apart.
+    #[test]
+    fn serialises_in_canonical_grouped_order() {
+        let json = serde_json::to_string(&Config::new().unwrap()).unwrap();
+        let expected = [
+            "production",
+            "domains",
+            "server",
+            "secret_key",
+            "alerts",
+            "cloudflare",
+            "proxy",
+            "backup",
+            "services",
+            "geoip_db_path",
+            "secret_scan_paths",
+            "postgres_url",
+            "clamav_addr",
+            "virustotal_api_key",
+            "spotlight_scripts",
+            "sshd_auth_log_path",
+            "firewall_backend",
+            "update_check_interval_hours",
+            "chromium_path",
+            "ffmpeg_path",
+        ];
+        let mut last = 0usize;
+        for key in expected {
+            let idx = json
+                .find(&format!("\"{key}\""))
+                .unwrap_or_else(|| panic!("missing top-level key {key}"));
+            assert!(idx >= last, "key `{key}` is out of canonical order");
+            last = idx;
+        }
+    }
+}

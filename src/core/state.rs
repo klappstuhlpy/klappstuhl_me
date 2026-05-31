@@ -183,7 +183,7 @@ impl AppState {
         let geoip = GeoIp::open(geoip_path.as_deref());
 
         // Cloudflare client (only if both token and zone are configured).
-        let cloudflare = match (config.cloudflare_api_token.as_ref(), config.cloudflare_zone_id.as_ref()) {
+        let cloudflare = match (config.cloudflare.api_token.as_ref(), config.cloudflare.zone_id.as_ref()) {
             (Some(token), Some(zone)) if !token.is_empty() && !zone.is_empty() => {
                 Some(Cloudflare::new(client.clone(), token.clone(), zone.clone()))
             }
@@ -318,7 +318,7 @@ impl AppState {
     /// payloads when nothing would consume them.
     pub fn has_any_alert_sink(&self) -> bool {
         let cfg = self.config();
-        cfg.webhook.is_some() || cfg.ntfy_url.is_some() || cfg.alert_webhook_url.is_some()
+        cfg.alerts.discord_webhook_url.is_some() || cfg.alerts.ntfy_url.is_some() || cfg.alerts.webhook_url.is_some()
     }
 
     /// Fans an alert out to every configured sink (Discord, ntfy, generic
@@ -332,22 +332,22 @@ impl AppState {
         };
         let cfg = self.config();
 
-        if let Some(wh) = cfg.webhook.clone() {
+        if let Some(wh) = cfg.alerts.discord_webhook_url.clone() {
             let client = self.client.clone();
             let v = value.clone();
             tokio::spawn(async move { wh.prepare(v).send(&client).await });
         }
 
-        if cfg.ntfy_url.is_none() && cfg.alert_webhook_url.is_none() {
+        if cfg.alerts.ntfy_url.is_none() && cfg.alerts.webhook_url.is_none() {
             return;
         }
         let note = crate::alerts::AlertNotification::from_discord_value(&value);
-        if let Some(url) = cfg.ntfy_url.clone() {
+        if let Some(url) = cfg.alerts.ntfy_url.clone() {
             let client = self.client.clone();
             let note = note.clone();
             tokio::spawn(async move { crate::alerts::send_ntfy(&client, &url, &note).await });
         }
-        if let Some(url) = cfg.alert_webhook_url.clone() {
+        if let Some(url) = cfg.alerts.webhook_url.clone() {
             let client = self.client.clone();
             let note = note.clone();
             tokio::spawn(async move { crate::alerts::send_webhook(&client, &url, &note).await });

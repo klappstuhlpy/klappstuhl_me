@@ -36,12 +36,12 @@ pub struct ApplyReport {
 
 /// The proxy kind configured for this server.
 pub fn configured_kind(state: &AppState) -> ProxyKind {
-    ProxyKind::parse(state.config().proxy_kind.as_deref())
+    ProxyKind::parse(state.config().proxy.kind.as_deref())
 }
 
 /// The directory proxy config is written to, if any.
 pub fn config_dir(state: &AppState) -> Option<PathBuf> {
-    state.config().proxy_config_dir.clone()
+    state.config().proxy.config_dir.clone()
 }
 
 /// Logs the outcome of an apply so route changes leave a trace even when the
@@ -189,8 +189,8 @@ async fn regenerate_cloudflared(
     let enabled: Vec<&ProxyRoute> = routes.iter().filter(|r| r.enabled).collect();
     let body = render::render_cloudflared_config(
         &enabled,
-        state.config().cloudflared_tunnel.as_deref(),
-        state.config().cloudflared_credentials_file.as_deref(),
+        state.config().cloudflare.tunnel_name.as_deref(),
+        state.config().cloudflare.tunnel_credentials_file.as_deref(),
     );
 
     let path = dir.join(render::CLOUDFLARED_FILE);
@@ -246,7 +246,8 @@ async fn prune_stale(
 async fn run_reload(state: &AppState) -> Option<String> {
     let cmd = state
         .config()
-        .proxy_reload_command
+        .proxy
+        .reload_command
         .as_deref()
         .filter(|s| !s.trim().is_empty())?;
 

@@ -33,7 +33,7 @@ struct AdminBackupsTemplate {
 /// Builds the human-readable "s3 → bucket/prefix" label shown in the UI, or
 /// `None` when no off-site target is configured.
 fn remote_label(state: &AppState) -> Option<String> {
-    state.config().backup_remote.as_ref().map(|r| {
+    state.config().backup.remote.as_ref().map(|r| {
         let prefix = r.normalized_prefix();
         format!("{} → {}/{}", r.kind, r.bucket, prefix)
     })
@@ -94,7 +94,7 @@ async fn upload_now(
     if !account.flags.is_admin() {
         return StatusCode::FORBIDDEN.into_response();
     }
-    if state.config().backup_remote.is_none() {
+    if state.config().backup.remote.is_none() {
         flasher.add(crate::flash::FlashMessage::warning("No off-site backup target is configured."));
         return flasher.bail("/admin/backups");
     }

@@ -157,14 +157,14 @@ pub fn resolve(name: &str) -> Option<PathBuf> {
 
 /// The configured retention count (number of backups to keep).
 pub fn keep_count(state: &AppState) -> usize {
-    state.config().backup_keep.unwrap_or(DEFAULT_KEEP)
+    state.config().backup.keep.unwrap_or(DEFAULT_KEEP)
 }
 
 /// Uploads a backup file to the configured off-site object store. Returns
 /// `Ok(None)` when no remote is configured (a no-op, not an error), or
 /// `Ok(Some(key))` with the remote object key on success.
 pub async fn upload_to_remote(state: &AppState, path: &std::path::Path) -> anyhow::Result<Option<String>> {
-    let Some(remote) = state.config().backup_remote.clone() else {
+    let Some(remote) = state.config().backup.remote.clone() else {
         return Ok(None);
     };
     let key = s3::upload_file(&state.client, &remote, path).await?;
@@ -176,7 +176,7 @@ pub async fn upload_to_remote(state: &AppState, path: &std::path::Path) -> anyho
 /// scheduler and the manual "backup now" action — the request/scheduler tick
 /// is never blocked on network I/O.
 pub fn spawn_remote_upload(state: AppState, path: PathBuf) {
-    if state.config().backup_remote.is_none() {
+    if state.config().backup.remote.is_none() {
         return;
     }
     let name = path
@@ -211,7 +211,7 @@ pub fn spawn_remote_upload(state: AppState, path: PathBuf) {
 /// first backup runs one interval after start-up (so frequent restarts don't
 /// spam backups).
 pub fn spawn_scheduler(state: AppState) {
-    let interval_hours = state.config().backup_interval_hours.unwrap_or(DEFAULT_INTERVAL_HOURS);
+    let interval_hours = state.config().backup.interval_hours.unwrap_or(DEFAULT_INTERVAL_HOURS);
     if interval_hours == 0 {
         tracing::info!("scheduled backups disabled (backup_interval_hours = 0)");
         return;
