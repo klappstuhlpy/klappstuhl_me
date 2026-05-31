@@ -26,32 +26,42 @@ management, security analytics, virus scanning, and an invite-only user system.
   - **Firewall** — visual frontend for **nftables**, **ufw**, or **iptables** (auto-detected at startup, overridable via `firewall_backend`). Create allow / deny / rate-limit / geo-block rules (source CIDR, port, protocol, country, requests-per-second); each rule is mirrored in SQLite and applied to the kernel by shelling out to the detected backend. On ufw hosts the dashboard also **imports the live ruleset** — `ufw status` is parsed and reconciled into the mirror on each load, so rules created out-of-band (`ufw allow OpenSSH` from a shell) appear automatically. Manual IP lockouts with optional expiry, plus **automatic lockout** — after 8 failed logins from an IP within 10 minutes the address is blocked for an hour (driven off the existing audit log) and the block is pushed to the backend. A background reaper releases expired lockouts. "Re-apply all" re-pushes every enabled rule. When no backend binary is present the page still manages rules in the DB (handy in dev / without `NET_ADMIN`).
   - **Proxy** — reverse-proxy / domain manager. Map a subdomain (`jellyfin.klappstuhl.me`) to an upstream container or `host:port`, pick the scheme, and toggle managed TLS, Cloudflare-proxied real-IP handling, HTTP basic auth (password hashed with bcrypt), a requests-per-second rate limit, and JSON allow/deny access rules. From the route list the server renders an nginx `server { … }` block (or a Caddyfile fragment, per `proxy_kind`) per enabled route, writes it to `proxy_config_dir/<subdomain>.conf` (plus an htpasswd sidecar for nginx auth), prunes stale managed files, and runs `proxy_reload_command`. Preview the generated config before saving. Container targets are populated from `config.services`. With no `proxy_config_dir` set, routes are still tracked in the DB as a record of which subdomain points where.
   - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI / Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
-  - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, signup, password change, logout), invite create/revoke, service/snapshot/script actions, secret status changes, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
+  - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, 2FA challenge/fail, signup, password change, logout), invite create/revoke, service/snapshot/script actions, secret status changes, backup create/delete, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
+  - **Logs** — interactive viewer over the rolling tracing log files. Parses the JSON application log (one object per line) and the compact bad-request log best-effort, with level/text filtering and tailing. (Separate from the dashboard's request-log panels.)
   - **Postgres** — browse databases, tables, and roles on a separate PostgreSQL server. Safe-mode query runner wraps every statement in `BEGIN TRANSACTION READ ONLY` so even a superuser credential can't accidentally mutate state; explicit danger-mode toggle for `INSERT` / `UPDATE` / `DELETE` / DDL when needed. Every query writes an audit entry (including blocked-by-safe-mode attempts).
   - **SSH Keys** — manage authorized SSH public keys stored in the database. Add keys with an optional label; optionally sync them to a real `authorized_keys` file on the host and populate each key's "Last used" timestamp by tailing the sshd auth log (see [SSH key sync](#ssh-key-sync-and-last-used-tracking)). Token audit (active API tokens across accounts) and session audit (active login sessions with IP + user-agent) sub-pages. Revoke individual keys, tokens, or sessions.
   - **File Sanitizer** — drag-and-drop file scanning with two optional backends.
     - **ClamAV** — streams the uploaded file to a local `clamd` daemon over TCP (INSTREAM protocol). Reports virus name on detection.
     - **VirusTotal** — looks up the file's SHA-256 against the VT v3 API (no file upload; hash-only). Shows `N/M engines detected` with a link to the VT report.
     - Scan history table (SQLite) with per-row deletion. Both backends are independent; results combine into a single clean/infected/unknown verdict.
+  - **Backups** — on-disk SQLite backups via `VACUUM INTO` (a consistent, fully-checkpointed copy taken without an exclusive lock, safe while serving). A background scheduler takes one every `backup_interval_hours` and prunes to the most recent `backup_keep`. Take a backup on demand, download any backup file, or delete one. Restore is intentionally a manual, offline operation (stop the server, swap `main.db`) — under WAL it's unsafe to replace the live DB in place.
+- **Two-factor auth (TOTP)** — opt-in RFC 6238 2FA managed from `/account`. Enroll by scanning a QR / entering the secret, confirm with a code, and download one-time recovery codes. On login, accounts with 2FA are bounced to `/login/2fa` (a short-lived signed pending cookie carries the challenge — never persisted) and must supply a TOTP code or a recovery code. The shared secret is encrypted at rest with ChaCha20-Poly1305 keyed by the app secret, so a leaked database (or a downloaded backup) doesn't expose usable 2FA secrets; recovery codes are stored only as SHA-256 hashes. Disabling 2FA requires a password-confirmation modal.
+- **Public status page (`/status`)** — unauthenticated, derived from the Health monitors. Shows an overall banner (all operational / degraded / major outage), per-service up/degraded/down status, 24h uptime %, and last-check time.
 - **Spotlight palette (Ctrl+K)** — macOS-style command palette available on every admin page. Opens with `Ctrl+K` (or the Search button in the sidebar footer). Fuzzy-searches across all admin nav items, configured scripts, audit log entries, file scan history, SSH keys, and live Docker containers. Keyboard-navigable (↑/↓/Enter/Esc). Scripts run inline and show their stdout/stderr output in the palette without leaving the page.
-- **API tokens with scopes** — generated from `/account`, each token can be restricted to a subset of `images:read · images:write · admin:read · admin:write`. Legacy keys (created without selecting scopes) keep full access for back-compat.
+- **API tokens with scopes** — generated from `/account`, each token can be restricted to a subset of `images:read · images:write · admin:read · admin:write`, and every API endpoint enforces the scope it needs (image processing / render / scan all require `images:read`; upload/delete require `images:write`). Legacy keys (created without selecting scopes) keep full access for back-compat.
 - **Live updates over WebSocket** — `/ws` push topic events to dashboards. Metrics tiles refresh on every scrape, audit-log entries appear instantly, and Docker graph updates on container events; polling is the automatic fallback when the socket is closed.
 - **Installable PWA** — `site.webmanifest` + service worker shell-cache the static assets. iOS standalone-mode meta tags + a black theme colour so the app looks native when installed to the home screen. Network-only for everything dynamic; offline access is intentionally **not** a goal for a homelab admin tool.
-- **REST API** — OpenAPI 3.0 documented at `/api/docs` via utoipa + Scalar.
+- **REST API** — OpenAPI 3.0 documented at `/api/docs` via utoipa + Scalar. All endpoints enforce token scopes (see below). Beyond image upload/download/delete:
+  - **Media processing** — `POST /api/image/:op` (blur, pixelate, deepfry, invert, grayscale → PNG), `POST /api/convert` (transcode between raster formats), `POST /api/metadata` (image info). Each accepts a multipart `file` **or** a public `url`; URL fetches are SSRF-guarded (private/reserved addresses refused, redirects disabled, size-capped).
+  - **Render** — `POST /api/render/code` renders syntax-highlighted code to an image (syntect; pick `language` + `theme`). `POST /api/render/screenshot` and `POST /api/render/markdown-pdf` drive a headless Chromium; `POST /api/convert/transcode` shells out to ffmpeg (video / HEIC). These three are config-gated and return an error when the backing binary isn't available.
+  - **Scan** — `POST /api/scan` runs an uploaded file through ClamAV + VirusTotal and returns a combined report.
+  - **Shareable links** — media/render endpoints accept `share=true` to store the result and return a JSON `ShareResult` with a short `/m/:id` link instead of raw bytes; `GET /m/:id` serves it back.
+- **Alert fan-out** — metric, health, and secret alerts deliver to any of a Discord webhook, an [ntfy](https://ntfy.sh) topic, and a generic JSON webhook (`{title, level, body, fields}`), depending on which of `discord_webhook_url` / `ntfy_url` / `alert_webhook_url` are configured.
 - **Automatic TLS** — Let's Encrypt via rustls-acme (TLS-ALPN-01) in production mode.
 
 ## Tech stack
 
 - **Backend** — Rust, [Axum](https://github.com/tokio-rs/axum) 0.7, Tokio, SQLite (rusqlite, bundled).
 - **Templates** — [Askama](https://github.com/djc/askama) (compile-time server-side rendering).
-- **Storage** — two SQLite files in the data dir: `main.db` (accounts, sessions, images, invites, metrics, snapshots, SSH keys, file scans), `requests.db` (HTTP access log).
-- **Auth** — HMAC-signed session tokens, Argon2 password hashing.
+- **Storage** — two SQLite files in the data dir: `main.db` (accounts, sessions, images, invites, metrics, snapshots, SSH keys, file scans, health monitors, firewall rules, proxy routes, TOTP secrets/recovery codes), `requests.db` (HTTP access log). Periodic `VACUUM INTO` backups land in `<data>/backups/`.
+- **Auth** — HMAC-signed session tokens, Argon2 password hashing, optional TOTP 2FA (RFC 6238; secret encrypted at rest with ChaCha20-Poly1305).
 - **TLS** — Automatic Let's Encrypt via rustls-acme.
 - **Metrics** — Native `/proc` and `/sys` parsing, `df` for disk usage, `docker stats` for containers. uPlot for charts.
 - **GeoIP** — Offline [MaxMind GeoLite2-City](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) database via the `maxminddb` crate.
 - **Cloudflare** — GraphQL Analytics API (zone traffic + firewall events) via `reqwest`.
 - **Docker** — [bollard](https://github.com/fussybeaver/bollard) crate for the Docker daemon API (container list, inspect, events stream, `docker commit`). [Cytoscape.js](https://js.cytoscape.org/) for the dependency graph.
 - **Virus scanning** — inline ClamAV INSTREAM TCP client; VirusTotal v3 REST API via `reqwest`. SHA-256 via the `sha2` crate.
+- **Media** — the `image` crate for raster manipulation/conversion; [syntect](https://github.com/trishume/syntect) for code-to-image rendering; optional headless **Chromium** (screenshots, Markdown→PDF) and **ffmpeg** (video / HEIC transcode) invoked as external binaries.
 
 ## Quick start (Docker — recommended)
 
@@ -75,16 +85,16 @@ After that, log in at `https://yourdomain.com/login`, then visit `/admin` to acc
 
 ### What the compose file mounts
 
-| Mount                                       | Why                                                                                          |
-|---------------------------------------------|----------------------------------------------------------------------------------------------|
-| `./data:/data`                              | Persistent config, database, logs, ACME cert cache.                                          |
-| `/var/run/docker.sock`                      | So `/admin/docker` can run `docker ps` / `docker compose up -d`.                             |
-| `/proc:/host/proc:ro`                       | So `/admin/metrics` reports the **host's** CPU/RAM/network.                                  |
-| `/sys:/host/sys:ro`                         | Same — for `/sys/block/*` (disk I/O counters).                                               |
-| `/etc/ufw:/etc/ufw`                         | So the firewall dashboard reads and writes the **host's** ufw rule database.                  |
-| `/var/lib/ufw:/var/lib/ufw`                 | ufw runtime state (required alongside `/etc/ufw` for `ufw status` to show host rules).       |
-| `/home:/host-home`, `/root:/host-root`      | (Optional) Host home roots, so the SSH admin page can write `authorized_keys` files.         |
-| `/var/log/auth.log:/host-log/auth.log:ro`   | (Optional) Host sshd log, so the SSH admin page can populate `last_used_at`.                 |
+| Mount                                       | Why                                                                                         |
+|---------------------------------------------|---------------------------------------------------------------------------------------------|
+| `./data:/data`                              | Persistent config, database, logs, ACME cert cache.                                         |
+| `/var/run/docker.sock`                      | So `/admin/docker` can run `docker ps` / `docker compose up -d`.                            |
+| `/proc:/host/proc:ro`                       | So `/admin/metrics` reports the **host's** CPU/RAM/network.                                 |
+| `/sys:/host/sys:ro`                         | Same — for `/sys/block/*` (disk I/O counters).                                              |
+| `/etc/ufw:/etc/ufw`                         | So the firewall dashboard reads and writes the **host's** ufw rule database.                |
+| `/var/lib/ufw:/var/lib/ufw`                 | ufw runtime state (required alongside `/etc/ufw` for `ufw status` to show host rules).      |
+| `/home:/host-home`, `/root:/host-root`      | (Optional) Host home roots, so the SSH admin page can write `authorized_keys` files.        |
+| `/var/log/auth.log:/host-log/auth.log:ro`   | (Optional) Host sshd log, so the SSH admin page can populate `last_used_at`.                |
 
 `HOST_PROC=/host/proc` and `HOST_SYS=/host/sys` are pre-set in the compose file so the metrics collector picks up the host filesystem.
 
@@ -106,6 +116,8 @@ A default `config.json` is written on first start. Full layout with all optional
   },
   "secret_key": "<auto-generated — leave this alone>",
   "discord_webhook_url": null,
+  "ntfy_url": null,
+  "alert_webhook_url": null,
   "services": [],
   "geoip_db_path": null,
   "cloudflare_api_token": null,
@@ -119,7 +131,11 @@ A default `config.json` is written on first start. Full layout with all optional
   "firewall_backend": null,
   "proxy_config_dir": null,
   "proxy_kind": null,
-  "proxy_reload_command": null
+  "proxy_reload_command": null,
+  "backup_interval_hours": null,
+  "backup_keep": null,
+  "chromium_path": null,
+  "ffmpeg_path": null
 }
 ```
 
@@ -130,7 +146,9 @@ A default `config.json` is written on first start. Full layout with all optional
 | `server.port`            | u16               | Listen port (`443` in production, anything else for dev).                                                                                                                                         |
 | `server.ip`              | string            | The IP the server listens on (default `0.0.0.0`).                                                                                                                                                 |
 | `secret_key`             | string            | Auto-generated; used for HMAC signing of session tokens and flash cookies.                                                                                                                        |
-| `discord_webhook_url`    | string \| null    | Discord incoming webhook URL for metric alerts and secret findings.                                                                                                                               |
+| `discord_webhook_url`    | string \| null    | Discord incoming webhook URL for metric / health / secret alerts.                                                                                                                                 |
+| `ntfy_url`               | string \| null    | [ntfy](https://ntfy.sh) topic URL (e.g. `https://ntfy.sh/my-topic`). When set, alerts are also pushed here as plain text.                                                                         |
+| `alert_webhook_url`      | string \| null    | Generic webhook URL. When set, alerts are also POSTed here as JSON `{title, level, body, fields}`.                                                                                                |
 | `services`               | ServiceConfig[]   | Docker services shown on `/admin/docker`. See below.                                                                                                                                              |
 | `geoip_db_path`          | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.                                                                                                             |
 | `cloudflare_api_token`   | string \| null    | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                                                                                                                     |
@@ -145,6 +163,10 @@ A default `config.json` is written on first start. Full layout with all optional
 | `proxy_config_dir`       | string \| null    | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy). Unset = DB-only, nothing written to disk. See below.                |
 | `proxy_kind`             | string \| null    | Config syntax to emit: `"nginx"` (default) or `"caddy"`.                                                                                                                                          |
 | `proxy_reload_command`   | string \| null    | Shell command run after config is regenerated, e.g. `"nginx -s reload"` or `"systemctl reload nginx"`. Skipped when unset.                                                                        |
+| `backup_interval_hours`  | u64 \| null       | Hours between automatic `VACUUM INTO` SQLite backups. `0` disables the scheduler; unset defaults to `24`. See below.                                                                              |
+| `backup_keep`            | usize \| null     | Number of automatic backups to retain (older ones pruned). Unset defaults to `14`.                                                                                                                |
+| `chromium_path`          | string \| null    | Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF render endpoints. Unset = probe common names on `PATH`; if none found those endpoints return an error.                       |
+| `ffmpeg_path`            | string \| null    | Path to an `ffmpeg` binary for the video/HEIC transcode endpoint. Unset = use `ffmpeg` on `PATH`; if absent the endpoint returns an error.                                                        |
 
 ### Docker services configuration
 
@@ -357,9 +379,38 @@ config** field is appended verbatim inside the server/site block. When
 `proxy_config_dir` is unset the page is purely a record-keeping view — no files
 are written. All changes are audited (`proxy.route.*`, `proxy.apply`).
 
+### SQLite backups
+
+A background task takes a `VACUUM INTO` snapshot of `main.db` every
+`backup_interval_hours` (default 24; `0` disables the scheduler) and prunes to
+the most recent `backup_keep` files (default 14). Backups land in
+`<data>/backups/` as `backup-<unix-ts>.db`. `VACUUM INTO` produces a consistent,
+fully-checkpointed copy without an exclusive lock, so it's safe while the server
+is serving requests.
+
+`/admin/backups` lists every backup with its size, takes one on demand, and lets
+you download or delete individual files. **Restore is a manual, offline step:**
+stop the server and replace `main.db` with the downloaded file — swapping it
+under live WAL connections is unsafe, so the UI deliberately doesn't offer it.
+
+### External render tools (Chromium / ffmpeg)
+
+The `/api/render/screenshot`, `/api/render/markdown-pdf`, and
+`/api/convert/transcode` endpoints shell out to external binaries:
+
+- **Chromium** (screenshots + Markdown→PDF) — set `chromium_path` to a
+  Chromium/Chrome binary, or leave it unset to probe common names on `PATH`.
+- **ffmpeg** (video / HEIC transcode) — set `ffmpeg_path`, or leave it unset to
+  use `ffmpeg` on `PATH`.
+
+When the required binary can't be found the corresponding endpoint returns an
+error rather than failing obscurely; the rest of the API is unaffected. The
+code-render endpoint (`/api/render/code`) needs no external tool — it uses the
+in-process `syntect` highlighter.
+
 ## Metric alert thresholds
 
-Hard-coded (`src/metrics/alerts.rs`). On the `OK → ALERT` transition, a red Discord embed fires via `discord_webhook_url` with a 30-minute cooldown per metric:
+Hard-coded (`src/services/metrics/alerts.rs`). On the `OK → ALERT` transition, an alert fans out to every configured channel (`discord_webhook_url` / `ntfy_url` / `alert_webhook_url`) with a 30-minute cooldown per metric:
 
 | Metric          | Threshold | Notes                                  |
 |-----------------|-----------|----------------------------------------|
@@ -394,50 +445,48 @@ The `static/` directory must be alongside the binary at runtime — it serves th
 
 ### Database migrations
 
-The schema is versioned via `PRAGMA user_version` and migrations are applied automatically on startup from `sql/0.sql` through `sql/N.sql`. To add a migration, drop a new `sql/<N+1>.sql` ending with `PRAGMA user_version = <N+1>;` and bump the array length in `src/main.rs`.
+The schema is versioned via `PRAGMA user_version` and migrations are applied automatically on startup from `sql/0.sql` through `sql/N.sql` (currently up to `sql/12.sql`). To add a migration, drop a new `sql/<N+1>.sql` ending with `PRAGMA user_version = <N+1>;` and bump the array length in `src/main.rs`.
 
 The `request` table (in `requests.db`, separate from `main.db`) uses idempotent `ALTER TABLE` for compatibility with existing production databases.
 
 ## Project layout
 
+The source is grouped by domain. `lib.rs` re-exports the leaf modules flat, so
+internal paths stay short (`crate::config`, `crate::docker`, …) regardless of
+the physical nesting.
+
 ```
 src/
-├── main.rs           — entry point: server, ACME, run/admin commands
-├── lib.rs            — module roots
-├── auth.rs           — Argon2 helpers
-├── cloudflare.rs     — Cloudflare GraphQL Analytics client
-├── config.rs         — Config struct + JSON load/save
-├── database.rs       — async SQLite worker pool with prepared-stmt cache
-├── docker.rs         — bollard Docker client wrapper + event watcher background task
-├── firewall/         — Firewall backend abstraction (nft/ufw/iptables), rule + lockout storage, auto-lockout, live ufw ruleset import
-├── geoip.rs          — Optional MaxMind reader wrapper
-├── health/           — Uptime monitoring (checker probes, sample/incident storage, background monitor)
-├── logging.rs        — Request log middleware + writer
-├── metrics/          — Live metrics (host parsers, docker stats, alerts)
-├── models.rs         — DB row types (Account, Session, Invite, ImageEntry)
-├── proxy/            — Reverse proxy manager (route storage, nginx/caddy config renderer, reload)
-├── routes/
-│   ├── admin.rs      — Dashboard
-│   ├── audit.rs      — Audit log
-│   ├── auth.rs       — Login / signup / password change
-│   ├── docker.rs     — Docker services + graph + snapshots + log SSE
-│   ├── firewall.rs   — Firewall rules + lockouts dashboard
-│   ├── health.rs     — Uptime monitoring dashboard
-│   ├── image.rs      — Image upload and gallery
-│   ├── metrics.rs    — Metrics charts + stats data
-│   ├── postgres.rs   — Postgres browser + query runner
-│   ├── proxy.rs      — Reverse proxy / domain manager dashboard
-│   ├── sanitizer.rs  — File sanitizer (ClamAV + VirusTotal)
-│   ├── secrets.rs    — Secret scanner
-│   ├── security.rs   — Security dashboard + GeoIP + Cloudflare
-│   ├── spotlight.rs  — Ctrl+K search + script runner
-│   ├── ssh.rs        — SSH key management + token/session audit
-│   └── ws.rs         — WebSocket live-push hub
-└── token.rs          — Session token signing + cookie helpers
+├── main.rs               — entry point: server, ACME, run/admin commands
+├── lib.rs                — module roots + flat re-exports
+├── core/                 — config, async SQLite pool, models, CLI, logging, app state, errors, utils
+├── auth/                 — Argon2 helpers, session-token signing, secret key, TOTP 2FA
+├── integrations/         — external services: Cloudflare, Discord/ntfy/webhook alerts, GeoIP, Chromium/ffmpeg helpers
+├── media/                — image manipulation/conversion, metadata, code-to-image, shared SSRF-guarded fetch (scan.rs)
+├── services/             — background/admin domains:
+│   ├── docker.rs         — bollard client wrapper + event watcher
+│   ├── backup.rs         — VACUUM INTO backups + scheduler
+│   ├── alerts.rs         — alert fan-out
+│   ├── audit.rs          — audit-log writer
+│   ├── ssh.rs            — SSH key storage + log tailer
+│   ├── firewall/         — backend abstraction (nft/ufw/iptables), storage, auto-lockout, ufw import
+│   ├── health/           — uptime checker probes, storage, background monitor
+│   ├── metrics/          — host parsers, docker stats, alerts, storage
+│   ├── postgres/         — Postgres client + safe-mode wrapper
+│   ├── proxy/            — route storage, nginx/caddy renderer, reload
+│   └── secrets/          — rules, scanner, storage
+└── web/                  — HTTP layer: caching, flash, headers, rate limiter
+    └── routes/
+        ├── admin.rs      — Dashboard
+        ├── auth.rs       — Login / signup / 2FA / password change / account
+        ├── audit.rs · backups.rs · logs.rs · docker.rs · firewall.rs · health.rs
+        ├── image.rs · metrics.rs · postgres.rs · proxy.rs · sanitizer.rs
+        ├── secrets.rs · security.rs · spotlight.rs · ssh.rs · ws.rs
+        └── api/           — REST API: images, media, scan, code, external (Chromium/ffmpeg), auth/scopes
 
-templates/            — Askama HTML templates
-static/               — CSS, JS, images served verbatim
-sql/                  — Numbered migration files (0.sql … 11.sql)
+templates/                — Askama HTML templates (grouped into subfolders)
+static/                   — CSS, JS, images served verbatim (grouped into subfolders)
+sql/                      — Numbered migration files (0.sql … 12.sql)
 ```
 
 ## License
