@@ -35,6 +35,15 @@ RUN cargo build --release
 # Minimal Debian image.  Only what is strictly needed at runtime:
 #   • ca-certificates  – validates the ACME certificate chain (Let's Encrypt)
 #   • docker-ce-cli    – the /services admin page shells out to `docker`
+#   • chromium         – the render screenshot / Markdown→PDF endpoints
+#   • ffmpeg           – the video/HEIC transcode endpoint
+#
+# chromium pulls in its own shared-library and font dependencies (libnss3,
+# fonts, …) via apt, so the headless browser actually starts inside the
+# container.  fonts-liberation is added explicitly so rendered pages have a
+# sane default font.  The app resolves both binaries off PATH (no config
+# needed) and already launches Chromium with --no-sandbox, which is required
+# when running as root inside a container.
 # ─────────────────────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim
 
@@ -45,6 +54,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     caddy \
     ufw \
+    chromium \
+    ffmpeg \
+    fonts-liberation \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

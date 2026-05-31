@@ -24,11 +24,12 @@ services:
       # Remove this mount if you are not using the services feature.
       - /var/run/docker.sock:/var/run/docker.sock
 
-      # Chromium binary (required for the render-screenshot/render-markdown-to-pdf api endpoint).
-      - /usr/bin/chromium:/usr/bin/chromium
-
-      # ffmpeg binary (required for the render-transcoding api endpoint).
-      - /usr/bin/ffmpeg:/usr/bin/ffmpeg
+      # NOTE: chromium and ffmpeg (used by the render-screenshot,
+      # render-markdown-to-pdf and transcode API endpoints) are installed
+      # inside the image itself — see the Dockerfile runtime stage. There is
+      # no need to bind-mount the host binaries; doing so would break, because
+      # the executables need their shared libraries and fonts to be present in
+      # the container too.
 
       # Host ufw configuration and rule database.  network_mode: host shares
       # the kernel's iptables tables, but ufw reads its rule list from
