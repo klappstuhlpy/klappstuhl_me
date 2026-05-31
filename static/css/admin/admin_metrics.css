@@ -16,6 +16,16 @@
     flex-direction: column;
     gap: 0.4rem;
     position: relative;
+
+    /* content overflow */
+    overflow: hidden;
+    min-width: 0;
+}
+
+.metric-tile * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .tile-head {
@@ -51,6 +61,10 @@
     display: flex;
     align-items: baseline;
     gap: 0.15rem;
+
+    /* overflow */
+    flex-wrap: wrap;
+    max-width: 100%;
 }
 
 .tile-value .unit {
@@ -64,6 +78,9 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 0.15rem;
+
+    /* overflow */
+    max-width: 100%;
 }
 
 .tile-value-stacked .net-line {
