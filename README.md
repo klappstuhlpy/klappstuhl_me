@@ -543,7 +543,7 @@ extra binary or SDK:
       "endpoint": "https://s3.us-west-002.backblazeb2.com",
       "region": "us-west-002",
       "bucket": "my-backups",
-      "prefix": "klappstuhl/",
+      "prefix": "website/",
       "access_key_id": "…",
       "secret_access_key": "…"
     }
@@ -558,8 +558,8 @@ extra binary or SDK:
 | `region`            | Signing region. AWS needs the real region; B2/R2/MinIO accept any value (defaults to `us-east-1`).      |
 | `bucket`            | Destination bucket.                                                                                     |
 | `prefix`            | (Optional) key prefix inside the bucket; a trailing slash is added automatically.                       |
-| `access_key_id`     | Access key id.                                                                                          |
-| `secret_access_key` | Secret access key.                                                                                      |
+| `access_key_id`     | Access key id. (Usually generated at access token creation.)                                            |
+| `secret_access_key` | Secret access key. (Usually generated at access token creation.)                                        |
 
 Each scheduled and manual backup is uploaded in the background; an upload
 failure raises an alert through the configured sinks (Discord / ntfy / webhook)
