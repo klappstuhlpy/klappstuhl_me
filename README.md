@@ -125,6 +125,8 @@ A default `config.json` is written on first start. Full layout with all optional
   "geoip_db_path": null,
   "cloudflare_api_token": null,
   "cloudflare_zone_id": null,
+  "cloudflare_account_id": null,
+  "cloudflared_tunnel_id": null,
   "secret_scan_paths": [],
   "postgres_url": null,
   "clamav_addr": null,
@@ -159,7 +161,9 @@ A default `config.json` is written on first start. Full layout with all optional
 | `services`                     | ServiceConfig[]          | Docker services shown on `/admin/docker`. See below.                                                                                                                                                |
 | `geoip_db_path`                | string \| null           | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.                                                                                                               |
 | `cloudflare_api_token`         | string \| null           | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                                                                                                                       |
-| `cloudflare_zone_id`           | string \| null           | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels.                                                                                                      |
+| `cloudflare_zone_id`           | string \| null           | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels (and DNS upserts for tunnel hostnames).                                                                |
+| `cloudflare_account_id`        | string \| null           | Cloudflare account ID. With `cloudflare_api_token` + `cloudflared_tunnel_id`, enables managing a remotely-managed Cloudflare Tunnel's ingress through the API from `/admin/proxy`. See below.        |
+| `cloudflared_tunnel_id`        | string \| null           | UUID of the Cloudflare Tunnel to manage over the API (the right model for a dashboard-created tunnel with no local credentials file). See below.                                                     |
 | `secret_scan_paths`            | string[]                 | Directory paths the secrets scanner walks recursively.                                                                                                                                              |
 | `postgres_url`                 | string \| null           | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                                                                                                                      |
 | `clamav_addr`                  | string \| null           | TCP address of a `clamd` daemon, e.g. `"host.docker.internal:3310"`. Enables ClamAV scanning.                                                                                                       |
@@ -169,8 +173,8 @@ A default `config.json` is written on first start. Full layout with all optional
 | `firewall_backend`             | string \| null           | Force the firewall backend: `"nftables"`, `"ufw"`, `"iptables"`, or `"disabled"`. Unset = auto-detect by probing each binary. `"disabled"` keeps the UI but issues no kernel commands. See below.   |
 | `proxy_config_dir`             | string \| null           | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy). Unset = DB-only, nothing written to disk. See below.                  |
 | `proxy_kind`                   | string \| null           | Config syntax to emit: `"nginx"` (default), `"caddy"`, or `"cloudflared"` (a single Cloudflare Tunnel `config.yml`). See below.                                                                     |
-| `cloudflared_tunnel`           | string \| null           | Cloudflare Tunnel id/name written as `tunnel:` into the generated cloudflared `config.yml`. Unset emits an editable placeholder. Only used when `proxy_kind` is `"cloudflared"`.                    |
-| `cloudflared_credentials_file` | string \| null           | Path written as `credentials-file:` into the cloudflared `config.yml`. Unset emits a placeholder. Only used when `proxy_kind` is `"cloudflared"`.                                                   |
+| `cloudflared_tunnel`           | string \| null           | (Local-file mode only) Tunnel id/name written as `tunnel:` into a generated `config.yml`. Used when `proxy_kind` is `"cloudflared"` **and** the API isn't configured.                               |
+| `cloudflared_credentials_file` | string \| null           | (Local-file mode only) Path written as `credentials-file:` into the generated `config.yml`. Used only when the tunnel API isn't configured.                                                          |
 | `proxy_reload_command`         | string \| null           | Shell command run after config is regenerated, e.g. `"nginx -s reload"`, `"systemctl reload nginx"`, or `"systemctl restart cloudflared"`. Skipped when unset.                                      |
 | `backup_interval_hours`        | u64 \| null              | Hours between automatic `VACUUM INTO` SQLite backups. `0` disables the scheduler; unset defaults to `24`. See below.                                                                                |
 | `backup_keep`                  | usize \| null            | Number of automatic backups to retain (older ones pruned). Unset defaults to `14`.                                                                                                                  |
@@ -410,10 +414,48 @@ it touches disk.
 
 #### Cloudflare Tunnel (cloudflared)
 
-With `proxy_kind` set to `"cloudflared"`, the same route list renders a single
-combined `config.yml` instead of one file per route — a Cloudflare Tunnel
-`ingress:` list with one entry per enabled route and the mandatory
-`http_status:404` catch-all last:
+With `proxy_kind` set to `"cloudflared"`, routes map onto a Cloudflare Tunnel's
+ingress (one rule per enabled route, plus the mandatory `http_status:404`
+catch-all). There are two modes depending on how your tunnel is run.
+
+**API mode (recommended — for a remotely-managed / dashboard tunnel).** A tunnel
+created in the Cloudflare dashboard and run with `cloudflared tunnel run --token …`
+has **no local credentials file or `config.yml`** — its ingress lives in
+Cloudflare. Point the app at the tunnel and it manages that ingress over the
+Cloudflare API:
+
+```json
+{
+  "proxy_kind": "cloudflared",
+  "cloudflare_api_token": "<token>",
+  "cloudflare_account_id": "<account id>",
+  "cloudflared_tunnel_id": "ac878d47-ad9c-4699-bcec-a6663ba7802c",
+  "cloudflare_zone_id": "<zone id>"
+}
+```
+
+In this mode:
+
+- **Import** — the **Import from Cloudflare** button on `/admin/proxy` pulls the
+  tunnel's existing public hostnames (created in the dashboard or elsewhere)
+  into the route table, so they're managed from here too.
+- **Push** — creating/editing/toggling a route (or **Regenerate & reload**)
+  writes every enabled route back as the tunnel's ingress **and** upserts the
+  proxied `CNAME <hostname> → <tunnel>.cfargotunnel.com` DNS record so the
+  hostname resolves. Because pushing **replaces** the whole ingress, import
+  first so the DB mirrors Cloudflare before you push.
+- **No reload, no config dir, no systemd.** Cloudflare propagates the pushed
+  config to your running `cloudflared` automatically — so `proxy_config_dir` and
+  `proxy_reload_command` are irrelevant here (handy when `cloudflared` runs as a
+  container with no `systemctl`).
+
+The API token needs **Account › Cloudflare Tunnel › Edit** and (for the DNS
+upserts) **Zone › DNS › Edit** on the relevant zone — broader than the
+analytics-only `Zone.Analytics:Read` token.
+
+**Local-file mode (for a locally-managed tunnel).** If the API settings above
+aren't all present, cloudflared falls back to writing a single combined
+`config.yml` to `proxy_config_dir`:
 
 ```json
 {
@@ -421,21 +463,24 @@ combined `config.yml` instead of one file per route — a Cloudflare Tunnel
   "proxy_kind": "cloudflared",
   "cloudflared_tunnel": "my-tunnel",
   "cloudflared_credentials_file": "/etc/cloudflared/<uuid>.json",
-  "proxy_reload_command": "systemctl restart cloudflared"
+  "proxy_reload_command": "docker restart cloudflared"
 }
 ```
 
-The file is written to `proxy_config_dir/config.yml` and rewritten wholesale on
-every change (there's nothing per-route to prune). `cloudflared_tunnel` and
-`cloudflared_credentials_file` fill the `tunnel:` / `credentials-file:` headers;
-left unset, editable placeholders are emitted so the file is still hand-offable.
-An `https` upstream gets `originRequest.noTLSVerify: true` (internal services
-are often self-signed), and a route's **Extra config** is appended verbatim
-under that route's `originRequest`. Tunnels terminate TLS at Cloudflare's edge,
-so cloudflared routes carry no local certificate — they show as **Cloudflare
-edge** on the Certs page. Per-route HTTP basic-auth, rate limits, and IP
-allow/deny aren't expressible in a tunnel ingress (enforce them with Cloudflare
-Access / WAF); the generated config notes this inline when those fields are set.
+The file is rewritten wholesale on every change (nothing per-route to prune);
+`cloudflared_tunnel` / `cloudflared_credentials_file` fill the `tunnel:` /
+`credentials-file:` headers (editable placeholders when unset). For a reload in
+a containerized deployment use `docker restart <cloudflared-container>` (the app
+already has the Docker socket) rather than `systemctl`, which isn't available
+inside the container.
+
+In both modes an `https` upstream gets `originRequest.noTLSVerify: true`
+(internal services are often self-signed). Tunnels terminate TLS at Cloudflare's
+edge, so cloudflared routes carry no local certificate — they show as
+**Cloudflare edge** on the Certs page. Per-route HTTP basic-auth, rate limits,
+and IP allow/deny aren't expressible in a tunnel ingress (enforce them with
+Cloudflare Access / WAF). All applies are logged (`tracing`) and audited
+(`proxy.apply`, `proxy.import`).
 
 The emitted nginx config references conventional certbot cert paths
 (`/etc/letsencrypt/live/<subdomain>/…`) and, for rate limits, a `limit_req_zone`

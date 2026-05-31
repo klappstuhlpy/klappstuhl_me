@@ -155,6 +155,21 @@ pub struct Config {
     /// Cloudflare zone ID for the domain this app sits behind.
     #[serde(default)]
     pub cloudflare_zone_id: Option<String>,
+    /// Cloudflare account ID. Required (alongside `cloudflare_api_token` and
+    /// `cloudflared_tunnel_id`) to manage a remotely-managed Cloudflare Tunnel
+    /// via the API — i.e. read/write the tunnel's ingress from `/admin/proxy`
+    /// when `proxy_kind` is `"cloudflared"`. Without it, cloudflared falls back
+    /// to writing a local `config.yml`.
+    #[serde(default)]
+    pub cloudflare_account_id: Option<String>,
+    /// The UUID of the Cloudflare Tunnel to manage (e.g.
+    /// `ac878d47-ad9c-4699-bcec-a6663ba7802c`). When set with
+    /// `cloudflare_account_id` + `cloudflare_api_token`, `/admin/proxy` manages
+    /// this tunnel's public-hostname ingress through the Cloudflare API instead
+    /// of a local file — the right model for a dashboard/remotely-managed
+    /// tunnel that has no local credentials file.
+    #[serde(default)]
+    pub cloudflared_tunnel_id: Option<String>,
     /// Directories to scan for leaked secrets (API keys, tokens, private
     /// keys, etc.).  When empty, the scheduled scanner is disabled — the
     /// /admin/secrets page still loads and a manual scan can be triggered.
@@ -295,6 +310,8 @@ impl Config {
             geoip_db_path: None,
             cloudflare_api_token: None,
             cloudflare_zone_id: None,
+            cloudflare_account_id: None,
+            cloudflared_tunnel_id: None,
             secret_scan_paths: Vec::new(),
             postgres_url: None,
             clamav_addr: None,

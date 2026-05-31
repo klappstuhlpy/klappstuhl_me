@@ -1,6 +1,7 @@
 //! Persistence layer for reverse-proxy routes.
 
 use crate::AppState;
+use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
@@ -186,6 +187,47 @@ pub async fn update_route(state: &AppState, id: i64, route: NewRoute) -> rusqlit
                     id,
                 ],
             )
+        })
+        .await
+}
+
+/// Upserts a route discovered by importing a Cloudflare Tunnel's ingress.
+/// Matches on the unique `subdomain`: a new hostname is inserted, an existing
+/// one has only its upstream + cloudflare flag refreshed (the operator's
+/// auth / rate-limit / access settings are preserved). Returns `true` when a
+/// new row was inserted.
+pub async fn upsert_imported_route(
+    state: &AppState,
+    subdomain: String,
+    target_host: String,
+    target_port: i64,
+    target_scheme: String,
+) -> rusqlite::Result<bool> {
+    state
+        .database()
+        .call(move |conn| -> rusqlite::Result<bool> {
+            let existed: bool = conn
+                .query_row(
+                    "SELECT 1 FROM proxy_route WHERE subdomain = ?",
+                    [&subdomain],
+                    |_| Ok(()),
+                )
+                .optional()?
+                .is_some();
+            conn.execute(
+                "INSERT INTO proxy_route
+                   (subdomain, target_host, target_port, target_scheme,
+                    ssl_managed, cloudflare_proxied, enabled)
+                 VALUES (?, ?, ?, ?, 0, 1, 1)
+                 ON CONFLICT(subdomain) DO UPDATE SET
+                    target_host        = excluded.target_host,
+                    target_port        = excluded.target_port,
+                    target_scheme      = excluded.target_scheme,
+                    cloudflare_proxied = 1,
+                    updated_at         = CURRENT_TIMESTAMP",
+                rusqlite::params![subdomain, target_host, target_port, target_scheme],
+            )?;
+            Ok(!existed)
         })
         .await
 }

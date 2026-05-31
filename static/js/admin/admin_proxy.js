@@ -26,10 +26,16 @@ function renderTiles(data) {
     document.getElementById("tile-routes").textContent =
         `${data.enabled_count} / ${data.total}`;
     const dirEl = document.getElementById("tile-dir");
-    dirEl.textContent = data.config_dir || "off";
-    dirEl.title = data.config_dir || "disk output disabled";
+    dirEl.textContent = data.cloudflared_api ? "Cloudflare API" : (data.config_dir || "off");
+    dirEl.title = data.cloudflared_api
+        ? "managed over the Cloudflare tunnel API"
+        : (data.config_dir || "disk output disabled");
+    // In API mode there's no local config dir to warn about.
     document.getElementById("nodir-banner").style.display =
-        data.config_dir ? "none" : "";
+        (data.config_dir || data.cloudflared_api) ? "none" : "";
+    // The "Import from Cloudflare" button only applies in tunnel API mode.
+    const importBtn = document.getElementById("cf-import-btn");
+    if (importBtn) importBtn.hidden = !data.cloudflared_api;
 }
 
 function renderRoutes(rows) {
@@ -54,7 +60,7 @@ function renderRoutes(rows) {
             <td><div class="row-actions">
                 <button class="button outline" data-action="edit">Edit</button>
                 <button class="button outline" data-action="toggle">${r.enabled ? "Disable" : "Enable"}</button>
-                <button class="button outline" data-action="delete">Delete</button>
+                <button class="button danger small" data-action="delete">Delete</button>
             </div></td>
         </tr>`;
     }).join("");
@@ -212,6 +218,30 @@ document.getElementById("reapply-btn").addEventListener("click", async () => {
         loadData();
     } finally {
         btn.disabled = false;
+    }
+});
+
+/* ── Import from Cloudflare (tunnel API mode) ──────────────────── */
+
+document.getElementById("cf-import-btn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("cf-import-btn");
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Importing…";
+    try {
+        const res = await fetch("/admin/proxy/import", { method: "POST" });
+        const data = await res.json();
+        if (res.ok) {
+            alert(`Imported from Cloudflare tunnel:\n  ${data.imported} new, ${data.updated} updated, ${data.skipped} skipped.`);
+            loadData();
+        } else {
+            alert("Import failed:\n" + (data.error || res.statusText));
+        }
+    } catch (e) {
+        alert("Import failed: " + e);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = original;
     }
 });
 

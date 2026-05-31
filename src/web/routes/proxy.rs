@@ -54,6 +54,10 @@ struct ContainerOption {
 struct DashboardData {
     proxy_kind: &'static str,
     config_dir: Option<String>,
+    /// True when cloudflared is managing a remotely-managed tunnel over the
+    /// Cloudflare API (enables the "Import from Cloudflare" button + drops the
+    /// "no config dir" warning since none is needed).
+    cloudflared_api: bool,
     routes: Vec<proxy::RouteView>,
     containers: Vec<ContainerOption>,
     total: i64,
@@ -85,6 +89,7 @@ async fn data(State(state): State<AppState>, account: Account) -> Result<Json<Da
     Ok(Json(DashboardData {
         proxy_kind: proxy::configured_kind(&state).label(),
         config_dir: proxy::config_dir(&state).map(|p| p.display().to_string()),
+        cloudflared_api: proxy::cloudflared::api_mode(&state),
         routes,
         containers,
         total,
@@ -337,11 +342,53 @@ async fn apply(
     Ok(Json(report))
 }
 
+/// Import the managed Cloudflare Tunnel's current ingress (hostnames created in
+/// the dashboard or elsewhere) into the route table.
+async fn import_cloudflare(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    account: Account,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    if !account.flags.is_admin() {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    if !proxy::cloudflared::api_mode(&state) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Cloudflare tunnel API is not configured (need cloudflare_api_token, cloudflare_account_id, cloudflared_tunnel_id, and proxy_kind = \"cloudflared\")."
+            })),
+        )
+            .into_response();
+    }
+    match proxy::cloudflared::import(&state).await {
+        Ok((imported, updated, skipped)) => {
+            state
+                .audit("proxy.import")
+                .actor(&account)
+                .ip_opt(client_ip)
+                .meta(serde_json::json!({ "imported": imported, "updated": updated, "skipped": skipped }))
+                .fire();
+            Json(serde_json::json!({ "imported": imported, "updated": updated, "skipped": skipped })).into_response()
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Cloudflare tunnel import failed");
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response()
+        }
+    }
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/admin/proxy", get(page).post(create))
         .route("/admin/proxy/data", get(data))
         .route("/admin/proxy/apply", post(apply))
+        .route("/admin/proxy/import", post(import_cloudflare))
         .route("/admin/proxy/:id", post(update).delete(remove))
         .route("/admin/proxy/:id/preview", get(preview))
         .route("/admin/proxy/:id/toggle", post(toggle))
