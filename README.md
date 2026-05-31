@@ -146,38 +146,38 @@ A default `config.json` is written on first start. Full layout with all optional
 }
 ```
 
-| Key                      | Type              | Notes                                                                                                                                                                                             |
-|--------------------------|-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `production`             | bool              | `true` switches the server to TLS via Let's Encrypt on port 443.                                                                                                                                  |
-| `domains`                | string[]          | Hostnames that ACME will request certificates for.                                                                                                                                                |
-| `server.port`            | u16               | Listen port (`443` in production, anything else for dev).                                                                                                                                         |
-| `server.ip`              | string            | The IP the server listens on (default `0.0.0.0`).                                                                                                                                                 |
-| `secret_key`             | string            | Auto-generated; used for HMAC signing of session tokens and flash cookies.                                                                                                                        |
-| `discord_webhook_url`    | string \| null    | Discord incoming webhook URL for metric / health / secret alerts.                                                                                                                                 |
-| `ntfy_url`               | string \| null    | [ntfy](https://ntfy.sh) topic URL (e.g. `https://ntfy.sh/my-topic`). When set, alerts are also pushed here as plain text.                                                                         |
-| `alert_webhook_url`      | string \| null    | Generic webhook URL. When set, alerts are also POSTed here as JSON `{title, level, body, fields}`.                                                                                                |
-| `services`               | ServiceConfig[]   | Docker services shown on `/admin/docker`. See below.                                                                                                                                              |
-| `geoip_db_path`          | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.                                                                                                             |
-| `cloudflare_api_token`   | string \| null    | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                                                                                                                     |
-| `cloudflare_zone_id`     | string \| null    | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels.                                                                                                    |
-| `secret_scan_paths`      | string[]          | Directory paths the secrets scanner walks recursively.                                                                                                                                            |
-| `postgres_url`           | string \| null    | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                                                                                                                    |
-| `clamav_addr`            | string \| null    | TCP address of a `clamd` daemon, e.g. `"host.docker.internal:3310"`. Enables ClamAV scanning.                                                                                                     |
-| `virustotal_api_key`     | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.                                                                                                                 |
-| `spotlight_scripts`      | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                                                                                                                           |
-| `sshd_auth_log_path`     | string \| null    | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below.                                                                                                    |
-| `firewall_backend`       | string \| null    | Force the firewall backend: `"nftables"`, `"ufw"`, `"iptables"`, or `"disabled"`. Unset = auto-detect by probing each binary. `"disabled"` keeps the UI but issues no kernel commands. See below. |
-| `proxy_config_dir`       | string \| null    | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy). Unset = DB-only, nothing written to disk. See below.                |
-| `proxy_kind`             | string \| null    | Config syntax to emit: `"nginx"` (default), `"caddy"`, or `"cloudflared"` (a single Cloudflare Tunnel `config.yml`). See below.                                                                    |
-| `cloudflared_tunnel`     | string \| null    | Cloudflare Tunnel id/name written as `tunnel:` into the generated cloudflared `config.yml`. Unset emits an editable placeholder. Only used when `proxy_kind` is `"cloudflared"`.                   |
-| `cloudflared_credentials_file` | string \| null | Path written as `credentials-file:` into the cloudflared `config.yml`. Unset emits a placeholder. Only used when `proxy_kind` is `"cloudflared"`.                                              |
-| `proxy_reload_command`   | string \| null    | Shell command run after config is regenerated, e.g. `"nginx -s reload"`, `"systemctl reload nginx"`, or `"systemctl restart cloudflared"`. Skipped when unset.                                     |
-| `backup_interval_hours`  | u64 \| null       | Hours between automatic `VACUUM INTO` SQLite backups. `0` disables the scheduler; unset defaults to `24`. See below.                                                                              |
-| `backup_keep`            | usize \| null     | Number of automatic backups to retain (older ones pruned). Unset defaults to `14`.                                                                                                                |
-| `backup_remote`          | object \| null    | Off-site backup target. When set, each new backup is also uploaded to an S3-compatible store (B2 / R2 / AWS / MinIO). See [Off-site backups](#off-site-backups).                                  |
-| `update_check_interval_hours` | u64 \| null  | Hours between background container image-update checks. `0` disables. Unset defaults to `12`. See [Container image updates](#container-image-update-detection).                                    |
-| `chromium_path`          | string \| null    | Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF render endpoints. Unset = probe common names on `PATH`; if none found those endpoints return an error.                       |
-| `ffmpeg_path`            | string \| null    | Path to an `ffmpeg` binary for the video/HEIC transcode endpoint. Unset = use `ffmpeg` on `PATH`; if absent the endpoint returns an error.                                                        |
+| Key                            | Type                     | Notes                                                                                                                                                                                               |
+|--------------------------------|--------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `production`                   | bool                     | `true` switches the server to TLS via Let's Encrypt on port 443.                                                                                                                                    |
+| `domains`                      | string[]                 | Hostnames that ACME will request certificates for.                                                                                                                                                  |
+| `server.port`                  | u16                      | Listen port (`443` in production, anything else for dev).                                                                                                                                           |
+| `server.ip`                    | string                   | The IP the server listens on (default `0.0.0.0`).                                                                                                                                                   |
+| `secret_key`                   | string                   | Auto-generated; used for HMAC signing of session tokens and flash cookies.                                                                                                                          |
+| `discord_webhook_url`          | string \| null           | Discord incoming webhook URL for metric / health / secret alerts.                                                                                                                                   |
+| `ntfy_url`                     | string \| null           | [ntfy](https://ntfy.sh) topic URL (e.g. `https://ntfy.sh/my-topic`). When set, alerts are also pushed here as plain text.                                                                           |
+| `alert_webhook_url`            | string \| null           | Generic webhook URL. When set, alerts are also POSTed here as JSON `{title, level, body, fields}`.                                                                                                  |
+| `services`                     | ServiceConfig[]          | Docker services shown on `/admin/docker`. See below.                                                                                                                                                |
+| `geoip_db_path`                | string \| null           | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.                                                                                                               |
+| `cloudflare_api_token`         | string \| null           | Cloudflare API token with `Zone.Analytics:Read` for the zone.                                                                                                                                       |
+| `cloudflare_zone_id`           | string \| null           | The zone ID matching `cloudflare_api_token`. Both must be set to enable the Cloudflare panels.                                                                                                      |
+| `secret_scan_paths`            | string[]                 | Directory paths the secrets scanner walks recursively.                                                                                                                                              |
+| `postgres_url`                 | string \| null           | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                                                                                                                      |
+| `clamav_addr`                  | string \| null           | TCP address of a `clamd` daemon, e.g. `"host.docker.internal:3310"`. Enables ClamAV scanning.                                                                                                       |
+| `virustotal_api_key`           | string \| null           | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.                                                                                                                   |
+| `spotlight_scripts`            | SpotlightScript[]        | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                                                                                                                             |
+| `sshd_auth_log_path`           | string \| null           | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below.                                                                                                      |
+| `firewall_backend`             | string \| null           | Force the firewall backend: `"nftables"`, `"ufw"`, `"iptables"`, or `"disabled"`. Unset = auto-detect by probing each binary. `"disabled"` keeps the UI but issues no kernel commands. See below.   |
+| `proxy_config_dir`             | string \| null           | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy). Unset = DB-only, nothing written to disk. See below.                  |
+| `proxy_kind`                   | string \| null           | Config syntax to emit: `"nginx"` (default), `"caddy"`, or `"cloudflared"` (a single Cloudflare Tunnel `config.yml`). See below.                                                                     |
+| `cloudflared_tunnel`           | string \| null           | Cloudflare Tunnel id/name written as `tunnel:` into the generated cloudflared `config.yml`. Unset emits an editable placeholder. Only used when `proxy_kind` is `"cloudflared"`.                    |
+| `cloudflared_credentials_file` | string \| null           | Path written as `credentials-file:` into the cloudflared `config.yml`. Unset emits a placeholder. Only used when `proxy_kind` is `"cloudflared"`.                                                   |
+| `proxy_reload_command`         | string \| null           | Shell command run after config is regenerated, e.g. `"nginx -s reload"`, `"systemctl reload nginx"`, or `"systemctl restart cloudflared"`. Skipped when unset.                                      |
+| `backup_interval_hours`        | u64 \| null              | Hours between automatic `VACUUM INTO` SQLite backups. `0` disables the scheduler; unset defaults to `24`. See below.                                                                                |
+| `backup_keep`                  | usize \| null            | Number of automatic backups to retain (older ones pruned). Unset defaults to `14`.                                                                                                                  |
+| `backup_remote`                | object \| null           | Off-site backup target. When set, each new backup is also uploaded to an S3-compatible store (B2 / R2 / AWS / MinIO). See [Off-site backups](#off-site-backups).                                    |
+| `update_check_interval_hours`  | u64 \| null              | Hours between background container image-update checks. `0` disables. Unset defaults to `12`. See [Container image updates](#container-image-update-detection).                                     |
+| `chromium_path`                | string \| null           | Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF render endpoints. Unset = probe common names on `PATH`; if none found those endpoints return an error.                         |
+| `ffmpeg_path`                  | string \| null           | Path to an `ffmpeg` binary for the video/HEIC transcode endpoint. Unset = use `ffmpeg` on `PATH`; if absent the endpoint returns an error.                                                          |
 
 ### Docker services configuration
 
@@ -204,30 +204,32 @@ Each entry powers one card on `/admin/docker`:
 Pre-defined shell commands that appear in the Ctrl+K palette under the **Scripts** section and can be run directly from the palette:
 
 ```json
-"spotlight_scripts": [
-  {
-    "id": "restart-nginx",
-    "name": "Restart nginx",
-    "command": "systemctl restart nginx",
-    "description": "Reload nginx config and restart the service",
-    "cwd": null
-  },
-  {
-    "id": "git-pull-site",
-    "name": "Pull site repo",
-    "command": "git pull",
-    "cwd": "/home/user/mysite"
-  }
-]
+{
+  "spotlight_scripts": [
+    {
+      "id": "restart-nginx",
+      "name": "Restart nginx",
+      "command": "systemctl restart nginx",
+      "description": "Reload nginx config and restart the service",
+      "cwd": null
+    },
+    {
+      "id": "git-pull-site",
+      "name": "Pull site repo",
+      "command": "git pull",
+      "cwd": "/home/user/mysite"
+    }
+  ]
+}
 ```
 
-| Field         | Description                                                                                     |
-|---------------|-------------------------------------------------------------------------------------------------|
-| `id`          | Unique identifier used internally. Must be unique across all scripts.                           |
-| `name`        | Display name shown in the palette.                                                              |
-| `command`     | Shell command executed via `sh -c` on Unix or `cmd /C` on Windows.                              |
-| `description` | (Optional) Subtitle shown below the name in the palette. Defaults to the raw command string.    |
-| `cwd`         | (Optional) Working directory for the command. Defaults to the process working directory.        |
+| Field         | Description                                                                                                    |
+|---------------|----------------------------------------------------------------------------------------------------------------|
+| `id`          | Unique identifier used internally. Must be unique across all scripts.                                          |
+| `name`        | Display name shown in the palette.                                                                             |
+| `command`     | Shell command executed via `sh -c` on Unix or `cmd /C` on Windows.                                             |
+| `description` | (Optional) Subtitle shown below the name in the palette. Defaults to the raw command string.                   |
+| `cwd`         | (Optional) Working directory for the command. Defaults to the process working directory.                       |
 | `schedule`    | (Optional) 5-field cron expression (`min hour dom month dow`, UTC) to run the script automatically. See below. |
 
 Scripts time out after 30 seconds. Every execution is recorded in the audit log (`spotlight.script.run` with the script name as target).
@@ -235,14 +237,16 @@ Scripts time out after 30 seconds. Every execution is recorded in the audit log 
 **Scheduled scripts (cron).** Add a `schedule` to any script to run it automatically in addition to on-demand palette runs — turning the script list into a lightweight cron without a separate daemon:
 
 ```json
-"spotlight_scripts": [
-  {
-    "id": "nightly-restic",
-    "name": "Nightly backup",
-    "command": "restic backup /data",
-    "schedule": "0 4 * * *"
-  }
-]
+{
+  "spotlight_scripts": [
+    {
+      "id": "nightly-restic",
+      "name": "Nightly backup",
+      "command": "restic backup /data",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}
 ```
 
 The expression is standard 5-field cron evaluated in **UTC**, supporting `*`, lists (`1,15`), ranges (`9-17`), and steps (`*/15`); day-of-month and day-of-week follow the usual Vixie-cron "either matches when both are set" rule. A background task wakes at the top of every minute and runs whatever is due. Invalid expressions are logged at start-up and skipped. Scheduled runs are audited as `spotlight.script.scheduled` (actor `scheduler`).
@@ -276,7 +280,9 @@ When the app runs in Docker and `clamd` runs on the host, there are three traps 
 
 2. **Let the container reach clamd.** Because the compose file uses `network_mode: host`, the container shares the host's network stack — `localhost` inside the container *is* the host. Set `clamav_addr` in `config.json` to:
    ```json
-   "clamav_addr": "127.0.0.1:3310"
+   {
+      "clamav_addr": "127.0.0.1:3310"
+   }
    ```
    No `host.docker.internal` alias or `extra_hosts` entry is needed.
 
@@ -322,7 +328,9 @@ volumes:
   - /var/log/auth.log:/host-log/auth.log:ro
 ```
 ```json
-"sshd_auth_log_path": "/host-log/auth.log"
+{
+  "sshd_auth_log_path": "/host-log/auth.log"
+}
 ```
 
 Distro-specific log locations:
@@ -383,9 +391,11 @@ proxy includes route files from, `proxy_kind` to `"nginx"` (default), `"caddy"`,
 or `"cloudflared"`, and `proxy_reload_command` to whatever reloads the proxy:
 
 ```json
-"proxy_config_dir": "/etc/nginx/conf.d",
-"proxy_kind": "nginx",
-"proxy_reload_command": "nginx -s reload"
+{
+  "proxy_config_dir": "/etc/nginx/conf.d",
+  "proxy_kind": "nginx",
+  "proxy_reload_command": "nginx -s reload"
+}
 ```
 
 On any route change (and via the "Regenerate & reload" button) the server writes
@@ -406,11 +416,13 @@ combined `config.yml` instead of one file per route — a Cloudflare Tunnel
 `http_status:404` catch-all last:
 
 ```json
-"proxy_config_dir": "/etc/cloudflared",
-"proxy_kind": "cloudflared",
-"cloudflared_tunnel": "my-tunnel",
-"cloudflared_credentials_file": "/etc/cloudflared/<uuid>.json",
-"proxy_reload_command": "systemctl restart cloudflared"
+{
+  "proxy_config_dir": "/etc/cloudflared",
+  "proxy_kind": "cloudflared",
+  "cloudflared_tunnel": "my-tunnel",
+  "cloudflared_credentials_file": "/etc/cloudflared/<uuid>.json",
+  "proxy_reload_command": "systemctl restart cloudflared"
+}
 ```
 
 The file is written to `proxy_config_dir/config.yml` and rewritten wholesale on
@@ -456,14 +468,16 @@ which AWS S3, Backblaze B2, Cloudflare R2, MinIO, and Wasabi all accept — no
 extra binary or SDK:
 
 ```json
-"backup_remote": {
-  "kind": "s3",
-  "endpoint": "https://s3.us-west-002.backblazeb2.com",
-  "region": "us-west-002",
-  "bucket": "my-backups",
-  "prefix": "klappstuhl/",
-  "access_key_id": "…",
-  "secret_access_key": "…"
+{
+  "backup_remote": {
+    "kind": "s3",
+    "endpoint": "https://s3.us-west-002.backblazeb2.com",
+    "region": "us-west-002",
+    "bucket": "my-backups",
+    "prefix": "klappstuhl/",
+    "access_key_id": "…",
+    "secret_access_key": "…"
+  }
 }
 ```
 
@@ -472,10 +486,10 @@ extra binary or SDK:
 | `kind`              | Storage backend. Currently only `"s3"`.                                                                 |
 | `endpoint`          | Base URL of the store. For AWS use `https://s3.<region>.amazonaws.com`; for B2/R2/MinIO use their host. |
 | `region`            | Signing region. AWS needs the real region; B2/R2/MinIO accept any value (defaults to `us-east-1`).      |
-| `bucket`            | Destination bucket.                                                                                      |
+| `bucket`            | Destination bucket.                                                                                     |
 | `prefix`            | (Optional) key prefix inside the bucket; a trailing slash is added automatically.                       |
-| `access_key_id`     | Access key id.                                                                                           |
-| `secret_access_key` | Secret access key.                                                                                       |
+| `access_key_id`     | Access key id.                                                                                          |
+| `secret_access_key` | Secret access key.                                                                                      |
 
 Each scheduled and manual backup is uploaded in the background; an upload
 failure raises an alert through the configured sinks (Discord / ntfy / webhook)
