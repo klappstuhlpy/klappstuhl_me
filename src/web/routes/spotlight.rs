@@ -6,8 +6,6 @@
 //! POST /admin/spotlight/run        — execute a pre-defined script from config
 //! GET  /admin/spotlight/scripts    — list configured scripts (for the palette)
 
-use std::time::Duration;
-
 use crate::{models::Account, AppState};
 use axum::{
     extract::{Query, State},
@@ -372,7 +370,10 @@ fn append_scripts(state: &AppState, q: &str, items: &mut Vec<SpotlightItem>) {
             || contains_ci(&s.name, q)
             || s.description.as_deref().map(|d| contains_ci(d, q)).unwrap_or(false)
         {
-            let subtitle = s.description.clone().unwrap_or_else(|| s.command.clone());
+            let mut subtitle = s.description.clone().unwrap_or_else(|| s.command.clone());
+            if let Some(schedule) = &s.schedule {
+                subtitle.push_str(&format!(" · ⏱ {schedule}"));
+            }
             items.push(SpotlightItem::script(s.name.clone(), subtitle, s.id.clone()));
         }
     }
@@ -426,12 +427,12 @@ async fn run_script(State(state): State<AppState>, account: Account, Json(payloa
             .into_response();
     };
 
-    let mut cmd = build_command(&script.command);
+    let mut cmd = crate::cron::build_command(&script.command);
     if let Some(cwd) = &script.cwd {
         cmd.current_dir(cwd);
     }
 
-    let result = tokio::time::timeout(Duration::from_secs(30), cmd.output()).await;
+    let result = tokio::time::timeout(crate::cron::SCRIPT_TIMEOUT, cmd.output()).await;
 
     let output = match result {
         Ok(Ok(out)) => out,
@@ -467,33 +468,6 @@ async fn run_script(State(state): State<AppState>, account: Account, Json(payloa
         "stderr":    stderr,
     }))
     .into_response()
-}
-
-#[cfg(unix)]
-fn build_command(command: &str) -> tokio::process::Command {
-    let mut cmd = tokio::process::Command::new("sh");
-    cmd.arg("-c").arg(command);
-    // systemd units often launch with a stripped PATH, which makes
-    // `sh -c "curl …"` fail with "curl: not found" even when curl is
-    // installed in /usr/bin. Make sure the standard system locations
-    // are searched, while still honouring whatever the parent set.
-    let path = match std::env::var_os("PATH") {
-        Some(p) if !p.is_empty() => {
-            let mut combined = p.into_string().unwrap_or_default();
-            combined.push_str(":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-            combined
-        }
-        _ => "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".to_string(),
-    };
-    cmd.env("PATH", path);
-    cmd
-}
-
-#[cfg(not(unix))]
-fn build_command(command: &str) -> tokio::process::Command {
-    let mut cmd = tokio::process::Command::new("cmd");
-    cmd.args(["/C", command]);
-    cmd
 }
 
 // ─── Router ──────────────────────────────────────────────────────────────────

@@ -54,6 +54,13 @@ pub struct SpotlightScript {
     /// Working directory for the command. Defaults to the process cwd.
     #[serde(default)]
     pub cwd: Option<String>,
+    /// Optional 5-field cron schedule (`min hour dom month dow`, evaluated in
+    /// UTC). When set, a background scheduler runs the script automatically at
+    /// the matching times, in addition to on-demand runs from the Ctrl+K
+    /// palette. Supports `*`, lists (`1,15`), ranges (`9-17`), and steps
+    /// (`*/15`). Example: `"0 4 * * *"` runs daily at 04:00 UTC.
+    #[serde(default)]
+    pub schedule: Option<String>,
 }
 
 /// Off-site backup target. When set, every freshly created SQLite backup is

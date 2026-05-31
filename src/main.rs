@@ -146,6 +146,10 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // digests; no-op without Docker or when disabled in config).
     klappstuhl_me::updates::spawn_update_checker(state.clone());
 
+    // Cron scheduler for spotlight scripts carrying a `schedule` (no-op if
+    // none do).
+    klappstuhl_me::cron::spawn_scheduler(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()

@@ -223,8 +223,24 @@ Pre-defined shell commands that appear in the Ctrl+K palette under the **Scripts
 | `command`     | Shell command executed via `sh -c` on Unix or `cmd /C` on Windows.                              |
 | `description` | (Optional) Subtitle shown below the name in the palette. Defaults to the raw command string.    |
 | `cwd`         | (Optional) Working directory for the command. Defaults to the process working directory.        |
+| `schedule`    | (Optional) 5-field cron expression (`min hour dom month dow`, UTC) to run the script automatically. See below. |
 
 Scripts time out after 30 seconds. Every execution is recorded in the audit log (`spotlight.script.run` with the script name as target).
+
+**Scheduled scripts (cron).** Add a `schedule` to any script to run it automatically in addition to on-demand palette runs — turning the script list into a lightweight cron without a separate daemon:
+
+```json
+"spotlight_scripts": [
+  {
+    "id": "nightly-restic",
+    "name": "Nightly backup",
+    "command": "restic backup /data",
+    "schedule": "0 4 * * *"
+  }
+]
+```
+
+The expression is standard 5-field cron evaluated in **UTC**, supporting `*`, lists (`1,15`), ranges (`9-17`), and steps (`*/15`); day-of-month and day-of-week follow the usual Vixie-cron "either matches when both are set" rule. A background task wakes at the top of every minute and runs whatever is due. Invalid expressions are logged at start-up and skipped. Scheduled runs are audited as `spotlight.script.scheduled` (actor `scheduler`).
 
 ### Enabling the security dashboard's optional features
 

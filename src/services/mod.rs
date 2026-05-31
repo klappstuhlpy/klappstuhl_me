@@ -5,6 +5,7 @@
 pub mod alerts;
 pub mod audit;
 pub mod backup;
+pub mod cron;
 pub mod docker;
 pub mod firewall;
 pub mod health;
