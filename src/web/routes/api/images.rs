@@ -1,4 +1,4 @@
-use axum::extract::{Multipart, Path, State};
+use axum::extract::{Multipart, Path, Query, State};
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use utoipa::ToSchema;
@@ -12,7 +12,7 @@ use crate::{
     error::ApiError,
     headers::ClientIp,
     models::Scope,
-    routes::image::{build_images_zip, BulkFilesPayload, DeleteResult, UploadResult},
+    routes::image::{build_images_zip, BulkFilesPayload, DeleteResult, UploadParams, UploadResult},
     AppState,
 };
 
@@ -33,9 +33,15 @@ struct UploadedFiles {
 /// The images get a new unique id assigned that is given in the return body.
 ///
 /// You can have multiple `file` fields.
+///
+/// Pass `?expires_in=<seconds>` to make the upload auto-delete after a TTL
+/// (capped at 365 days). Omit it for a permanent upload.
 #[utoipa::path(
     post,
     path = "/api/images/upload",
+    params(
+        ("expires_in" = Option<i64>, Query, description = "Optional time-to-live in seconds; the upload is auto-deleted afterwards (max 365 days)."),
+    ),
     request_body(
         content = inline(UploadedFiles),
         content_type = "multipart/form-data",
@@ -56,6 +62,7 @@ struct UploadedFiles {
 pub async fn upload_files(
     State(state): State<AppState>,
     ClientIp(client_ip): ClientIp,
+    Query(params): Query<UploadParams>,
     auth: ApiToken,
     multipart: Multipart,
 ) -> Result<Json<UploadResult>, ApiError> {
@@ -64,7 +71,8 @@ pub async fn upload_files(
         return Err(ApiError::unauthorized());
     };
 
-    let result = raw_upload_file(state, account, client_ip, multipart, true).await?;
+    let expires_at = crate::routes::image::expiry_from_params(&params);
+    let result = raw_upload_file(state, account, client_ip, multipart, true, expires_at).await?;
     if result.is_error() {
         return Err(ApiError::new("Upload failed"));
     }

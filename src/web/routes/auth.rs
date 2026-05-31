@@ -927,6 +927,49 @@ async fn totp_disable(
         .bail("/account")
 }
 
+/// Generates a [ShareX](https://getsharex.com) custom-uploader config
+/// (`.sxcu`) pre-filled with the user's API key and this site's upload
+/// endpoint. Importing it makes ShareX (and Flameshot/other tools that read
+/// the same format) upload screenshots straight to the gallery, copying the
+/// returned link to the clipboard.
+async fn sharex_config(State(state): State<AppState>, account: Account) -> Response {
+    let Some(api_key) = state.get_api_key(account.id).await else {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Generate an API key on your account page first, then download this again.",
+        )
+            .into_response();
+    };
+
+    let upload_url = state.config().url_to("/api/images/upload");
+    let config = serde_json::json!({
+        "Version": "15.0.0",
+        "Name": "klappstuhl.me",
+        "DestinationType": "ImageUploader, FileUploader",
+        "RequestMethod": "POST",
+        "RequestURL": upload_url,
+        "Headers": { "Authorization": api_key },
+        "Body": "MultipartFormData",
+        "FileFormName": "file",
+        // UploadResult.links is the array of canonical URLs; take the first.
+        "URL": "{json:links[0]}",
+        "ErrorMessage": "{json:error}"
+    });
+    let body = serde_json::to_vec_pretty(&config).unwrap_or_default();
+
+    (
+        [
+            (axum::http::header::CONTENT_TYPE, "application/json".to_string()),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                "attachment; filename=\"klappstuhl.sxcu\"".to_string(),
+            ),
+        ],
+        body,
+    )
+        .into_response()
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route(
@@ -952,6 +995,7 @@ pub fn routes() -> Router<AppState> {
             post(generate_api_key).layer(RateLimit::default().quota(1, 600.0).build()),
         )
         .route("/account/change_password", post(change_password))
+        .route("/account/sharex.sxcu", get(sharex_config))
         .route("/user/:name", get(show_other_account_info))
         .route(
             "/signup",

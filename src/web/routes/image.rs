@@ -23,6 +23,7 @@ use base64::Engine;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
+use time::OffsetDateTime;
 use utoipa::ToSchema;
 
 // ---------------------------------------------------------------------------
@@ -33,6 +34,32 @@ const ALLOWED_EXTENSIONS: &[&str] = &["apng", "png", "jpg", "jpeg", "gif", "avif
 
 fn is_allowed_extension(ext: &str) -> bool {
     ALLOWED_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str())
+}
+
+/// Upper bound on a requested time-to-live (365 days). Keeps a typo or a
+/// malicious value from pinning storage forever / overflowing the timestamp.
+const MAX_TTL_SECONDS: i64 = 365 * 24 * 3600;
+
+/// Optional upload parameters (passed in the query string so the same shared
+/// path works for the web form and the API).
+#[derive(Debug, Default, Deserialize)]
+pub struct UploadParams {
+    /// Time-to-live in seconds. When set (and positive), the upload is
+    /// auto-deleted by the reaper after this many seconds. Capped at 365 days.
+    #[serde(default)]
+    pub expires_in: Option<i64>,
+}
+
+/// Resolves a requested TTL into an absolute expiry timestamp, clamped to
+/// `MAX_TTL_SECONDS`. `None`/zero/negative means "never expires".
+fn expiry_from(expires_in: Option<i64>) -> Option<OffsetDateTime> {
+    let secs = expires_in.filter(|&s| s > 0)?.min(MAX_TTL_SECONDS);
+    Some(OffsetDateTime::now_utc() + time::Duration::seconds(secs))
+}
+
+/// Public wrapper over [`expiry_from`] for the API upload handler.
+pub fn expiry_from_params(params: &UploadParams) -> Option<OffsetDateTime> {
+    expiry_from(params.expires_in)
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +194,7 @@ pub async fn raw_upload_file(
     client_ip: Option<IpAddr>,
     multipart: Multipart,
     api: bool,
+    expires_at: Option<OffsetDateTime>,
 ) -> Result<UploadResult, ApiError> {
     let (files, skipped) = collect_fields(multipart).await;
 
@@ -223,8 +251,8 @@ pub async fn raw_upload_file(
         let insert_result = state
             .database()
             .execute(
-                "INSERT INTO images (id, mimetype, uploader_id, image_data) VALUES (?, ?, ?, ?)",
-                (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec()),
+                "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at) VALUES (?, ?, ?, ?, ?)",
+                (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at),
             )
             .await;
 
@@ -235,8 +263,8 @@ pub async fn raw_upload_file(
                 let retry = state
                     .database()
                     .execute(
-                        "INSERT INTO images (id, mimetype, uploader_id, image_data) VALUES (?, ?, ?, ?)",
-                        (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec()),
+                        "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at) VALUES (?, ?, ?, ?, ?)",
+                        (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at),
                     )
                     .await;
 
@@ -364,12 +392,14 @@ async fn upload_file(
     State(state): State<AppState>,
     ClientIp(client_ip): ClientIp,
     referrer: Option<Referrer>,
+    axum::extract::Query(params): axum::extract::Query<UploadParams>,
     account: Account,
     flasher: Flasher,
     multipart: Multipart,
 ) -> Response {
     let url = referrer.map(|r| r.0).unwrap_or_else(|| "/images".to_string());
-    match raw_upload_file(state, account, client_ip, multipart, false).await {
+    let expires_at = expiry_from(params.expires_in);
+    match raw_upload_file(state, account, client_ip, multipart, false, expires_at).await {
         Err(msg) => flasher.add(msg.error.as_ref()).bail(&url),
         Ok(result) => {
             let message = if result.is_success() {
@@ -420,11 +450,13 @@ pub async fn build_images_zip(
     account: &Account,
     requested: &[String],
 ) -> Result<(Vec<u8>, usize), ApiError> {
+    let now = OffsetDateTime::now_utc();
     let owned: Vec<ImageFile> = state
         .resolve_image_files()
         .await
         .iter()
         .filter(|e| e.uploader_id == Some(account.id))
+        .filter(|e| e.expires_at.map(|exp| exp > now).unwrap_or(true))
         .cloned()
         .collect();
 
@@ -602,6 +634,11 @@ struct ImageTemplate {
     entry: ImageEntry,
     data: ResolvedImageData,
     flashes: Flashes,
+    /// Absolute URL of this landing page (OpenGraph `og:url`).
+    page_url: String,
+    /// Absolute URL of the raw image bytes (OpenGraph `og:image`), so link
+    /// unfurls in Discord/Slack/Twitter show the picture.
+    raw_url: String,
 }
 
 async fn get_image_page(
@@ -617,6 +654,12 @@ async fn get_image_page(
         return Ok(Redirect::to("/").into_response());
     };
 
+    // An expired image is treated as gone (the reaper will remove the row;
+    // this closes the up-to-an-hour window between expiry and the next sweep).
+    if entry.is_expired() {
+        return Ok(Redirect::to("/").into_response());
+    }
+
     // Canonical URL is always "/gallery/{id}.{ext}". If the request came in
     // without an extension (or with the wrong one) bounce the user to the
     // canonical form via a 308 so bookmarks / shared links normalize.
@@ -631,11 +674,16 @@ async fn get_image_page(
         content_type: entry.mimetype.clone(),
     };
 
+    let page_url = filters::canonical_url(format!("/gallery/{}.{}", id, canonical_ext)).unwrap_or_default();
+    let raw_url = filters::canonical_url(format!("/gallery/raw/{}.{}", id, canonical_ext)).unwrap_or_default();
+
     Ok(ImageTemplate {
         account,
         entry,
         data,
         flashes,
+        page_url,
+        raw_url,
     }
     .into_response())
 }
@@ -652,6 +700,10 @@ async fn get_image_raw(State(state): State<AppState>, Path(image_id): Path<Strin
     let Some(entry) = state.get_image(id.clone()).await else {
         return Err(StatusCode::NOT_FOUND);
     };
+
+    if entry.is_expired() {
+        return Err(StatusCode::NOT_FOUND);
+    }
 
     let canonical_ext = entry.ext();
     let provided_ext = image_id.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
@@ -676,11 +728,13 @@ async fn get_images_page(
     account: Account,
     flashes: Flashes,
 ) -> Result<Response, InternalError> {
+    let now = OffsetDateTime::now_utc();
     let files: Vec<ImageFile> = state
         .resolve_image_files()
         .await
         .iter()
         .filter(|e| e.uploader_id == Some(account.id))
+        .filter(|e| e.expires_at.map(|exp| exp > now).unwrap_or(true))
         .cloned()
         .collect();
 
@@ -690,6 +744,38 @@ async fn get_images_page(
         flashes,
     }
     .into_response())
+}
+
+/// Background reaper: deletes expired images hourly and invalidates the image
+/// caches when anything was removed. Expiry is also enforced at serve time, so
+/// this is the cleanup half — it keeps the database from accumulating dead
+/// rows rather than being the sole gate.
+pub fn spawn_expiry_reaper(state: AppState) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            ticker.tick().await;
+            let deleted = state
+                .database()
+                .call(|conn| {
+                    // datetime() normalises whatever timestamp format the
+                    // driver stored (RFC3339 with `T`/`Z`/offset, or the
+                    // SQLite `YYYY-MM-DD HH:MM:SS` form) so the comparison
+                    // doesn't depend on the exact serialisation.
+                    conn.execute(
+                        "DELETE FROM images WHERE expires_at IS NOT NULL \
+                         AND datetime(expires_at) <= datetime('now')",
+                        [],
+                    )
+                })
+                .await
+                .unwrap_or(0);
+            if deleted > 0 {
+                tracing::info!(count = deleted, "reaped expired images");
+                state.invalidate_image_caches().await;
+            }
+        }
+    });
 }
 
 pub fn routes() -> Router<AppState> {

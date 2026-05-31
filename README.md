@@ -9,7 +9,7 @@ management, security analytics, virus scanning, and an invite-only user system.
 ## Highlights
 
 - **Public site** — landing page, projects page, image gallery.
-- **Image host** — drag-and-drop upload, public direct links, per-user library.
+- **Image host** — drag-and-drop upload, public direct links, per-user library. Optional **expiring uploads** (pick a TTL — 1 hour … 30 days — and a background reaper deletes them, also enforced at serve time), **OpenGraph embeds** on the `/gallery/:id` landing page so links unfurl with the picture, and a downloadable **ShareX uploader config** (`/account/sharex.sxcu`) pre-filled with your API token for screenshot-to-gallery uploads.
 - **Admin shell at `/admin`** — sidebar layout with the following pages:
   - **Dashboard** — request analytics, popular routes, referring sites, API consumers.
   - **Invites** — invite-only signup. Admins generate one-time codes (with optional expiry + note), copy a `/signup?code=…` URL, share it with the invitee. No public registration.

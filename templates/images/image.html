@@ -3,8 +3,14 @@
 {% block css %}
 <link rel="stylesheet" href="/static/css/image.css" type="text/css">
 
-<meta property="og:url" content='{{ "/gallery/{{ entry.id }}.{{ entry.ext() }}"|canonical_url }}'>
-<meta property="og:title" content="{{ entry.id }}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="klappstuhl.me">
+<meta property="og:url" content="{{ page_url }}">
+<meta property="og:title" content="{{ entry.id }}.{{ entry.ext() }}">
+<meta property="og:image" content="{{ raw_url }}">
+<meta property="og:image:type" content="{{ entry.mimetype }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ raw_url }}">
 {% endblock %}
 
 {% block body %}

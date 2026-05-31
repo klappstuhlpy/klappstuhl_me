@@ -251,6 +251,11 @@ function modalAlertHook(modal) {
 }
 
 uploadInput?.addEventListener('change', () => {
+    // Carry the chosen TTL through as a query param so the shared upload
+    // handler picks it up (the form body is multipart and reserved for files).
+    const expiry = document.getElementById('upload-expiry');
+    const secs = expiry ? parseInt(expiry.value, 10) : 0;
+    uploadForm.action = secs > 0 ? `/images/bulk?expires_in=${secs}` : '/images/bulk';
     uploadForm.submit();
 });
 

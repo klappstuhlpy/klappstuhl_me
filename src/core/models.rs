@@ -29,6 +29,9 @@ pub struct ImageFile {
     /// The id of the uploader
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) uploader_id: Option<i64>,
+    /// Optional expiry timestamp (RFC3339). `None` = never expires.
+    #[serde(with = "time::serde::rfc3339::option", default, skip_serializing_if = "Option::is_none")]
+    pub(crate) expires_at: Option<OffsetDateTime>,
 }
 
 /// An entry that represents a saved image.
@@ -50,6 +53,9 @@ pub struct ImageEntry {
     /// The id of the uploader
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uploader_id: Option<i64>,
+    /// Optional expiry timestamp. `None` = never expires.
+    #[serde(with = "time::serde::rfc3339::option", default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<OffsetDateTime>,
 }
 
 impl ImageEntry {
@@ -62,7 +68,13 @@ impl ImageEntry {
             image_data: Default::default(),
             uploaded_at: OffsetDateTime::now_utc(),
             uploader_id: Default::default(),
+            expires_at: None,
         }
+    }
+
+    /// Whether this image's expiry has passed.
+    pub fn is_expired(&self) -> bool {
+        self.expires_at.map(|e| OffsetDateTime::now_utc() > e).unwrap_or(false)
     }
 
     /// Returns data safe for embedding into the frontend
@@ -98,6 +110,9 @@ impl Table for ImageEntry {
             image_data: row.get("image_data")?,
             uploaded_at: row.get("uploaded_at")?,
             uploader_id: row.get("uploader_id")?,
+            // Tolerant: queries that don't SELECT this column (e.g. the
+            // metadata-only cache load) yield None rather than erroring.
+            expires_at: row.get::<_, Option<OffsetDateTime>>("expires_at").unwrap_or(None),
         })
     }
 }

@@ -24,6 +24,7 @@ mod ssh;
 mod ws;
 
 pub use api::{copy_api_token, ApiToken};
+pub use image::spawn_expiry_reaper;
 
 #[derive(Template)]
 #[template(path = "index.html")]

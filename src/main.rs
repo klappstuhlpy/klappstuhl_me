@@ -150,6 +150,9 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // none do).
     klappstuhl_me::cron::spawn_scheduler(state.clone());
 
+    // Reap expired image uploads (TTL) hourly.
+    klappstuhl_me::routes::spawn_expiry_reaper(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()
@@ -371,9 +374,17 @@ fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
         // at user_version 12 without them.
         "ALTER TABLE account ADD COLUMN totp_secret TEXT",
         "ALTER TABLE account ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
+        // Optional per-image expiry (RFC3339 / SQLite timestamp). NULL = never
+        // expires. A background reaper deletes rows past this time.
+        "ALTER TABLE images ADD COLUMN expires_at TEXT",
     ] {
         let _ = connection.execute(ddl, []);
     }
+    // Index for the expiry reaper's `WHERE expires_at <= now` sweep.
+    let _ = connection.execute(
+        "CREATE INDEX IF NOT EXISTS images_expires_at_idx ON images (expires_at)",
+        [],
+    );
     // Index for the new ssh_key.target_user column. CREATE INDEX is
     // idempotent via IF NOT EXISTS, but it needs the column to exist
     // first — that's why this runs after the ALTER above rather than
