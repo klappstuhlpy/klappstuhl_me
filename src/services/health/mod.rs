@@ -188,15 +188,17 @@ fn fire_down_webhook(state: &AppState, target: &HealthTarget, outcome: &CheckOut
     if !state.has_any_alert_sink() {
         return;
     }
+    let dashboard_url = state.config().url_to("/admin/health");
     let payload = json!({
         "username": "klappstuhl health",
         "embeds": [{
             "title": format!("🔴 {} is {}", target.name, outcome.status_str()),
             "description": format!(
-                "**Target:** `{}`\n**Kind:** {}\n**Error:** {}\n\nCheck the [/admin/health](/admin/health) dashboard.",
+                "**Target:** `{}`\n**Kind:** {}\n**Error:** {}\n\nCheck the [/admin/health]({}) dashboard.",
                 target.target,
                 target.kind,
                 outcome.error.as_deref().unwrap_or("unknown"),
+                dashboard_url,
             ),
             "color": 0xef4444,
         }]

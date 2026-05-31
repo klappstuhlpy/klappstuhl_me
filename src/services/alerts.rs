@@ -110,6 +110,68 @@ impl AlertNotification {
     }
 }
 
+/// Turns `[label](target)` into plain text. When the label and target are
+/// identical (e.g. `[/admin/health](/admin/health)`) only the label is kept;
+/// otherwise the target is appended in parentheses so the destination survives.
+fn delink(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut rest = input;
+    while let Some(open) = rest.find('[') {
+        // Look for the `](` separating label from target, then the closing `)`.
+        if let Some(sep_rel) = rest[open..].find("](") {
+            let sep = open + sep_rel;
+            if let Some(close_rel) = rest[sep + 2..].find(')') {
+                let close = sep + 2 + close_rel;
+                let label = &rest[open + 1..sep];
+                let target = &rest[sep + 2..close];
+                out.push_str(&rest[..open]);
+                out.push_str(label);
+                if !target.is_empty() && target != label {
+                    out.push_str(" (");
+                    out.push_str(target);
+                    out.push(')');
+                }
+                rest = &rest[close + 1..];
+                continue;
+            }
+        }
+        // Not a well-formed link: emit through the `[` and keep scanning.
+        out.push_str(&rest[..=open]);
+        rest = &rest[open + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Strips the Discord-flavoured markdown that appears in alert payloads
+/// (`**bold**`, `__underline__`, `~~strike~~`, `` `code` ``, and `[label](url)`
+/// links) so plain-text sinks like ntfy don't render the literal markers.
+///
+/// Single `*` / `_` / `~` are left alone — Discord only uses them paired for
+/// emphasis here, and stripping lone ones would mangle identifiers such as
+/// `cpu_percent`.
+fn strip_markdown(input: &str) -> String {
+    let delinked = delink(input);
+    // All markers are ASCII, so a byte scan can't split a multi-byte char.
+    let b = delinked.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        let c = b[i];
+        if c == b'`' {
+            i += 1;
+            continue;
+        }
+        if (c == b'*' || c == b'_' || c == b'~') && i + 1 < b.len() && b[i + 1] == c {
+            i += 2;
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or(delinked)
+}
+
 /// POSTs the notification to an ntfy topic URL as a plain-text push.
 pub async fn send_ntfy(client: &reqwest::Client, url: &str, note: &AlertNotification) {
     let priority = match note.level.as_str() {
@@ -122,14 +184,16 @@ pub async fn send_ntfy(client: &reqwest::Client, url: &str, note: &AlertNotifica
         "success" => "white_check_mark",
         _ => "information_source",
     };
+    // ntfy renders plain text, so strip the Discord markdown from the body and
+    // title (the title header is also ASCII-folded for header-value safety).
     let body = if note.body.is_empty() {
-        note.title.clone()
+        strip_markdown(&note.title)
     } else {
-        note.body.clone()
+        strip_markdown(&note.body)
     };
     let _ = client
         .post(url)
-        .header("Title", note.ascii_title())
+        .header("Title", strip_markdown(&note.ascii_title()))
         .header("Priority", priority)
         .header("Tags", tags)
         .body(body)
@@ -177,5 +241,36 @@ mod tests {
         assert_eq!(note.title, "Alert");
         assert_eq!(note.level, "info");
         assert!(note.fields.is_empty());
+    }
+
+    #[test]
+    fn strips_discord_markdown_for_ntfy() {
+        let input = "**Target:** `web`\n**Kind:** http\n\nCheck the [/admin/health](/admin/health) dashboard.";
+        let out = strip_markdown(input);
+        assert_eq!(
+            out,
+            "Target: web\nKind: http\n\nCheck the /admin/health dashboard."
+        );
+    }
+
+    #[test]
+    fn delink_keeps_distinct_targets() {
+        assert_eq!(delink("see [the docs](https://x.test)"), "see the docs (https://x.test)");
+        // Identical label/target collapses to a single copy.
+        assert_eq!(delink("[/admin/health](/admin/health)"), "/admin/health");
+    }
+
+    #[test]
+    fn strip_leaves_single_markers_and_other_text() {
+        // Lone underscores in identifiers must survive.
+        assert_eq!(strip_markdown("cpu_percent over threshold"), "cpu_percent over threshold");
+        // Strikethrough + underline pairs are removed.
+        assert_eq!(strip_markdown("~~old~~ __new__"), "old new");
+    }
+
+    #[test]
+    fn strip_handles_multibyte_text() {
+        // Emoji / non-ASCII bytes must not be corrupted by the byte scan.
+        assert_eq!(strip_markdown("🔴 **web** is down"), "🔴 web is down");
     }
 }
