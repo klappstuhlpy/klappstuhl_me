@@ -102,7 +102,7 @@
                 <button class="button logs-btn" type="button">Logs</button>
                 <form method="post" action="/admin/docker/action" class="inline-form">
                     <input type="hidden" name="name" value="{{ service.name }}">
-                    <button type="submit" name="action" value="pull" class="button pull-btn" title="docker pull (or compose pull)">Pull</button>
+                    <button type="submit" name="action" value="pull" class="button pull-btn" id="card-button pull" title="docker pull (or compose pull)" disabled>Pull</button>
                 </form>
                 <form method="post" action="/admin/docker/action" class="inline-form recreate-form">
                     <input type="hidden" name="name" value="{{ service.name }}">

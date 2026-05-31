@@ -127,6 +127,10 @@ function updateCardFromView(card, view) {
     }
   }
 
+  // disable Pull button if no image is available
+  const img = card.querySelector("[data-role='image']");
+  document.getElementById("card-button pull").disabled = !img;
+
   // Live CPU / RAM (only Docker services with `docker stats` data)
   const cpuRow = card.querySelector("[data-role='cpu-row']");
   const memRow = card.querySelector("[data-role='mem-row']");
