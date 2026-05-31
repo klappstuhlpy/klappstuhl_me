@@ -134,6 +134,8 @@ A default `config.json` is written on first start. Full layout with all optional
   "proxy_reload_command": null,
   "backup_interval_hours": null,
   "backup_keep": null,
+  "backup_remote": null,
+  "update_check_interval_hours": null,
   "chromium_path": null,
   "ffmpeg_path": null
 }
@@ -165,6 +167,8 @@ A default `config.json` is written on first start. Full layout with all optional
 | `proxy_reload_command`   | string \| null    | Shell command run after config is regenerated, e.g. `"nginx -s reload"` or `"systemctl reload nginx"`. Skipped when unset.                                                                        |
 | `backup_interval_hours`  | u64 \| null       | Hours between automatic `VACUUM INTO` SQLite backups. `0` disables the scheduler; unset defaults to `24`. See below.                                                                              |
 | `backup_keep`            | usize \| null     | Number of automatic backups to retain (older ones pruned). Unset defaults to `14`.                                                                                                                |
+| `backup_remote`          | object \| null    | Off-site backup target. When set, each new backup is also uploaded to an S3-compatible store (B2 / R2 / AWS / MinIO). See [Off-site backups](#off-site-backups).                                  |
+| `update_check_interval_hours` | u64 \| null  | Hours between background container image-update checks. `0` disables. Unset defaults to `12`. See [Container image updates](#container-image-update-detection).                                    |
 | `chromium_path`          | string \| null    | Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF render endpoints. Unset = probe common names on `PATH`; if none found those endpoints return an error.                       |
 | `ffmpeg_path`            | string \| null    | Path to an `ffmpeg` binary for the video/HEIC transcode endpoint. Unset = use `ffmpeg` on `PATH`; if absent the endpoint returns an error.                                                        |
 
@@ -392,6 +396,60 @@ is serving requests.
 you download or delete individual files. **Restore is a manual, offline step:**
 stop the server and replace `main.db` with the downloaded file — swapping it
 under live WAL connections is unsafe, so the UI deliberately doesn't offer it.
+
+### Off-site backups
+
+Local backups share a disk with the live database, so a dead disk takes them
+with it. Set `backup_remote` to also mirror every new backup to an
+S3-compatible object store. Path-style addressing + AWS Signature V4 are used,
+which AWS S3, Backblaze B2, Cloudflare R2, MinIO, and Wasabi all accept — no
+extra binary or SDK:
+
+```json
+"backup_remote": {
+  "kind": "s3",
+  "endpoint": "https://s3.us-west-002.backblazeb2.com",
+  "region": "us-west-002",
+  "bucket": "my-backups",
+  "prefix": "klappstuhl/",
+  "access_key_id": "…",
+  "secret_access_key": "…"
+}
+```
+
+| Field               | Notes                                                                                                   |
+|---------------------|---------------------------------------------------------------------------------------------------------|
+| `kind`              | Storage backend. Currently only `"s3"`.                                                                 |
+| `endpoint`          | Base URL of the store. For AWS use `https://s3.<region>.amazonaws.com`; for B2/R2/MinIO use their host. |
+| `region`            | Signing region. AWS needs the real region; B2/R2/MinIO accept any value (defaults to `us-east-1`).      |
+| `bucket`            | Destination bucket.                                                                                      |
+| `prefix`            | (Optional) key prefix inside the bucket; a trailing slash is added automatically.                       |
+| `access_key_id`     | Access key id.                                                                                           |
+| `secret_access_key` | Secret access key.                                                                                       |
+
+Each scheduled and manual backup is uploaded in the background; an upload
+failure raises an alert through the configured sinks (Discord / ntfy / webhook)
+so a silently broken target doesn't go unnoticed. The `/admin/backups` page
+shows the configured target and adds a per-backup **Upload off-site** button
+(handy to validate credentials right after configuring). Uploads are audited as
+`backup.upload`.
+
+### Container image update detection
+
+For every entry in `config.services`, a background task asks the image's
+registry what digest it currently serves for the running tag (Docker Registry
+v2 API, with anonymous pull-token auth handled for Docker Hub / GHCR) and
+compares it against the digest the local image was pulled at. A mismatch means
+`docker pull` would fetch something newer. Results drive an **update available**
+badge on the `/admin/docker` service cards; a **Check updates** button there
+runs the check on demand. A freshly-discovered update (one that wasn't available
+on the previous run) fans out an alert. Set `update_check_interval_hours` to
+tune the cadence (default 12; `0` disables). The status is also exposed at
+`GET /api/admin/updates` for external dashboards — the first endpoint to require
+the `admin:read` token scope.
+
+Images built locally (no registry digest) and private registries that need
+credentials degrade gracefully to an `unknown` state rather than erroring.
 
 ### External render tools (Chromium / ffmpeg)
 

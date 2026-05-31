@@ -15,6 +15,14 @@
     <form method="post" action="/admin/backups">
         <button type="submit" class="button primary">Backup now</button>
     </form>
+    <p class="admin-page-sub" style="margin-top:.75rem">
+        {% match remote_label %}
+        {% when Some with (label) %}
+        Off-site: <strong style="color:var(--success-text,#10b981)">enabled</strong> · <code>{{ label }}</code> — new backups are uploaded automatically.
+        {% when None %}
+        Off-site: <strong style="color:var(--text-muted,#a1a1aa)">disabled</strong> — set <code>backup_remote</code> in <code>config.json</code> to mirror backups to an S3-compatible store (B2, R2, AWS, MinIO).
+        {% endmatch %}
+    </p>
 </section>
 
 <section class="admin-section">
@@ -40,6 +48,11 @@
                     <td>{{ b.modified }}</td>
                     <td class="col-actions">
                         <a class="button outline" href="/admin/backups/{{ b.name }}/download">Download</a>
+                        {% if remote_label.is_some() %}
+                        <form method="post" action="/admin/backups/{{ b.name }}/upload" style="display:inline">
+                            <button type="submit" class="button outline small">Upload off-site</button>
+                        </form>
+                        {% endif %}
                         <button class="button danger small" data-id="{{ b.name }}">Delete</button>
                     </td>
                 </tr>

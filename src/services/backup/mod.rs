@@ -19,6 +19,8 @@ use time::OffsetDateTime;
 
 use crate::AppState;
 
+pub mod s3;
+
 const PREFIX: &str = "backup-";
 const SUFFIX: &str = ".db";
 
@@ -158,6 +160,52 @@ pub fn keep_count(state: &AppState) -> usize {
     state.config().backup_keep.unwrap_or(DEFAULT_KEEP)
 }
 
+/// Uploads a backup file to the configured off-site object store. Returns
+/// `Ok(None)` when no remote is configured (a no-op, not an error), or
+/// `Ok(Some(key))` with the remote object key on success.
+pub async fn upload_to_remote(state: &AppState, path: &std::path::Path) -> anyhow::Result<Option<String>> {
+    let Some(remote) = state.config().backup_remote.clone() else {
+        return Ok(None);
+    };
+    let key = s3::upload_file(&state.client, &remote, path).await?;
+    Ok(Some(key))
+}
+
+/// Uploads a backup in the background, emitting an alert on failure so a
+/// silently broken off-site target doesn't go unnoticed. Used by the
+/// scheduler and the manual "backup now" action — the request/scheduler tick
+/// is never blocked on network I/O.
+pub fn spawn_remote_upload(state: AppState, path: PathBuf) {
+    if state.config().backup_remote.is_none() {
+        return;
+    }
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    tokio::spawn(async move {
+        match upload_to_remote(&state, &path).await {
+            Ok(Some(key)) => tracing::info!(key = %key, "backup uploaded off-site"),
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(error = %e, file = %name, "off-site backup upload failed");
+                state.send_alert(serde_json::json!({
+                    "username": "klappstuhl",
+                    "embeds": [{
+                        "title": "⚠️ Off-site backup failed",
+                        "description": "A SQLite backup could not be uploaded to the configured remote store.",
+                        "color": 0xef4444u32,
+                        "fields": [
+                            { "name": "File", "value": name, "inline": true },
+                            { "name": "Error", "value": e.to_string(), "inline": false },
+                        ]
+                    }]
+                }));
+            }
+        }
+    });
+}
+
 /// Background scheduler: takes a backup every `backup_interval_hours` and
 /// prunes to `backup_keep`. A value of 0 hours disables the scheduler. The
 /// first backup runs one interval after start-up (so frequent restarts don't
@@ -177,6 +225,7 @@ pub fn spawn_scheduler(state: AppState) {
             match create(&state).await {
                 Ok(path) => {
                     tracing::info!(path = %path.display(), "scheduled backup created");
+                    spawn_remote_upload(state.clone(), path);
                     prune(keep);
                 }
                 Err(e) => tracing::warn!(error = %e, "scheduled backup failed"),

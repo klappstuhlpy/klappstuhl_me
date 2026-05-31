@@ -56,6 +56,56 @@ pub struct SpotlightScript {
     pub cwd: Option<String>,
 }
 
+/// Off-site backup target. When set, every freshly created SQLite backup is
+/// also uploaded to an S3-compatible object store (AWS S3, Backblaze B2,
+/// Cloudflare R2, MinIO, …) so a dead local disk can't take the backups with
+/// it. Uses path-style addressing + AWS Signature V4, which all of the above
+/// accept — no extra binary required.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BackupRemoteConfig {
+    /// Storage backend. Currently only `"s3"` is supported.
+    #[serde(default = "default_remote_kind")]
+    pub kind: String,
+    /// Endpoint base URL, e.g. `"https://s3.us-west-002.backblazeb2.com"`,
+    /// `"https://<account>.r2.cloudflarestorage.com"`, or for AWS
+    /// `"https://s3.us-east-1.amazonaws.com"`.
+    pub endpoint: String,
+    /// Signing region. AWS needs the real region; B2/R2/MinIO accept any value
+    /// (defaults to `us-east-1`).
+    #[serde(default = "default_remote_region")]
+    pub region: String,
+    /// Destination bucket name.
+    pub bucket: String,
+    /// Optional key prefix inside the bucket (e.g. `"klappstuhl/"`). A trailing
+    /// slash is added automatically if missing and the prefix is non-empty.
+    #[serde(default)]
+    pub prefix: String,
+    /// Access key id.
+    pub access_key_id: String,
+    /// Secret access key.
+    pub secret_access_key: String,
+}
+
+fn default_remote_kind() -> String {
+    "s3".to_string()
+}
+
+fn default_remote_region() -> String {
+    "us-east-1".to_string()
+}
+
+impl BackupRemoteConfig {
+    /// The key prefix normalised to either empty or ending in a single `/`.
+    pub fn normalized_prefix(&self) -> String {
+        let p = self.prefix.trim_matches('/');
+        if p.is_empty() {
+            String::new()
+        } else {
+            format!("{p}/")
+        }
+    }
+}
+
 /// The server configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
@@ -190,6 +240,10 @@ pub struct Config {
     /// Defaults to 14 when unset.
     #[serde(default)]
     pub backup_keep: Option<usize>,
+    /// Off-site backup target. When set, each new SQLite backup is also
+    /// uploaded to an S3-compatible object store. Unset = local-only backups.
+    #[serde(default)]
+    pub backup_remote: Option<BackupRemoteConfig>,
     /// Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF
     /// render endpoints. When unset, common names on `PATH` are tried; if none
     /// is found those endpoints return 503.
@@ -231,6 +285,7 @@ impl Config {
             proxy_reload_command: None,
             backup_interval_hours: None,
             backup_keep: None,
+            backup_remote: None,
             chromium_path: None,
             ffmpeg_path: None,
             secret_key: SecretKey::random()?,

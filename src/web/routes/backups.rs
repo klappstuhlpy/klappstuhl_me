@@ -8,7 +8,7 @@
 //! Restore is deliberately not offered in-app (replacing the live DB under
 //! WAL is unsafe); download and swap `main.db` with the server stopped.
 
-use crate::{backup, headers::ClientIp, models::Account, AppState};
+use crate::{backup, flash::Flasher, headers::ClientIp, models::Account, AppState};
 use askama::Template;
 use axum::{
     extract::{Path, State},
@@ -26,6 +26,17 @@ struct AdminBackupsTemplate {
     backups: Vec<backup::BackupInfo>,
     total_size_human: String,
     keep: usize,
+    /// `Some("s3 → bucket/prefix")` when an off-site target is configured.
+    remote_label: Option<String>,
+}
+
+/// Builds the human-readable "s3 → bucket/prefix" label shown in the UI, or
+/// `None` when no off-site target is configured.
+fn remote_label(state: &AppState) -> Option<String> {
+    state.config().backup_remote.as_ref().map(|r| {
+        let prefix = r.normalized_prefix();
+        format!("{} → {}/{}", r.kind, r.bucket, prefix)
+    })
 }
 
 async fn page(State(state): State<AppState>, account: Account) -> Result<AdminBackupsTemplate, StatusCode> {
@@ -39,6 +50,7 @@ async fn page(State(state): State<AppState>, account: Account) -> Result<AdminBa
         active_page: "backups",
         total_size_human: backup::human_size(total),
         keep: backup::keep_count(&state),
+        remote_label: remote_label(&state),
         backups,
     })
 }
@@ -53,6 +65,9 @@ async fn create_now(State(state): State<AppState>, ClientIp(client_ip): ClientIp
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
+            // Push the fresh backup off-site in the background (no-op when
+            // unconfigured); the request is never blocked on network I/O.
+            backup::spawn_remote_upload(state.clone(), path);
             backup::prune(backup::keep_count(&state));
             state
                 .audit("backup.create")
@@ -64,6 +79,49 @@ async fn create_now(State(state): State<AppState>, ClientIp(client_ip): ClientIp
         Err(e) => tracing::warn!(error = %e, "manual backup failed"),
     }
     Redirect::to("/admin/backups").into_response()
+}
+
+/// Uploads one existing backup to the off-site store synchronously and flashes
+/// the result. Unlike the automatic background push, this gives the operator
+/// immediate feedback (useful to validate credentials after configuring).
+async fn upload_now(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    flasher: Flasher,
+    account: Account,
+    Path(name): Path<String>,
+) -> Response {
+    if !account.flags.is_admin() {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    if state.config().backup_remote.is_none() {
+        flasher.add(crate::flash::FlashMessage::warning("No off-site backup target is configured."));
+        return flasher.bail("/admin/backups");
+    }
+    let Some(path) = backup::resolve(&name) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    match backup::upload_to_remote(&state, &path).await {
+        Ok(Some(key)) => {
+            state
+                .audit("backup.upload")
+                .actor(&account)
+                .target(name)
+                .ip_opt(client_ip)
+                .fire();
+            flasher.add(crate::flash::FlashMessage::success(format!(
+                "Uploaded off-site as <code>{key}</code>."
+            )));
+        }
+        Ok(None) => {}
+        Err(e) => {
+            tracing::warn!(error = %e, file = %name, "manual off-site upload failed");
+            flasher.add(crate::flash::FlashMessage::error(format!(
+                "Off-site upload failed: {e}"
+            )));
+        }
+    }
+    flasher.bail("/admin/backups")
 }
 
 async fn download(account: Account, Path(name): Path<String>) -> Response {
@@ -115,5 +173,6 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/admin/backups", get(page).post(create_now))
         .route("/admin/backups/:name/download", get(download))
+        .route("/admin/backups/:name/upload", post(upload_now))
         .route("/admin/backups/:name/delete", post(delete_backup))
 }
