@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API | Klappstuhl_me</title>
+    <title>API | Klappstuhl.me</title>
     <link rel="manifest" href="/static/site.webmanifest">
     <meta name="theme-color" content="#c4a058">
     <meta property="og:site_name" content="Klappstuhl.me">
@@ -20,8 +20,11 @@
         isEditable: false,
         darkMode: true,
         authentication: {
-            apiKey: {
-                token: '{{ api_key }}'
+            preferredSecurityScheme: 'api_key',
+            securitySchemes: {
+                api_key: {
+                    value: '{{ api_key }}'
+                }
             }
         }
     }
