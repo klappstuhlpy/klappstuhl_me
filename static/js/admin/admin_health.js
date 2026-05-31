@@ -101,7 +101,7 @@ function renderTargets(rows) {
                 <button class="button outline" data-action="probe">Check now</button>
                 <button class="button outline" data-action="toggle">${r.enabled ? "Disable" : "Enable"}</button>
                 <button class="button outline" data-action="edit">Edit</button>
-                <button class="button outline" data-action="delete">Delete</button>
+                <button class="button danger small" data-action="delete">Delete</button>
             </div></td>
         </tr>`;
     }).join("");
