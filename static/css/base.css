@@ -726,7 +726,10 @@ button.close:focus { background-color: var(--close-button-bg-hover); }
     position: relative;
     display: flex;
     align-items: center;
-    border: 1px solid;
+    border: 1px solid var(--box-border);
+    border-radius: 0.625rem;
+    padding: 1rem 1.25rem;
+    margin: 1rem;
 }
 
 .alert > button.close { margin-left: auto; }
