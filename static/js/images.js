@@ -226,7 +226,7 @@ class BulkFilesOperations {
 }
 
 const fileExtension = (name) => name.slice((name.lastIndexOf('.') - 1 >>> 0) + 2);
-const allowedExtensions = ["apng", "png", "jpg", "jpeg", "gif", "avif"];
+const allowedExtensions = ["apng", "png", "jpg", "jpeg", "gif", "avif", "webp"];
 
 // Server-enforced per-file ceiling, mirrored client-side for a friendly error
 // before the bytes are sent. The server still streams + caps independently.

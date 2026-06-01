@@ -4,7 +4,7 @@ use crate::error::{ApiError, InternalError};
 use crate::filters::canonical_url;
 use crate::flash::{FlashMessage, Flasher, Flashes};
 use crate::headers::{ClientIp, Referrer};
-use crate::models::{Account, ImageEntry, ImageFile, ResolvedImageData};
+use crate::models::{Account, ImageEntry, ImageFile};
 use crate::ratelimit::RateLimit;
 use crate::utils::get_new_image_id;
 use crate::{database::is_unique_constraint_violation, filters, AppState};
@@ -18,8 +18,6 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     Json, Router,
 };
-use base64::engine::general_purpose;
-use base64::Engine;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
@@ -30,7 +28,7 @@ use utoipa::ToSchema;
 // Allowed MIME types
 // ---------------------------------------------------------------------------
 
-const ALLOWED_EXTENSIONS: &[&str] = &["apng", "png", "jpg", "jpeg", "gif", "avif"];
+const ALLOWED_EXTENSIONS: &[&str] = &["apng", "png", "jpg", "jpeg", "gif", "avif", "webp"];
 
 fn is_allowed_extension(ext: &str) -> bool {
     ALLOWED_EXTENSIONS.contains(&ext.to_ascii_lowercase().as_str())
@@ -632,13 +630,15 @@ async fn bulk_download_files(
 struct ImageTemplate {
     account: Option<Account>,
     entry: ImageEntry,
-    data: ResolvedImageData,
     flashes: Flashes,
     /// Absolute URL of this landing page (OpenGraph `og:url`).
     page_url: String,
     /// Absolute URL of the raw image bytes (OpenGraph `og:image`), so link
     /// unfurls in Discord/Slack/Twitter show the picture.
     raw_url: String,
+    /// Pixel dimensions, when they could be read from the header. `None` for
+    /// formats the decoder can't introspect (e.g. AVIF in this build).
+    dimensions: Option<(u32, u32)>,
 }
 
 async fn get_image_page(
@@ -669,23 +669,39 @@ async fn get_image_page(
         return Ok(Redirect::permanent(&format!("/gallery/{}.{}", id, canonical_ext)).into_response());
     }
 
-    let data = ResolvedImageData {
-        bytes: general_purpose::STANDARD.encode(&entry.image_data),
-        content_type: entry.mimetype.clone(),
-    };
-
     let page_url = canonical_url(format!("/gallery/{}.{}", id, canonical_ext)).unwrap_or_default();
     let raw_url = canonical_url(format!("/gallery/raw/{}.{}", id, canonical_ext)).unwrap_or_default();
+
+    // Read pixel dimensions from the header only (cheap — no full decode) so
+    // the info panel can show them. Best-effort: unsupported formats yield None.
+    let dimensions = image_dimensions(&entry.image_data).await;
 
     Ok(ImageTemplate {
         account,
         entry,
-        data,
         flashes,
         page_url,
         raw_url,
+        dimensions,
     }
     .into_response())
+}
+
+/// Reads an image's pixel dimensions from its header without decoding the full
+/// pixel buffer. Runs on the blocking pool since the `image` reader is sync.
+/// Returns `None` for anything the configured decoders can't introspect.
+async fn image_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
+    let bytes = bytes.to_vec();
+    tokio::task::spawn_blocking(move || {
+        image::ImageReader::new(std::io::Cursor::new(bytes))
+            .with_guessed_format()
+            .ok()?
+            .into_dimensions()
+            .ok()
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
 /// Serves raw image bytes with the correct `Content-Type`.

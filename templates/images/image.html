@@ -1,18 +1,59 @@
-<title>{{ entry.id }}.{{ entry.ext() }}</title>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ entry.download_name()|e }}</title>
 
-{% block css %}
 <link rel="stylesheet" href="/static/css/image.css" type="text/css">
 
+<meta name="theme-color" content="#000000">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="klappstuhl.me">
 <meta property="og:url" content="{{ page_url }}">
-<meta property="og:title" content="{{ entry.id }}.{{ entry.ext() }}">
+<meta property="og:title" content="{{ entry.download_name()|e }}">
 <meta property="og:image" content="{{ raw_url }}">
 <meta property="og:image:type" content="{{ entry.mimetype }}">
+{%- if let Some((w, h)) = dimensions %}
+<meta property="og:image:width" content="{{ w }}">
+<meta property="og:image:height" content="{{ h }}">
+{%- endif %}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="{{ raw_url }}">
-{% endblock %}
+</head>
+<body>
 
-{% block body %}
-<img src="data:{{ data.content_type }};base64,{{ data.bytes }}" alt="Image"/>
-{% endblock %}
+{%- for flash in flashes -%}
+{{ flash.html()|safe }}
+{%- endfor -%}
+
+<main class="viewer">
+    <a class="viewer-link" href="{{ raw_url }}">
+        <img src="{{ raw_url }}" alt="{{ entry.download_name()|e }}"/>
+    </a>
+</main>
+
+<aside class="info-bar">
+    <div class="info-meta">
+        <span class="info-name" title="{{ entry.download_name()|e }}">{{ entry.download_name()|e }}</span>
+        <span class="info-stats">
+            {%- if let Some((w, h)) = dimensions %}<span>{{ w }}&times;{{ h }}</span>{%- endif %}
+            <span>{{ entry.size|filesizeformat }}</span>
+            <span>{{ entry.uploaded_at|isoformat }}</span>
+        </span>
+    </div>
+    <div class="info-actions">
+        <button class="copy-btn" data-copy="{{ raw_url }}" title="Copy direct link">Link</button>
+        <button class="copy-btn" data-copy="![{{ entry.download_name()|e }}]({{ raw_url }})" title="Copy Markdown">Markdown</button>
+        <button class="copy-btn" data-copy="<img src=&quot;{{ raw_url }}&quot; alt=&quot;{{ entry.download_name()|e }}&quot;>" title="Copy HTML">HTML</button>
+        <button class="copy-btn" data-copy="[img]{{ raw_url }}[/img]" title="Copy BBCode">BBCode</button>
+        <a class="copy-btn download" href="{{ raw_url }}" download="{{ entry.download_name()|e }}" title="Download">Download</a>
+        {%- match account %}{%- when Some with (_account) %}
+        <a class="copy-btn" href="/images" title="Back to your images">Gallery</a>
+        {%- when None %}{%- endmatch %}
+    </div>
+</aside>
+
+<script src="/static/js/image_view.js"></script>
+</body>
+</html>

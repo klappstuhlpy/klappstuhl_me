@@ -1,14 +1,136 @@
+:root {
+    --bar-bg: rgba(20, 20, 22, 0.92);
+    --bar-border: #2a2a2e;
+    --btn-bg: #1f1f23;
+    --btn-bg-hover: #2d2d33;
+    --btn-border: #38383f;
+    --text: #e7e7ea;
+    --text-dim: #9b9ba3;
+    --accent: #4f9cf9;
+}
+
+* {
+    box-sizing: border-box;
+}
+
 body {
     background-color: #000;
+    color: var(--text);
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.viewer {
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100vh;
-    margin: 0;
+    min-height: 0;
+    padding: 1rem;
 }
 
-img {
+.viewer-link {
+    display: flex;
     max-width: 100%;
     max-height: 100%;
+}
+
+.viewer img {
+    max-width: 100%;
+    max-height: calc(100vh - 5rem);
     object-fit: contain;
+    background-image:
+        linear-gradient(45deg, #111 25%, transparent 25%),
+        linear-gradient(-45deg, #111 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #111 75%),
+        linear-gradient(-45deg, transparent 75%, #111 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+.info-bar {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    background: var(--bar-bg);
+    border-top: 1px solid var(--bar-border);
+    backdrop-filter: blur(8px);
+}
+
+.info-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.info-name {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 60vw;
+}
+
+.info-stats {
+    display: flex;
+    gap: 0.75rem;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+
+.info-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.copy-btn {
+    appearance: none;
+    border: 1px solid var(--btn-border);
+    background: var(--btn-bg);
+    color: var(--text);
+    padding: 0.4rem 0.7rem;
+    border-radius: 7px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    line-height: 1;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.copy-btn:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--accent);
+}
+
+.copy-btn.download {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.copy-btn.copied {
+    border-color: #3ecf8e;
+    color: #3ecf8e;
+}
+
+@media (max-width: 600px) {
+    .info-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .info-name {
+        max-width: 100%;
+    }
+    .info-actions {
+        justify-content: space-between;
+    }
 }
