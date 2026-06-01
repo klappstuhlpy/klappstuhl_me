@@ -304,7 +304,7 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 15] = [
+const MIGRATIONS: [&str; 13] = [
     include_str!("../sql/0.sql"),
     include_str!("../sql/1.sql"),
     include_str!("../sql/2.sql"),
@@ -318,8 +318,6 @@ const MIGRATIONS: [&str; 15] = [
     include_str!("../sql/10.sql"),
     include_str!("../sql/11.sql"),
     include_str!("../sql/12.sql"),
-    include_str!("../sql/13.sql"),
-    include_str!("../sql/14.sql"),
 ];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
@@ -348,59 +346,6 @@ fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
     }
 
     tx.commit()?;
-
-    // Idempotent column fix-ups for databases that landed at user_version=3
-    // *before* the temperature → disk-I/O refactor consolidated those
-    // columns into sql/3.sql.  Those installs have a metric_sample table
-    // without disk_read_bytes / disk_write_bytes / disk_read_ops /
-    // disk_write_ops, which makes the /admin/metrics/history query 500.
-    //
-    // SQLite has no ADD COLUMN IF NOT EXISTS, so we try-and-ignore:
-    // a "duplicate column name" error is the expected no-op outcome on
-    // schemas that already have the column.  Done outside the migration
-    // transaction so a failure here can never roll the version bump back.
-    for ddl in [
-        "ALTER TABLE metric_sample ADD COLUMN disk_read_bytes  INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE metric_sample ADD COLUMN disk_write_bytes INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE metric_sample ADD COLUMN disk_read_ops    INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE metric_sample ADD COLUMN disk_write_ops   INTEGER NOT NULL DEFAULT 0",
-        // API-token scopes: comma-separated list. Empty string means
-        // "legacy / unrestricted" so pre-existing API keys keep working.
-        "ALTER TABLE session ADD COLUMN scopes TEXT NOT NULL DEFAULT ''",
-        // SSH key per-row target host user — added to sql/6.sql after the
-        // table was first shipped, so databases that ran the original
-        // migration are missing it and any SELECT on /admin/ssh/data
-        // 500s with "no such column: target_user".
-        "ALTER TABLE ssh_key ADD COLUMN target_user TEXT",
-        // TOTP 2FA columns (sql/12.sql) — defensive in case a database landed
-        // at user_version 12 without them.
-        "ALTER TABLE account ADD COLUMN totp_secret TEXT",
-        "ALTER TABLE account ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
-        // Optional per-image expiry (RFC3339 / SQLite timestamp). NULL = never
-        // expires. A background reaper deletes rows past this time.
-        "ALTER TABLE images ADD COLUMN expires_at TEXT",
-        // Original uploaded filename (sql/13.sql) — defensive in case a database
-        // landed at user_version 13 without it.
-        "ALTER TABLE images ADD COLUMN original_name TEXT",
-        // Per-image view counter (sql/14.sql) — defensive in case a database
-        // landed at user_version 14 without it.
-        "ALTER TABLE images ADD COLUMN views INTEGER NOT NULL DEFAULT 0",
-    ] {
-        let _ = connection.execute(ddl, []);
-    }
-    // Index for the expiry reaper's `WHERE expires_at <= now` sweep.
-    let _ = connection.execute(
-        "CREATE INDEX IF NOT EXISTS images_expires_at_idx ON images (expires_at)",
-        [],
-    );
-    // Index for the new ssh_key.target_user column. CREATE INDEX is
-    // idempotent via IF NOT EXISTS, but it needs the column to exist
-    // first — that's why this runs after the ALTER above rather than
-    // alongside the schema-creation block in sql/6.sql.
-    let _ = connection.execute(
-        "CREATE INDEX IF NOT EXISTS ssh_key_target_user_idx ON ssh_key (target_user)",
-        [],
-    );
 
     Ok(())
 }

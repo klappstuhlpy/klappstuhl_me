@@ -8,12 +8,14 @@
 
 CREATE TABLE IF NOT EXISTS images
 (
-    id          TEXT    NOT NULL PRIMARY KEY,
-    image_data  BLOB    NOT NULL,
-    size        INTEGER GENERATED ALWAYS AS (length(image_data)) STORED,
-    mimetype    TEXT    NOT NULL,
-    uploaded_at TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    uploader_id INTEGER REFERENCES account (id) ON DELETE SET NULL
+    id            TEXT    NOT NULL PRIMARY KEY,
+    image_data    BLOB    NOT NULL,
+    size          INTEGER GENERATED ALWAYS AS (length(image_data)) STORED,
+    mimetype      TEXT    NOT NULL,
+    uploaded_at   TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    uploader_id   INTEGER REFERENCES account (id) ON DELETE SET NULL,
+    original_name TEXT,
+    views         INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS image_idx ON images (id);
@@ -24,14 +26,14 @@ CREATE INDEX IF NOT EXISTS image_idx ON images (id);
 -- Email is *not* stored anywhere
 CREATE TABLE IF NOT EXISTS account
 (
-    id          INTEGER PRIMARY KEY,
-    name        TEXT UNIQUE NOT NULL,
-    password    TEXT        NOT NULL,
-    created_at  TEXT        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    flags       INTEGER     NOT NULL DEFAULT 0,
-    invite_code TEXT        NOT NULL DEFAULT '_console',
-    totp_secret TEXT,
-    totp_enabled INTEGER    NOT NULL DEFAULT 0
+    id           INTEGER PRIMARY KEY,
+    name         TEXT UNIQUE NOT NULL,
+    password     TEXT        NOT NULL,
+    created_at   TEXT        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    flags        INTEGER     NOT NULL DEFAULT 0,
+    invite_code  TEXT        NOT NULL DEFAULT '_console',
+    totp_secret  TEXT,
+    totp_enabled INTEGER     NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS account_name_idx ON account (name);
