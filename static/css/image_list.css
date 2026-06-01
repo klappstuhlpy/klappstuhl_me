@@ -196,7 +196,8 @@ h1 {
 }
 
 .file-size,
-.file-uploaded {
+.file-uploaded,
+.file-views {
     font-size: 0.7rem;
     color: var(--text-muted);
 }
