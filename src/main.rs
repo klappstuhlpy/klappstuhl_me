@@ -304,7 +304,7 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 14] = [
+const MIGRATIONS: [&str; 15] = [
     include_str!("../sql/0.sql"),
     include_str!("../sql/1.sql"),
     include_str!("../sql/2.sql"),
@@ -319,6 +319,7 @@ const MIGRATIONS: [&str; 14] = [
     include_str!("../sql/11.sql"),
     include_str!("../sql/12.sql"),
     include_str!("../sql/13.sql"),
+    include_str!("../sql/14.sql"),
 ];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
@@ -381,6 +382,9 @@ fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
         // Original uploaded filename (sql/13.sql) — defensive in case a database
         // landed at user_version 13 without it.
         "ALTER TABLE images ADD COLUMN original_name TEXT",
+        // Per-image view counter (sql/14.sql) — defensive in case a database
+        // landed at user_version 14 without it.
+        "ALTER TABLE images ADD COLUMN views INTEGER NOT NULL DEFAULT 0",
     ] {
         let _ = connection.execute(ddl, []);
     }

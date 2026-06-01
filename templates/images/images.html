@@ -58,6 +58,7 @@
             <div class="card-info">
                 <span class="file-size">{{ file.size|filesizeformat }}</span>
                 <span class="file-uploaded">{{ file.uploaded_at|isoformat }}</span>
+                <span class="file-views">{{ file.views }} view{% if file.views != 1 %}s{% endif %}</span>
             </div>
         </div>
     </div>

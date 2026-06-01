@@ -580,7 +580,7 @@ impl AppState {
         let files: Vec<ImageEntry> = self
             .database()
             .all(
-                "SELECT id, size, X'' AS image_data, mimetype, uploader_id, uploaded_at, expires_at, original_name FROM images ORDER BY id ASC",
+                "SELECT id, size, X'' AS image_data, mimetype, uploader_id, uploaded_at, expires_at, original_name, views FROM images ORDER BY id ASC",
                 [],
             )
             .await
@@ -601,11 +601,31 @@ impl AppState {
                 uploader_id: entry.uploader_id,
                 expires_at: entry.expires_at,
                 original_name: entry.original_name,
+                views: entry.views,
             });
         }
 
         let _ = self.inner.cached_image_files.set(image_files).await;
         self.inner.cached_images.set(files).await
+    }
+
+    /// Atomically bumps an image's view counter and returns the new total.
+    ///
+    /// Best-effort: a database error yields `None` and the caller falls back to
+    /// the (possibly stale) cached count. The metadata cache is intentionally
+    /// *not* invalidated here — view counts are approximate and invalidating on
+    /// every view would reload every image from disk constantly. The gallery's
+    /// cached count catches up on the next natural invalidation.
+    pub async fn increment_image_views(&self, id: &str) -> Option<i64> {
+        let id = id.to_string();
+        self.database()
+            .get_row(
+                "UPDATE images SET views = views + 1 WHERE id = ? RETURNING views",
+                boxed_params![id],
+                |row| row.get::<_, i64>(0),
+            )
+            .await
+            .ok()
     }
 
     pub async fn resolve_image_data_for(&self, id: &str) -> Option<Vec<u8>> {

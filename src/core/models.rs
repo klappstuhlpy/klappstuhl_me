@@ -35,6 +35,9 @@ pub struct ImageFile {
     /// The uploader's original filename, if recorded. `None` for legacy rows.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) original_name: Option<String>,
+    /// Number of times the image's landing page has been viewed.
+    #[serde(default)]
+    pub(crate) views: i64,
 }
 
 impl ImageFile {
@@ -81,6 +84,9 @@ pub struct ImageEntry {
     /// The uploader's original filename, if recorded. `None` for legacy rows.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub original_name: Option<String>,
+    /// Number of times this image's landing page has been viewed.
+    #[serde(default)]
+    pub views: i64,
 }
 
 impl ImageEntry {
@@ -95,6 +101,7 @@ impl ImageEntry {
             uploader_id: Default::default(),
             expires_at: None,
             original_name: None,
+            views: 0,
         }
     }
 
@@ -158,6 +165,7 @@ impl Table for ImageEntry {
             // metadata-only cache load) yield None rather than erroring.
             expires_at: row.get::<_, Option<OffsetDateTime>>("expires_at").unwrap_or(None),
             original_name: row.get::<_, Option<String>>("original_name").unwrap_or(None),
+            views: row.get::<_, i64>("views").unwrap_or(0),
         })
     }
 }

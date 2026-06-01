@@ -639,6 +639,8 @@ struct ImageTemplate {
     /// Pixel dimensions, when they could be read from the header. `None` for
     /// formats the decoder can't introspect (e.g. AVIF in this build).
     dimensions: Option<(u32, u32)>,
+    /// View count including the current visit.
+    views: i64,
 }
 
 async fn get_image_page(
@@ -676,6 +678,9 @@ async fn get_image_page(
     // the info panel can show them. Best-effort: unsupported formats yield None.
     let dimensions = image_dimensions(&entry.image_data).await;
 
+    // Count this visit. Falls back to the cached value on a DB error.
+    let views = state.increment_image_views(&id).await.unwrap_or(entry.views + 1);
+
     Ok(ImageTemplate {
         account,
         entry,
@@ -683,6 +688,7 @@ async fn get_image_page(
         page_url,
         raw_url,
         dimensions,
+        views,
     }
     .into_response())
 }
