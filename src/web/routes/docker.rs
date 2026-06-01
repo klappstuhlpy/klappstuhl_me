@@ -168,11 +168,32 @@ async fn run_docker(args: &[&str], cwd: Option<&str>) -> (bool, String) {
             }
             (out.status.success(), text.trim_end().to_string())
         }
-        Err(e) => (
-            false,
-            format!("$ docker {}\nfailed to launch docker: {e}", args.join(" ")),
-        ),
+        Err(e) => {
+            // `os error 2` here usually means either the `docker` binary isn't
+            // on PATH or the working directory doesn't exist — name both so the
+            // message isn't misleading.
+            let where_ = match cwd {
+                Some(dir) => format!(" (cwd: {dir})"),
+                None => String::new(),
+            };
+            (
+                false,
+                format!("$ docker {}{where_}\nfailed to launch: {e}", args.join(" ")),
+            )
+        }
     }
+}
+
+/// True when `path` is a usable compose project directory — it exists and
+/// contains a compose file. When the app runs in a container without the
+/// host's compose directory mounted, this is false and callers fall back to
+/// bare-container commands over the Docker socket.
+fn compose_dir_usable(path: &str) -> bool {
+    let dir = std::path::Path::new(path);
+    dir.is_dir()
+        && ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"]
+            .iter()
+            .any(|f| dir.join(f).exists())
 }
 
 /// Perform one service action, returning `(success, captured_output)`.
@@ -180,20 +201,32 @@ async fn run_docker(args: &[&str], cwd: Option<&str>) -> (bool, String) {
 /// When the service has a compose `path` we drive `docker compose`; otherwise
 /// we operate on the bare container by `identifier`.
 async fn perform_action(path: Option<&str>, identifier: &str, action: &str) -> (bool, String) {
-    match action {
-        "start" => match path {
+    // Only drive `docker compose` when the project directory is actually
+    // reachable (it exists and has a compose file). Otherwise fall back to
+    // bare-container commands over the Docker socket — this is what happens
+    // when the app runs in a container without the host compose dir mounted.
+    let compose = path.filter(|p| compose_dir_usable(p));
+    let note = match (path, compose) {
+        (Some(p), None) => Some(format!(
+            "note: compose directory \"{p}\" isn't accessible here — using container commands instead\n"
+        )),
+        _ => None,
+    };
+
+    let (success, output) = match action {
+        "start" => match compose {
             Some(p) => run_docker(&["compose", "up", "-d"], Some(p)).await,
             None => run_docker(&["start", identifier], None).await,
         },
-        "stop" => match path {
+        "stop" => match compose {
             Some(p) => run_docker(&["compose", "down"], Some(p)).await,
             None => run_docker(&["stop", identifier], None).await,
         },
-        "restart" => match path {
+        "restart" => match compose {
             Some(p) => run_docker(&["compose", "restart"], Some(p)).await,
             None => run_docker(&["restart", identifier], None).await,
         },
-        "pull" => match path {
+        "pull" => match compose {
             Some(p) => run_docker(&["compose", "pull"], Some(p)).await,
             None => {
                 let (_, raw) = run_docker(&["inspect", "-f", "{{.Config.Image}}", identifier], None).await;
@@ -205,7 +238,7 @@ async fn perform_action(path: Option<&str>, identifier: &str, action: &str) -> (
                 }
             }
         },
-        "recreate" => match path {
+        "recreate" => match compose {
             Some(p) => run_docker(&["compose", "up", "-d", "--force-recreate"], Some(p)).await,
             None => {
                 // No compose file to recreate from — the best we can do for a
@@ -215,7 +248,12 @@ async fn perform_action(path: Option<&str>, identifier: &str, action: &str) -> (
                 (s1 && s2, format!("{o1}\n{o2}").trim().to_string())
             }
         },
-        other => (false, format!("unknown action: {other}")),
+        other => return (false, format!("unknown action: {other}")),
+    };
+
+    match note {
+        Some(note) => (success, format!("{note}{output}")),
+        None => (success, output),
     }
 }
 
