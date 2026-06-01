@@ -21,7 +21,7 @@ use axum::{
     http::StatusCode,
     response::{
         sse::{Event, KeepAlive, Sse},
-        IntoResponse, Json, Redirect, Response,
+        IntoResponse, Json, Response,
     },
     routing::{delete, get, post},
     Form, Router,
@@ -110,6 +110,115 @@ impl Drop for KillOnDrop {
     }
 }
 
+// ─── Docker action log ────────────────────────────────────────────────────────
+//
+// An in-memory ring buffer of the most recent service actions (start / stop /
+// restart / pull / recreate) together with the captured command output. This
+// is what powers the "Action Log" panel on the Docker admin page so the
+// operator can actually see what happened when they click a button — the old
+// flow inherited stdout to the server console and showed the user nothing.
+
+/// One recorded service action and its captured command output.
+#[derive(Clone, Serialize)]
+struct DockerActionLog {
+    #[serde(with = "time::serde::rfc3339")]
+    ts: OffsetDateTime,
+    service: String,
+    action: String,
+    success: bool,
+    actor: String,
+    output: String,
+}
+
+/// Maximum number of action-log entries kept in memory.
+const ACTION_LOG_CAP: usize = 200;
+
+/// Process-wide action-log ring buffer (newest entry at the front).
+fn action_log() -> &'static std::sync::Mutex<std::collections::VecDeque<DockerActionLog>> {
+    static LOG: std::sync::OnceLock<std::sync::Mutex<std::collections::VecDeque<DockerActionLog>>> =
+        std::sync::OnceLock::new();
+    LOG.get_or_init(|| std::sync::Mutex::new(std::collections::VecDeque::new()))
+}
+
+fn record_action(entry: DockerActionLog) {
+    if let Ok(mut log) = action_log().lock() {
+        log.push_front(entry);
+        log.truncate(ACTION_LOG_CAP);
+    }
+}
+
+/// Run `docker <args>` (optionally in `cwd`), capturing combined stdout+stderr.
+/// Returns `(success, trimmed_output)`. Docker writes pull/compose progress to
+/// stderr, so both streams are merged into the returned text.
+async fn run_docker(args: &[&str], cwd: Option<&str>) -> (bool, String) {
+    let mut cmd = tokio::process::Command::new("docker");
+    cmd.args(args);
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
+    match cmd.output().await {
+        Ok(out) => {
+            let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            if !stderr.trim().is_empty() {
+                if !text.is_empty() && !text.ends_with('\n') {
+                    text.push('\n');
+                }
+                text.push_str(&stderr);
+            }
+            (out.status.success(), text.trim_end().to_string())
+        }
+        Err(e) => (
+            false,
+            format!("$ docker {}\nfailed to launch docker: {e}", args.join(" ")),
+        ),
+    }
+}
+
+/// Perform one service action, returning `(success, captured_output)`.
+///
+/// When the service has a compose `path` we drive `docker compose`; otherwise
+/// we operate on the bare container by `identifier`.
+async fn perform_action(path: Option<&str>, identifier: &str, action: &str) -> (bool, String) {
+    match action {
+        "start" => match path {
+            Some(p) => run_docker(&["compose", "up", "-d"], Some(p)).await,
+            None => run_docker(&["start", identifier], None).await,
+        },
+        "stop" => match path {
+            Some(p) => run_docker(&["compose", "down"], Some(p)).await,
+            None => run_docker(&["stop", identifier], None).await,
+        },
+        "restart" => match path {
+            Some(p) => run_docker(&["compose", "restart"], Some(p)).await,
+            None => run_docker(&["restart", identifier], None).await,
+        },
+        "pull" => match path {
+            Some(p) => run_docker(&["compose", "pull"], Some(p)).await,
+            None => {
+                let (_, raw) = run_docker(&["inspect", "-f", "{{.Config.Image}}", identifier], None).await;
+                let image = raw.trim();
+                if image.is_empty() || image.starts_with("Error") {
+                    (false, "could not determine the image to pull".to_string())
+                } else {
+                    run_docker(&["pull", image], None).await
+                }
+            }
+        },
+        "recreate" => match path {
+            Some(p) => run_docker(&["compose", "up", "-d", "--force-recreate"], Some(p)).await,
+            None => {
+                // No compose file to recreate from — the best we can do for a
+                // bare container is stop + start it. Capture both steps.
+                let (s1, o1) = run_docker(&["stop", identifier], None).await;
+                let (s2, o2) = run_docker(&["start", identifier], None).await;
+                (s1 && s2, format!("{o1}\n{o2}").trim().to_string())
+            }
+        },
+        other => (false, format!("unknown action: {other}")),
+    }
+}
+
 // ─── Combined Docker page ─────────────────────────────────────────────────────
 
 #[derive(Template)]
@@ -170,89 +279,80 @@ async fn service_action(
     ClientIp(client_ip): ClientIp,
     account: Account,
     Form(data): Form<ServiceAction>,
-) -> Result<Redirect, StatusCode> {
+) -> Response {
     if !account.flags.is_admin() {
-        return Err(StatusCode::FORBIDDEN);
+        return StatusCode::FORBIDDEN.into_response();
     }
 
-    let cfg = state.config().services.iter().find(|s| s.name == data.name).cloned();
+    let Some(cfg) = state.config().services.iter().find(|s| s.name == data.name).cloned() else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "unknown service" })),
+        )
+            .into_response();
+    };
 
-    if cfg.is_some() {
-        state
-            .audit("service.action")
-            .actor(&account)
-            .target(data.name.clone())
-            .ip_opt(client_ip)
-            .meta(serde_json::json!({ "action": data.action }))
-            .fire();
+    if !matches!(data.action.as_str(), "start" | "stop" | "restart" | "pull" | "recreate") {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "unknown action" })),
+        )
+            .into_response();
     }
 
-    if let Some(cfg) = cfg {
-        match data.action.as_str() {
-            "start" => {
-                if let Some(ref path) = cfg.path {
-                    let _ = Command::new("docker")
-                        .args(["compose", "up", "-d"])
-                        .current_dir(path)
-                        .status();
-                } else {
-                    let _ = Command::new("docker").args(["start", &cfg.identifier]).status();
-                }
-            }
-            "stop" => {
-                if let Some(ref path) = cfg.path {
-                    let _ = Command::new("docker")
-                        .args(["compose", "down"])
-                        .current_dir(path)
-                        .status();
-                } else {
-                    let _ = Command::new("docker").args(["stop", &cfg.identifier]).status();
-                }
-            }
-            "restart" => {
-                if let Some(ref path) = cfg.path {
-                    let _ = Command::new("docker")
-                        .args(["compose", "restart"])
-                        .current_dir(path)
-                        .status();
-                } else {
-                    let _ = Command::new("docker").args(["restart", &cfg.identifier]).status();
-                }
-            }
-            "pull" => {
-                if let Some(ref path) = cfg.path {
-                    let _ = Command::new("docker")
-                        .args(["compose", "pull"])
-                        .current_dir(path)
-                        .status();
-                } else {
-                    let image_out = Command::new("docker")
-                        .args(["inspect", "-f", "{{.Config.Image}}", &cfg.identifier])
-                        .output();
-                    if let Ok(out) = image_out {
-                        let image = String::from_utf8_lossy(&out.stdout).trim().to_owned();
-                        if !image.is_empty() && !image.starts_with("Error") {
-                            let _ = Command::new("docker").args(["pull", &image]).status();
-                        }
-                    }
-                }
-            }
-            "recreate" => {
-                if let Some(ref path) = cfg.path {
-                    let _ = Command::new("docker")
-                        .args(["compose", "up", "-d", "--force-recreate"])
-                        .current_dir(path)
-                        .status();
-                } else {
-                    let _ = Command::new("docker").args(["stop", &cfg.identifier]).status();
-                    let _ = Command::new("docker").args(["start", &cfg.identifier]).status();
-                }
-            }
-            _ => {}
-        }
+    state
+        .audit("service.action")
+        .actor(&account)
+        .target(data.name.clone())
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({ "action": data.action }))
+        .fire();
+
+    let (success, output) = perform_action(cfg.path.as_deref(), &cfg.identifier, &data.action).await;
+
+    // State changed — drop the cached container/network/volume lists so the
+    // graph and live data reflect the new reality immediately.
+    if let Some(docker) = state.docker() {
+        docker.invalidate().await;
     }
 
-    Ok(Redirect::to("/admin/docker"))
+    record_action(DockerActionLog {
+        ts: OffsetDateTime::now_utc(),
+        service: cfg.name.clone(),
+        action: data.action.clone(),
+        success,
+        actor: account.name.clone(),
+        output: output.clone(),
+    });
+
+    let status = if success {
+        StatusCode::OK
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    };
+    (
+        status,
+        Json(serde_json::json!({
+            "ok": success,
+            "service": cfg.name,
+            "action": data.action,
+            "output": output,
+        })),
+    )
+        .into_response()
+}
+
+// ─── Action log data (JSON) ───────────────────────────────────────────────────
+
+async fn action_log_data(account: Account) -> Response {
+    if !account.flags.is_admin() {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let entries: Vec<DockerActionLog> = action_log()
+        .lock()
+        .map(|g| g.iter().cloned().collect())
+        .unwrap_or_default();
+    Json(serde_json::json!({ "actions": entries })).into_response()
 }
 
 // ─── Live service data (JSON) ─────────────────────────────────────────────────
@@ -764,6 +864,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/admin/docker", get(docker_page))
         .route("/admin/docker/action", post(service_action))
+        .route("/admin/docker/actions/log", get(action_log_data))
         .route("/admin/docker/services/data", get(services_data))
         .route("/admin/docker/updates/check", post(check_updates_now))
         .route("/admin/docker/logs/:name", get(container_logs_sse))

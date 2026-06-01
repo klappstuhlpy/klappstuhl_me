@@ -10,19 +10,147 @@ function syncCardButtons(card) {
   if (startBtn)   startBtn.disabled   = isRunning;
   if (restartBtn) restartBtn.disabled = !isRunning;
   if (stopBtn)    stopBtn.disabled    = !isRunning;
-  // Pull works whether the service is running or not (compose pull
-  // doesn't require the container to be up). Recreate only makes sense
-  // when there's a target to replace, so disable when offline AND no
-  // compose path (the template only renders Recreate for Docker so we
-  // can leave it enabled — recreate will start a stopped container too
-  // via "docker compose up -d --force-recreate").
+  // Pull and Recreate are always available: `docker compose pull` / `up`
+  // work whether the container is up or not, and for a bare container the
+  // backend reports a clear, logged error if it can't resolve the image.
   if (pullBtn) pullBtn.disabled = false;
   if (recreateBtn) recreateBtn.disabled = false;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".service-card").forEach(syncCardButtons);
+  wireActionForms();
+  loadActionLog();
 });
+
+/* ── Docker action log ───────────────────────────────────────── */
+
+const actionLogBody  = document.getElementById("action-log-body");
+const actionLogEmpty = document.getElementById("action-log-empty");
+const actionLogBusy  = document.getElementById("action-log-busy");
+const actionLogRefresh = document.getElementById("action-log-refresh");
+
+function fmtActionTime(iso) {
+  try {
+    return new Date(iso).toLocaleString([], {
+      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit",
+    });
+  } catch (_) {
+    return "";
+  }
+}
+
+function buildActionRow(entry) {
+  const row = document.createElement("div");
+  row.className = "action-row " + (entry.success ? "ok" : "fail");
+
+  const head = document.createElement("div");
+  head.className = "action-row-head";
+  head.innerHTML =
+    `<span class="action-badge ${entry.success ? "ok" : "fail"}">${escHtml(entry.action)}</span>` +
+    `<span class="action-service">${escHtml(entry.service)}</span>` +
+    (entry.actor ? `<span class="action-actor">${escHtml(entry.actor)}</span>` : "") +
+    `<span class="action-time">${escHtml(fmtActionTime(entry.ts))}</span>`;
+  row.appendChild(head);
+
+  const out = (entry.output || "").trim();
+  if (out) {
+    const pre = document.createElement("pre");
+    pre.className = "action-output";
+    pre.textContent = out;
+    row.appendChild(pre);
+  }
+  return row;
+}
+
+async function loadActionLog() {
+  if (!actionLogBody) return;
+  try {
+    const res = await fetch("/admin/docker/actions/log");
+    if (!res.ok) return;
+    const data = await res.json();
+    const entries = Array.isArray(data.actions) ? data.actions : [];
+    actionLogBody.querySelectorAll(".action-row").forEach(n => n.remove());
+    if (entries.length === 0) {
+      if (actionLogEmpty) actionLogEmpty.hidden = false;
+      return;
+    }
+    if (actionLogEmpty) actionLogEmpty.hidden = true;
+    // Server returns newest-first; append in order so newest stays on top.
+    for (const entry of entries) actionLogBody.appendChild(buildActionRow(entry));
+  } catch (e) {
+    console.error("action log load failed", e);
+  }
+}
+
+actionLogRefresh?.addEventListener("click", loadActionLog);
+
+/* ── Service action buttons (start/stop/restart/pull/recreate) ── */
+
+function wireActionForms() {
+  document
+    .querySelectorAll(".service-card form[action='/admin/docker/action']")
+    .forEach(form => form.addEventListener("submit", onActionSubmit));
+}
+
+async function onActionSubmit(e) {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const card = form.closest(".service-card");
+  const submitter = e.submitter || form.querySelector("button[type='submit']");
+  const action = submitter ? submitter.value : "";
+  const nameInput = form.querySelector("input[name='name']");
+  const name = nameInput ? nameInput.value : (card ? card.dataset.name : "");
+  if (!action || !name) return;
+
+  // Busy state: lock every button on the card and show a spinner label.
+  const buttons = card ? Array.from(card.querySelectorAll("button")) : [];
+  buttons.forEach(b => { b.dataset.prevDisabled = b.disabled ? "1" : "0"; b.disabled = true; });
+  const originalText = submitter ? submitter.textContent : "";
+  if (submitter) submitter.textContent = "Working…";
+  if (actionLogBusy) actionLogBusy.hidden = false;
+
+  const body = new URLSearchParams({ name, action });
+
+  try {
+    const res = await fetch("/admin/docker/action", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    // Optimistically show the result immediately; loadActionLog() below
+    // reconciles with the authoritative server-side log.
+    if (actionLogBody) {
+      if (actionLogEmpty) actionLogEmpty.hidden = true;
+      actionLogBody.prepend(buildActionRow({
+        ts: new Date().toISOString(),
+        service: data.service || name,
+        action: data.action || action,
+        success: data.ok === true,
+        actor: "you",
+        output: data.output || (res.ok ? "" : `request failed (HTTP ${res.status})`),
+      }));
+    }
+  } catch (err) {
+    console.error("docker action failed", err);
+    if (actionLogBody) {
+      actionLogBody.prepend(buildActionRow({
+        ts: new Date().toISOString(),
+        service: name, action, success: false, actor: "you",
+        output: "network error — could not reach the server",
+      }));
+    }
+  } finally {
+    if (submitter) submitter.textContent = originalText;
+    if (actionLogBusy) actionLogBusy.hidden = true;
+    // refreshServices() re-syncs running state and re-enables buttons via
+    // syncCardButtons; then reconcile the action log with the server.
+    await refreshServices();
+    await loadActionLog();
+  }
+}
 
 /* ── Filter (search) ─────────────────────────────────────────── */
 
@@ -127,9 +255,8 @@ function updateCardFromView(card, view) {
     }
   }
 
-  // disable Pull button if no image is available
-  const img = card.querySelector("[data-role='image']");
-  document.getElementById("card-button pull").disabled = !img;
+  // (Pull-button enable/disable is handled in syncCardButtons below, which
+  // checks for a known image on this specific card.)
 
   // Live CPU / RAM (only Docker services with `docker stats` data)
   const cpuRow = card.querySelector("[data-role='cpu-row']");

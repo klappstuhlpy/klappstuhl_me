@@ -102,7 +102,7 @@
                 <button class="button logs-btn" type="button">Logs</button>
                 <form method="post" action="/admin/docker/action" class="inline-form">
                     <input type="hidden" name="name" value="{{ service.name }}">
-                    <button type="submit" name="action" value="pull" class="button pull-btn" id="card-button pull" title="docker pull (or compose pull)" disabled>Pull</button>
+                    <button type="submit" name="action" value="pull" class="button pull-btn" title="docker pull (or compose pull)">Pull</button>
                 </form>
                 <form method="post" action="/admin/docker/action" class="inline-form recreate-form">
                     <input type="hidden" name="name" value="{{ service.name }}">
@@ -115,6 +115,18 @@
 </div>
 <div class="services-empty" id="services-empty" hidden>No services match the filter.</div>
 {% endif %}
+
+{# ── Docker action log ────────────────────────────────────────────────────── #}
+<div class="docker-action-log" id="docker-action-log">
+    <div class="event-log-header">
+        <span class="event-log-title">Action Log</span>
+        <span class="event-log-status" id="action-log-busy" hidden>working…</span>
+        <button class="button outline small" id="action-log-refresh" type="button" title="Reload the action log">Refresh</button>
+    </div>
+    <div class="action-log-body" id="action-log-body">
+        <div class="event-log-empty" id="action-log-empty">No actions yet. Start, stop, pull or recreate a service to see output here.</div>
+    </div>
+</div>
 
 {# ── Dependency graph section ─────────────────────────────────────────────── #}
 <div class="docker-graph-section">

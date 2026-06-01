@@ -335,6 +335,91 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* ── Docker action log ──────────────────────────────────────────── */
+
+.docker-action-log {
+    margin-top: 0.75rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: var(--box);
+}
+
+.action-log-body {
+    max-height: 24rem;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+}
+
+.action-row {
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--box-border);
+}
+
+.action-row:last-child { border-bottom: none; }
+
+.action-row-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.action-badge {
+    flex-shrink: 0;
+    display: inline-block;
+    padding: 0.05rem 0.45rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-radius: 0.2rem;
+    border: 1px solid var(--box-border);
+    color: var(--text-muted);
+    min-width: 4.25rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.action-badge.ok   { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
+.action-badge.fail { color: var(--error-text);   border-color: var(--error-border);   background: var(--error-bg); }
+
+.action-service {
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.action-actor { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+
+.action-time {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.action-output {
+    margin: 0.45rem 0 0;
+    padding: 0.5rem 0.6rem;
+    background: #09090b;
+    color: #d4d4d4;
+    border-radius: 0.35rem;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 14rem;
+    overflow-y: auto;
+}
+
+.action-row.fail .action-output { color: #fca5a5; }
+
 /* ── Unavailable state — .docker-unavailable* live in admin.css ──── */
 
 /* ── Services grid ──────────────────────────────────────────────── */
