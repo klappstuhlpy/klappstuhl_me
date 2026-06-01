@@ -12,7 +12,7 @@ pub mod web;
 pub use auth::{key, token, totp};
 pub use core::{cli, config, database, error, filters, logging, models, state, utils};
 pub use integrations::{cf_tunnel, cloudflare, discord, exttools, geoip};
-pub use media::{codeimage, metadata, scan};
+pub use media::{codeimage, metadata, scan, thumbnail};
 pub use services::{
     alerts, audit, backup, cron, dbadmin, docker, firewall, health, metrics, proxy, secrets, ssh, updates,
 };

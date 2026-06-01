@@ -66,6 +66,14 @@ impl SessionInfo {
     }
 }
 
+/// A cached, downscaled gallery thumbnail. `bytes` is reference-counted so the
+/// cache and every in-flight response share one allocation.
+#[derive(Clone)]
+pub struct Thumbnail {
+    pub bytes: Arc<Vec<u8>>,
+    pub content_type: &'static str,
+}
+
 struct InnerState {
     config: Config,
     database: Database,
@@ -77,6 +85,10 @@ struct InnerState {
     /// callers asked to share via a short link. Capacity-bounded rather than
     /// TTL'd — old entries are evicted as new ones arrive.
     processed_media: Cache<String, ProcessedMedia>,
+    /// Bounded LRU of generated gallery thumbnails, keyed by image id. Image
+    /// bytes are immutable per id (ids are random and never reused), so entries
+    /// never go stale; they're simply evicted under capacity pressure.
+    thumbnails: Cache<String, Thumbnail>,
     geoip: GeoIp,
     cloudflare: Option<Cloudflare>,
     /// Broadcast hub for live updates pushed to /ws subscribers. Each
@@ -212,6 +224,7 @@ impl AppState {
                 cached_users: Cache::new(1000),
                 valid_sessions: Cache::new(1000),
                 processed_media: Cache::new(512),
+                thumbnails: Cache::new(1024),
                 geoip,
                 cloudflare,
                 live_tx,
@@ -626,6 +639,29 @@ impl AppState {
             )
             .await
             .ok()
+    }
+
+    /// Returns a cached thumbnail for `id`, generating it from `bytes` on a
+    /// cache miss. Returns `None` when the bytes can't be decoded (e.g. AVIF),
+    /// signalling the caller to fall back to the original image.
+    ///
+    /// Generation (decode + resize + encode) runs on the blocking pool so it
+    /// never stalls the async runtime.
+    pub async fn thumbnail_for(&self, id: &str, bytes: &[u8]) -> Option<Thumbnail> {
+        if let Some(thumb) = self.inner.thumbnails.get(id) {
+            return Some(thumb);
+        }
+        let owned = bytes.to_vec();
+        let (data, content_type) = tokio::task::spawn_blocking(move || crate::thumbnail::generate(&owned))
+            .await
+            .ok()
+            .flatten()?;
+        let thumb = Thumbnail {
+            bytes: Arc::new(data),
+            content_type,
+        };
+        self.inner.thumbnails.insert(id.to_string(), thumb.clone());
+        Some(thumb)
     }
 
     pub async fn resolve_image_data_for(&self, id: &str) -> Option<Vec<u8>> {

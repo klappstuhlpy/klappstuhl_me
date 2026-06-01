@@ -780,6 +780,46 @@ fn inline_disposition(name: &str) -> String {
     format!("inline; filename=\"{ascii}\"; filename*=UTF-8''{encoded}")
 }
 
+/// Serves a downscaled thumbnail for the gallery grid.
+///
+/// Generates (and caches) a small JPEG/PNG so the grid doesn't download every
+/// full-resolution original. Falls back to the raw bytes for inputs the
+/// decoder can't handle (e.g. AVIF). Public, like the raw endpoint.
+async fn get_image_thumb(State(state): State<AppState>, Path(image_id): Path<String>) -> Result<Response, StatusCode> {
+    let id = image_id.split('.').next().unwrap_or(&image_id).to_string();
+
+    let Some(entry) = state.get_image(id.clone()).await else {
+        return Err(StatusCode::NOT_FOUND);
+    };
+    if entry.is_expired() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Cache thumbnails aggressively in the browser: a given id's bytes never
+    // change (ids are random and never reused).
+    let cache_control = "public, max-age=604800, immutable";
+
+    match state.thumbnail_for(&id, &entry.image_data).await {
+        Some(thumb) => Ok((
+            [
+                (header::CONTENT_TYPE, thumb.content_type.to_string()),
+                (header::CACHE_CONTROL, cache_control.to_string()),
+            ],
+            (*thumb.bytes).clone(),
+        )
+            .into_response()),
+        // Undecodable format — serve the original so the tile still renders.
+        None => Ok((
+            [
+                (header::CONTENT_TYPE, entry.mimetype.clone()),
+                (header::CACHE_CONTROL, cache_control.to_string()),
+            ],
+            entry.image_data,
+        )
+            .into_response()),
+    }
+}
+
 #[derive(Template)]
 #[template(path = "images/images.html")]
 struct ImagesTemplate {
@@ -848,6 +888,7 @@ pub fn routes() -> Router<AppState> {
         .route("/images", get(get_images_page))
         .route("/gallery/:id", get(get_image_page))
         .route("/gallery/raw/:id", get(get_image_raw))
+        .route("/gallery/thumb/:id", get(get_image_thumb))
         .route("/images/bulk", delete(bulk_delete_files))
         .route("/images/bulk/download", post(bulk_download_files))
         .route("/images/bulk", post(upload_file).layer(RateLimit::default().build()))

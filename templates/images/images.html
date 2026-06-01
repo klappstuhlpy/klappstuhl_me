@@ -51,7 +51,7 @@
             <input type="checkbox" autocomplete="off">
         </label>
         <a href="{{ file.url }}" class="card-thumb-link">
-            <img class="card-thumb" src="/gallery/raw/{{ file.id }}" loading="lazy" alt="{{ file.download_name()|e }}">
+            <img class="card-thumb" src="/gallery/thumb/{{ file.id }}" loading="lazy" alt="{{ file.download_name()|e }}">
         </a>
         <div class="card-meta">
             <a href="{{ file.url }}" class="file-name card-name" title="{{ file.download_name()|e }}">{{ file.id|e }}</a>

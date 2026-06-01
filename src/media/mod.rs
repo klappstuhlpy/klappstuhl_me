@@ -4,3 +4,4 @@
 pub mod codeimage;
 pub mod metadata;
 pub mod scan;
+pub mod thumbnail;
