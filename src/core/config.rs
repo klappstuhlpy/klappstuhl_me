@@ -418,16 +418,22 @@ impl Config {
     }
 
     pub fn canonical_url(&self) -> String {
-        let scheme = if self.server.port == 443 { "https://" } else { "http://" };
         let domain = self.domains.first().map(|x| x.as_str()).unwrap_or("localhost");
-        let mut url = String::with_capacity(8 + domain.len());
-        url.push_str(scheme);
-        url.push_str(domain);
-        if domain == "localhost" {
-            url.push(':');
-            url.push_str(&self.server.port.to_string());
+
+        // A real deployment is served over HTTPS by the reverse proxy /
+        // Cloudflare in front of us, which terminates TLS and forwards to our
+        // (usually non-443) listen port. The public URL must therefore be
+        // https:// regardless of the local port — deriving the scheme from
+        // `server.port` produced http:// links behind a proxy, which made
+        // clients like ShareX hit an http→https redirect that downgrades the
+        // POST to a GET (405 Method Not Allowed).
+        //
+        // Local/dev (non-production, or the localhost fallback) keeps plain
+        // HTTP on the actual listen port.
+        if !self.production || domain == "localhost" {
+            return format!("http://{domain}:{}", self.server.port);
         }
-        url
+        format!("https://{domain}")
     }
 
     pub fn url_to(&self, url: impl Into<std::borrow::Cow<'static, str>>) -> String {
