@@ -286,12 +286,6 @@ pub async fn raw_upload_file(
 
     state.invalidate_image_caches().await;
 
-    let title = if api {
-        format!("[API] Image Upload: {} files", total)
-    } else {
-        format!("Image Upload: {} files", total)
-    };
-
     // Audit log so /admin/audit shows who uploaded what, from where, and
     // how it went. Image IDs go in meta (target stays human-readable as a
     // count); for the common case of one upload the ID is enough to
@@ -512,7 +506,6 @@ async fn bulk_delete_files(
     let mut success = 0usize;
     let mut failed = 0usize;
     let total = payload.files.len();
-    let description = crate::utils::join_iter("\n", payload.files.iter().map(|x| format!("- {x}")).take(25));
     let files_audit: Vec<String> = payload.files.clone(); // for audit meta
 
     for file in payload.files {
