@@ -154,16 +154,27 @@
             },
         }));
 
-        const edges = (graph.edges || []).map(e => ({
-            group: 'edges',
-            data: {
-                id: `${e.source}→${e.target}→${e.type}`,
-                source: e.source,
-                target: e.target,
-                type: e.type,
-                label: e.label || '',
-            },
-        }));
+        // Only keep edges whose endpoints actually exist as nodes. A single
+        // edge referencing a missing node makes cytoscape throw inside cy.add,
+        // which aborts the whole batch — leaving every node disconnected and
+        // the cose layout packing them into a useless line.
+        const nodeIds = new Set(nodes.map(n => n.data.id));
+        const edges = (graph.edges || [])
+            .filter(e => {
+                const ok = nodeIds.has(e.source) && nodeIds.has(e.target);
+                if (!ok) console.warn('docker graph: dropping dangling edge', e);
+                return ok;
+            })
+            .map(e => ({
+                group: 'edges',
+                data: {
+                    id: `${e.source}→${e.target}→${e.type}`,
+                    source: e.source,
+                    target: e.target,
+                    type: e.type,
+                    label: e.label || '',
+                },
+            }));
 
         cy.add([...nodes, ...edges]);
         applyFilter(activeFilter);
@@ -183,16 +194,23 @@
     }
 
     function runLayout() {
+        if (cy.elements().length === 0) return;
+        // Make sure the renderer has picked up the container's real size before
+        // laying out — a 0-height viewport collapses cose into a flat line.
+        cy.resize();
         const layout = cy.layout({
             name: 'cose',
             animate: true,
             animationDuration: 400,
+            randomize: true,
+            componentSpacing: 80,
             nodeRepulsion: () => 8000,
             idealEdgeLength: () => 80,
             edgeElasticity: () => 100,
             gravity: 0.25,
             numIter: 1000,
             padding: 40,
+            fit: true,
         });
         layout.run();
     }
@@ -384,12 +402,16 @@
             }
         }
 
-        // Add new edges
+        // Add new edges — skip any whose endpoints aren't present, otherwise
+        // cytoscape throws and the refresh aborts.
         for (const [eid, e] of newEdges) {
-            if (!cy.getElementById(eid).length) {
-                cy.add({ group: 'edges', data: { id: eid, source: e.source, target: e.target, type: e.type, label: e.label || '' } });
-                structureChanged = true;
+            if (cy.getElementById(eid).length) continue;
+            if (!cy.getElementById(e.source).length || !cy.getElementById(e.target).length) {
+                console.warn('docker graph: dropping dangling edge', e);
+                continue;
             }
+            cy.add({ group: 'edges', data: { id: eid, source: e.source, target: e.target, type: e.type, label: e.label || '' } });
+            structureChanged = true;
         }
 
         if (structureChanged) runLayout();

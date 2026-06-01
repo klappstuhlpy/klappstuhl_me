@@ -9,7 +9,11 @@
 //! socket path doesn't exist).  Routes that need Docker gracefully degrade
 //! to an empty graph rather than 500-ing.
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::Context;
 use bollard::{
@@ -265,6 +269,18 @@ impl DockerClient {
         let mut nodes: Vec<GraphNode> = Vec::new();
         let mut edges: Vec<GraphEdge> = Vec::new();
 
+        // Network names referenced by at least one container. The list-networks
+        // summary often reports an empty `containers` map, so we can't rely on
+        // it to decide whether a built-in network (bridge/host/none) is in use.
+        // Tracking references here lets us always emit a node for any network a
+        // container is attached to, preventing dangling edges in the graph.
+        let referenced_networks: HashSet<String> = containers
+            .iter()
+            .filter_map(|c| c.network_settings.as_ref())
+            .filter_map(|ns| ns.networks.as_ref())
+            .flat_map(|nets| nets.keys().cloned())
+            .collect();
+
         // ── Container nodes ───────────────────────────────────────────
 
         // Map from compose service name → container node id for depends_on edges.
@@ -378,10 +394,12 @@ impl DockerClient {
                 .unwrap_or_else(|| id.get(..12).unwrap_or(&id).to_owned());
 
             // Skip Docker's built-in bridge/host/none for noise reduction,
-            // unless they actually have containers attached.
+            // unless they actually have containers attached. `net.containers`
+            // is unreliable in the list response, so also keep any network a
+            // container references (otherwise its edge would dangle).
             let container_count = net.containers.as_ref().map(|m| m.len()).unwrap_or(0);
             let is_builtin = matches!(name.as_str(), "bridge" | "host" | "none");
-            if is_builtin && container_count == 0 {
+            if is_builtin && container_count == 0 && !referenced_networks.contains(&name) {
                 continue;
             }
 
