@@ -113,7 +113,7 @@ struct FlashMessageHtml<'a> {
 
 impl<'a> std::fmt::Display for FlashMessageHtml<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, r#"<div class="alert {}" role="alert">"#, self.message.level)?;
+        writeln!(f, r#"<div class="alert-flash {}" role="alert">"#, self.message.level)?;
         writeln!(
             f,
             r#"<p>{}</p>"#,

@@ -722,7 +722,7 @@ button.close:focus { background-color: var(--close-button-bg-hover); }
 
 /* ── Alerts ──────────────────────────────────────────────────── */
 
-.alert {
+.alert-flash {
     position: relative;
     display: flex;
     align-items: center;
@@ -732,13 +732,13 @@ button.close:focus { background-color: var(--close-button-bg-hover); }
     margin: 1rem;
 }
 
-.alert > button.close { margin-left: auto; }
-.alert > p { margin-bottom: 0; }
+.alert-flash > button.close { margin-left: auto; }
+.alert-flash > p { margin-bottom: 0; }
 
-.alert.info    { background-color: var(--info-bg);    color: var(--info-text);    border-color: var(--info-border); }
-.alert.error   { background-color: var(--error-bg);   color: var(--error-text);   border-color: var(--error-border); }
-.alert.warning { background-color: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
-.alert.success { background-color: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
+.alert-flash.info    { background-color: var(--info-bg);    color: var(--info-text);    border-color: var(--info-border); }
+.alert-flash.error   { background-color: var(--error-bg);   color: var(--error-text);   border-color: var(--error-border); }
+.alert-flash.warning { background-color: var(--warning-bg); color: var(--warning-text); border-color: var(--warning-border); }
+.alert-flash.success { background-color: var(--success-bg); color: var(--success-text); border-color: var(--success-border); }
 
 /* ── Badges ──────────────────────────────────────────────────── */
 
