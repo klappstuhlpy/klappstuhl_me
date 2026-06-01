@@ -76,6 +76,9 @@ struct ValidatedFile {
     bytes: Bytes,
     /// MIME type detected from the byte content.
     mimetype: String,
+    /// The uploader's sanitised original filename (e.g. `holiday.png`),
+    /// preserved for human-friendly downloads. The public URL still uses `id`.
+    original_name: String,
 }
 
 /// Reads a multipart field body, aborting as soon as it exceeds `cap` bytes.
@@ -128,6 +131,7 @@ async fn validate_field(field: Field<'_>, max_bytes: u64) -> anyhow::Result<Vali
         ext,
         bytes,
         mimetype,
+        original_name: filename,
     })
 }
 
@@ -269,8 +273,8 @@ pub async fn raw_upload_file(
         let insert_result = state
             .database()
             .execute(
-                "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at) VALUES (?, ?, ?, ?, ?)",
-                (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at),
+                "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at, original_name) VALUES (?, ?, ?, ?, ?, ?)",
+                (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at, file.original_name.clone()),
             )
             .await;
 
@@ -281,8 +285,8 @@ pub async fn raw_upload_file(
                 let retry = state
                     .database()
                     .execute(
-                        "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at) VALUES (?, ?, ?, ?, ?)",
-                        (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at),
+                        "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at, original_name) VALUES (?, ?, ?, ?, ?, ?)",
+                        (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at, file.original_name.clone()),
                     )
                     .await;
 
@@ -475,17 +479,28 @@ pub async fn build_images_zip(
     }
 
     let mut entries: Vec<(String, Vec<u8>)> = Vec::with_capacity(selected.len());
+    let mut used_names: std::collections::HashSet<String> = std::collections::HashSet::new();
     for f in &selected {
+        let stem = f.id.split('.').next().unwrap_or(&f.id);
         // The cached ImageFile may carry empty image_data because the
         // cache stores metadata only. Fetch the bytes on demand.
-        let data = match state
-            .resolve_image_data_for(f.id.split('.').next().unwrap_or(&f.id))
-            .await
-        {
+        let data = match state.resolve_image_data_for(stem).await {
             Some(d) => d,
             None => continue,
         };
-        entries.push((f.id.clone(), data));
+        // Name entries after the uploader's original filename. Two images can
+        // share a name, so disambiguate collisions with the unique id stem to
+        // avoid clobbering earlier entries in the archive.
+        let mut name = f.download_name();
+        if !used_names.insert(name.clone()) {
+            let (base, ext) = match name.rsplit_once('.') {
+                Some((b, e)) => (b.to_string(), format!(".{e}")),
+                None => (name.clone(), String::new()),
+            };
+            name = format!("{base}-{stem}{ext}");
+            used_names.insert(name.clone());
+        }
+        entries.push((name, data));
     }
 
     if entries.is_empty() {
@@ -697,7 +712,50 @@ async fn get_image_raw(State(state): State<AppState>, Path(image_id): Path<Strin
     }
 
     let mime = entry.mimetype.clone();
-    Ok(([(header::CONTENT_TYPE, mime)], entry.image_data).into_response())
+    Ok((
+        [
+            (header::CONTENT_TYPE, mime),
+            (header::CONTENT_DISPOSITION, inline_disposition(&entry.download_name())),
+        ],
+        entry.image_data,
+    )
+        .into_response())
+}
+
+/// Builds a `Content-Disposition: inline` value that names the download after
+/// the uploader's original filename. Serves the bytes inline (so the browser
+/// still renders the image) while making "Save image as…" suggest a sensible
+/// name. Emits an ASCII-sanitised `filename=` plus an RFC 5987 `filename*` so
+/// Unicode names survive on clients that support the extension.
+fn inline_disposition(name: &str) -> String {
+    let ascii: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' ' | '(' | ')') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let ascii = if ascii.trim().is_empty() {
+        "download".to_string()
+    } else {
+        ascii
+    };
+
+    let mut encoded = String::new();
+    for &b in name.as_bytes() {
+        let unreserved = b.is_ascii_alphanumeric()
+            || matches!(b, b'!' | b'#' | b'$' | b'&' | b'+' | b'-' | b'.' | b'^' | b'_' | b'`' | b'|' | b'~');
+        if unreserved {
+            encoded.push(b as char);
+        } else {
+            encoded.push_str(&format!("%{b:02X}"));
+        }
+    }
+
+    format!("inline; filename=\"{ascii}\"; filename*=UTF-8''{encoded}")
 }
 
 #[derive(Template)]
@@ -771,4 +829,32 @@ pub fn routes() -> Router<AppState> {
         .route("/images/bulk", delete(bulk_delete_files))
         .route("/images/bulk/download", post(bulk_download_files))
         .route("/images/bulk", post(upload_file).layer(RateLimit::default().build()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inline_disposition_strips_header_breaking_chars() {
+        // A filename carrying CR/LF or a quote must never be able to inject a
+        // new header or break out of the quoted filename token.
+        let value = inline_disposition("evil\r\nSet-Cookie: x=1\".png");
+        assert!(!value.contains('\r'));
+        assert!(!value.contains('\n'));
+        // The quote is replaced in the ASCII fallback...
+        assert!(value.contains("filename=\"evil__Set-Cookie_ x_1_.png\""));
+        // ...and percent-encoded in the RFC 5987 variant.
+        assert!(value.contains("filename*=UTF-8''"));
+        assert!(value.contains("%0D%0A"));
+    }
+
+    #[test]
+    fn inline_disposition_preserves_unicode_in_extended_field() {
+        let value = inline_disposition("naïve—café.png");
+        // ASCII fallback degrades non-ASCII to underscores.
+        assert!(value.contains("filename=\"na_ve_caf_.png\""));
+        // Extended field keeps the bytes via percent-encoding.
+        assert!(value.contains("filename*=UTF-8''na%C3%AFve%E2%80%94caf%C3%A9.png"));
+    }
 }

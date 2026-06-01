@@ -32,6 +32,28 @@ pub struct ImageFile {
     /// Optional expiry timestamp (RFC3339). `None` = never expires.
     #[serde(with = "time::serde::rfc3339::option", default, skip_serializing_if = "Option::is_none")]
     pub(crate) expires_at: Option<OffsetDateTime>,
+    /// The uploader's original filename, if recorded. `None` for legacy rows.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) original_name: Option<String>,
+}
+
+impl ImageFile {
+    /// A human-friendly download filename. The recorded original name when
+    /// present (path components stripped), otherwise the canonical `id`
+    /// (which already carries the extension). Always a bare filename.
+    pub fn download_name(&self) -> String {
+        match self.original_name.as_deref() {
+            Some(name) => {
+                let bare = name.rsplit(['/', '\\']).next().unwrap_or(name).trim();
+                if bare.is_empty() {
+                    self.id.clone()
+                } else {
+                    bare.to_string()
+                }
+            }
+            None => self.id.clone(),
+        }
+    }
 }
 
 /// An entry that represents a saved image.
@@ -56,6 +78,9 @@ pub struct ImageEntry {
     /// Optional expiry timestamp. `None` = never expires.
     #[serde(with = "time::serde::rfc3339::option", default, skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<OffsetDateTime>,
+    /// The uploader's original filename, if recorded. `None` for legacy rows.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub original_name: Option<String>,
 }
 
 impl ImageEntry {
@@ -69,6 +94,7 @@ impl ImageEntry {
             uploaded_at: OffsetDateTime::now_utc(),
             uploader_id: Default::default(),
             expires_at: None,
+            original_name: None,
         }
     }
 
@@ -93,6 +119,24 @@ impl ImageEntry {
     pub fn ext(&self) -> String {
         self.mimetype.split('/').last().unwrap_or("png").to_string()
     }
+
+    /// A human-friendly download filename: the recorded original name when
+    /// present, otherwise the canonical `{id}.{ext}`. The result is always a
+    /// bare filename (no path separators) so it is safe in a
+    /// `Content-Disposition` header or as a ZIP entry name.
+    pub fn download_name(&self) -> String {
+        match self.original_name.as_deref() {
+            Some(name) => {
+                let bare = name.rsplit(['/', '\\']).next().unwrap_or(name).trim();
+                if bare.is_empty() {
+                    format!("{}.{}", self.id, self.ext())
+                } else {
+                    bare.to_string()
+                }
+            }
+            None => format!("{}.{}", self.id, self.ext()),
+        }
+    }
 }
 
 impl Table for ImageEntry {
@@ -113,6 +157,7 @@ impl Table for ImageEntry {
             // Tolerant: queries that don't SELECT this column (e.g. the
             // metadata-only cache load) yield None rather than erroring.
             expires_at: row.get::<_, Option<OffsetDateTime>>("expires_at").unwrap_or(None),
+            original_name: row.get::<_, Option<String>>("original_name").unwrap_or(None),
         })
     }
 }

@@ -304,7 +304,7 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 13] = [
+const MIGRATIONS: [&str; 14] = [
     include_str!("../sql/0.sql"),
     include_str!("../sql/1.sql"),
     include_str!("../sql/2.sql"),
@@ -318,6 +318,7 @@ const MIGRATIONS: [&str; 13] = [
     include_str!("../sql/10.sql"),
     include_str!("../sql/11.sql"),
     include_str!("../sql/12.sql"),
+    include_str!("../sql/13.sql"),
 ];
 
 fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
@@ -377,6 +378,9 @@ fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
         // Optional per-image expiry (RFC3339 / SQLite timestamp). NULL = never
         // expires. A background reaper deletes rows past this time.
         "ALTER TABLE images ADD COLUMN expires_at TEXT",
+        // Original uploaded filename (sql/13.sql) — defensive in case a database
+        // landed at user_version 13 without it.
+        "ALTER TABLE images ADD COLUMN original_name TEXT",
     ] {
         let _ = connection.execute(ddl, []);
     }

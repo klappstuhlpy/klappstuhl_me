@@ -580,7 +580,7 @@ impl AppState {
         let files: Vec<ImageEntry> = self
             .database()
             .all(
-                "SELECT id, size, X'' AS image_data, mimetype, uploader_id, uploaded_at, expires_at FROM images ORDER BY id ASC",
+                "SELECT id, size, X'' AS image_data, mimetype, uploader_id, uploaded_at, expires_at, original_name FROM images ORDER BY id ASC",
                 [],
             )
             .await
@@ -600,6 +600,7 @@ impl AppState {
                 uploaded_at: entry.uploaded_at,
                 uploader_id: entry.uploader_id,
                 expires_at: entry.expires_at,
+                original_name: entry.original_name,
             });
         }
 
