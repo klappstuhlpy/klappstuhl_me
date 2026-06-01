@@ -317,7 +317,17 @@ pub struct Config {
     /// return 503.
     #[serde(default)]
     pub ffmpeg_path: Option<String>,
+    /// Maximum accepted size of a single uploaded image, in bytes. `0`/unset
+    /// defaults to 10 MiB. The upload handler streams each field and aborts as
+    /// soon as this is exceeded, so an oversized (or maliciously huge) upload
+    /// can never be buffered whole in memory.
+    #[serde(default)]
+    pub max_upload_bytes: Option<u64>,
 }
+
+/// Default per-file upload ceiling (10 MiB) used when `max_upload_bytes` is
+/// unset or zero.
+pub const DEFAULT_MAX_UPLOAD_BYTES: u64 = 10 * 1024 * 1024;
 
 impl Config {
     pub fn new() -> anyhow::Result<Self> {
@@ -342,7 +352,14 @@ impl Config {
             update_check_interval_hours: None,
             chromium_path: None,
             ffmpeg_path: None,
+            max_upload_bytes: None,
         })
+    }
+
+    /// Effective per-file upload size limit in bytes, applying the
+    /// [`DEFAULT_MAX_UPLOAD_BYTES`] fallback when unset or zero.
+    pub fn effective_max_upload_bytes(&self) -> u64 {
+        self.max_upload_bytes.filter(|&n| n > 0).unwrap_or(DEFAULT_MAX_UPLOAD_BYTES)
     }
 
     pub fn path() -> anyhow::Result<PathBuf> {
@@ -614,6 +631,7 @@ mod tests {
             "update_check_interval_hours",
             "chromium_path",
             "ffmpeg_path",
+            "max_upload_bytes",
         ];
         let mut last = 0usize;
         for key in expected {

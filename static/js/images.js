@@ -228,8 +228,30 @@ class BulkFilesOperations {
 const fileExtension = (name) => name.slice((name.lastIndexOf('.') - 1 >>> 0) + 2);
 const allowedExtensions = ["apng", "png", "jpg", "jpeg", "gif", "avif"];
 
+// Server-enforced per-file ceiling, mirrored client-side for a friendly error
+// before the bytes are sent. The server still streams + caps independently.
+const maxUploadBytes = parseInt(uploadForm?.dataset.maxUploadBytes ?? '0', 10) || 0;
+
+function formatBytes(bytes) {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${bytes} B`;
+}
+
 function filterValidFileList(files) {
-    let filtered = Array.from(files).filter(f => allowedExtensions.includes(fileExtension(f.name)));
+    let all = Array.from(files);
+    let filtered = all.filter(f => allowedExtensions.includes(fileExtension(f.name)));
+    let tooLarge = [];
+    if (maxUploadBytes > 0) {
+        tooLarge = filtered.filter(f => f.size > maxUploadBytes);
+        filtered = filtered.filter(f => f.size <= maxUploadBytes);
+    }
+    if (tooLarge.length > 0) {
+        showAlert({
+            level: 'error',
+            content: `${tooLarge.length} file${tooLarge.length === 1 ? '' : 's'} exceeded the ${formatBytes(maxUploadBytes)} limit and ${tooLarge.length === 1 ? 'was' : 'were'} skipped.`,
+        });
+    }
     const dt = new DataTransfer();
     filtered.forEach(f => dt.items.add(f));
     return dt.files;
@@ -251,6 +273,17 @@ function modalAlertHook(modal) {
 }
 
 uploadInput?.addEventListener('change', () => {
+    // Drop oversized / unsupported files before submitting (the server caps
+    // independently, but this gives immediate feedback). Reassigning .files
+    // does not re-fire 'change', so there's no recursion.
+    const valid = filterValidFileList(uploadInput.files);
+    if (valid.length === 0) {
+        uploadInput.value = '';
+        return;
+    }
+    if (valid.length !== uploadInput.files.length) {
+        uploadInput.files = valid;
+    }
     // Carry the chosen TTL through as a query param so the shared upload
     // handler picks it up (the form body is multipart and reserved for files).
     const expiry = document.getElementById('upload-expiry');

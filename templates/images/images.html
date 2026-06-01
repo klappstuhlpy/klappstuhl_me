@@ -22,7 +22,8 @@
         <button class="clear" tabindex="-1" id="clear-search-filter">✖&#xfe0e;</button>
     </div>
     <div class="toolbar-actions">
-        <form id="upload-form" method="POST" action="/images/bulk" enctype="multipart/form-data">
+        <form id="upload-form" method="POST" action="/images/bulk" enctype="multipart/form-data"
+              data-max-upload-bytes="{{ crate::CONFIG.get().unwrap().effective_max_upload_bytes() }}">
             <label for="upload-expiry" class="upload-expiry-label" title="Auto-delete the upload after this long">Expiry</label>
             <select id="upload-expiry" class="upload-expiry-select" autocomplete="off">
                 <option value="0" selected>Never</option>

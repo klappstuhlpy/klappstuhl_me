@@ -78,7 +78,24 @@ struct ValidatedFile {
     mimetype: String,
 }
 
-async fn validate_field(field: Field<'_>) -> anyhow::Result<ValidatedFile> {
+/// Reads a multipart field body, aborting as soon as it exceeds `cap` bytes.
+///
+/// Unlike `Field::bytes()` (which buffers the whole field before any size
+/// check is possible), this streams chunk-by-chunk so a maliciously huge
+/// upload is rejected after at most `cap` bytes are held in memory.
+async fn read_capped(mut field: Field<'_>, cap: u64) -> anyhow::Result<Bytes> {
+    let cap = cap as usize;
+    let mut buf = Vec::new();
+    while let Some(chunk) = field.chunk().await? {
+        if buf.len() + chunk.len() > cap {
+            anyhow::bail!("file exceeds the maximum upload size");
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(Bytes::from(buf))
+}
+
+async fn validate_field(field: Field<'_>, max_bytes: u64) -> anyhow::Result<ValidatedFile> {
     let filename = field
         .file_name()
         .map(sanitise_file_name::sanitise)
@@ -95,7 +112,7 @@ async fn validate_field(field: Field<'_>) -> anyhow::Result<ValidatedFile> {
         anyhow::bail!("unsupported file extension: {ext}");
     }
 
-    let bytes = field.bytes().await?;
+    let bytes = read_capped(field, max_bytes).await?;
     if bytes.is_empty() {
         anyhow::bail!("empty file");
     }
@@ -114,12 +131,12 @@ async fn validate_field(field: Field<'_>) -> anyhow::Result<ValidatedFile> {
     })
 }
 
-async fn collect_fields(mut multipart: Multipart) -> (Vec<ValidatedFile>, usize) {
+async fn collect_fields(mut multipart: Multipart, max_bytes: u64) -> (Vec<ValidatedFile>, usize) {
     let mut files = Vec::new();
     let mut skipped = 0usize;
 
     while let Ok(Some(field)) = multipart.next_field().await {
-        match validate_field(field).await {
+        match validate_field(field, max_bytes).await {
             Ok(f) => files.push(f),
             Err(e) => {
                 tracing::debug!(error = %e, "skipped upload field");
@@ -196,7 +213,8 @@ pub async fn raw_upload_file(
     api: bool,
     expires_at: Option<OffsetDateTime>,
 ) -> Result<UploadResult, ApiError> {
-    let (files, skipped) = collect_fields(multipart).await;
+    let max_bytes = state.config().effective_max_upload_bytes();
+    let (files, skipped) = collect_fields(multipart, max_bytes).await;
 
     if files.is_empty() {
         return Err(ApiError::new("No valid files were provided."));
