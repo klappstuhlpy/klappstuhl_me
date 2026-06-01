@@ -125,7 +125,7 @@ function formatRelative(seconds) {
 }
 
 function createAlert({content, level = 'info'}) {
-    return html('div.alert', {role: 'alert', class: level},
+    return html('div.alert-flash', {role: 'alert', class: level},
         content ? html('p', content) : null,
         html('button.close', {
             'aria-hidden': 'true',
