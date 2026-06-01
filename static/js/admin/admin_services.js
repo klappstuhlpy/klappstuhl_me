@@ -10,10 +10,18 @@ function syncCardButtons(card) {
   if (startBtn)   startBtn.disabled   = isRunning;
   if (restartBtn) restartBtn.disabled = !isRunning;
   if (stopBtn)    stopBtn.disabled    = !isRunning;
-  // Pull and Recreate are always available: `docker compose pull` / `up`
-  // work whether the container is up or not, and for a bare container the
-  // backend reports a clear, logged error if it can't resolve the image.
-  if (pullBtn) pullBtn.disabled = false;
+  // Pull only makes sense for containers that run a real registry image —
+  // i.e. ones the update-checker could resolve a digest for (they show an
+  // "up to date" / "update available" badge). Locally-built images have
+  // nothing to pull, so the button is disabled. `card.dataset.pullable` is
+  // set from the live service data in updateCardFromView().
+  const pullable = card.dataset.pullable === "true";
+  if (pullBtn) {
+    pullBtn.disabled = !pullable;
+    pullBtn.title = pullable
+      ? "docker pull (or compose pull)"
+      : "No registry image to pull (built locally, private, or not checked yet)";
+  }
   if (recreateBtn) recreateBtn.disabled = false;
 }
 
@@ -105,7 +113,7 @@ async function onActionSubmit(e) {
 
   // Busy state: lock every button on the card and show a spinner label.
   const buttons = card ? Array.from(card.querySelectorAll("button")) : [];
-  buttons.forEach(b => { b.dataset.prevDisabled = b.disabled ? "1" : "0"; b.disabled = true; });
+  buttons.forEach(b => { b.disabled = true; });
   const originalText = submitter ? submitter.textContent : "";
   if (submitter) submitter.textContent = "Working…";
   if (actionLogBusy) actionLogBusy.hidden = false;
@@ -133,6 +141,15 @@ async function onActionSubmit(e) {
         output: data.output || (res.ok ? "" : `request failed (HTTP ${res.status})`),
       }));
     }
+
+    // A pull or recreate can change the running image, so the cached
+    // update badge is now stale — re-run the registry check in the
+    // background and refresh the cards once it lands.
+    if (data && data.ok === true && (action === "pull" || action === "recreate")) {
+      fetch("/admin/docker/updates/check", { method: "POST" })
+        .then(() => refreshServices())
+        .catch(() => {});
+    }
   } catch (err) {
     console.error("docker action failed", err);
     if (actionLogBody) {
@@ -145,10 +162,15 @@ async function onActionSubmit(e) {
   } finally {
     if (submitter) submitter.textContent = originalText;
     if (actionLogBusy) actionLogBusy.hidden = true;
-    // refreshServices() re-syncs running state and re-enables buttons via
-    // syncCardButtons; then reconcile the action log with the server.
+    // Re-enable everything we locked (including the Logs button, which
+    // syncCardButtons doesn't manage), then refresh the live data so the card
+    // reflects the new running state / restart count / start time. A second
+    // delayed refresh catches containers that are still settling after a
+    // restart or recreate.
+    buttons.forEach(b => { b.disabled = false; });
     await refreshServices();
     await loadActionLog();
+    setTimeout(refreshServices, 2500);
   }
 }
 
@@ -236,10 +258,15 @@ function updateCardFromView(card, view) {
     restarts.textContent = view.restart_count;
   }
 
-  // Image-update badge (from the background registry checker)
+  // Image-update badge (from the background registry checker). A known
+  // up_to_date / update_available state means the image lives in a registry
+  // and can be pulled; anything else (unknown / not yet checked) cannot.
+  const u = view.update;
+  const pullable = !!(u && (u.state === "update_available" || u.state === "up_to_date"));
+  card.dataset.pullable = pullable ? "true" : "false";
+
   const updBadge = card.querySelector("[data-role='update']");
   if (updBadge) {
-    const u = view.update;
     if (u && u.state === "update_available") {
       updBadge.hidden = false;
       updBadge.className = "update-badge available";
@@ -256,7 +283,7 @@ function updateCardFromView(card, view) {
   }
 
   // (Pull-button enable/disable is handled in syncCardButtons below, which
-  // checks for a known image on this specific card.)
+  // reads the card.dataset.pullable flag set just above.)
 
   // Live CPU / RAM (only Docker services with `docker stats` data)
   const cpuRow = card.querySelector("[data-role='cpu-row']");
