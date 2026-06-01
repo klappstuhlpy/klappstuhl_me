@@ -448,7 +448,7 @@ impl Config {
         // Local/dev (non-production, or the localhost fallback) keeps plain
         // HTTP on the actual listen port.
         if !self.production || domain == "localhost" {
-            return format!("http://{domain}:{}", self.server.port);
+            return format!("http://localhost:{}", self.server.port);
         }
         format!("https://{domain}")
     }

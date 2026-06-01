@@ -38,7 +38,9 @@ pub fn isoformat(dt: &OffsetDateTime) -> askama::Result<String> {
 /// Returns a canonical URL to the given path
 pub fn canonical_url(url: impl Display) -> askama::Result<String> {
     let path = url.to_string();
-    let mut url = crate::CONFIG.get().unwrap().canonical_url();
+    let config = crate::CONFIG.get().unwrap();
+    let mut url = config.canonical_url();
+
     url.push_str(&path);
     Ok(url)
 }
