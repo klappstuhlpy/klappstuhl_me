@@ -154,9 +154,102 @@ pub async fn upload_file(
     Ok(key)
 }
 
+/// Pulls `<Key>…</Key>` values out of an S3 `ListObjectsV2` XML response.
+/// Hand-rolled (no XML dependency) — the response shape is fixed and the keys
+/// never contain `<`, so a literal scan is sufficient and easy to test.
+fn extract_keys(xml: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = xml;
+    while let Some(open) = rest.find("<Key>") {
+        let after = &rest[open + "<Key>".len()..];
+        let Some(close) = after.find("</Key>") else { break };
+        out.push(after[..close].to_string());
+        rest = &after[close + "</Key>".len()..];
+    }
+    out
+}
+
+/// Lists object keys under the configured prefix via `ListObjectsV2` (one
+/// signed GET). Returns the full keys (prefix included). Best-effort: used to
+/// show which local backups also exist off-site, so it carries a short timeout.
+pub async fn list_keys(client: &reqwest::Client, cfg: &BackupRemoteConfig) -> anyhow::Result<Vec<String>> {
+    if !cfg.kind.eq_ignore_ascii_case("s3") {
+        anyhow::bail!("unsupported backup_remote.kind: {} (only \"s3\" is supported)", cfg.kind);
+    }
+
+    let endpoint = cfg.endpoint.trim_end_matches('/');
+    let canonical_uri = format!("/{}", uri_encode(&cfg.bucket, false));
+    // SigV4 canonical query: keys sorted, values URI-encoded (slashes too).
+    let prefix = cfg.normalized_prefix();
+    let canonical_query = format!("list-type=2&prefix={}", uri_encode(&prefix, false));
+    let url = format!("{endpoint}{canonical_uri}?{canonical_query}");
+    let parsed = reqwest::Url::parse(&url).with_context(|| format!("invalid remote endpoint URL: {url}"))?;
+
+    let host = match (parsed.host_str(), parsed.port()) {
+        (Some(h), Some(p)) => format!("{h}:{p}"),
+        (Some(h), None) => h.to_string(),
+        (None, _) => anyhow::bail!("remote endpoint URL has no host: {url}"),
+    };
+
+    let now = time::OffsetDateTime::now_utc();
+    let amz_date = now
+        .format(format_description!("[year][month][day]T[hour][minute][second]Z"))
+        .context("formatting amz date")?;
+    let datestamp = now.format(format_description!("[year][month][day]")).context("formatting datestamp")?;
+
+    // GET with an empty body — the payload hash is SHA-256 of "".
+    let payload_hash = sha256_hex(b"");
+    let canonical_headers = format!("host:{host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n");
+    let signed_headers = "host;x-amz-content-sha256;x-amz-date";
+    let canonical_request = format!(
+        "GET\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
+    );
+
+    let scope = format!("{datestamp}/{}/{SERVICE}/aws4_request", cfg.region);
+    let string_to_sign =
+        format!("{ALGORITHM}\n{amz_date}\n{scope}\n{}", sha256_hex(canonical_request.as_bytes()));
+
+    let k_date = hmac(format!("AWS4{}", cfg.secret_access_key).as_bytes(), datestamp.as_bytes());
+    let k_region = hmac(&k_date, cfg.region.as_bytes());
+    let k_service = hmac(&k_region, SERVICE.as_bytes());
+    let k_signing = hmac(&k_service, b"aws4_request");
+    let signature = to_hex(&hmac(&k_signing, string_to_sign.as_bytes()));
+
+    let authorization = format!(
+        "{ALGORITHM} Credential={}/{scope}, SignedHeaders={signed_headers}, Signature={signature}",
+        cfg.access_key_id
+    );
+
+    let resp = client
+        .get(parsed)
+        .header("Authorization", authorization)
+        .header("x-amz-date", amz_date)
+        .header("x-amz-content-sha256", payload_hash)
+        .timeout(std::time::Duration::from_secs(8))
+        .send()
+        .await
+        .context("ListObjectsV2 request to remote store failed")?;
+
+    let status = resp.status();
+    let text = resp.text().await.unwrap_or_default();
+    if !status.is_success() {
+        let snippet: String = text.chars().take(300).collect();
+        anyhow::bail!("remote store rejected list ({status}): {snippet}");
+    }
+    Ok(extract_keys(&text))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extract_keys_pulls_all_keys() {
+        let xml = "<ListBucketResult><Contents><Key>db/backup-1.db</Key><Size>10</Size></Contents>\
+                   <Contents><Key>db/backup-2.db</Key></Contents></ListBucketResult>";
+        assert_eq!(extract_keys(xml), vec!["db/backup-1.db", "db/backup-2.db"]);
+        assert!(extract_keys("<ListBucketResult></ListBucketResult>").is_empty());
+    }
 
     #[test]
     fn hex_roundtrip() {

@@ -128,6 +128,35 @@ pub struct AlertsConfig {
     /// `{title, level, body, fields}`.
     #[serde(default)]
     pub webhook_url: Option<String>,
+    /// SMTP email sink — when set, alerts are also delivered as a plain-text
+    /// email to every recipient.
+    #[serde(default)]
+    pub email: Option<EmailConfig>,
+}
+
+/// SMTP delivery settings for the email alert sink. TLS is mandatory: port
+/// 465 uses implicit TLS, any other port (587, 25) upgrades via STARTTLS.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmailConfig {
+    /// SMTP server hostname (e.g. `smtp.fastmail.com`).
+    pub host: String,
+    /// SMTP port. `465` → implicit TLS, otherwise STARTTLS. Defaults to 587.
+    #[serde(default = "default_smtp_port")]
+    pub port: u16,
+    /// AUTH LOGIN username. Omit (with `password`) for an unauthenticated relay.
+    #[serde(default)]
+    pub username: Option<String>,
+    /// AUTH LOGIN password / app-password.
+    #[serde(default)]
+    pub password: Option<String>,
+    /// Envelope sender / `From:` address.
+    pub from: String,
+    /// One or more recipient addresses.
+    pub to: Vec<String>,
+}
+
+fn default_smtp_port() -> u16 {
+    587
 }
 
 /// Cloudflare credentials and tunnel settings. The token + zone power the

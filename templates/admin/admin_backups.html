@@ -1,33 +1,86 @@
 {% extends "admin/admin_layout.html" %}
 
-{% block title %}Backups | Admin | Klappstuhl.me{% endblock %}
+{% block title %}Data protection | Admin | Klappstuhl.me{% endblock %}
+
+{% block admin_css %}
+<link rel="stylesheet" href="/static/css/admin/admin_backups.css" type="text/css">
+{% endblock %}
 
 {% block admin_body %}
 <div class="admin-page-header">
-    <h1>Backups</h1>
+    <h1>Data protection</h1>
     <p class="admin-page-sub">
-        Automatic SQLite snapshots via <code>VACUUM INTO</code>, keeping the
-        newest {{ keep }}. Total on disk: {{ total_size_human }}.
+        SQLite snapshots via <code>VACUUM INTO</code> — schedule, retention, and
+        off-site mirroring in one place.
     </p>
+</div>
+
+<div class="summary">
+    <div class="statistic-box">
+        <span class="title">Schedule</span>
+        {% if schedule_enabled %}
+        <span class="value sm success">Every {{ interval_hours }}h</span>
+        {% else %}
+        <span class="value sm muted">Disabled</span>
+        {% endif %}
+        <span class="sub">
+            {% match next_run %}
+            {% when Some with (n) %}Next ~ {{ n }}
+            {% when None %}
+                {% if schedule_enabled %}Runs after first backup{% else %}Set <code>backup.interval_hours</code>{% endif %}
+            {% endmatch %}
+        </span>
+    </div>
+
+    <div class="statistic-box">
+        <span class="title">Retention</span>
+        <span class="value">{{ keep }}</span>
+        <span class="sub">newest kept · {{ total_size_human }} on disk</span>
+    </div>
+
+    <div class="statistic-box">
+        <span class="title">Snapshots</span>
+        <span class="value">{{ count }}</span>
+        <span class="sub">
+            {% match last_backup %}
+            {% when Some with (l) %}last {{ l }}
+            {% when None %}none yet
+            {% endmatch %}
+        </span>
+    </div>
+
+    <div class="statistic-box">
+        <span class="title">Off-site</span>
+        {% match remote_label %}
+        {% when Some with (label) %}
+            {% if remote_reachable %}
+            <span class="value sm success">{{ off_site_count }} / {{ count }}</span>
+            <span class="sub"><code>{{ label }}</code></span>
+            {% else %}
+            <span class="value sm muted">Unreachable</span>
+            <span class="sub">
+                {% match remote_error %}
+                {% when Some with (e) %}{{ e }}
+                {% when None %}<code>{{ label }}</code>
+                {% endmatch %}
+            </span>
+            {% endif %}
+        {% when None %}
+        <span class="value sm muted">Disabled</span>
+        <span class="sub">set <code>backup.remote</code> in <code>config.json</code></span>
+        {% endmatch %}
+    </div>
 </div>
 
 <section class="admin-section">
     <form method="post" action="/admin/backups">
         <button type="submit" class="button primary">Backup now</button>
     </form>
-    <p class="admin-page-sub" style="margin-top:.75rem">
-        {% match remote_label %}
-        {% when Some with (label) %}
-        Off-site: <strong style="color:var(--success-text,#10b981)">enabled</strong> · <code>{{ label }}</code> — new backups are uploaded automatically.
-        {% when None %}
-        Off-site: <strong style="color:var(--text-muted,#a1a1aa)">disabled</strong> — set <code>backup_remote</code> in <code>config.json</code> to mirror backups to an S3-compatible store (B2, R2, AWS, MinIO).
-        {% endmatch %}
-    </p>
 </section>
 
 <section class="admin-section">
-    <h2>Snapshots <span class="count-badge">{{ backups.len() }}</span></h2>
-    {% if backups.is_empty() %}
+    <h2>Snapshots <span class="count-badge">{{ count }}</span></h2>
+    {% if rows.is_empty() %}
     <p class="admin-empty">No backups yet — they appear here once the scheduler runs or you take one manually.</p>
     {% else %}
     <div class="container-table-wrap">
@@ -37,15 +90,17 @@
                     <th>File</th>
                     <th>Size</th>
                     <th>Created (UTC)</th>
+                    <th>Off-site</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                {% for b in backups %}
+                {% for b in rows %}
                 <tr>
                     <td><code>{{ b.name }}</code></td>
                     <td>{{ b.size_human }}</td>
                     <td>{{ b.modified }}</td>
+                    <td><span class="offsite-pill {{ b.off_site_class }}">{{ b.off_site_label }}</span></td>
                     <td class="col-actions">
                         <a class="button outline" href="/admin/backups/{{ b.name }}/download">Download</a>
                         {% if remote_label.is_some() %}

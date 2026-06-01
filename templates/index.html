@@ -7,22 +7,30 @@
 <meta property="og:title" content="Home | Klappstuhl.me">
 {% endblock %}
 
+{% block index_nav %}
+<a class="nav-item" href="/projects">Projects</a>
+<a class="nav-item" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">GitHub ↗</a>
+{% endblock %}
+
 {% block body %}
 {% for flash in flashes %}
 {{ flash.html()|safe }}
 {% endfor %}
 
-<section class="hero">
-    <p class="hero-label">klappstuhl.me</p>
-    <h1 class="hero-title">Hey, I'm Klappstuhl.</h1>
-    <p class="hero-sub">
-        A student from Germany who builds things for the web.
-        This site hosts my personal image hosting service and project overview.
-    </p>
-    <div class="hero-actions">
-        <a href="https://github.com/klappstuhlpy" class="button primary" target="_blank" rel="noopener">GitHub ↗</a>
-        <a href="/projects" class="button outline">Projects</a>
-    </div>
-</section>
+{# Ambient drifting-code field — populated by index.js, purely decorative. #}
+<div class="ambient" aria-hidden="true"></div>
 
+<section class="hero" aria-label="klappstuhl.me">
+    <h1 class="hero-name">
+        {# Real text is the no-JS / reduced-motion fallback; index.js scrambles it in. #}
+        <span class="scramble" data-final="klappstuhl.me">klappstuhl.me</span><span class="cursor" aria-hidden="true">▋</span>
+    </h1>
+    <p class="hero-tag">
+        <span class="scramble" data-final="builds things for the web" data-delay="850">builds things for the web</span>
+    </p>
+</section>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/index.js"></script>
 {% endblock %}

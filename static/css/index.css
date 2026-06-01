@@ -1,41 +1,107 @@
+/* ── Homepage: animated decrypt-reveal hero over an ambient code field ──
+   Concept: the name scrambles in (violet glyphs settling into white
+   letters) with a blinking cursor, layered over faint monospace code
+   tokens drifting upward. Motion is JS-driven (static/js/index.js) but
+   the page is fully usable with no JS and respects reduced-motion. */
+
+/* ── Hero ──────────────────────────────────────────────────────── */
+
 .hero {
-    padding-top: 5rem;
-    padding-bottom: 5rem;
-    max-width: 640px;
-}
-
-.hero-label {
-    font-size: 0.8rem;
-    color: var(--branding);
-    letter-spacing: 0.05em;
-    margin-bottom: 1rem;
-    text-transform: lowercase;
-}
-
-.hero-title {
-    font-size: 2.5rem;
-    font-weight: 500;
-    line-height: 1.15;
-    margin-bottom: 1.25rem;
-    color: var(--foreground);
-}
-
-.hero-sub {
-    font-size: 1rem;
-    color: var(--text-muted);
-    line-height: 1.7;
-    margin-bottom: 2rem;
-    max-width: 480px;
-}
-
-.hero-actions {
+    position: relative;
+    z-index: 1;
+    /* Fill the viewport minus the header + footer chrome so the
+       animation reads as full-screen without forcing a scrollbar.
+       svh keeps it honest on mobile when the URL bar shows/hides. */
+    min-height: calc(100svh - 13rem);
     display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 1.1rem;
+    padding: 2rem 0;
 }
 
+.hero-name {
+    margin: 0;
+    font-size: clamp(2.1rem, 9vw, 5rem);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    color: var(--foreground);
+    /* Reserve a stable baseline so the cursor never reflows the line. */
+    white-space: nowrap;
+}
+
+.hero-tag {
+    margin: 0;
+    font-size: clamp(0.8rem, 2.6vw, 1.05rem);
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    min-height: 1.4em; /* avoid layout shift while it scrambles in */
+}
+
+/* Random glyphs shown mid-decrypt — violet, slightly translucent, so the
+   word resolves from "brand colour noise" into clean white text. */
+.scramble .glitch {
+    color: var(--branding);
+    opacity: 0.85;
+}
+
+.cursor {
+    display: inline-block;
+    margin-left: 0.08em;
+    color: var(--branding);
+    font-weight: 400;
+    animation: cursor-blink 1.1s steps(1, end) infinite;
+}
+
+@keyframes cursor-blink {
+    0%, 49%   { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+/* ── Ambient drifting-code field ───────────────────────────────── */
+
+.ambient {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    pointer-events: none;
+    /* Smooths the subtle mouse-parallax nudge applied in JS. */
+    transition: transform 0.35s ease-out;
+}
+
+.code-bit {
+    position: absolute;
+    bottom: -12%;
+    color: var(--branding);
+    opacity: 0;
+    white-space: nowrap;
+    font-family: inherit;
+    user-select: none;
+    will-change: transform, opacity;
+    animation-name: code-drift;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@keyframes code-drift {
+    0%   { transform: translateY(0) translateX(0); opacity: 0; }
+    12%  { opacity: 0.09; }
+    88%  { opacity: 0.09; }
+    100% { transform: translateY(-118vh) translateX(var(--drift, 0)); opacity: 0; }
+}
+
+/* ── Reduced motion: everything settles to a clean static state ─── */
+
+@media (prefers-reduced-motion: reduce) {
+    .cursor   { animation: none; }
+    .ambient  { display: none; }
+}
+
+/* Tablet/desktop: name can shed the nowrap clamp if it ever needs to. */
 @media (min-width: 480px) {
-    .hero-title {
-        font-size: 3rem;
-    }
+    .hero { gap: 1.35rem; }
 }

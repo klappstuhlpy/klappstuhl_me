@@ -160,6 +160,45 @@ pub fn keep_count(state: &AppState) -> usize {
     state.config().backup.keep.unwrap_or(DEFAULT_KEEP)
 }
 
+/// The effective scheduled-backup interval in hours (0 = disabled).
+pub fn interval_hours(state: &AppState) -> u64 {
+    state.config().backup.interval_hours.unwrap_or(DEFAULT_INTERVAL_HOURS)
+}
+
+/// Off-site backup status for the data-protection dashboard.
+pub enum RemoteStatus {
+    /// No off-site target configured.
+    Disabled,
+    /// Configured but the listing failed (network / credentials) — the string
+    /// is a short human-readable reason.
+    Unreachable(String),
+    /// Reachable; the set holds the **bare file names** present off-site
+    /// (prefix stripped) so they can be matched against local backups.
+    Reachable(std::collections::HashSet<String>),
+}
+
+/// Fetches the set of backup file names present in the off-site store, mapped
+/// to the [`RemoteStatus`] the dashboard renders. Best-effort and bounded by
+/// the underlying request timeout.
+pub async fn remote_status(state: &AppState) -> RemoteStatus {
+    let Some(remote) = state.config().backup.remote.clone() else {
+        return RemoteStatus::Disabled;
+    };
+    match s3::list_keys(&state.client, &remote).await {
+        Ok(keys) => {
+            let prefix = remote.normalized_prefix();
+            let names = keys
+                .into_iter()
+                // Keep only this app's backups, reduced to the bare file name.
+                .filter_map(|k| k.strip_prefix(&prefix).map(str::to_string))
+                .filter(|n| n.starts_with(PREFIX) && n.ends_with(SUFFIX))
+                .collect();
+            RemoteStatus::Reachable(names)
+        }
+        Err(e) => RemoteStatus::Unreachable(e.to_string()),
+    }
+}
+
 /// Uploads a backup file to the configured off-site object store. Returns
 /// `Ok(None)` when no remote is configured (a no-op, not an error), or
 /// `Ok(Some(key))` with the remote object key on success.

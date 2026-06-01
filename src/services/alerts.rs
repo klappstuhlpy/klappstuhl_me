@@ -206,6 +206,190 @@ pub async fn send_webhook(client: &reqwest::Client, url: &str, note: &AlertNotif
     let _ = client.post(url).json(note).send().await;
 }
 
+// ── SMTP email sink ──────────────────────────────────────────────────────
+//
+// A minimal async SMTP client built on the `tokio-rustls` stack the app
+// already pulls in (matching the hand-rolled SigV4 / TOTP / cron style — no
+// new dependency). TLS is mandatory: port 465 is implicit TLS, everything
+// else upgrades via STARTTLS. Auth is AUTH LOGIN when credentials are present.
+
+use std::io::{Error, ErrorKind, Result as IoResult};
+use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpStream;
+
+use base64::Engine as _;
+
+use crate::config::EmailConfig;
+
+fn smtp_err(msg: &str) -> Error {
+    Error::new(ErrorKind::Other, format!("smtp: {msg}"))
+}
+
+fn b64(s: &str) -> String {
+    base64::engine::general_purpose::STANDARD.encode(s.as_bytes())
+}
+
+/// The hostname we announce in EHLO — the domain of the `from` address, or
+/// `localhost` if it has no `@`. Purely cosmetic to most servers.
+fn ehlo_name(cfg: &EmailConfig) -> &str {
+    cfg.from.split_once('@').map(|(_, domain)| domain).filter(|d| !d.is_empty()).unwrap_or("localhost")
+}
+
+/// Reads one (possibly multi-line) SMTP reply and returns its 3-digit code.
+/// Continuation lines have a `-` as the 4th byte (`250-...`); the final line
+/// uses a space (`250 ...`).
+async fn read_reply<R: AsyncBufReadExt + Unpin>(reader: &mut R) -> IoResult<u16> {
+    loop {
+        let mut line = String::new();
+        if reader.read_line(&mut line).await? == 0 {
+            return Err(smtp_err("connection closed"));
+        }
+        let bytes = line.as_bytes();
+        if bytes.len() < 3 {
+            return Err(smtp_err("truncated reply"));
+        }
+        let code: u16 = line[..3].parse().map_err(|_| smtp_err("bad reply code"))?;
+        // More lines coming if the 4th char is a hyphen.
+        if bytes.len() >= 4 && bytes[3] == b'-' {
+            continue;
+        }
+        return Ok(code);
+    }
+}
+
+/// Sends a single command line (CRLF appended) and asserts the reply code.
+async fn command<S>(reader: &mut BufReader<S>, line: &str, expect: u16) -> IoResult<()>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    let w = reader.get_mut();
+    w.write_all(line.as_bytes()).await?;
+    w.write_all(b"\r\n").await?;
+    w.flush().await?;
+    let code = read_reply(reader).await?;
+    if code != expect {
+        return Err(smtp_err(&format!("expected {expect}, got {code} after `{}`", line.split(' ').next().unwrap_or(line))));
+    }
+    Ok(())
+}
+
+/// Builds a trusting rustls client config from the bundled webpki roots.
+fn tls_config() -> Arc<rustls::ClientConfig> {
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    Arc::new(rustls::ClientConfig::builder().with_root_certificates(roots).with_no_client_auth())
+}
+
+/// Runs the EHLO → AUTH → MAIL → DATA exchange over an established stream.
+/// `expect_greeting` is true for implicit-TLS connects (the server sends a
+/// fresh 220 over TLS) and false after a STARTTLS upgrade.
+async fn deliver<S>(stream: S, cfg: &EmailConfig, message: &[u8], expect_greeting: bool) -> IoResult<()>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    let mut reader = BufReader::new(stream);
+    if expect_greeting && read_reply(&mut reader).await? != 220 {
+        return Err(smtp_err("bad greeting"));
+    }
+    command(&mut reader, &format!("EHLO {}", ehlo_name(cfg)), 250).await?;
+
+    if let (Some(user), Some(pass)) = (&cfg.username, &cfg.password) {
+        command(&mut reader, "AUTH LOGIN", 334).await?;
+        command(&mut reader, &b64(user), 334).await?;
+        command(&mut reader, &b64(pass), 235).await?;
+    }
+
+    command(&mut reader, &format!("MAIL FROM:<{}>", cfg.from), 250).await?;
+    for to in &cfg.to {
+        command(&mut reader, &format!("RCPT TO:<{to}>"), 250).await?;
+    }
+    command(&mut reader, "DATA", 354).await?;
+
+    let w = reader.get_mut();
+    w.write_all(message).await?;
+    w.write_all(b"\r\n.\r\n").await?;
+    w.flush().await?;
+    if read_reply(&mut reader).await? != 250 {
+        return Err(smtp_err("message rejected"));
+    }
+    let _ = command(&mut reader, "QUIT", 221).await; // best-effort
+    Ok(())
+}
+
+/// Assembles an RFC 5322 message. The body is base64-encoded (avoids 8bit /
+/// line-length / dot-stuffing concerns) and the subject uses the ASCII-folded
+/// title (sidestepping encoded-word headers for emoji).
+fn build_message(cfg: &EmailConfig, note: &AlertNotification) -> Vec<u8> {
+    let subject = strip_markdown(&note.ascii_title());
+    let text = if note.body.is_empty() {
+        strip_markdown(&note.title)
+    } else {
+        strip_markdown(&note.body)
+    };
+
+    let date = time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc2822)
+        .unwrap_or_default();
+
+    // Wrap the base64 body at 76 columns per MIME.
+    let encoded = base64::engine::general_purpose::STANDARD.encode(text.as_bytes());
+    let mut wrapped = String::new();
+    for chunk in encoded.as_bytes().chunks(76) {
+        wrapped.push_str(std::str::from_utf8(chunk).unwrap_or(""));
+        wrapped.push_str("\r\n");
+    }
+
+    let headers = format!(
+        "From: {from}\r\n\
+         To: {to}\r\n\
+         Subject: {subject}\r\n\
+         Date: {date}\r\n\
+         MIME-Version: 1.0\r\n\
+         Content-Type: text/plain; charset=utf-8\r\n\
+         Content-Transfer-Encoding: base64\r\n\
+         \r\n",
+        from = cfg.from,
+        to = cfg.to.join(", "),
+    );
+
+    let mut msg = headers.into_bytes();
+    msg.extend_from_slice(wrapped.as_bytes());
+    msg
+}
+
+/// Delivers the notification as an email via SMTP. Errors are returned so the
+/// caller can log/alert; deliveries are spawned in the background by `send_alert`.
+pub async fn send_email(cfg: &EmailConfig, note: &AlertNotification) -> IoResult<()> {
+    if cfg.to.is_empty() {
+        return Err(smtp_err("no recipients configured"));
+    }
+    let message = build_message(cfg, note);
+
+    let server_name = rustls_pki_types::ServerName::try_from(cfg.host.clone())
+        .map_err(|_| smtp_err("invalid host name"))?;
+    let connector = tokio_rustls::TlsConnector::from(tls_config());
+
+    let tcp = TcpStream::connect((cfg.host.as_str(), cfg.port)).await?;
+
+    if cfg.port == 465 {
+        // Implicit TLS — wrap immediately, then expect the 220 greeting.
+        let tls = connector.connect(server_name, tcp).await?;
+        deliver(tls, cfg, &message, true).await
+    } else {
+        // STARTTLS — greet + EHLO + STARTTLS in the clear, then upgrade.
+        let mut reader = BufReader::new(tcp);
+        if read_reply(&mut reader).await? != 220 {
+            return Err(smtp_err("bad greeting"));
+        }
+        command(&mut reader, &format!("EHLO {}", ehlo_name(cfg)), 250).await?;
+        command(&mut reader, "STARTTLS", 220).await?;
+        let tcp = reader.into_inner();
+        let tls = connector.connect(server_name, tcp).await?;
+        deliver(tls, cfg, &message, false).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,5 +456,48 @@ mod tests {
     fn strip_handles_multibyte_text() {
         // Emoji / non-ASCII bytes must not be corrupted by the byte scan.
         assert_eq!(strip_markdown("🔴 **web** is down"), "🔴 web is down");
+    }
+
+    fn sample_email_cfg() -> crate::config::EmailConfig {
+        crate::config::EmailConfig {
+            host: "smtp.example.test".into(),
+            port: 587,
+            username: Some("u".into()),
+            password: Some("p".into()),
+            from: "alerts@klappstuhl.me".into(),
+            to: vec!["ops@klappstuhl.me".into()],
+        }
+    }
+
+    #[test]
+    fn ehlo_name_uses_from_domain() {
+        assert_eq!(ehlo_name(&sample_email_cfg()), "klappstuhl.me");
+        let mut cfg = sample_email_cfg();
+        cfg.from = "noatsign".into();
+        assert_eq!(ehlo_name(&cfg), "localhost");
+    }
+
+    #[test]
+    fn build_message_has_headers_and_base64_body() {
+        let note = AlertNotification::from_discord_value(&json!({
+            "embeds": [{
+                "title": "🔴 web is down",
+                "description": "**unreachable**",
+                "color": 0xef4444u32,
+            }]
+        }));
+        let msg = String::from_utf8(build_message(&sample_email_cfg(), &note)).unwrap();
+
+        // Subject is ASCII-folded (emoji + markdown stripped).
+        assert!(msg.contains("Subject: web is down\r\n"), "got: {msg}");
+        assert!(msg.contains("From: alerts@klappstuhl.me\r\n"));
+        assert!(msg.contains("To: ops@klappstuhl.me\r\n"));
+        assert!(msg.contains("Content-Transfer-Encoding: base64\r\n"));
+
+        // Body sits after the blank header/body separator and decodes back to
+        // the markdown-stripped description.
+        let body_b64: String = msg.split("\r\n\r\n").nth(1).unwrap().split_whitespace().collect();
+        let decoded = base64::engine::general_purpose::STANDARD.decode(body_b64).unwrap();
+        assert_eq!(String::from_utf8(decoded).unwrap(), "unreachable");
     }
 }

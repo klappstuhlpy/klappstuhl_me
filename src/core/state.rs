@@ -331,7 +331,10 @@ impl AppState {
     /// payloads when nothing would consume them.
     pub fn has_any_alert_sink(&self) -> bool {
         let cfg = self.config();
-        cfg.alerts.discord_webhook_url.is_some() || cfg.alerts.ntfy_url.is_some() || cfg.alerts.webhook_url.is_some()
+        cfg.alerts.discord_webhook_url.is_some()
+            || cfg.alerts.ntfy_url.is_some()
+            || cfg.alerts.webhook_url.is_some()
+            || cfg.alerts.email.is_some()
     }
 
     /// Fans an alert out to every configured sink (Discord, ntfy, generic
@@ -351,7 +354,7 @@ impl AppState {
             tokio::spawn(async move { wh.prepare(v).send(&client).await });
         }
 
-        if cfg.alerts.ntfy_url.is_none() && cfg.alerts.webhook_url.is_none() {
+        if cfg.alerts.ntfy_url.is_none() && cfg.alerts.webhook_url.is_none() && cfg.alerts.email.is_none() {
             return;
         }
         let note = crate::alerts::AlertNotification::from_discord_value(&value);
@@ -364,6 +367,14 @@ impl AppState {
             let client = self.client.clone();
             let note = note.clone();
             tokio::spawn(async move { crate::alerts::send_webhook(&client, &url, &note).await });
+        }
+        if let Some(email) = cfg.alerts.email.clone() {
+            let note = note.clone();
+            tokio::spawn(async move {
+                if let Err(e) = crate::alerts::send_email(&email, &note).await {
+                    tracing::warn!("alert email delivery failed: {e}");
+                }
+            });
         }
     }
 

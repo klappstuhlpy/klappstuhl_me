@@ -18,16 +18,38 @@ use axum::{
     Router,
 };
 
+/// One backup file as shown in the dashboard table. The off-site state is
+/// pre-rendered to a label + CSS class so the template stays declarative.
+struct BackupRow {
+    name: String,
+    size_human: String,
+    modified: String,
+    off_site_label: &'static str,
+    off_site_class: &'static str,
+}
+
 #[derive(Template)]
 #[template(path = "admin/admin_backups.html")]
 struct AdminBackupsTemplate {
     account: Option<Account>,
     active_page: &'static str,
-    backups: Vec<backup::BackupInfo>,
+    rows: Vec<BackupRow>,
+    count: usize,
     total_size_human: String,
     keep: usize,
+    // ── Schedule ──
+    schedule_enabled: bool,
+    interval_hours: u64,
+    last_backup: Option<String>,
+    /// Estimated next scheduled run (last backup + interval), UTC.
+    next_run: Option<String>,
+    // ── Off-site ──
     /// `Some("s3 → bucket/prefix")` when an off-site target is configured.
     remote_label: Option<String>,
+    remote_reachable: bool,
+    /// Reason the off-site store could not be listed, when applicable.
+    remote_error: Option<String>,
+    off_site_count: usize,
 }
 
 /// Builds the human-readable "s3 → bucket/prefix" label shown in the UI, or
@@ -39,19 +61,77 @@ fn remote_label(state: &AppState) -> Option<String> {
     })
 }
 
+/// Formats a UTC unix timestamp as `YYYY-MM-DD HH:MM UTC`, or `None` if invalid.
+fn fmt_ts(unix: i64) -> Option<String> {
+    use time::format_description::well_known::Rfc3339;
+    time::OffsetDateTime::from_unix_timestamp(unix)
+        .ok()
+        .and_then(|t| t.format(&Rfc3339).ok())
+}
+
 async fn page(State(state): State<AppState>, account: Account) -> Result<AdminBackupsTemplate, StatusCode> {
     if !account.flags.is_admin() {
         return Err(StatusCode::FORBIDDEN);
     }
     let backups = backup::list();
     let total: u64 = backups.iter().map(|b| b.size).sum();
+
+    // Off-site status (best-effort; bounded by the S3 client timeout).
+    let remote = backup::remote_status(&state).await;
+    let (remote_reachable, remote_error, off_site_names) = match remote {
+        backup::RemoteStatus::Disabled => (false, None, None),
+        backup::RemoteStatus::Unreachable(e) => (false, Some(e), None),
+        backup::RemoteStatus::Reachable(set) => (true, None, Some(set)),
+    };
+
+    let off_site_count = off_site_names
+        .as_ref()
+        .map(|set| backups.iter().filter(|b| set.contains(&b.name)).count())
+        .unwrap_or(0);
+
+    let rows: Vec<BackupRow> = backups
+        .iter()
+        .map(|b| {
+            let (off_site_label, off_site_class) = match &off_site_names {
+                Some(set) if set.contains(&b.name) => ("✓ stored", "yes"),
+                Some(_) => ("local only", "no"),
+                None => ("—", "unknown"),
+            };
+            BackupRow {
+                name: b.name.clone(),
+                size_human: b.size_human.clone(),
+                modified: b.modified.clone(),
+                off_site_label,
+                off_site_class,
+            }
+        })
+        .collect();
+
+    // Schedule summary + a next-run estimate from the newest backup.
+    let interval_hours = backup::interval_hours(&state);
+    let schedule_enabled = interval_hours > 0;
+    let last_unix = backups.first().map(|b| b.modified_unix);
+    let last_backup = last_unix.and_then(fmt_ts);
+    let next_run = match (schedule_enabled, last_unix) {
+        (true, Some(unix)) => fmt_ts(unix + (interval_hours as i64) * 3600),
+        _ => None,
+    };
+
     Ok(AdminBackupsTemplate {
         account: Some(account),
         active_page: "backups",
+        count: rows.len(),
         total_size_human: backup::human_size(total),
         keep: backup::keep_count(&state),
+        schedule_enabled,
+        interval_hours,
+        last_backup,
+        next_run,
         remote_label: remote_label(&state),
-        backups,
+        remote_reachable,
+        remote_error,
+        off_site_count,
+        rows,
     })
 }
 
