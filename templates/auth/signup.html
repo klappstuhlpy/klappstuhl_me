@@ -28,7 +28,7 @@
             {% endfor %}
             {% match error %}
             {% when Some with (msg) %}
-            <div class="alert error" role="alert"><p>{{ msg }}</p></div>
+            <div class="alert-flash error" role="alert"><p>{{ msg }}</p></div>
             {% when None %}{% endmatch %}
 
             <div class="field-group">
