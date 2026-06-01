@@ -8,11 +8,13 @@
 {% block title %}Your Images | Klappstuhl.me{% endblock %}
 
 {% block body %}
-<h1>Your Images</h1>
 
 {%- for flash in flashes -%}
 {{ flash.html()|safe }}
 {%- endfor -%}
+
+<h1>Your Images</h1>
+
 
 <div class="toolbar">
     <div class="text-input-container">
