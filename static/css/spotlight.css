@@ -5,7 +5,7 @@
 .admin-sidebar-footer {
     padding: 0.75rem 0.5rem 0.6rem;
     border-top: 1px solid var(--box-border);
-    margin-top: auto;
+    margin-top: 0.5rem;
 }
 
 .spotlight-trigger {
