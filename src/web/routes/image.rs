@@ -295,8 +295,7 @@ pub async fn raw_upload_file(
     // Audit log so /admin/audit shows who uploaded what, from where, and
     // how it went. Image IDs go in meta (target stays human-readable as a
     // count); for the common case of one upload the ID is enough to
-    // round-trip to the /gallery URL. Fired BEFORE send_alert because
-    // the latter consumes `account` by value.
+    // round-trip to the /gallery URL.
     state
         .audit("image.upload")
         .actor(&account)
@@ -311,15 +310,6 @@ pub async fn raw_upload_file(
             "links":    links,
         }))
         .fire();
-
-    state.send_alert(
-        crate::discord::Alert::success(title)
-            .account(account)
-            .field("Total", total)
-            .field("Errors", errors)
-            .field("Infected", infected)
-            .field("Links", links.join("\n")),
-    );
 
     Ok(UploadResult {
         errors,
@@ -372,14 +362,6 @@ pub async fn delete_image(
             "via_api": api,
         }))
         .fire();
-
-    let title = if api { "[API] Deleted Image" } else { "Deleted Image" };
-    state.send_alert(
-        crate::discord::Alert::error(title)
-            .account(account)
-            .field("ID", id.clone())
-            .field("Failed", failed),
-    );
 
     Ok(DeleteResult { file: id, failed })
 }
@@ -573,14 +555,6 @@ async fn bulk_delete_files(
         }))
         .fire();
 
-    state.send_alert(
-        crate::discord::Alert::error("Deleted Images")
-            .description(description)
-            .account(account)
-            .field("Total", total)
-            .field("Failed", failed),
-    );
-
     Ok(Json(BulkFileOperationResponse { success, failed }))
 }
 
@@ -607,7 +581,7 @@ async fn bulk_download_files(
 
     let filename = format!(
         "klappstuhl-images-{}.zip",
-        time::OffsetDateTime::now_utc().unix_timestamp(),
+        OffsetDateTime::now_utc().unix_timestamp(),
     );
     Ok((
         [
@@ -674,8 +648,8 @@ async fn get_image_page(
         content_type: entry.mimetype.clone(),
     };
 
-    let page_url = filters::canonical_url(format!("/gallery/{}.{}", id, canonical_ext)).unwrap_or_default();
-    let raw_url = filters::canonical_url(format!("/gallery/raw/{}.{}", id, canonical_ext)).unwrap_or_default();
+    let page_url = canonical_url(format!("/gallery/{}.{}", id, canonical_ext)).unwrap_or_default();
+    let raw_url = canonical_url(format!("/gallery/raw/{}.{}", id, canonical_ext)).unwrap_or_default();
 
     Ok(ImageTemplate {
         account,
