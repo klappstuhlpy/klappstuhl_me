@@ -562,6 +562,9 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    /* Let items reflow onto a second line on narrow screens instead of
+       pushing the refresh-state label past the page edge. */
+    flex-wrap: wrap;
 }
 
 .services-search-input {
@@ -572,6 +575,11 @@
     padding: 0.3rem 0.65rem;
     font-size: 0.83rem;
     width: 12rem;
+    /* Allow the input to shrink below 12rem so the toolbar never overflows
+       its container on small viewports. */
+    max-width: 100%;
+    min-width: 0;
+    flex-shrink: 1;
     outline: none;
 }
 
