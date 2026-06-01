@@ -73,7 +73,7 @@
 /* ── Key table ──────────────────────────────────────────────── */
 
 /* .container-table-wrap / .container-table come from admin_audit.css /
-   admin_postgres.css — they share the same class names already in use */
+   admin_database.css — they share the same class names already in use */
 
 .key-fp {
     font-size: 0.72rem;

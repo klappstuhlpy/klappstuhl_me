@@ -1,38 +1,37 @@
 {% extends "admin/admin_layout.html" %}
 
-{% block title %}Postgres | Admin | Klappstuhl.me{% endblock %}
+{% block title %}Database | Admin | Klappstuhl.me{% endblock %}
 
 {% block admin_css %}
 <link rel="stylesheet" href="/static/css/admin/admin_metrics.css">
-<link rel="stylesheet" href="/static/css/admin/admin_postgres.css">
+<link rel="stylesheet" href="/static/css/admin/admin_database.css">
 {% endblock %}
 
 {% block admin_body %}
 <div class="admin-page-header">
-    <h1>Postgres</h1>
-    {% if configured %}
+    <h1>Database</h1>
     <div class="postgres-toolbar">
         <label for="db-picker" class="postgres-toolbar-label">Database</label>
         <select id="db-picker" class="form-field"></select>
     </div>
-    {% endif %}
 </div>
 
-{% if !configured %}
+{% if !postgres_configured %}
 <div class="admin-empty" style="margin-bottom: 1rem;">
-    Postgres admin is disabled — no <code>postgres_url</code> in
-    <code>config.json</code>. Add a libpq URL
-    (<code>postgresql://user:password@host:port/database</code>) and
-    restart the app to enable this page.
+    Browsing the internal databases (<code>main</code>, <code>requests</code>).
+    To also browse an external PostgreSQL instance, add a
+    <code>postgres_url</code>
+    (<code>postgresql://user:password@host:port/database</code>) to
+    <code>config.json</code> and restart the app.
 </div>
-{% else %}
+{% endif %}
 
 <div class="pg-grid">
     {# ─── Left column: tabs (Tables / Roles) ────────────────────── #}
     <section class="pg-panel">
         <div class="pg-tabs" id="pg-tabs">
             <button data-tab="tables" class="pg-tab active">Tables</button>
-            <button data-tab="roles"  class="pg-tab">Roles</button>
+            <button data-tab="roles"  class="pg-tab" id="pg-tab-roles">Roles</button>
         </div>
 
         <div class="pg-tab-panel" id="pg-panel-tables">
@@ -75,7 +74,7 @@
     <section class="pg-panel">
         <div class="pg-runner-head">
             <h2 class="pg-h2">Query</h2>
-            <label class="toggle-label" title="Wrap query in BEGIN TRANSACTION READ ONLY">
+            <label class="toggle-label" title="Run the query in read-only mode">
                 <input type="checkbox" id="safe-mode" checked>
                 <span class="toggle-track"><span class="toggle-thumb"></span></span>
                 <span class="toggle-text">Safe mode</span>
@@ -87,7 +86,7 @@
             class="pg-sql-input"
             spellcheck="false"
             autocomplete="off"
-            placeholder="SELECT 1;">SELECT current_database(), current_user, version();</textarea>
+            placeholder="SELECT 1;">SELECT 1;</textarea>
 
         <div class="pg-runner-actions">
             <button class="button primary" id="run-btn">Run</button>
@@ -105,12 +104,8 @@
         </div>
     </section>
 </div>
-
-{% endif %}
 {% endblock %}
 
 {% block body_end %}
-{% if configured %}
-<script src="/static/js/admin/admin_postgres.js"></script>
-{% endif %}
+<script src="/static/js/admin/admin_database.js"></script>
 {% endblock %}

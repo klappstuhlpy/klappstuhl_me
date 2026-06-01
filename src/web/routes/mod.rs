@@ -9,13 +9,13 @@ mod audit;
 mod auth;
 mod backups;
 mod certs;
+mod dbadmin;
 mod docker;
 mod firewall;
 mod health;
 mod image;
 mod logs;
 mod metrics;
-mod postgres;
 mod proxy;
 mod sanitizer;
 mod secrets;
@@ -69,7 +69,7 @@ pub fn all() -> Router<AppState> {
         .merge(admin::routes())
         .merge(audit::routes())
         .merge(metrics::routes())
-        .merge(postgres::routes())
+        .merge(dbadmin::routes())
         .merge(secrets::routes())
         .merge(security::routes())
         .merge(ssh::routes())

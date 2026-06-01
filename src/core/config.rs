@@ -252,7 +252,7 @@ pub struct Config {
     /// `docker-compose.yml` and reference the in-container path here.
     #[serde(default)]
     pub secret_scan_paths: Vec<PathBuf>,
-    /// PostgreSQL connection string for the `/admin/postgres` page.
+    /// PostgreSQL connection string for the `/admin/database` page.
     ///
     /// Format (libpq URL):
     /// `postgresql://user:password@host:port/database`

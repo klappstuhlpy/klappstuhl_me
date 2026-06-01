@@ -1,10 +1,10 @@
 //! Pre-flight query classifier.
 //!
-//! The real safety net is `BEGIN TRANSACTION READ ONLY` (enforced by the
-//! Postgres server), but a lightweight first-keyword check rejects obvious
-//! writes before we even open a connection — that way the user sees a
-//! clear "blocked by safe-mode" error instead of a generic
-//! `read-only transaction: cannot execute INSERT` from Postgres.
+//! The real safety net is the engine-level read-only mode (Postgres'
+//! `BEGIN TRANSACTION READ ONLY`, SQLite's `PRAGMA query_only`), but a
+//! lightweight first-keyword check rejects obvious writes before we even
+//! open a connection — that way the user sees a clear "blocked by
+//! safe-mode" error instead of a generic engine error.
 //!
 //! The check is intentionally conservative:
 //! - Comments (`-- …`, `/* … */`) are stripped first.
@@ -17,8 +17,8 @@
 /// `EXPLAIN`, `SHOW`, `WITH … SELECT`, `VALUES`, `TABLE`, `FETCH`).
 ///
 /// Returning `true` doesn't mean the query *will* be allowed — the
-/// server-side `READ ONLY` transaction has final say. It just means we
-/// won't reject before sending.
+/// engine-level read-only mode has final say. It just means we won't
+/// reject before sending.
 pub fn is_safe_query(sql: &str) -> bool {
     let stripped = strip_comments(sql);
     let trimmed = stripped.trim();
@@ -29,7 +29,7 @@ pub fn is_safe_query(sql: &str) -> bool {
     let head = first_real_keyword(trimmed);
     matches!(
         head.to_ascii_uppercase().as_str(),
-        "SELECT" | "EXPLAIN" | "SHOW" | "VALUES" | "TABLE" | "FETCH" | "WITH"
+        "SELECT" | "EXPLAIN" | "SHOW" | "VALUES" | "TABLE" | "FETCH" | "WITH" | "PRAGMA"
     )
 }
 
@@ -89,6 +89,7 @@ mod tests {
         assert!(is_safe_query("EXPLAIN ANALYZE SELECT 1"));
         assert!(is_safe_query("SHOW TIMEZONE"));
         assert!(is_safe_query("WITH x AS (SELECT 1) SELECT * FROM x"));
+        assert!(is_safe_query("PRAGMA table_info(account)"));
     }
 
     #[test]

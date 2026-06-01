@@ -1,34 +1,21 @@
-//! PostgreSQL admin tooling for `/admin/postgres`.
+//! PostgreSQL backend for the database admin page.
 //!
 //! `tokio-postgres` is connected per-request — admin pages don't see
 //! enough traffic to warrant a pool, and per-request connections also
 //! give us a clean way to switch databases (Postgres has no
 //! `USE database` and a client must reconnect to target a different DB).
 //!
-//! Safety:
-//! - Safe-mode queries run inside `BEGIN TRANSACTION READ ONLY` so even
-//!   if the connecting user has DDL/DML rights, the query physically
-//!   cannot mutate anything.  This is bulletproof against parser-bypass
-//!   tricks (comments, quoted identifiers, etc.).
-//! - `is_safe_query()` is a lightweight pre-filter that rejects obvious
-//!   writes before we even contact the server — it short-circuits the
-//!   common case and keeps error messages user-friendly.
-//! - In danger mode the operator has explicitly opted-in via a checkbox
-//!   that's only visible to admins; the safety wrappers are skipped.
+//! Safe-mode queries run inside `BEGIN TRANSACTION READ ONLY` so even if
+//! the connecting user has DDL/DML rights, the query physically cannot
+//! mutate anything. This is bulletproof against parser-bypass tricks
+//! (comments, quoted identifiers, etc.).
 
-mod safety;
-
-pub use safety::is_safe_query;
-
-use serde::Serialize;
 use std::time::{Duration, Instant};
 use tokio_postgres::{config::Config as PgConfig, types::Type, NoTls};
 
+use super::{DatabaseInfo, QueryResult, RoleInfo, TableInfo, ROW_LIMIT};
 use crate::AppState;
 
-/// Hard cap on the number of rows returned by the query runner so a
-/// `SELECT * FROM big_table` doesn't OOM the browser tab.
-pub const ROW_LIMIT: usize = 1000;
 /// Connection + statement timeout (per HTTP request).
 pub const QUERY_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -47,7 +34,7 @@ fn parse_url(url: &str, override_db: Option<&str>) -> anyhow::Result<PgConfig> {
 /// instance, optionally targeting a specific database.
 ///
 /// The spawned `connection` task drives the protocol — we await `client`
-/// for queries.  When the client is dropped at the end of the request,
+/// for queries. When the client is dropped at the end of the request,
 /// the connection task exits gracefully.
 async fn connect(state: &AppState, db: Option<&str>) -> anyhow::Result<tokio_postgres::Client> {
     let url = state
@@ -68,17 +55,6 @@ async fn connect(state: &AppState, db: Option<&str>) -> anyhow::Result<tokio_pos
 
 // ─── Catalog reads ───────────────────────────────────────────────────
 
-#[derive(Debug, Serialize)]
-pub struct DatabaseInfo {
-    pub name: String,
-    pub owner: String,
-    pub encoding: String,
-    /// On-disk size as a human string (`"42 MB"`, returned by
-    /// `pg_size_pretty(pg_database_size(...))`).  We use the formatted
-    /// string so the UI doesn't have to know about Postgres' size types.
-    pub size_pretty: String,
-}
-
 pub async fn list_databases(state: &AppState) -> anyhow::Result<Vec<DatabaseInfo>> {
     let client = connect(state, None).await?;
     let rows = client
@@ -95,22 +71,18 @@ pub async fn list_databases(state: &AppState) -> anyhow::Result<Vec<DatabaseInfo
         .await?;
     Ok(rows
         .into_iter()
-        .map(|r| DatabaseInfo {
-            name: r.get("name"),
-            owner: r.get("owner"),
-            encoding: r.get("encoding"),
-            size_pretty: r.get("size_pretty"),
+        .map(|r| {
+            let name: String = r.get("name");
+            DatabaseInfo {
+                id: format!("pg:{name}"),
+                name,
+                kind: "postgres",
+                owner: r.get("owner"),
+                encoding: r.get("encoding"),
+                size_pretty: r.get("size_pretty"),
+            }
         })
         .collect())
-}
-
-#[derive(Debug, Serialize)]
-pub struct TableInfo {
-    pub schema: String,
-    pub name: String,
-    pub owner: String,
-    pub row_estimate: i64,
-    pub size_pretty: String,
 }
 
 pub async fn list_tables(state: &AppState, db: &str) -> anyhow::Result<Vec<TableInfo>> {
@@ -145,15 +117,6 @@ pub async fn list_tables(state: &AppState, db: &str) -> anyhow::Result<Vec<Table
         .collect())
 }
 
-#[derive(Debug, Serialize)]
-pub struct RoleInfo {
-    pub name: String,
-    pub superuser: bool,
-    pub can_login: bool,
-    pub can_create_db: bool,
-    pub can_create_role: bool,
-}
-
 pub async fn list_roles(state: &AppState) -> anyhow::Result<Vec<RoleInfo>> {
     let client = connect(state, None).await?;
     let rows = client
@@ -183,18 +146,7 @@ pub async fn list_roles(state: &AppState) -> anyhow::Result<Vec<RoleInfo>> {
 
 // ─── Query runner ────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize)]
-pub struct QueryResult {
-    pub columns: Vec<String>,
-    pub rows: Vec<Vec<String>>,
-    pub row_count: usize,
-    pub elapsed_ms: u64,
-    /// `true` when we capped the result set at [`ROW_LIMIT`].  The UI
-    /// shows a banner so the operator knows results are partial.
-    pub truncated: bool,
-}
-
-/// Runs the given SQL.  When `safe` is true, wraps the query in
+/// Runs the given SQL. When `safe` is true, wraps the query in
 /// `BEGIN TRANSACTION READ ONLY` … `COMMIT` so the server enforces
 /// read-only-ness regardless of the connecting role's privileges.
 pub async fn run_query(state: &AppState, db: &str, sql: &str, safe: bool) -> anyhow::Result<QueryResult> {
@@ -239,7 +191,7 @@ pub async fn run_query(state: &AppState, db: &str, sql: &str, safe: bool) -> any
     })
 }
 
-/// Per-cell type-dispatch.  Covers everything you'd reasonably encounter
+/// Per-cell type-dispatch. Covers everything you'd reasonably encounter
 /// in an admin tool — TEXT family, integers, floats, booleans, JSON,
 /// UUID, timestamps. Unknown OIDs degrade gracefully to a placeholder.
 ///

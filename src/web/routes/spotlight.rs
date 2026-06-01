@@ -93,7 +93,7 @@ fn static_nav() -> Vec<SpotlightItem> {
         SpotlightItem::nav("Firewall", "Packet-filter rules and lockouts", "/admin/firewall"),
         SpotlightItem::nav("Secrets", "Secret scanner findings", "/admin/secrets"),
         SpotlightItem::nav("Audit log", "All admin actions", "/admin/audit"),
-        SpotlightItem::nav("Postgres", "Query the database", "/admin/postgres"),
+        SpotlightItem::nav("Database", "Browse and query the databases", "/admin/database"),
         SpotlightItem::nav("SSH Keys", "Keys, tokens, session audit", "/admin/ssh"),
         SpotlightItem::nav("SSH Session Audit", "Active sessions and logins", "/admin/ssh/audit"),
         SpotlightItem::nav("File Sanitizer", "ClamAV + VirusTotal scanning", "/admin/sanitizer"),

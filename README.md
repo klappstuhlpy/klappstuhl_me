@@ -29,7 +29,7 @@ management, security analytics, virus scanning, and an invite-only user system.
   - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI / Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
   - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth events (login success/fail, 2FA challenge/fail, signup, password change, logout), invite create/revoke, service/snapshot/script actions, secret status changes, backup create/delete, and admin cache invalidation are all tracked. Filterable by action prefix and actor.
   - **Logs** — interactive viewer over the rolling tracing log files. Parses the JSON application log (one object per line) and the compact bad-request log best-effort, with level/text filtering and tailing. (Separate from the dashboard's request-log panels.)
-  - **Postgres** — browse databases, tables, and roles on a separate PostgreSQL server. Safe-mode query runner wraps every statement in `BEGIN TRANSACTION READ ONLY` so even a superuser credential can't accidentally mutate state; explicit danger-mode toggle for `INSERT` / `UPDATE` / `DELETE` / DDL when needed. Every query writes an audit entry (including blocked-by-safe-mode attempts).
+  - **Database** — browse databases, tables, and (for Postgres) roles behind one picker: the app's own internal SQLite databases (`main`, `requests`) are always available, and an external PostgreSQL server is added when `postgres_url` is configured. Safe-mode query runner enforces read-only execution at the engine level — `BEGIN TRANSACTION READ ONLY` for Postgres, `PRAGMA query_only` for SQLite — so even a superuser credential can't accidentally mutate state; explicit danger-mode toggle for `INSERT` / `UPDATE` / `DELETE` / DDL when needed. Every query writes an audit entry (including blocked-by-safe-mode attempts).
   - **SSH Keys** — manage authorized SSH public keys stored in the database. Add keys with an optional label; optionally sync them to a real `authorized_keys` file on the host and populate each key's "Last used" timestamp by tailing the sshd auth log (see [SSH key sync](#ssh-key-sync-and-last-used-tracking)). Token audit (active API tokens across accounts) and session audit (active login sessions with IP + user-agent) sub-pages. Revoke individual keys, tokens, or sessions.
   - **File Sanitizer** — drag-and-drop file scanning with two optional backends.
     - **ClamAV** — streams the uploaded file to a local `clamd` daemon over TCP (INSTREAM protocol). Reports virus name on detection.
@@ -318,7 +318,7 @@ Because the container uses host networking you can run this from either the host
 
 **VirusTotal** — set `virustotal_api_key` to a free public API key. The File Sanitizer computes the SHA-256 of each upload and does a hash-only lookup against VT v3 — no file data is ever sent to VirusTotal. Files not yet in the VT database show as "Not in VT".
 
-**Postgres** — set `postgres_url` to a libpq connection string. The configured credential should have at least `pg_read_all_data`; a superuser works too since safe-mode queries are always wrapped in `BEGIN TRANSACTION READ ONLY`.
+**Database** — the internal SQLite databases (`main`, `requests`) are browsable out of the box. To also browse an external Postgres server, set `postgres_url` to a libpq connection string. The configured credential should have at least `pg_read_all_data`; a superuser works too since safe-mode queries are always wrapped in `BEGIN TRANSACTION READ ONLY`.
 
 ### SSH key sync and "Last used" tracking
 
@@ -666,7 +666,7 @@ src/
 │   ├── firewall/         — backend abstraction (nft/ufw/iptables), storage, auto-lockout, ufw import
 │   ├── health/           — uptime checker probes, storage, background monitor
 │   ├── metrics/          — host parsers, docker stats, alerts, storage
-│   ├── postgres/         — Postgres client + safe-mode wrapper
+│   ├── dbadmin/          — database admin: Postgres + internal SQLite backends, safe-mode wrapper
 │   ├── proxy/            — route storage, nginx/caddy/cloudflared renderer + reload (mod.rs), Cloudflare Tunnel API import/push (cloudflared.rs)
 │   └── secrets/          — rules, scanner, storage
 └── web/                  — HTTP layer: caching, flash, headers, rate limiter
@@ -674,7 +674,7 @@ src/
         ├── admin.rs      — Dashboard
         ├── auth.rs       — Login / signup / 2FA / password change / account
         ├── audit.rs · backups.rs · certs.rs · logs.rs · docker.rs · firewall.rs · health.rs
-        ├── image.rs · metrics.rs · postgres.rs · proxy.rs · sanitizer.rs
+        ├── image.rs · metrics.rs · dbadmin.rs · proxy.rs · sanitizer.rs
         ├── secrets.rs · security.rs · spotlight.rs · ssh.rs · ws.rs
         └── api/           — REST API: images, media, scan, code, external (Chromium/ffmpeg), admin, auth/scopes
 

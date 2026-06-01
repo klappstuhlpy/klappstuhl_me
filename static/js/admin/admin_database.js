@@ -1,7 +1,8 @@
-/* ── Postgres admin dashboard ──────────────────────────────────
-   Three panels:
+/* ── Database admin dashboard ──────────────────────────────────
+   Browses the internal SQLite databases (main, requests) and, when
+   configured, an external Postgres instance. Three panels:
      - Database picker in the header (drives the page state).
-     - Left: Tables / Roles tabs.
+     - Left: Tables / Roles tabs (Roles is Postgres-only).
      - Right: SQL editor + Run button + results table.
    Safe-mode is on by default; toggling it off shows a confirmation
    banner the first time and switches the Run button to danger style.
@@ -9,6 +10,7 @@
 
 const dbPicker     = document.getElementById("db-picker");
 const tabsEl       = document.getElementById("pg-tabs");
+const rolesTab     = document.getElementById("pg-tab-roles");
 const tablesTbody  = document.querySelector("#tables-table tbody");
 const rolesTbody   = document.querySelector("#roles-table tbody");
 const sqlInput     = document.getElementById("sql-input");
@@ -17,6 +19,9 @@ const safeToggle   = document.getElementById("safe-mode");
 const statusEl     = document.getElementById("pg-status");
 const resultMeta   = document.getElementById("pg-result-meta");
 const resultTable  = document.getElementById("pg-result-table");
+
+// Maps a source id ("sqlite:main", "pg:foo") to its backend kind.
+const dbKinds = new Map();
 
 function escapeHtml(s) {
     if (s == null) return "";
@@ -34,7 +39,7 @@ function showStatus(text, cls) {
 
 async function loadDatabases() {
     showStatus("Loading databases…");
-    const res = await fetch("/admin/postgres/databases");
+    const res = await fetch("/admin/database/databases");
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         showStatus("Failed to list databases: " + (err.error || res.status), "error");
@@ -42,23 +47,38 @@ async function loadDatabases() {
     }
     const dbs = await res.json();
     dbPicker.innerHTML = "";
+    dbKinds.clear();
     for (const db of dbs) {
+        dbKinds.set(db.id, db.kind);
         const opt = document.createElement("option");
-        opt.value = db.name;
-        opt.textContent = `${db.name}  ·  ${db.size_pretty}`;
+        opt.value = db.id;
+        opt.textContent = `${db.name}  ·  ${db.kind}  ·  ${db.size_pretty}`;
         dbPicker.appendChild(opt);
     }
     showStatus("");
     if (dbs.length > 0) {
-        await loadTables(dbs[0].name);
+        onDatabaseSelected();
     }
+}
+
+/* Reflects the selected source: Roles tab only applies to Postgres. */
+function onDatabaseSelected() {
+    const id = dbPicker.value;
+    const isPostgres = dbKinds.get(id) === "postgres";
+    rolesTab.classList.toggle("hidden", !isPostgres);
+    // If a SQLite source is picked while the Roles tab was active, fall back
+    // to the Tables tab.
+    if (!isPostgres && rolesTab.classList.contains("active")) {
+        tabsEl.querySelector('[data-tab="tables"]').click();
+    }
+    loadTables(id);
 }
 
 /* ── Tables list ───────────────────────────────────────────── */
 
 async function loadTables(db) {
     tablesTbody.innerHTML = '<tr><td colspan="6" class="muted">Loading…</td></tr>';
-    const res = await fetch(`/admin/postgres/tables?db=${encodeURIComponent(db)}`);
+    const res = await fetch(`/admin/database/tables?db=${encodeURIComponent(db)}`);
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         tablesTbody.innerHTML = `<tr><td colspan="6" class="muted">Error: ${escapeHtml(err.error || res.statusText)}</td></tr>`;
@@ -78,15 +98,18 @@ async function loadTables(db) {
             <td class="numeric">${fmtNumber(r.row_estimate)}</td>
             <td class="numeric">${escapeHtml(r.size_pretty)}</td>
             <td><button class="button outline use-table-btn"
-                    data-table="${fq}" title="Insert a SELECT * stub into the query box">Use</button></td>
+                    data-name="${escapeHtml(r.name)}" title="Insert a SELECT * stub into the query box">Use</button></td>
         </tr>`;
     }).join("");
 
-    // Wire "Use" buttons
+    // Wire "Use" buttons. SQLite has a single schema, so reference the bare
+    // (quoted) table name; Postgres uses the schema-qualified name.
+    const isPostgres = dbKinds.get(dbPicker.value) === "postgres";
     tablesTbody.querySelectorAll(".use-table-btn").forEach(btn => {
         btn.addEventListener("click", () => {
-            const fq = btn.dataset.table;
-            sqlInput.value = `SELECT * FROM ${fq} LIMIT 100;`;
+            const name = btn.dataset.name;
+            const ref = isPostgres ? name : `"${name.replace(/"/g, '""')}"`;
+            sqlInput.value = `SELECT * FROM ${ref} LIMIT 100;`;
             sqlInput.focus();
         });
     });
@@ -96,7 +119,7 @@ async function loadTables(db) {
 
 async function loadRoles() {
     rolesTbody.innerHTML = '<tr><td colspan="5" class="muted">Loading…</td></tr>';
-    const res = await fetch("/admin/postgres/roles");
+    const res = await fetch("/admin/database/roles");
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         rolesTbody.innerHTML = `<tr><td colspan="5" class="muted">Error: ${escapeHtml(err.error || res.statusText)}</td></tr>`;
@@ -129,7 +152,7 @@ tabsEl.addEventListener("click", (e) => {
     if (btn.dataset.tab === "roles") loadRoles();
 });
 
-dbPicker.addEventListener("change", () => loadTables(dbPicker.value));
+dbPicker.addEventListener("change", onDatabaseSelected);
 
 /* ── Safe-mode toggle ───────────────────────────────────────── */
 
@@ -143,7 +166,7 @@ safeToggle.addEventListener("change", () => {
         banner = document.createElement("div");
         banner.className = "pg-danger-banner";
         banner.textContent =
-            "⚠ Safe mode off. The query will run in a normal transaction — INSERT, UPDATE, DELETE, DROP and other writes are permitted.";
+            "⚠ Safe mode off. The query runs with writes enabled — INSERT, UPDATE, DELETE, DROP and other writes are permitted.";
         runBtn.parentElement.insertAdjacentElement("afterend", banner);
     } else if (safe && banner) {
         banner.remove();
@@ -172,7 +195,7 @@ runBtn.addEventListener("click", async () => {
     });
 
     try {
-        const res = await fetch("/admin/postgres/query", {
+        const res = await fetch("/admin/database/query", {
             method: "POST",
             headers: { "content-type": "application/x-www-form-urlencoded" },
             body,
