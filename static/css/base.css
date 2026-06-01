@@ -445,6 +445,10 @@ header.grid-item {
     grid-area: h;
     border-bottom: 1px solid var(--box-border);
     margin-bottom: 1.5rem;
+    /* Reserve the status-bar inset in standalone PWA mode so the nav drops
+       below the phone clock / battery instead of hiding under them. The
+       env() value is 0 in normal browser tabs, leaving the layout intact. */
+    padding-top: calc(0.75rem + env(safe-area-inset-top));
 }
 
 main.grid-item { grid-area: c; }
@@ -559,12 +563,16 @@ a.nav-item.active { font-weight: bold; }
 
 .hamburger-menu {
     position: absolute;
-    top: 29px;
+    /* Offset by the status-bar inset so the icon clears the notch / clock
+       when launched as a home-screen PWA (black-translucent status bar). */
+    top: calc(29px + env(safe-area-inset-top));
     right: 1rem;
     width: 26px;
     height: 26px;
     cursor: pointer;
-    z-index: 2;
+    /* Sit above page content (homepage hero z-index:1, gallery select
+       pill z-index:2) so the toggle stays tappable over either. */
+    z-index: 1001;
 }
 
 #hamburger-toggle:checked + .hamburger-menu { position: fixed; }
@@ -594,11 +602,15 @@ a.nav-item.active { font-weight: bold; }
         width: 50%;
         height: 100%;
         margin: 0;
-        padding: 60px 0;
+        /* Pad the top by the status-bar inset so the first link clears the
+           clock / battery when running as a standalone PWA. */
+        padding: calc(60px + env(safe-area-inset-top)) 0 60px;
         background-color: var(--background);
         box-shadow: 2px 2px 6px rgba(0, 0, 0, .4);
         transition-duration: .25s;
-        z-index: 1;
+        /* Above all in-page content so the drawer is fully opaque — the
+           homepage hero and gallery select pills must not bleed through. */
+        z-index: 1000;
         flex-direction: column;
     }
 
