@@ -5,12 +5,22 @@ Error | Klappstuhl.me
 {% endblock %}
 
 {% block body %}
-<h1>Whoops</h1>
-<p>
-    An internal error happened: {{ error }}
-</p>
-<p>
-    There is no need to be alarmed. <a href="/">Feel free to go back.</a>
-</p>
+<section class="error-cli">
+    <div class="tui-box">
+        <div class="tui-bar">
+            <span class="tui-lights"><span></span><span></span><span></span></span>
+            <span class="tui-title"><span class="glyph spark">✻</span> klappstuhl@me — panic</span>
+        </div>
+        <div class="tui-body">
+            <p class="tui-prompt" data-prompt="$">klappstuhl --serve "$REQUEST"</p>
+            <pre class="error-trace">thread 'request' panicked:
+  error: {{ error }}
+     ┌─ the server caught this and kept running
+     │
+     = note: there is no need to be alarmed
+     = help: head back home and try again</pre>
+            <p class="tui-prompt" data-prompt="$"><a href="/">cd ~</a> <span class="blink" aria-hidden="true">▋</span></p>
+        </div>
+    </div>
+</section>
 {% endblock %}
-

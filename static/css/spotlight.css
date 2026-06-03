@@ -102,9 +102,10 @@
 }
 
 .spotlight-search-icon {
-    font-size: 1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
     flex-shrink: 0;
-    color: var(--text-muted);
+    color: var(--branding);
 }
 
 .spotlight-input {
@@ -137,6 +138,12 @@
     overflow-y: auto;
     flex: 1;
     padding: 0.4rem 0;
+    /* Keep scrolling on its own compositor layer and isolate paints to this
+       box, so moving over rows while scrolling doesn't repaint the whole
+       (blurred-backdrop) overlay — the source of the scroll lag. */
+    contain: content;
+    overscroll-behavior: contain;
+    transform: translateZ(0);
 }
 
 .spotlight-results:empty::after {
@@ -171,6 +178,7 @@
     border-radius: 0;
     transition: background 0.08s;
     border: none;
+    border-left: 2px solid transparent;
     background: transparent;
     width: 100%;
     text-align: left;
@@ -178,13 +186,13 @@
     color: inherit;
 }
 
-.spotlight-item:hover,
-.spotlight-item.active {
+.spotlight-item:hover {
     background: var(--box-shade);
 }
 
 .spotlight-item.active {
-    background: color-mix(in srgb, var(--branding) 12%, transparent);
+    background: var(--branding-dim);
+    border-left-color: var(--branding);
 }
 
 .spotlight-item-icon {
@@ -236,6 +244,7 @@
 
 .spotlight-item-badge.kind-script   { border-color: var(--branding); color: var(--branding); background: color-mix(in srgb, var(--branding) 10%, transparent); }
 .spotlight-item-badge.kind-api      { border-color: var(--branding); color: var(--branding); background: color-mix(in srgb, var(--branding) 14%, transparent); }
+.spotlight-item-badge.kind-ai       { border-color: var(--branding); color: var(--branding-bright); background: color-mix(in srgb, var(--branding) 16%, transparent); }
 .spotlight-item-badge.kind-audit    { border-color: var(--warning-border); color: var(--warning-text); background: var(--warning-bg); }
 .spotlight-item-badge.kind-scan     { border-color: var(--success-border); color: var(--success-text); background: var(--success-bg); }
 .spotlight-item-badge.kind-ssh      { border-color: var(--box-border); color: var(--text-muted); background: var(--box-shade); }

@@ -22,22 +22,38 @@
     padding: 2rem 0;
 }
 
+/* Centered terminal window holding the boot-sequence hero. */
+.term-window {
+    width: min(640px, 94vw);
+    text-align: left;
+}
+
+.term-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 1.25rem 1.4rem 1.5rem;
+}
+
+/* The prompt lines sit tight above their "output". */
+.term-hero .tui-prompt { margin: 0; font-size: 0.95rem; }
+.term-hero .tui-prompt:not(:first-child) { margin-top: 0.6rem; }
+
 .hero-name {
-    margin: 0;
-    font-size: clamp(2.1rem, 9vw, 5rem);
+    margin: 0.1rem 0 0;
+    font-size: clamp(1.9rem, 7vw, 3.4rem);
     font-weight: 500;
     letter-spacing: -0.02em;
     line-height: 1.05;
-    color: var(--foreground);
-    /* Reserve a stable baseline so the cursor never reflows the line. */
+    color: var(--branding-bright);
     white-space: nowrap;
 }
 
 .hero-tag {
-    margin: 0;
-    font-size: clamp(0.8rem, 2.6vw, 1.05rem);
-    color: var(--text-muted);
-    letter-spacing: 0.05em;
+    margin: 0.1rem 0 0;
+    font-size: clamp(0.85rem, 2.6vw, 1.05rem);
+    color: var(--foreground);
+    letter-spacing: 0.02em;
     min-height: 1.4em; /* avoid layout shift while it scrambles in */
 }
 

@@ -11,7 +11,7 @@ pub mod web;
 // Flat aliases: keep every `crate::<module>` path working after the regrouping.
 pub use auth::{key, token, totp};
 pub use core::{cli, config, database, error, filters, logging, models, state, utils};
-pub use integrations::{cf_tunnel, cloudflare, discord, exttools, geoip};
+pub use integrations::{ai, cf_tunnel, cloudflare, discord, exttools, geoip};
 pub use media::{codeimage, metadata, scan, thumbnail};
 pub use services::{
     alerts, audit, backup, cron, dbadmin, docker, firewall, health, metrics, proxy, secrets, ssh, updates,

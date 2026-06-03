@@ -22,6 +22,7 @@ mod secrets;
 mod security;
 mod spotlight;
 mod ssh;
+mod terminal;
 mod ws;
 
 pub use api::{copy_api_token, ApiToken};
@@ -82,6 +83,7 @@ pub fn all() -> Router<AppState> {
         .merge(backups::routes())
         .merge(logs::routes())
         .merge(spotlight::routes())
+        .merge(terminal::routes())
         .merge(ws::routes())
         .nest("/api", api::routes())
 }

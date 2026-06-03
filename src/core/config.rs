@@ -222,6 +222,41 @@ pub struct BackupConfig {
     pub remote: Option<BackupRemoteConfig>,
 }
 
+/// AI assistant settings powering the public `/terminal` "ask AI" feature.
+/// Backed by the Groq API (free tier, available in the EU; OpenAI-compatible).
+/// Disabled (the endpoint returns 503) unless `api_key` is set.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct AiConfig {
+    /// Groq API key (`gsk_…`, free from <https://console.groq.com/keys>). The
+    /// key stays server-side; the browser only ever talks to this app's
+    /// `/api/ask` proxy. Unset = feature off.
+    #[serde(default)]
+    pub api_key: Option<String>,
+    /// Groq model id to use. Unset defaults to a free model with tool-calling
+    /// support (see [`AiConfig::model_id`]).
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Default for "may anyone spend tokens?": `false` restricts `/api/ask` to
+    /// admin accounts, `true` lets any visitor use it (still rate-limited).
+    /// This is only the *initial* value — admins can flip it at runtime from
+    /// `/terminal` (persisted in the `storage` KV table), and the stored value
+    /// then takes precedence over this default.
+    #[serde(default)]
+    pub public: bool,
+}
+
+impl AiConfig {
+    /// Whether the ask-AI feature is enabled (an API key is configured).
+    pub fn enabled(&self) -> bool {
+        self.api_key.as_deref().map(|k| !k.is_empty()).unwrap_or(false)
+    }
+
+    /// The configured model, or a free default with reliable tool-calling.
+    pub fn model_id(&self) -> &str {
+        self.model.as_deref().filter(|m| !m.is_empty()).unwrap_or("llama-3.3-70b-versatile")
+    }
+}
+
 /// The server configuration.
 ///
 /// Field/declaration order is the canonical on-disk order: `load()` rewrites
@@ -352,6 +387,10 @@ pub struct Config {
     /// can never be buffered whole in memory.
     #[serde(default)]
     pub max_upload_bytes: Option<u64>,
+    /// AI assistant settings (Groq) for the public `/terminal` ask feature.
+    /// Off unless `ai.api_key` is set.
+    #[serde(default)]
+    pub ai: AiConfig,
 }
 
 /// Default per-file upload ceiling (10 MiB) used when `max_upload_bytes` is
@@ -382,6 +421,7 @@ impl Config {
             chromium_path: None,
             ffmpeg_path: None,
             max_upload_bytes: None,
+            ai: AiConfig::default(),
         })
     }
 
@@ -661,6 +701,7 @@ mod tests {
             "chromium_path",
             "ffmpeg_path",
             "max_upload_bytes",
+            "ai",
         ];
         let mut last = 0usize;
         for key in expected {

@@ -56,7 +56,7 @@
 }
 
 .admin-nav-item.active {
-    background: rgba(124, 58, 237, 0.12);
+    background: rgb(237 153 58 / 0.12);
     color: var(--foreground);
     font-weight: 600;
 }
