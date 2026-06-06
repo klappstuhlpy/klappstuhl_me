@@ -27,66 +27,174 @@
         </div>
     </div>
 
+    {# ─── Feature Flags ──────────────────────────────────────────── #}
     <section class="config-section">
         <h2>Feature Flags</h2>
-        <div class="config-grid">
-            <label class="config-toggle">
-                <span class="config-label">Audit Log</span>
-                <input type="checkbox" {% if guild.flags.audit_log %}checked{% endif %} disabled>
-            </label>
-            <label class="config-toggle">
-                <span class="config-label">Raid Protection</span>
-                <input type="checkbox" {% if guild.flags.raid %}checked{% endif %} disabled>
-            </label>
-            <label class="config-toggle">
-                <span class="config-label">Alerts</span>
-                <input type="checkbox" {% if guild.flags.alerts %}checked{% endif %} disabled>
-            </label>
-            <label class="config-toggle">
-                <span class="config-label">Gatekeeper</span>
-                <input type="checkbox" {% if guild.flags.gatekeeper %}checked{% endif %} disabled>
-            </label>
-        </div>
+        <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
+            <input type="hidden" name="_section" value="flags">
+            <div class="config-grid">
+                <label class="config-toggle">
+                    <span class="config-label">Audit Log</span>
+                    <input type="checkbox" name="audit_log" value="true" {% if guild.flags.audit_log %}checked{% endif %}>
+                </label>
+                <label class="config-toggle">
+                    <span class="config-label">Raid Protection</span>
+                    <input type="checkbox" name="raid" value="true" {% if guild.flags.raid %}checked{% endif %}>
+                </label>
+                <label class="config-toggle">
+                    <span class="config-label">Alerts</span>
+                    <input type="checkbox" name="alerts" value="true" {% if guild.flags.alerts %}checked{% endif %}>
+                </label>
+                <label class="config-toggle">
+                    <span class="config-label">Gatekeeper</span>
+                    <input type="checkbox" name="gatekeeper" value="true" {% if guild.flags.gatekeeper %}checked{% endif %}>
+                </label>
+            </div>
+            <div class="config-actions">
+                <button type="submit" class="button primary small">Save</button>
+            </div>
+        </form>
     </section>
 
+    {# ─── Moderation ─────────────────────────────────────────────── #}
     <section class="config-section">
-        <h2>Channels</h2>
-        <div class="config-grid">
-            <div class="config-field">
-                <span class="config-label">Audit Log Channel</span>
-                <span class="config-value">{% match guild.audit_log_channel_id %}{% when Some with (id) %}{{ id }}{% when None %}<em>Not set</em>{% endmatch %}</span>
+        <h2>Moderation</h2>
+        <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
+            <input type="hidden" name="_section" value="moderation">
+            <div class="config-grid">
+                <div class="config-field">
+                    <label class="config-label" for="audit_log_channel">Audit Log Channel</label>
+                    <select name="audit_log_channel_id" id="audit_log_channel" class="config-select">
+                        <option value="">Not set</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% match guild.audit_log_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            #{{ ch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="alert_channel">Alert Channel</label>
+                    <select name="alert_channel_id" id="alert_channel" class="config-select">
+                        <option value="">Not set</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% match guild.alert_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            #{{ ch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="mute_role">Mute Role</label>
+                    <select name="mute_role_id" id="mute_role" class="config-select">
+                        <option value="">Not set</option>
+                        {% for role in roles %}
+                        <option value="{{ role.id }}" {% match guild.mute_role %}{% when Some with (ref) %}{% if ref.id == role.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            @{{ role.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="mention_count">Mention Threshold</label>
+                    <input type="number" name="mention_count" id="mention_count" class="config-input" min="0" max="100" placeholder="Off" value="{% match guild.mention_count %}{% when Some with (n) %}{{ n }}{% when None %}{% endmatch %}">
+                </div>
             </div>
-            <div class="config-field">
-                <span class="config-label">Poll Channel</span>
-                <span class="config-value">{% match guild.poll_channel_id %}{% when Some with (id) %}{{ id }}{% when None %}<em>Not set</em>{% endmatch %}</span>
+            <div class="config-actions">
+                <button type="submit" class="button primary small">Save</button>
             </div>
-            <div class="config-field">
-                <span class="config-label">Alert Channel</span>
-                <span class="config-value">{% match guild.alert_channel_id %}{% when Some with (id) %}{{ id }}{% when None %}<em>Not set</em>{% endmatch %}</span>
-            </div>
-            <div class="config-field">
-                <span class="config-label">Music Panel Channel</span>
-                <span class="config-value">{% match guild.music_panel_channel_id %}{% when Some with (id) %}{{ id }}{% when None %}<em>Not set</em>{% endmatch %}</span>
-            </div>
-        </div>
+        </form>
     </section>
 
+    {# ─── Polls ──────────────────────────────────────────────────── #}
     <section class="config-section">
-        <h2>Settings</h2>
-        <div class="config-grid">
-            <div class="config-field">
-                <span class="config-label">Prefixes</span>
-                <span class="config-value">{% if guild.prefixes.is_empty() %}<em>Default</em>{% else %}{{ guild.prefixes.join(", ") }}{% endif %}</span>
+        <h2>Polls</h2>
+        <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
+            <input type="hidden" name="_section" value="polls">
+            <div class="config-grid">
+                <div class="config-field">
+                    <label class="config-label" for="poll_channel">Poll Channel</label>
+                    <select name="poll_channel_id" id="poll_channel" class="config-select">
+                        <option value="">Not set</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% match guild.poll_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            #{{ ch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="poll_reason_channel">Reason Channel</label>
+                    <select name="poll_reason_channel_id" id="poll_reason_channel" class="config-select">
+                        <option value="">Not set</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% match guild.poll_reason_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            #{{ ch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="poll_ping_role">Ping Role</label>
+                    <select name="poll_ping_role_id" id="poll_ping_role" class="config-select">
+                        <option value="">Not set</option>
+                        {% for role in roles %}
+                        <option value="{{ role.id }}" {% match guild.poll_ping_role %}{% when Some with (ref) %}{% if ref.id == role.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            @{{ role.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <label class="config-toggle">
-                <span class="config-label">Music Panel</span>
-                <input type="checkbox" {% if guild.use_music_panel %}checked{% endif %} disabled>
-            </label>
-            <div class="config-field">
-                <span class="config-label">Mention Threshold</span>
-                <span class="config-value">{% match guild.mention_count %}{% when Some with (n) %}{{ n }}{% when None %}<em>Off</em>{% endmatch %}</span>
+            <div class="config-actions">
+                <button type="submit" class="button primary small">Save</button>
             </div>
-        </div>
+        </form>
+    </section>
+
+    {# ─── Music ──────────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Music</h2>
+        <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
+            <input type="hidden" name="_section" value="music">
+            <div class="config-grid">
+                <label class="config-toggle">
+                    <span class="config-label">Music Panel</span>
+                    <input type="checkbox" name="use_music_panel" value="true" {% if guild.use_music_panel %}checked{% endif %}>
+                </label>
+                <div class="config-field">
+                    <label class="config-label" for="music_panel_channel">Panel Channel</label>
+                    <select name="music_panel_channel_id" id="music_panel_channel" class="config-select">
+                        <option value="">Not set</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% match guild.music_panel_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            #{{ ch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="config-actions">
+                <button type="submit" class="button primary small">Save</button>
+            </div>
+        </form>
+    </section>
+
+    {# ─── Prefixes ───────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Prefixes</h2>
+        <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
+            <input type="hidden" name="_section" value="prefixes">
+            <div class="config-grid" style="grid-template-columns: 1fr;">
+                <div class="config-field">
+                    <label class="config-label" for="prefixes">Command Prefixes (comma-separated)</label>
+                    <input type="text" name="prefixes" id="prefixes" class="config-input" placeholder="?, !" value="{{ guild.prefixes.join(", ") }}">
+                </div>
+            </div>
+            <div class="config-actions">
+                <button type="submit" class="button primary small">Save</button>
+            </div>
+        </form>
     </section>
 </div>
 {% endblock %}

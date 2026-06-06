@@ -828,6 +828,50 @@ config edit). The choice is persisted in the `storage` KV table
 `ai.public` config default. Admins can always use the assistant regardless of
 the toggle.
 
+## Percy Bot Dashboard
+
+The Percy bot dashboard at `/percy/dashboard` lets Discord server administrators manage the Percy bot's per-guild configuration through a web interface instead of slash commands. It connects to Percy's internal API to read and write guild settings.
+
+### Requirements
+
+Add two config blocks to `config.json`:
+
+```json
+{
+  "discord": {
+    "client_id": "<Discord OAuth2 application ID>",
+    "client_secret": "<client secret>",
+    "redirect_uri": "https://<your-domain>/auth/discord/callback"
+  },
+  "percy": {
+    "api_url": "http://127.0.0.1:8090",
+    "api_token": "<shared secret matching Percy's INTERNAL_API_TOKEN>"
+  }
+}
+```
+
+Register the redirect URI in the [Discord Developer Portal](https://discord.com/developers/applications) under OAuth2.
+
+### Routes
+
+| Path | Description |
+|------|-------------|
+| `/auth/discord` | Initiate Discord OAuth2 link |
+| `/auth/discord/callback` | OAuth2 callback |
+| `/account/discord/unlink` | Remove Discord link |
+| `/percy/dashboard` | Server selection (guilds you can manage) |
+| `/percy/dashboard/guild/:id` | Per-guild config editor |
+| `/percy/dashboard/guild/:id/config` | POST: save config changes |
+
+### How it works
+
+1. User links their Discord account via OAuth2 (`/auth/discord`)
+2. The dashboard queries Percy's internal API for guilds the user can manage (Manage Server or Administrator permission)
+3. The config editor loads channels and roles from Percy's gateway cache for dropdown selects
+4. Form submissions are proxied through the Rust BFF to Percy's `PATCH /api/internal/guilds/{id}/config`, which writes to PostgreSQL and invalidates the cache
+
+---
+
 ## Metric alert thresholds
 
 Hard-coded (`src/services/metrics/alerts.rs`). On the `OK → ALERT` transition, an alert fans out to every configured

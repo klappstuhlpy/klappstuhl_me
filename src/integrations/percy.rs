@@ -145,6 +145,21 @@ pub struct UserGuild {
     pub owner: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChannelRef {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub channel_type: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RoleRef {
+    pub id: String,
+    pub name: String,
+    pub color: u32,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GuildInfo {
     pub id: u64,
@@ -152,14 +167,14 @@ pub struct GuildInfo {
     pub icon_url: Option<String>,
     pub member_count: Option<u32>,
     pub flags: GuildFlags,
-    pub audit_log_channel_id: Option<u64>,
-    pub poll_channel_id: Option<u64>,
-    pub poll_ping_role_id: Option<u64>,
-    pub poll_reason_channel_id: Option<u64>,
+    pub audit_log_channel: Option<ChannelRef>,
+    pub poll_channel: Option<ChannelRef>,
+    pub poll_ping_role: Option<RoleRef>,
+    pub poll_reason_channel: Option<ChannelRef>,
     pub mention_count: Option<u32>,
-    pub mute_role_id: Option<u64>,
-    pub alert_channel_id: Option<u64>,
-    pub music_panel_channel_id: Option<u64>,
+    pub mute_role: Option<RoleRef>,
+    pub alert_channel: Option<ChannelRef>,
+    pub music_panel_channel: Option<ChannelRef>,
     pub use_music_panel: bool,
     pub prefixes: Vec<String>,
 }
