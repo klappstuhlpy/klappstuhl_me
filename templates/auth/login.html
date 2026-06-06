@@ -58,6 +58,13 @@
             <input type="hidden" id="session-description" name="session_description" value="">
             <button class="button primary login-submit" type="submit">Login</button>
         </form>
+
+        {% if discord_enabled %}
+        <div class="login-divider">
+            <span>or</span>
+        </div>
+        <a href="/auth/discord" class="button outline login-discord">Login with Discord</a>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

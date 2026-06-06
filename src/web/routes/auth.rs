@@ -28,13 +28,15 @@ use time::OffsetDateTime;
 struct LoginTemplate {
     account: Option<Account>,
     flashes: Flashes,
+    discord_enabled: bool,
 }
 
-async fn login(account: Option<Account>, flashes: Flashes) -> Response {
+async fn login(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
     if account.is_some() {
         Redirect::to("/").into_response()
     } else {
-        LoginTemplate { account, flashes }.into_response()
+        let discord_enabled = state.config().discord.enabled();
+        LoginTemplate { account, flashes, discord_enabled }.into_response()
     }
 }
 
@@ -500,10 +502,15 @@ struct AccountInfoTemplate {
     /// Whether this account has TOTP 2FA enabled (drives the account-page UI).
     totp_enabled: bool,
     key: SecretKey,
+    /// Discord username if a Discord account is linked (empty string = not linked).
+    discord_username: String,
+    /// Whether Discord OAuth is configured (controls showing the link button).
+    discord_enabled: bool,
 }
 
 impl AccountInfoTemplate {
     async fn new(account: Account, user: Account, current_token: Token, state: &AppState) -> Self {
+        let user_id_for_discord = user.id;
         let entries = state
             .resolve_images()
             .await
@@ -541,6 +548,16 @@ impl AccountInfoTemplate {
         sessions.sort_by_key(|s| std::cmp::Reverse(s.created_at));
         let key = state.config().secret_key;
 
+        let discord_username: String = state
+            .database()
+            .call(move |conn| {
+                conn.prepare_cached("SELECT discord_username FROM user_discord_links WHERE account_id = ?")
+                    .and_then(|mut stmt| stmt.query_row([user_id_for_discord], |row| row.get(0)))
+            })
+            .await
+            .unwrap_or_default();
+        let discord_enabled = state.config().discord.enabled();
+
         Self {
             account: Some(account),
             user,
@@ -551,6 +568,8 @@ impl AccountInfoTemplate {
             api_key_scopes,
             totp_enabled,
             key,
+            discord_username,
+            discord_enabled,
         }
     }
 }

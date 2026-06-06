@@ -133,6 +133,24 @@
 </section>
 {% endif %}
 
+{# ─── Discord ────────────────────────────────────────────────── #}
+{% if account.id == user.id %}
+<section class="account-section">
+    <h2>Discord</h2>
+    {% if !discord_username.is_empty() %}
+    <p>Linked to <strong>{{ discord_username }}</strong>.</p>
+    <form method="POST" action="/account/discord/unlink">
+        <button class="button danger outline" type="submit">Unlink Discord</button>
+    </form>
+    {% else if discord_enabled %}
+    <p>Link your Discord account to access the bot dashboard and log in with Discord.</p>
+    <a href="/auth/discord" class="button primary">Link Discord</a>
+    {% else %}
+    <p class="muted">Discord integration is not configured.</p>
+    {% endif %}
+</section>
+{% endif %}
+
 {# ─── Two-factor authentication ──────────────────────────────── #}
 {% if account.id == user.id %}
 <section class="account-section">

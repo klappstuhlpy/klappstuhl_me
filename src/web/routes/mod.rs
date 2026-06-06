@@ -8,6 +8,8 @@ mod api;
 mod audit;
 mod auth;
 mod backups;
+mod dashboard;
+mod discord_oauth;
 mod certs;
 mod dbadmin;
 mod docker;
@@ -66,6 +68,8 @@ pub fn all() -> Router<AppState> {
         .route("/projects", get(projects))
         .route("/m/:id", get(api::serve_media))
         .merge(auth::routes())
+        .merge(discord_oauth::routes())
+        .merge(dashboard::routes())
         .merge(image::routes())
         .merge(admin::routes())
         .merge(audit::routes())

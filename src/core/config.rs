@@ -222,6 +222,54 @@ pub struct BackupConfig {
     pub remote: Option<BackupRemoteConfig>,
 }
 
+/// Discord OAuth2 settings for identity linking (login with Discord, link
+/// Discord account to an existing user). Disabled unless all three fields are
+/// set. Register an application at <https://discord.com/developers/applications>
+/// and add the redirect URI to the OAuth2 settings there.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DiscordConfig {
+    /// OAuth2 application client ID.
+    #[serde(default)]
+    pub client_id: Option<String>,
+    /// OAuth2 application client secret.
+    #[serde(default)]
+    pub client_secret: Option<String>,
+    /// The full callback URL registered in the Discord developer portal,
+    /// e.g. `"https://klappstuhl.me/auth/discord/callback"`.
+    #[serde(default)]
+    pub redirect_uri: Option<String>,
+}
+
+impl DiscordConfig {
+    /// Whether Discord OAuth is fully configured and available.
+    pub fn enabled(&self) -> bool {
+        self.client_id.as_deref().is_some_and(|s| !s.is_empty())
+            && self.client_secret.as_deref().is_some_and(|s| !s.is_empty())
+            && self.redirect_uri.as_deref().is_some_and(|s| !s.is_empty())
+    }
+}
+
+/// Percy bot integration settings. Connects to Percy's internal aiohttp API
+/// to fetch guild data and proxy config mutations from the dashboard.
+/// Disabled unless both `api_url` and `api_token` are set.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct PercyConfig {
+    /// Base URL of Percy's internal API (e.g. `"http://127.0.0.1:8090"`).
+    #[serde(default)]
+    pub api_url: Option<String>,
+    /// Pre-shared bearer token matching Percy's `INTERNAL_API_TOKEN`.
+    #[serde(default)]
+    pub api_token: Option<String>,
+}
+
+impl PercyConfig {
+    /// Whether the Percy integration is fully configured.
+    pub fn enabled(&self) -> bool {
+        self.api_url.as_deref().is_some_and(|s| !s.is_empty())
+            && self.api_token.as_deref().is_some_and(|s| !s.is_empty())
+    }
+}
+
 /// AI assistant settings powering the public `/terminal` "ask AI" feature.
 /// Backed by the Groq API (free tier, available in the EU; OpenAI-compatible).
 /// Disabled (the endpoint returns 503) unless `api_key` is set.
@@ -391,6 +439,14 @@ pub struct Config {
     /// Off unless `ai.api_key` is set.
     #[serde(default)]
     pub ai: AiConfig,
+    /// Discord OAuth2 settings for identity linking (bot dashboard access).
+    /// Off unless all three fields (`client_id`, `client_secret`, `redirect_uri`) are set.
+    #[serde(default)]
+    pub discord: DiscordConfig,
+    /// Percy bot internal API settings for the dashboard BFF.
+    /// Off unless both `api_url` and `api_token` are set.
+    #[serde(default)]
+    pub percy: PercyConfig,
 }
 
 /// Default per-file upload ceiling (10 MiB) used when `max_upload_bytes` is
@@ -422,6 +478,8 @@ impl Config {
             ffmpeg_path: None,
             max_upload_bytes: None,
             ai: AiConfig::default(),
+            discord: DiscordConfig::default(),
+            percy: PercyConfig::default(),
         })
     }
 

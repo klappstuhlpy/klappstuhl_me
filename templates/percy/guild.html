@@ -1,0 +1,92 @@
+{% extends "../layout.html" %}
+
+{% block title %}{{ guild.name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard" class="dashboard-back">&larr; All servers</a>
+
+    <div class="guild-header">
+        {% match guild.icon_url %}
+        {% when Some with (url) %}
+        <img class="guild-header-icon" src="{{ url }}?size=128" alt="" width="64" height="64">
+        {% when None %}
+        <div class="guild-header-icon guild-icon-placeholder large">{{ guild.name.chars().next().unwrap_or('?') }}</div>
+        {% endmatch %}
+        <div>
+            <h1 class="guild-header-name">{{ guild.name }}</h1>
+            {% match guild.member_count %}
+            {% when Some with (count) %}
+            <span class="guild-members">{{ count }} members</span>
+            {% when None %}
+            {% endmatch %}
+        </div>
+    </div>
+
+    <section class="config-section">
+        <h2>Feature Flags</h2>
+        <div class="config-grid">
+            <label class="config-toggle">
+                <span class="config-label">Audit Log</span>
+                <input type="checkbox" {% if guild.flags.audit_log %}checked{% endif %} disabled>
+            </label>
+            <label class="config-toggle">
+                <span class="config-label">Raid Protection</span>
+                <input type="checkbox" {% if guild.flags.raid %}checked{% endif %} disabled>
+            </label>
+            <label class="config-toggle">
+                <span class="config-label">Alerts</span>
+                <input type="checkbox" {% if guild.flags.alerts %}checked{% endif %} disabled>
+            </label>
+            <label class="config-toggle">
+                <span class="config-label">Gatekeeper</span>
+                <input type="checkbox" {% if guild.flags.gatekeeper %}checked{% endif %} disabled>
+            </label>
+        </div>
+    </section>
+
+    <section class="config-section">
+        <h2>Channels</h2>
+        <div class="config-grid">
+            <div class="config-field">
+                <span class="config-label">Audit Log Channel</span>
+                <span class="config-value">{% match guild.audit_log_channel_id %}{% when Some with (id) %}{{ id }}{% when None %}<em>Not set</em>{% endmatch %}</span>
+            </div>
+            <div class="config-field">
+                <span class="config-label">Poll Channel</span>
+                <span class="config-value">{% match guild.poll_channel_id %}{% when Some with (id) %}{{ id }}{% when None %}<em>Not set</em>{% endmatch %}</span>
+            </div>
+            <div class="config-field">
+                <span class="config-label">Alert Channel</span>
+                <span class="config-value">{% match guild.alert_channel_id %}{% when Some with (id) %}{{ id }}{% when None %}<em>Not set</em>{% endmatch %}</span>
+            </div>
+            <div class="config-field">
+                <span class="config-label">Music Panel Channel</span>
+                <span class="config-value">{% match guild.music_panel_channel_id %}{% when Some with (id) %}{{ id }}{% when None %}<em>Not set</em>{% endmatch %}</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="config-section">
+        <h2>Settings</h2>
+        <div class="config-grid">
+            <div class="config-field">
+                <span class="config-label">Prefixes</span>
+                <span class="config-value">{% if guild.prefixes.is_empty() %}<em>Default</em>{% else %}{{ guild.prefixes.join(", ") }}{% endif %}</span>
+            </div>
+            <label class="config-toggle">
+                <span class="config-label">Music Panel</span>
+                <input type="checkbox" {% if guild.use_music_panel %}checked{% endif %} disabled>
+            </label>
+            <div class="config-field">
+                <span class="config-label">Mention Threshold</span>
+                <span class="config-value">{% match guild.mention_count %}{% when Some with (n) %}{{ n }}{% when None %}<em>Off</em>{% endmatch %}</span>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
