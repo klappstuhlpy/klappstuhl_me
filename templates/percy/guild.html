@@ -91,8 +91,14 @@
                             <span class="config-label">Gatekeeper</span>
                             <span class="config-description">Require captcha verification for new joins</span>
                         </div>
-                        <input type="checkbox" name="gatekeeper" value="true" {% if guild.flags.gatekeeper %}checked{% endif %}>
+                        <input type="checkbox" name="gatekeeper" value="true" {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if !gk.needs_setup %}checked{% endif %}{% when None %}checked{% endmatch %}{% endif %}>
                     </label>
+                    {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %}
+                    <div class="config-warning">
+                        <span class="config-warning-icon">&#9888;</span>
+                        <span>Gatekeeper is partially enabled but needs configuration. Go to the <strong>Gatekeeper</strong> tab or use <code>/moderation gatekeeper setup</code> in Discord to complete setup.</span>
+                    </div>
+                    {% endif %}{% when None %}{% endmatch %}{% endif %}
                 </div>
                 <div class="config-actions">
                     <button type="button" class="button small cancel-btn">Cancel</button>
