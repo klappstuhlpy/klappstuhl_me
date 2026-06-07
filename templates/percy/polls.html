@@ -122,8 +122,18 @@
 
             <div class="config-field" style="margin-bottom:0.75rem;">
                 <label class="config-label" for="edit-poll-color">Color</label>
-                <span class="config-description">Hex color for the embed sidebar (e.g. #ff5733)</span>
-                <input type="text" id="edit-poll-color" class="config-input" placeholder="#d97757">
+                <span class="config-description">
+                    Hex color for the embed sidebar (e.g. #ff5733)
+                </span>
+                <input
+                        type="text"
+                        id="edit-poll-color"
+                        class="config-input"
+                        placeholder="#d97757"
+                        pattern="^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
+                        title="Please enter a valid hex color (e.g. #ff5733)"
+                        required
+                >
             </div>
 
             <div class="config-field" style="margin-bottom:0.75rem;">

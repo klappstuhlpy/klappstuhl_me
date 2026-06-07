@@ -377,8 +377,20 @@
                     </div>
                     <div class="config-field">
                         <label class="config-label" for="gk_rate">Rate Limit</label>
-                        <span class="config-description">Auto-trigger threshold (joins/seconds, e.g. 5/10)</span>
-                        <input type="text" name="rate" id="gk_rate" class="config-input" placeholder="5/10" value="{{ gk.rate.as_deref().unwrap_or("") }}">
+                        <span class="config-description">
+                            Auto-trigger threshold (joins/seconds, e.g. 5/10)
+                        </span>
+                        <input
+                                type="text"
+                                name="rate"
+                                id="gk_rate"
+                                class="config-input"
+                                placeholder="5/10"
+                                value="{{ gk.rate.as_deref().unwrap_or("") }}"
+                        pattern="^\d+\/\d+$"
+                        title="Please enter a value in the format number/number, e.g. 5/10"
+                        required
+                        >
                     </div>
                 </div>
                 <div class="config-actions">
