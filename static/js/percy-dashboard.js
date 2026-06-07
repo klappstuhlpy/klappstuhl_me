@@ -21,6 +21,13 @@
         switchTab(hash);
     }
 
+    document.querySelectorAll('.gk-setup-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchTab('gatekeeper');
+        });
+    });
+
     // -- Form state tracking ---------------------------------------------------
 
     function captureFormState(form) {
@@ -164,6 +171,10 @@
                     showToast('success', data.message || 'Settings saved.');
                     formStates.set(form, captureFormState(form));
                     hideBanner();
+                    const section = form.querySelector('input[name="_section"]');
+                    if (section && section.value === 'flags') {
+                        setTimeout(() => location.reload(), 400);
+                    }
                 } else {
                     showToast('error', data.error || 'Failed to save settings.');
                 }

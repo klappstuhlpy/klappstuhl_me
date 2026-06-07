@@ -431,24 +431,81 @@
     color: var(--text-muted);
 }
 
-/* -- Config warning -- */
+/* -- Gatekeeper setup callout (floating) -- */
 
-.config-warning {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.6rem 0.85rem;
-    border-radius: 0.375rem;
-    background: var(--warning-bg);
+.gk-setup-callout {
+    position: relative;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem;
+    border-radius: 0.625rem;
+    background: linear-gradient(135deg, var(--warning-bg) 0%, color-mix(in srgb, var(--warning-bg) 60%, var(--box)) 100%);
     border: 1px solid var(--warning-border);
-    color: var(--warning-text);
-    font-size: 0.8rem;
-    margin-top: 0.5rem;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--warning-border) 25%, transparent),
+                inset 0 1px 0 color-mix(in srgb, var(--warning-text) 6%, transparent);
+    overflow: hidden;
+    animation: gk-callout-in 0.4s ease-out;
 }
-.config-warning-icon {
-    flex-shrink: 0;
-    font-size: 1rem;
-    line-height: 1.3;
+@keyframes gk-callout-in {
+    from { opacity: 0; transform: translateY(-0.5rem); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.gk-setup-callout-pulse {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--warning-text);
+    animation: gk-pulse 2s ease-in-out infinite;
+}
+@keyframes gk-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--warning-text) 40%, transparent); }
+    50%      { opacity: 0.7; box-shadow: 0 0 0 6px transparent; }
+}
+.gk-setup-callout-content {
+    padding-left: 1.25rem;
+}
+.gk-setup-callout-title {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--warning-text);
+    margin-bottom: 0.35rem;
+}
+.gk-setup-callout-content p {
+    margin: 0;
+    font-size: 0.78rem;
+    color: color-mix(in srgb, var(--warning-text) 80%, var(--text));
+    line-height: 1.5;
+}
+.gk-setup-callout-content code {
+    font-size: 0.72rem;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--warning-border) 30%, transparent);
+}
+.gk-setup-link {
+    color: var(--warning-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.gk-setup-link:hover {
+    color: var(--text);
+}
+.gk-setup-callout-hint {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* -- Gatekeeper disabled toggle state -- */
+
+.config-toggle.gk-disabled {
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 /* -- Members page -- */

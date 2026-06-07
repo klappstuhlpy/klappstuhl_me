@@ -86,19 +86,18 @@
                         </div>
                         <input type="checkbox" name="alerts" value="true" {% if guild.flags.alerts %}checked{% endif %}>
                     </label>
-                    <label class="config-toggle">
+                    <label class="config-toggle{% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %} gk-disabled{% endif %}{% when None %} gk-disabled{% endmatch %}{% endif %}">
                         <div>
                             <span class="config-label">Gatekeeper</span>
                             <span class="config-description">Require captcha verification for new joins</span>
                         </div>
-                        <input type="checkbox" name="gatekeeper" value="true" {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if !gk.needs_setup %}checked{% endif %}{% when None %}checked{% endmatch %}{% endif %}>
+                        <input type="checkbox" name="gatekeeper" value="true" {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if !gk.needs_setup %}checked{% endif %}{% when None %}{% endmatch %}{% endif %}{% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %} disabled{% endif %}{% when None %} disabled{% endmatch %}{% endif %}>
                     </label>
                     {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %}
-                    <div class="config-warning">
-                        <span class="config-warning-icon">&#9888;</span>
-                        <span>Gatekeeper is partially enabled but needs configuration. Go to the <strong>Gatekeeper</strong> tab or use <code>/moderation gatekeeper setup</code> in Discord to complete setup.</span>
-                    </div>
-                    {% endif %}{% when None %}{% endmatch %}{% endif %}
+                    <input type="hidden" name="gatekeeper" value="true">
+                    {% endif %}{% when None %}
+                    <input type="hidden" name="gatekeeper" value="true">
+                    {% endmatch %}{% endif %}
                 </div>
                 <div class="config-actions">
                     <button type="button" class="button small cancel-btn">Cancel</button>
@@ -106,6 +105,26 @@
                 </div>
             </form>
         </section>
+
+        {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %}
+        <div class="gk-setup-callout">
+            <div class="gk-setup-callout-pulse"></div>
+            <div class="gk-setup-callout-content">
+                <span class="gk-setup-callout-title">&#9888; Gatekeeper needs setup</span>
+                <p>The flag is enabled but configuration is incomplete. Complete setup in the <a href="#gatekeeper" class="gk-setup-link">Gatekeeper tab</a> or run <code>/moderation gatekeeper setup</code> in Discord.</p>
+                <span class="gk-setup-callout-hint">Toggle is locked until setup is complete.</span>
+            </div>
+        </div>
+        {% endif %}{% when None %}
+        <div class="gk-setup-callout">
+            <div class="gk-setup-callout-pulse"></div>
+            <div class="gk-setup-callout-content">
+                <span class="gk-setup-callout-title">&#9888; Gatekeeper needs setup</span>
+                <p>The flag is enabled but configuration is incomplete. Complete setup in the <a href="#gatekeeper" class="gk-setup-link">Gatekeeper tab</a> or run <code>/moderation gatekeeper setup</code> in Discord.</p>
+                <span class="gk-setup-callout-hint">Toggle is locked until setup is complete.</span>
+            </div>
+        </div>
+        {% endmatch %}{% endif %}
 
         {# ─── Polls ──────────────────────────────────────────────────── #}
         <section class="config-section">
