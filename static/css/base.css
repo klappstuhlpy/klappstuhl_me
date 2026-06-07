@@ -130,7 +130,7 @@ a:not(.button) {
     color: var(--link-text);
 }
 
-a:not(.button):hover {
+a:not(.button, .button-card):hover {
     text-decoration: underline;
     color: var(--link-hover-text);
 }
