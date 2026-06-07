@@ -1,0 +1,113 @@
+{% extends "../layout.html" %}
+
+{% block title %}Tags — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Tags</h1>
+            <p>Custom text tags, usage statistics, and top creators.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/tags" class="active">Tags</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+    </nav>
+
+    {# ─── Summary Tiles ───────────────────────────────────────────── #}
+    <div class="metric-tiles">
+        <div class="metric-tile">
+            <span class="tile-label">Total Tags</span>
+            <span class="tile-value">{{ tags.total }}</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Total Uses</span>
+            <span class="tile-value">{{ tags.total_uses }}</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Top Creators</span>
+            <span class="tile-value">{{ tags.top_creators.len() }}</span>
+            <span class="tile-sub">Unique authors</span>
+        </div>
+    </div>
+
+    {# ─── Most Used Tags ──────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Most Used Tags</h2>
+        <p class="config-section-description">Top tags ranked by usage count.</p>
+
+        {% if tags.tags.is_empty() %}
+        <div class="empty-state">
+            <h3>No tags</h3>
+            <p>Tags created with the /tag command will appear here.</p>
+        </div>
+        {% else %}
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Owner</th>
+                        <th class="numeric">Uses</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tag in tags.tags %}
+                    <tr>
+                        <td><strong>{{ tag.name }}</strong></td>
+                        <td>{{ tag.owner_name.as_deref().unwrap_or("Unknown") }}</td>
+                        <td class="numeric">{{ tag.uses }}</td>
+                        <td class="member-joined">{{ tag.created_at.as_deref().unwrap_or("—") }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </section>
+
+    {# ─── Top Creators ────────────────────────────────────────────── #}
+    {% if !tags.top_creators.is_empty() %}
+    <section class="config-section">
+        <h2>Top Creators</h2>
+        <p class="config-section-description">Members who have created the most tags.</p>
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Member</th>
+                        <th class="numeric">Tags Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for creator in tags.top_creators %}
+                    <tr>
+                        <td><span class="leaderboard-rank{% if loop.index == 1 %} gold{% else if loop.index == 2 %} silver{% else if loop.index == 3 %} bronze{% endif %}">{{ loop.index }}</span></td>
+                        <td>{{ creator.username }}</td>
+                        <td class="numeric">{{ creator.count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+</div>
+
+{% endblock %}

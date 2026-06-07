@@ -1,0 +1,107 @@
+{% extends "../layout.html" %}
+
+{% block title %}Members — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Members</h1>
+            <p>Manage server members, roles, and moderation actions.</p>
+        </div>
+    </div>
+
+    {# ─── Sub-page Navigation ─────────────────────────────────────── #}
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members" class="active">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+    </nav>
+
+    <div class="members-toolbar">
+        <input type="text" id="member-search" class="config-input" placeholder="Search members..." style="max-width:320px;">
+        <span class="members-count" id="member-count">{{ members.len() }} loaded</span>
+    </div>
+
+    <div class="members-table-wrap">
+        <table class="members-table" id="members-table">
+            <thead>
+                <tr>
+                    <th>Member</th>
+                    <th>Joined</th>
+                    <th>Roles</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="members-tbody">
+                {% for member in members %}
+                <tr data-user-id="{{ member.id }}" data-name="{{ member.display_name|lower }}">
+                    <td>
+                        <div class="member-cell">
+                            <img class="member-avatar" src="{{ member.avatar_url }}?size=64" alt="" width="36" height="36">
+                            <div class="member-info">
+                                <span class="member-name">{{ member.display_name }}</span>
+                                <span class="member-username">{{ member.name }}{% if member.bot %} <span class="badge">BOT</span>{% endif %}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="member-joined">{{ member.joined_at.as_deref().unwrap_or("—") }}</td>
+                    <td>
+                        <div class="member-roles">
+                            {% for role_id in member.roles %}
+                            <span class="role-chip" data-role-id="{{ role_id }}">{{ role_id }}</span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="member-actions">
+                            {% if !member.bot %}
+                            <button class="button small" data-action="kick" data-user-id="{{ member.id }}" data-name="{{ member.display_name }}">Kick</button>
+                            <button class="button small danger" data-action="ban" data-user-id="{{ member.id }}" data-name="{{ member.display_name }}">Ban</button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="members-pagination">
+        <button id="load-more" class="button small">Load more</button>
+    </div>
+
+    {# -- Action confirmation modal -- #}
+    <div class="modal-overlay" id="action-modal" hidden>
+        <div class="modal-card">
+            <h3 id="modal-title">Confirm Action</h3>
+            <p id="modal-description"></p>
+            <div class="config-field" style="margin: 1rem 0;">
+                <label class="config-label" for="modal-reason">Reason (optional)</label>
+                <input type="text" id="modal-reason" class="config-input" placeholder="Moderation reason...">
+            </div>
+            <div class="modal-actions">
+                <button class="button small" id="modal-cancel">Cancel</button>
+                <button class="button small danger" id="modal-confirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const GUILD_ID = '{{ guild_id }}';
+const ROLES = [{% for role in roles %}{ id: '{{ role.id }}', name: '{{ role.name }}', color: {{ role.color }} },{% endfor %}];
+</script>
+<script src="/static/js/percy-members.js"></script>
+{% endblock %}

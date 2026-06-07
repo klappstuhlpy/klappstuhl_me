@@ -1,0 +1,415 @@
+{% extends "../layout.html" %}
+
+{% block title %}Commands — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+<style>
+.cmd-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.cmd-state.enabled { color: var(--success-text); }
+.cmd-state.partial { color: var(--warning-text); }
+.cmd-state.disabled { color: var(--error-text); }
+.cmd-state::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+.command-card {
+    cursor: pointer;
+}
+.command-card:hover {
+    border-color: var(--branding);
+    background: var(--box-shade);
+}
+.cmd-edit-form {
+    margin-top: 1rem;
+}
+.cmd-channels-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: var(--form-input-background);
+    border: 1px solid var(--form-input-border);
+    border-radius: 0.375rem;
+}
+.cmd-channel-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+}
+.cmd-channel-row input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--branding);
+}
+.cmd-mode-select {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.cmd-mode-btn {
+    flex: 1;
+    padding: 0.5rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-align: center;
+    border-radius: 0.375rem;
+    border: 1px solid var(--box-border);
+    background: var(--box-shade);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.cmd-mode-btn:hover {
+    border-color: var(--foreground);
+    color: var(--foreground);
+}
+.cmd-mode-btn.active-enabled {
+    border-color: var(--success-border);
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+.cmd-mode-btn.active-partial {
+    border-color: var(--warning-border);
+    background: var(--warning-bg);
+    color: var(--warning-text);
+}
+.cmd-mode-btn.active-disabled {
+    border-color: var(--error-border);
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Commands</h1>
+            <p>Manage command availability per-channel. Plonk users or channels to ignore them entirely.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands" class="active">Commands</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+    </nav>
+
+    {# ─── Summary ─────────────────────────────────────────────────── #}
+    <div class="metric-tiles">
+        <div class="metric-tile">
+            <span class="tile-label">Total Commands</span>
+            <span class="tile-value">{{ commands.commands.len() }}</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Enabled</span>
+            <span class="tile-value" style="color:var(--success-text);">{{ commands.commands.len() - disabled_count - partial_count }}</span>
+            <span class="tile-sub">Fully enabled</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Partial</span>
+            <span class="tile-value" style="color:var(--warning-text);">{{ partial_count }}</span>
+            <span class="tile-sub">Disabled in some channels</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Disabled</span>
+            <span class="tile-value" style="color:var(--error-text);">{{ disabled_count }}</span>
+            <span class="tile-sub">Globally disabled</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Plonked</span>
+            <span class="tile-value">{{ commands.plonks.len() }}</span>
+            <span class="tile-sub">Ignored entities</span>
+        </div>
+    </div>
+
+    {# ─── Plonks (Ignored) ────────────────────────────────────────── #}
+    {% if !commands.plonks.is_empty() %}
+    <section class="config-section">
+        <h2>Plonked Entities</h2>
+        <p class="config-section-description">Members and channels completely ignored by the bot.</p>
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th class="col-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for plonk in commands.plonks %}
+                    <tr data-entity-id="{{ plonk.entity_id }}">
+                        <td><strong>{{ plonk.name }}</strong></td>
+                        <td><span class="pill pending">{{ plonk.entity_type }}</span></td>
+                        <td class="col-actions">
+                            <button class="button small danger" onclick="removePlonk('{{ plonk.entity_id }}')">Unplonk</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {# ─── Command List ────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>All Commands</h2>
+        <p class="config-section-description">Click a command to configure its availability. Three states: Enabled (works everywhere), Partial (disabled in specific channels), Disabled (blocked server-wide).</p>
+
+        <div class="members-toolbar" style="margin-bottom:1rem;">
+            <input type="text" id="cmd-search" class="config-input" placeholder="Search commands..." style="max-width:320px;">
+        </div>
+
+        <div class="command-grid" id="command-grid">
+            {% for cmd in commands.commands %}
+            <div class="command-card" data-idx="{{ loop.index0 }}" data-name="{{ cmd.name|lower }}" data-category="{{ cmd.category|lower }}">
+                <div style="flex:1;min-width:0;">
+                    <span class="command-name">{{ cmd.name }}</span>
+                    <br>
+                    <span class="command-category">{{ cmd.category }}</span>
+                    {% if !cmd.description.is_empty() %}
+                    <br><span class="config-description">{{ cmd.description }}</span>
+                    {% endif %}
+                </div>
+                {% if cmd.globally_disabled %}
+                <span class="cmd-state disabled">Disabled</span>
+                {% else if !cmd.disabled_in.is_empty() %}
+                <span class="cmd-state partial">Partial</span>
+                {% else %}
+                <span class="cmd-state enabled">Enabled</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    {# ─── Command Edit Modal ──────────────────────────────────────── #}
+    <div class="modal-overlay" id="cmd-edit-modal" hidden>
+        <div class="modal-card" style="max-width:500px;">
+            <h3 id="cmd-edit-title">Configure Command</h3>
+            <p class="text-muted" id="cmd-edit-desc" style="margin-bottom:1rem;"></p>
+
+            <div class="cmd-edit-form">
+                <label class="config-label" style="margin-bottom:0.5rem;display:block;">Status</label>
+                <span class="config-description" style="margin-bottom:0.75rem;">Choose how this command is available in your server.</span>
+
+                <div class="cmd-mode-select">
+                    <button type="button" class="cmd-mode-btn" data-mode="enabled" onclick="setMode('enabled')">Enabled</button>
+                    <button type="button" class="cmd-mode-btn" data-mode="partial" onclick="setMode('partial')">Per-Channel</button>
+                    <button type="button" class="cmd-mode-btn" data-mode="disabled" onclick="setMode('disabled')">Disabled</button>
+                </div>
+
+                <div id="channel-select-wrap" hidden>
+                    <label class="config-label">Disable in these channels:</label>
+                    <span class="config-description">The command will be blocked in checked channels but work in all others.</span>
+                    <div class="cmd-channels-list" id="cmd-channels-list">
+                        {% for ch in channels %}
+                        <label class="cmd-channel-row">
+                            <input type="checkbox" value="{{ ch.id }}">
+                            <span>#{{ ch.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="button small" onclick="closeCommandEdit()">Cancel</button>
+                <button class="button primary small" id="cmd-save-btn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var GUILD_ID = '{{ guild_id }}';
+    var COMMANDS_DATA = {{ commands.commands|json|safe }};
+
+    let editingIdx = null;
+    let currentMode = 'enabled';
+
+    function showToast(level, message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast toast-' + level;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('visible'));
+        setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    function openCommandEdit(idx) {
+        editingIdx = idx;
+        const cmd = COMMANDS_DATA[idx];
+        if (!cmd) return;
+        document.getElementById('cmd-edit-title').textContent = cmd.name;
+        document.getElementById('cmd-edit-desc').textContent = cmd.category;
+
+        if (cmd.globally_disabled) {
+            setMode('disabled');
+        } else if (cmd.disabled_in.length > 0) {
+            setMode('partial');
+        } else {
+            setMode('enabled');
+        }
+
+        document.querySelectorAll('#cmd-channels-list input[type="checkbox"]').forEach(function(cb) {
+            cb.checked = cmd.disabled_in.indexOf(cb.value) !== -1;
+        });
+
+        document.getElementById('cmd-edit-modal').hidden = false;
+    }
+
+    function closeCommandEdit() {
+        document.getElementById('cmd-edit-modal').hidden = true;
+        editingIdx = null;
+    }
+
+    function setMode(mode) {
+        currentMode = mode;
+        var btns = document.querySelectorAll('.cmd-mode-btn');
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].className = 'cmd-mode-btn';
+            if (btns[i].getAttribute('data-mode') === mode) {
+                btns[i].classList.add('active-' + mode);
+            }
+        }
+        document.getElementById('channel-select-wrap').hidden = (mode !== 'partial');
+    }
+
+    // Event delegation for command cards
+    var grid = document.getElementById('command-grid');
+    if (grid) {
+        grid.addEventListener('click', function(e) {
+            var card = e.target.closest('.command-card');
+            if (!card) return;
+            var idx = parseInt(card.getAttribute('data-idx'), 10);
+            if (!isNaN(idx)) openCommandEdit(idx);
+        });
+    }
+    console.log('[percy-commands] loaded', COMMANDS_DATA.length, 'commands');
+
+    // Mode buttons
+    document.querySelectorAll('.cmd-mode-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            setMode(btn.getAttribute('data-mode'));
+        });
+    });
+
+    // Save button
+    document.getElementById('cmd-save-btn').addEventListener('click', async function() {
+        if (editingIdx === null) return;
+        var cmd = COMMANDS_DATA[editingIdx];
+        var btn = document.getElementById('cmd-save-btn');
+        btn.disabled = true;
+
+        try {
+            if (currentMode === 'enabled') {
+                var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ name: cmd.name, enabled: true, channel_id: null }),
+                });
+                var data = await resp.json();
+                if (!data.ok) { showToast('error', data.error || 'Failed'); btn.disabled = false; return; }
+            } else if (currentMode === 'disabled') {
+                var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ name: cmd.name, enabled: false, channel_id: null }),
+                });
+                var data = await resp.json();
+                if (!data.ok) { showToast('error', data.error || 'Failed'); btn.disabled = false; return; }
+            } else {
+                // Partial: clear all, then disable in selected channels
+                await fetch('/percy/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ name: cmd.name, enabled: true, channel_id: null }),
+                });
+
+                var checked = document.querySelectorAll('#cmd-channels-list input:checked');
+                for (var i = 0; i < checked.length; i++) {
+                    await fetch('/percy/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({ name: cmd.name, enabled: false, channel_id: checked[i].value }),
+                    });
+                }
+            }
+
+            showToast('success', 'Command "' + cmd.name + '" updated.');
+            closeCommandEdit();
+            setTimeout(function() { location.reload(); }, 400);
+        } catch(err) {
+            showToast('error', 'Network error');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // Close modal on overlay click
+    document.getElementById('cmd-edit-modal').addEventListener('click', function(e) {
+        if (e.target === e.currentTarget) closeCommandEdit();
+    });
+
+    // Search filter
+    document.getElementById('cmd-search').addEventListener('input', function() {
+        var q = this.value.toLowerCase();
+        var cards = document.querySelectorAll('.command-card');
+        for (var i = 0; i < cards.length; i++) {
+            var name = cards[i].getAttribute('data-name') || '';
+            var cat = cards[i].getAttribute('data-category') || '';
+            cards[i].style.display = (name.indexOf(q) !== -1 || cat.indexOf(q) !== -1) ? '' : 'none';
+        }
+    });
+
+    // Plonk removal (expose globally for inline onclick)
+    window.removePlonk = async function(entityId) {
+        try {
+            var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/plonks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ action: 'remove', entity_id: entityId }),
+            });
+            var data = await resp.json();
+            if (data.ok) {
+                var row = document.querySelector('[data-entity-id="' + entityId + '"]');
+                if (row) row.remove();
+                showToast('success', 'Entity unplonked.');
+            } else {
+                showToast('error', data.error || 'Failed to unplonk');
+            }
+        } catch(err) {
+            showToast('error', 'Network error');
+        }
+    };
+})();
+</script>
+{% endblock %}

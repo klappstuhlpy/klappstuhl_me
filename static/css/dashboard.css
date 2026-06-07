@@ -181,9 +181,16 @@
     border: 1px solid var(--box-border);
 }
 
+.config-toggle > div,
+.config-field > div {
+    display: flex;
+    flex-direction: column;
+}
+
 .config-label {
     font-size: 0.78rem;
     color: var(--text-muted);
+    display: block;
 }
 .config-value {
     font-size: 0.85rem;
@@ -259,6 +266,7 @@
 }
 
 .config-description {
+    display: block;
     font-size: 0.72rem;
     color: var(--text-muted);
     margin-top: 0.15rem;
@@ -336,6 +344,40 @@
 .config-tabs button[aria-selected="true"] {
     color: var(--branding);
     border-bottom-color: var(--branding);
+}
+
+/* -- Unsaved changes banner -- */
+
+.unsaved-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 0.85rem 1.5rem;
+    background: var(--box);
+    border-top: 1px solid var(--branding);
+    box-shadow: 0 -4px 24px rgba(0,0,0,.5);
+    z-index: 9998;
+    transform: translateY(100%);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+.unsaved-banner.visible {
+    transform: translateY(0);
+    opacity: 1;
+}
+.unsaved-banner-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--branding);
+}
+.unsaved-banner-actions {
+    display: flex;
+    gap: 0.5rem;
 }
 
 /* -- Toast notifications -- */
@@ -417,7 +459,6 @@
     min-width: 800px;
     border-collapse: collapse;
     font-size: 0.85rem;
-    table-layout: fixed;
 }
 .members-table th {
     text-align: left;
@@ -429,11 +470,12 @@
     font-weight: 600;
     border-bottom: 1px solid var(--box-border);
     background: var(--box-shade);
+    white-space: nowrap;
 }
-.members-table th:nth-child(1) { width: 28%; }
-.members-table th:nth-child(2) { width: 14%; }
-.members-table th:nth-child(3) { width: 38%; }
-.members-table th:nth-child(4) { width: 20%; }
+.members-table th:nth-child(1) { width: 25%; }
+.members-table th:nth-child(2) { width: 15%; }
+.members-table th:nth-child(3) { width: auto; }
+.members-table th:nth-child(4) { width: 14%; }
 
 .members-table td {
     padding: 0.6rem 1rem;
@@ -483,15 +525,21 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.3rem;
+    overflow: hidden;
+    max-height: 3.2rem;
 }
 .member-actions {
     display: flex;
     gap: 0.4rem;
+    white-space: nowrap;
+    justify-content: flex-end;
 }
 .member-joined {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     color: var(--text-muted);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .role-chip {
@@ -584,6 +632,7 @@
 }
 .dashboard-nav a:hover {
     color: var(--foreground);
+    text-decoration: none;
 }
 .dashboard-nav a.active {
     color: var(--branding);
@@ -674,8 +723,12 @@
     text-align: right;
 }
 .data-table .col-actions {
+    display: flex;
     text-align: right;
     white-space: nowrap;
+    gap: 0.35rem;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
 }
 
 /* -- Status pills -- */

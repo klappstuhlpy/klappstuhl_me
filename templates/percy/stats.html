@@ -1,0 +1,157 @@
+{% extends "../layout.html" %}
+
+{% block title %}Stats — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Stats</h1>
+            <p>Server statistics, bot metrics, and command usage analytics.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats" class="active">Stats</a>
+    </nav>
+
+    {# ─── Server Stats ────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Server Overview</h2>
+        <p class="config-section-description">Real-time server metrics from Discord's gateway.</p>
+        <div class="metric-tiles">
+            <div class="metric-tile">
+                <span class="tile-label">Members</span>
+                <span class="tile-value">{{ stats.member_count.unwrap_or(0) }}</span>
+                <span class="tile-sub">{{ stats.human_count }} humans, {{ stats.bot_count }} bots</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Online</span>
+                <span class="tile-value">{{ stats.online_count }}</span>
+                <span class="tile-sub">Currently active</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Channels</span>
+                <span class="tile-value">{{ stats.channel_count }}</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Roles</span>
+                <span class="tile-value">{{ stats.role_count }}</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Emojis</span>
+                <span class="tile-value">{{ stats.emoji_count }}</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Boosts</span>
+                <span class="tile-value">{{ stats.boost_count }}</span>
+                <span class="tile-sub">Tier {{ stats.boost_tier }}</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Commands Used</span>
+                <span class="tile-value">{{ stats.total_commands }}</span>
+                <span class="tile-sub">All time in this server</span>
+            </div>
+        </div>
+    </section>
+
+    {# ─── Top Commands ────────────────────────────────────────────── #}
+    {% if !stats.top_commands.is_empty() %}
+    <section class="config-section">
+        <h2>Top Commands</h2>
+        <p class="config-section-description">Most used commands in this server.</p>
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Command</th>
+                        <th class="numeric">Uses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cmd in stats.top_commands %}
+                    <tr>
+                        <td><span class="leaderboard-rank{% if loop.index == 1 %} gold{% else if loop.index == 2 %} silver{% else if loop.index == 3 %} bronze{% endif %}">{{ loop.index }}</span></td>
+                        <td><strong>{{ cmd.command }}</strong></td>
+                        <td class="numeric">{{ cmd.uses }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {# ─── Server Info ─────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Server Info</h2>
+        <p class="config-section-description">General server metadata.</p>
+        <div class="config-grid">
+            <div class="config-field">
+                <span class="config-label">Owner</span>
+                <span class="config-value">{{ stats.owner_name.as_deref().unwrap_or("Unknown") }}</span>
+            </div>
+            <div class="config-field">
+                <span class="config-label">Created</span>
+                <span class="config-value">{{ stats.created_at }}</span>
+            </div>
+            <div class="config-field">
+                <span class="config-label">Server ID</span>
+                <span class="config-value">{{ guild_id }}</span>
+            </div>
+        </div>
+    </section>
+
+    {# ─── Bot Stats ───────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Bot Stats</h2>
+        <p class="config-section-description">Global bot statistics across all servers.</p>
+        <div class="metric-tiles">
+            <div class="metric-tile">
+                <span class="tile-label">Servers</span>
+                <span class="tile-value">{{ bot_stats.guild_count }}</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Users</span>
+                <span class="tile-value">{{ bot_stats.user_count }}</span>
+                <span class="tile-sub">Across all servers</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Commands</span>
+                <span class="tile-value">{{ bot_stats.command_count }}</span>
+                <span class="tile-sub">Available commands</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Total Used</span>
+                <span class="tile-value">{{ bot_stats.total_commands_used }}</span>
+                <span class="tile-sub">All-time invocations</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Latency</span>
+                <span class="tile-value">{{ bot_stats.latency_ms }}ms</span>
+                <span class="tile-sub">Gateway ping</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Modules</span>
+                <span class="tile-value">{{ bot_stats.cog_count }}</span>
+                <span class="tile-sub">Loaded cogs</span>
+            </div>
+        </div>
+    </section>
+</div>
+
+{% endblock %}

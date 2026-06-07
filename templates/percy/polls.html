@@ -1,0 +1,268 @@
+{% extends "../layout.html" %}
+
+{% block title %}Polls — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Polls</h1>
+            <p>View and manage running and completed polls.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/polls" class="active">Polls</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+    </nav>
+
+    {# ─── Summary Tiles ───────────────────────────────────────────── #}
+    <div class="metric-tiles">
+        <div class="metric-tile">
+            <span class="tile-label">Total Polls</span>
+            <span class="tile-value">{{ polls.polls.len() }}</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Active</span>
+            <span class="tile-value">{{ active_count }}</span>
+            <span class="tile-sub">Currently running</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Ended</span>
+            <span class="tile-value">{{ ended_count }}</span>
+            <span class="tile-sub">Completed polls</span>
+        </div>
+    </div>
+
+    {# ─── Polls Table ─────────────────────────────────────────────── #}
+    {% if polls.polls.is_empty() %}
+    <div class="empty-state">
+        <h3>No polls yet</h3>
+        <p>Polls created with the /polls command will appear here.</p>
+    </div>
+    {% else %}
+    <div class="data-table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Question</th>
+                    <th>Status</th>
+                    <th class="numeric">Votes</th>
+                    <th>Options</th>
+                    <th>Published</th>
+                    <th class="col-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for poll in polls.polls %}
+                <tr>
+                    <td>
+                        <strong>{{ poll.question }}</strong>
+                        {% if !poll.description.is_empty() %}
+                        <br><span class="text-muted" style="font-size:0.75rem;">{{ poll.description }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if poll.ended %}
+                        <span class="pill ended dot">Ended</span>
+                        {% else %}
+                        <span class="pill active dot">Active</span>
+                        {% endif %}
+                    </td>
+                    <td class="numeric">{{ poll.total_votes }}</td>
+                    <td>{{ poll.options.len() }} options</td>
+                    <td class="member-joined">{{ poll.published.as_deref().unwrap_or("—") }}</td>
+                    <td class="col-actions">
+                        {% if !poll.ended %}
+                        <button class="button small" onclick='openEditPoll({{ poll.id }}, this)'>Edit</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {# ─── Edit Poll Modal ─────────────────────────────────────────── #}
+    <div class="modal-overlay" id="poll-edit-modal" hidden>
+        <div class="modal-card" style="max-width:560px;">
+            <h3>Edit Poll</h3>
+            <p class="text-muted" style="margin-bottom:1rem;">Edit the question, description, options, and appearance of this poll.</p>
+
+            <div class="config-field" style="margin-bottom:0.75rem;">
+                <label class="config-label" for="edit-poll-question">Question</label>
+                <span class="config-description">The main poll question displayed to voters</span>
+                <input type="text" id="edit-poll-question" class="config-input" placeholder="What should we...">
+            </div>
+
+            <div class="config-field" style="margin-bottom:0.75rem;">
+                <label class="config-label" for="edit-poll-description">Description</label>
+                <span class="config-description">Optional context shown below the question</span>
+                <input type="text" id="edit-poll-description" class="config-input" placeholder="Optional description...">
+            </div>
+
+            <div class="config-field" style="margin-bottom:0.75rem;">
+                <label class="config-label" for="edit-poll-image">Image URL</label>
+                <span class="config-description">Image displayed alongside the poll embed</span>
+                <input type="url" id="edit-poll-image" class="config-input" placeholder="https://...">
+            </div>
+
+            <div class="config-field" style="margin-bottom:0.75rem;">
+                <label class="config-label" for="edit-poll-color">Color</label>
+                <span class="config-description">Hex color for the embed sidebar (e.g. #ff5733)</span>
+                <input type="text" id="edit-poll-color" class="config-input" placeholder="#d97757">
+            </div>
+
+            <div class="config-field" style="margin-bottom:0.75rem;">
+                <label class="config-label">Options</label>
+                <span class="config-description">Poll choices (minimum 2). Leave blank to keep unchanged, clear all text to remove.</span>
+                <div id="edit-poll-options" style="display:flex;flex-direction:column;gap:0.4rem;margin-top:0.4rem;"></div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="button small" onclick="closeEditPoll()">Cancel</button>
+                <button class="button primary small" id="poll-save-btn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const GUILD_ID = '{{ guild_id }}';
+const POLLS_DATA = {{ polls.polls|json|safe }};
+
+let editingPollId = null;
+
+function showToast(level, message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + level;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('visible'));
+    setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
+function openEditPoll(pollId) {
+    const poll = POLLS_DATA.find(p => p.id === pollId);
+    if (!poll) return;
+
+    editingPollId = pollId;
+    document.getElementById('edit-poll-question').value = poll.question || '';
+    document.getElementById('edit-poll-description').value = poll.description || '';
+    document.getElementById('edit-poll-image').value = poll.image_url || '';
+    document.getElementById('edit-poll-color').value = poll.color || '';
+
+    const optionsContainer = document.getElementById('edit-poll-options');
+    optionsContainer.innerHTML = '';
+
+    const opts = poll.options || [];
+    const count = Math.max(opts.length, 2);
+    for (let i = 0; i < Math.min(count, 8); i++) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'config-input';
+        input.placeholder = 'Option ' + (i + 1);
+        input.value = opts[i] || '';
+        input.dataset.index = i;
+        optionsContainer.appendChild(input);
+    }
+
+    // Add button for more options (up to 8)
+    if (count < 8) {
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'button small';
+        addBtn.textContent = '+ Add option';
+        addBtn.style.alignSelf = 'flex-start';
+        addBtn.style.marginTop = '0.25rem';
+        addBtn.addEventListener('click', () => {
+            const current = optionsContainer.querySelectorAll('input').length;
+            if (current >= 8) return;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'config-input';
+            input.placeholder = 'Option ' + (current + 1);
+            input.dataset.index = current;
+            optionsContainer.insertBefore(input, addBtn);
+            if (current + 1 >= 8) addBtn.remove();
+        });
+        optionsContainer.appendChild(addBtn);
+    }
+
+    document.getElementById('poll-edit-modal').hidden = false;
+}
+
+function closeEditPoll() {
+    document.getElementById('poll-edit-modal').hidden = true;
+    editingPollId = null;
+}
+
+document.getElementById('poll-save-btn').addEventListener('click', async () => {
+    if (!editingPollId) return;
+
+    const question = document.getElementById('edit-poll-question').value.trim();
+    const description = document.getElementById('edit-poll-description').value.trim();
+    const image_url = document.getElementById('edit-poll-image').value.trim();
+    const color = document.getElementById('edit-poll-color').value.trim();
+
+    const optInputs = document.getElementById('edit-poll-options').querySelectorAll('input');
+    const options = [];
+    optInputs.forEach(input => {
+        const v = input.value.trim();
+        if (v) options.push(v);
+    });
+
+    if (!question) {
+        showToast('error', 'Question is required.');
+        return;
+    }
+    if (options.length < 2) {
+        showToast('error', 'At least 2 options are required.');
+        return;
+    }
+
+    const body = { question, description, image_url, color, options };
+
+    const btn = document.getElementById('poll-save-btn');
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/polls/${editingPollId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            showToast('success', 'Poll updated successfully.');
+            closeEditPoll();
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showToast('error', data.error || 'Failed to update poll.');
+        }
+    } catch {
+        showToast('error', 'Network error.');
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+// Close modal on overlay click
+document.getElementById('poll-edit-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeEditPoll();
+});
+</script>
+{% endblock %}

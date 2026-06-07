@@ -830,7 +830,7 @@ the toggle.
 
 ## Percy Bot Dashboard
 
-The Percy bot dashboard at `/percy/dashboard` lets Discord server administrators manage the Percy bot's per-guild configuration through a web interface instead of slash commands. It connects to Percy's internal API to read and write guild settings.
+The Percy bot dashboard at `/percy/dashboard` is a full-featured web management interface for the Percy Discord bot. Server administrators can configure the bot, moderate members, browse leveling leaderboards, manage polls/giveaways/tags, control command availability, and view server/bot statistics — all through a terminal-aesthetic UI that connects to Percy's internal API.
 
 ### Requirements
 
@@ -845,30 +845,64 @@ Add two config blocks to `config.json`:
   },
   "percy": {
     "api_url": "http://127.0.0.1:8090",
-    "api_token": "<shared secret matching Percy's INTERNAL_API_TOKEN>"
+    "api_token": "<shared secret matching Percy's INTERNAL_API_TOKEN>",
+    "bot_client_id": "<Discord application ID for bot invite links>"
   }
 }
 ```
 
-Register the redirect URI in the [Discord Developer Portal](https://discord.com/developers/applications) under OAuth2.
+Register the redirect URI in the [Discord Developer Portal](https://discord.com/developers/applications) under OAuth2. The OAuth flow requests `identify` and `guilds` scopes.
+
+### Features
+
+- **Tabbed configuration** — General (feature flags, polls, music, prefixes), Moderation (audit/alert/mute/mention + mod/message/voice log channels), and Gatekeeper (verification channel, roles, bypass action, rate limit) tabs. Every option has a short description explaining what it controls. Cancel/Save Changes buttons with form-state tracking.
+- **Member management** — searchable, paginated member directory with kick/ban actions and role mutations. Confirmation modals gather moderation reasons. Wide table layout with hover states.
+- **Leveling** — XP leaderboard with rank medals (gold/silver/bronze), leveling config tiles (status, XP rate, voice XP, role stacking), and in-place level/XP editing per member via modal.
+- **Polls** — Browse all guild polls with status pills (Active/Ended), total vote counts, option counts, and publish/expiry dates. Edit running polls inline (question, description, options, image URL, color) via a modal form.
+- **Giveaways** — Track active and completed giveaways with entry counts, winner counts, and end times.
+- **Tags** — View most-used tags ranked by usage, top creators leaderboard, total tag count and total usage statistics.
+- **Command management** — Three-state system: Enabled (works everywhere), Partial (disabled in specific channels), Disabled (blocked server-wide). Click any command to open a configuration form with mode selector and per-channel checkboxes. Searchable grid with color-coded status dots. Plonk (ignore) management to block specific users or channels from using the bot entirely.
+- **Server & bot stats** — Real-time server metrics (members, online count, channels, roles, emojis, boosts, command usage), top commands table, server info, and bot-wide statistics (guild count, total users, latency, uptime, loaded modules).
+- **Gatekeeper control** — view status (active/inactive, pending members), configure the verification channel, gatekeeper role, starter role, bypass action, and join rate threshold.
+- **Bot invite flow** — if Percy is not in a guild, displays an invite link (constructed from `percy.bot_client_id`) instead of an error.
+- **Setup wizard** — a first-time configuration banner for guilds with a fresh (empty) config.
+- **Async forms** — all config saves submit via JavaScript `fetch` with toast notifications; no-JS fallback via standard form POST with redirect.
 
 ### Routes
 
-| Path | Description |
-|------|-------------|
-| `/auth/discord` | Initiate Discord OAuth2 link |
-| `/auth/discord/callback` | OAuth2 callback |
-| `/account/discord/unlink` | Remove Discord link |
-| `/percy/dashboard` | Server selection (guilds you can manage) |
-| `/percy/dashboard/guild/:id` | Per-guild config editor |
-| `/percy/dashboard/guild/:id/config` | POST: save config changes |
+| Path | Method | Description |
+|------|--------|-------------|
+| `/auth/discord` | GET | Initiate Discord OAuth2 link |
+| `/auth/discord/callback` | GET | OAuth2 callback |
+| `/account/discord/unlink` | POST | Remove Discord link |
+| `/percy/dashboard` | GET | Server selection (guilds you can manage) |
+| `/percy/dashboard/guild/:id` | GET | Per-guild config editor (tabbed) |
+| `/percy/dashboard/guild/:id/config` | POST | Save config changes (flags/moderation/polls/music/prefixes) |
+| `/percy/dashboard/guild/:id/gatekeeper` | POST | Save gatekeeper settings |
+| `/percy/dashboard/guild/:id/members` | GET | Member management page |
+| `/percy/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API, ?limit, ?after) |
+| `/percy/dashboard/guild/:id/members/:uid/action` | POST | Execute moderation action (kick/ban/unban) |
+| `/percy/dashboard/guild/:id/members/:uid/roles` | POST | Add/remove member roles |
+| `/percy/dashboard/guild/:id/leveling` | GET | Leveling leaderboard and config |
+| `/percy/dashboard/guild/:id/leveling/users/:uid` | POST | Update user level/XP |
+| `/percy/dashboard/guild/:id/polls` | GET | Polls overview |
+| `/percy/dashboard/guild/:id/polls/:poll_id` | POST | Edit a running poll |
+| `/percy/dashboard/guild/:id/giveaways` | GET | Giveaways overview |
+| `/percy/dashboard/guild/:id/tags` | GET | Tags and usage stats |
+| `/percy/dashboard/guild/:id/commands` | GET | Command management |
+| `/percy/dashboard/guild/:id/commands/toggle` | POST | Enable/disable a command |
+| `/percy/dashboard/guild/:id/plonks` | POST | Add/remove plonked entities |
+| `/percy/dashboard/guild/:id/stats` | GET | Server and bot statistics |
 
 ### How it works
 
 1. User links their Discord account via OAuth2 (`/auth/discord`)
 2. The dashboard queries Percy's internal API for guilds the user can manage (Manage Server or Administrator permission)
-3. The config editor loads channels and roles from Percy's gateway cache for dropdown selects
-4. Form submissions are proxied through the Rust BFF to Percy's `PATCH /api/internal/guilds/{id}/config`, which writes to PostgreSQL and invalidates the cache
+3. If the bot is not in the guild (Percy returns 404), an invite page is shown
+4. The config editor loads channels and roles from Percy's gateway cache for dropdown selects
+5. Form submissions are proxied through the Rust BFF to Percy's internal API, which writes to PostgreSQL and invalidates the cache
+6. Member actions (kick/ban/role changes) call Discord's API through Percy — the BFF never touches Discord directly
+7. Stats, leaderboards, and browsing pages (polls/tags/giveaways) read data from Percy's repositories and format them for display
 
 ---
 

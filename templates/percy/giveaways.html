@@ -1,0 +1,95 @@
+{% extends "../layout.html" %}
+
+{% block title %}Giveaways — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Giveaways</h1>
+            <p>Track active and past giveaways, entries, and winners.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways" class="active">Giveaways</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+    </nav>
+
+    {# ─── Summary Tiles ───────────────────────────────────────────── #}
+    <div class="metric-tiles">
+        <div class="metric-tile">
+            <span class="tile-label">Total</span>
+            <span class="tile-value">{{ giveaways.giveaways.len() }}</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Active</span>
+            <span class="tile-value">{{ active_count }}</span>
+            <span class="tile-sub">Currently running</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Ended</span>
+            <span class="tile-value">{{ ended_count }}</span>
+        </div>
+    </div>
+
+    {# ─── Giveaways Table ─────────────────────────────────────────── #}
+    {% if giveaways.giveaways.is_empty() %}
+    <div class="empty-state">
+        <h3>No giveaways</h3>
+        <p>Giveaways created with the /giveaway command will appear here.</p>
+    </div>
+    {% else %}
+    <div class="data-table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th class="numeric">Entries</th>
+                    <th class="numeric">Winners</th>
+                    <th>Ends At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for giveaway in giveaways.giveaways %}
+                <tr>
+                    <td>
+                        <strong>{{ giveaway.title }}</strong>
+                        {% match giveaway.description %}
+                        {% when Some with (desc) %}
+                        <br><span class="text-muted" style="font-size:0.75rem;">{{ desc }}</span>
+                        {% when None %}
+                        {% endmatch %}
+                    </td>
+                    <td>
+                        {% if giveaway.ended %}
+                        <span class="pill ended dot">Ended</span>
+                        {% else %}
+                        <span class="pill active dot">Active</span>
+                        {% endif %}
+                    </td>
+                    <td class="numeric">{{ giveaway.entries }}</td>
+                    <td class="numeric">{{ giveaway.winners_count }}</td>
+                    <td class="member-joined">{{ giveaway.ends_at.as_deref().unwrap_or("—") }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

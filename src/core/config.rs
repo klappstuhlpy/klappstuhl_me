@@ -260,6 +260,9 @@ pub struct PercyConfig {
     /// Pre-shared bearer token matching Percy's `INTERNAL_API_TOKEN`.
     #[serde(default)]
     pub api_token: Option<String>,
+    /// Discord application (bot) client ID for constructing invite links.
+    #[serde(default)]
+    pub bot_client_id: Option<String>,
 }
 
 impl PercyConfig {

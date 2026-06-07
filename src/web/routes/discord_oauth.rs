@@ -88,7 +88,7 @@ async fn discord_login(
          ?client_id={client_id}\
          &redirect_uri={encoded_redirect}\
          &response_type=code\
-         &scope=identify\
+         &scope=identify%20guilds\
          &state={signed}",
     );
     Redirect::to(&url).into_response()

@@ -23,7 +23,7 @@
     {% else %}
     <div class="guild-grid">
         {% for guild in guilds %}
-        <a href="/percy/dashboard/guild/{{ guild.id }}" class="guild-card">
+        <a href="/percy/dashboard/guild/{{ guild.id }}" class="guild-card button-card">
             {% match guild.icon_url %}
             {% when Some with (url) %}
             <img class="guild-icon" src="{{ url }}?size=128" alt="" width="48" height="48">

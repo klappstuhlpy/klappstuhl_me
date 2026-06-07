@@ -1,0 +1,164 @@
+{% extends "../layout.html" %}
+
+{% block title %}Leveling — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Leveling</h1>
+            <p>XP leaderboard, level management, and leveling configuration.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/leveling" class="active">Leveling</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+    </nav>
+
+    {# ─── Status Tiles ────────────────────────────────────────────── #}
+    <div class="metric-tiles">
+        <div class="metric-tile">
+            <span class="tile-label">Status</span>
+            <span class="tile-value">{% if config.enabled %}ON{% else %}OFF{% endif %}</span>
+            <span class="tile-sub">{% if config.configured %}Configured{% else %}Not configured{% endif %}</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">XP Rate</span>
+            <span class="tile-value">{{ config.xp_rate }}x</span>
+            <span class="tile-sub">Multiplier</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Voice XP</span>
+            <span class="tile-value">{% if config.voice_enabled %}ON{% else %}OFF{% endif %}</span>
+            <span class="tile-sub">Earn XP in voice</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Stack Roles</span>
+            <span class="tile-value">{% if config.stack_roles %}Yes{% else %}No{% endif %}</span>
+            <span class="tile-sub">Keep lower-level roles</span>
+        </div>
+    </div>
+
+    {# ─── Leaderboard ─────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Leaderboard</h2>
+        <p class="config-section-description">Top members by XP. Click a row to edit level or XP.</p>
+
+        {% if leaderboard.entries.is_empty() %}
+        <div class="empty-state">
+            <h3>No leveling data</h3>
+            <p>Members will appear here once they start earning XP.</p>
+        </div>
+        {% else %}
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Member</th>
+                        <th class="numeric">Level</th>
+                        <th class="numeric">XP</th>
+                        <th class="numeric">Total XP</th>
+                        <th class="col-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in leaderboard.entries %}
+                    <tr data-user-id="{{ entry.user_id }}">
+                        <td>
+                            <span class="leaderboard-rank{% if loop.index == 1 %} gold{% else if loop.index == 2 %} silver{% else if loop.index == 3 %} bronze{% endif %}">{{ loop.index }}</span>
+                        </td>
+                        <td>
+                            <div class="member-cell">
+                                {% match entry.avatar_url %}
+                                {% when Some with (url) %}
+                                <img class="member-avatar" src="{{ url }}?size=32" alt="" width="32" height="32">
+                                {% when None %}
+                                {% endmatch %}
+                                <span class="member-name">{{ entry.username }}</span>
+                            </div>
+                        </td>
+                        <td class="numeric">{{ entry.level }}</td>
+                        <td class="numeric">{{ entry.xp }}</td>
+                        <td class="numeric">{{ entry.total_xp }}</td>
+                        <td class="col-actions">
+                            <button class="button small" onclick="editLevel('{{ entry.user_id }}', '{{ entry.username }}', {{ entry.level }}, {{ entry.xp }})">Edit</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </section>
+
+    {# ─── Edit modal ──────────────────────────────────────────────── #}
+    <div class="modal-overlay" id="level-modal" hidden>
+        <div class="modal-card">
+            <h3>Edit Level & XP</h3>
+            <p id="level-modal-desc" class="text-muted"></p>
+            <div class="config-field" style="margin: 1rem 0 0.5rem;">
+                <label class="config-label" for="edit-level">Level</label>
+                <input type="number" id="edit-level" class="config-input" min="0">
+            </div>
+            <div class="config-field" style="margin: 0.5rem 0 0;">
+                <label class="config-label" for="edit-xp">XP</label>
+                <input type="number" id="edit-xp" class="config-input" min="0">
+            </div>
+            <div class="modal-actions">
+                <button class="button small" onclick="document.getElementById('level-modal').hidden=true">Cancel</button>
+                <button class="button primary small" id="level-save-btn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const GUILD_ID = '{{ guild_id }}';
+let editingUserId = null;
+
+function editLevel(userId, username, level, xp) {
+    editingUserId = userId;
+    document.getElementById('level-modal-desc').textContent = 'Editing ' + username;
+    document.getElementById('edit-level').value = level;
+    document.getElementById('edit-xp').value = xp;
+    document.getElementById('level-modal').hidden = false;
+}
+
+document.getElementById('level-save-btn').addEventListener('click', async () => {
+    if (!editingUserId) return;
+    const level = parseInt(document.getElementById('edit-level').value);
+    const xp = parseInt(document.getElementById('edit-xp').value);
+
+    try {
+        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/leveling/users/${editingUserId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ level, xp }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            document.getElementById('level-modal').hidden = true;
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to update');
+        }
+    } catch {
+        alert('Network error');
+    }
+});
+</script>
+{% endblock %}
