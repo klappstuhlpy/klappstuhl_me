@@ -487,11 +487,13 @@ pub struct Member {
 pub struct GatekeeperInfo {
     pub channel: Option<ChannelRef>,
     pub role: Option<RoleRef>,
+    pub message: Option<u64>,
     pub starter_role: Option<RoleRef>,
     pub bypass_action: String,
     pub rate: Option<String>,
     pub started_at: Option<String>,
     pub member_count: u32,
+    pub needs_setup: bool,
 }
 
 // -- Leveling types ----------------------------------------------------------
