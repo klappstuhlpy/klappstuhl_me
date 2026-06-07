@@ -706,7 +706,6 @@
 }
 .data-table td {
     padding: 0.6rem 1rem;
-    border-bottom: 1px solid var(--box-border);
     vertical-align: middle;
 }
 .data-table tr:last-child td {
