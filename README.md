@@ -830,7 +830,7 @@ the toggle.
 
 ## Percy Bot Dashboard
 
-The Percy bot dashboard at `/percy/dashboard` is a full-featured web management interface for the Percy Discord bot. Server administrators can configure the bot, moderate members, browse leveling leaderboards, manage polls/giveaways/tags, control command availability, and view server/bot statistics — all through a terminal-aesthetic UI that connects to Percy's internal API.
+The Percy bot dashboard at `/percy/dashboard` is a full-featured web management interface for the Percy Discord bot. Server administrators can configure the bot, moderate members, manage economy/leveling/autoresponders/comics/temp-channels, browse polls/giveaways/tags/highlights/emoji-stats, control command availability, and view server/bot statistics — all through a terminal-aesthetic UI that connects to Percy's internal API.
 
 ### Requirements
 
@@ -855,17 +855,23 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 
 ### Features
 
-- **Tabbed configuration** — General (feature flags, polls, music, prefixes), Moderation (audit/alert/mute/mention + mod/message/voice log channels), and Gatekeeper (verification channel, roles, bypass action, rate limit) tabs. Every option has a short description explaining what it controls. Cancel/Save Changes buttons with form-state tracking.
-- **Member management** — searchable, paginated member directory with kick/ban actions and role mutations. Confirmation modals gather moderation reasons. Wide table layout with hover states.
-- **Leveling** — XP leaderboard with rank medals (gold/silver/bronze), leveling config tiles (status, XP rate, voice XP, role stacking), and in-place level/XP editing per member via modal.
-- **Polls** — Browse all guild polls with status pills (Active/Ended), total vote counts, option counts, and publish/expiry dates. Edit running polls inline (question, description, options, image URL, color) via a modal form.
+- **Tabbed configuration** — General (feature flags, polls, music, prefixes, Discord status feed subscription), Moderation (audit/alert/mute/mention + mod/message/voice log channels, active lockdowns with unlock), and Gatekeeper (verification channel, roles, starter message modal, bypass action, rate limit, auto-enable/disable) tabs. REQUIRED tags appear when a flag is enabled but its associated config is missing. Cancel/Save Changes buttons with form-state tracking.
+- **Member management** — searchable, paginated member directory with kick/ban actions and role mutations. Confirmation modals gather moderation reasons.
+- **Leveling** — Full configuration form (enable/disable, voice XP, stack roles, clear-XP-on-leave, XP curve factor, base XP, min/max gain per message, XP cooldown, level-up announcement destination — same channel / DM / off / a specific channel — and level-up message template). Collection editors with add/remove and Discord role/channel pickers for **level rewards** (roles granted at a level, shown with their color swatch, plus a one-click "Generate preset roles" button that creates 12 themed milestone roles for levels 5–100 behind an "Are you sure?" confirm), **XP multipliers** (per role and per channel), **blacklists** (roles/channels/users excluded from XP), and **special level-up messages** (custom text per level). XP leaderboard with rank medals (gold/silver/bronze) and in-place level/XP editing per member via modal.
+- **Economy** — Shop item management (create/delete), top balance leaderboard, and lottery control (start/cancel active lotteries).
+- **Autoresponders** — Full CRUD table: create triggers with match type (contains/exact/starts/ends/regex), toggle enable/disable, view usage counts, delete. Add modal with response template and ignore-case option.
+- **Comic Feeds** — Card-based view per subscribed brand (Marvel/DC/Manga) showing delivery channel, format, schedule day, next pull time, and pin status. Subscribe/edit/delete feeds and manually push the current week's releases.
+- **Temporary Voice Channels** — Manage hub channels that spawn temp voice channels. Table with format string editing and placeholder reference (%name, %display_name, %guild, %channel).
+- **Highlights** — Admin view of all member highlight configurations (trigger words, blocked count) with the ability to remove a user's highlights.
+- **Emoji Stats** — Read-only usage statistics: total uses, distinct emojis, and a ranked table of top custom emojis with images and counts.
+- **Polls** — Browse all guild polls with status pills (Active/Ended), total vote counts, option counts, and publish/expiry dates. Edit running polls inline.
 - **Giveaways** — Track active and completed giveaways with entry counts, winner counts, and end times.
 - **Tags** — View most-used tags ranked by usage, top creators leaderboard, total tag count and total usage statistics.
-- **Command management** — Three-state system: Enabled (works everywhere), Partial (disabled in specific channels), Disabled (blocked server-wide). Click any command to open a configuration form with mode selector and per-channel checkboxes. Searchable grid with color-coded status dots. Plonk (ignore) management to block specific users or channels from using the bot entirely.
-- **Server & bot stats** — Real-time server metrics (members, online count, channels, roles, emojis, boosts, command usage), top commands table, server info, and bot-wide statistics (guild count, total users, latency, uptime, loaded modules).
-- **Gatekeeper control** — view status (active/inactive, pending members), configure the verification channel, gatekeeper role, starter role, bypass action, and join rate threshold.
-- **Bot invite flow** — if Percy is not in a guild, displays an invite link (constructed from `percy.bot_client_id`) instead of an error.
-- **Setup wizard** — a first-time configuration banner for guilds with a fresh (empty) config.
+- **Command management** — Three-state system: Enabled/Partial/Disabled. Click any command to configure per-channel state. Plonk management to ignore specific users or channels.
+- **Server & bot stats** — Real-time server metrics and bot-wide statistics.
+- **Bot invite flow** — if Percy is not in a guild, displays an invite link instead of an error.
+- **Setup wizard** — a first-time configuration banner for guilds with a fresh config.
+- **Grouped dropdown navigation** — Pages organized into Core (Configuration, Members, Stats, Commands), Features (Leveling, Economy, Autoresponders, Comics, Temp Channels), and Browse (Polls, Giveaways, Tags, Highlights, Emoji Stats) groups.
 - **Async forms** — all config saves submit via JavaScript `fetch` with toast notifications; no-JS fallback via standard form POST with redirect.
 
 ### Routes
@@ -876,15 +882,28 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/auth/discord/callback` | GET | OAuth2 callback |
 | `/account/discord/unlink` | POST | Remove Discord link |
 | `/percy/dashboard` | GET | Server selection (guilds you can manage) |
-| `/percy/dashboard/guild/:id` | GET | Per-guild config editor (tabbed) |
+| `/percy/dashboard/guild/:id` | GET | Per-guild config editor (tabbed: General, Moderation, Gatekeeper) |
 | `/percy/dashboard/guild/:id/config` | POST | Save config changes (flags/moderation/polls/music/prefixes) |
 | `/percy/dashboard/guild/:id/gatekeeper` | POST | Save gatekeeper settings |
 | `/percy/dashboard/guild/:id/members` | GET | Member management page |
-| `/percy/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API, ?limit, ?after) |
+| `/percy/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API) |
 | `/percy/dashboard/guild/:id/members/:uid/action` | POST | Execute moderation action (kick/ban/unban) |
 | `/percy/dashboard/guild/:id/members/:uid/roles` | POST | Add/remove member roles |
-| `/percy/dashboard/guild/:id/leveling` | GET | Leveling leaderboard and config |
+| `/percy/dashboard/guild/:id/leveling` | GET | Leveling config + leaderboard + collection editors |
+| `/percy/dashboard/guild/:id/leveling/config` | POST | Update leveling configuration |
 | `/percy/dashboard/guild/:id/leveling/users/:uid` | POST | Update user level/XP |
+| `/percy/dashboard/guild/:id/leveling/roles` | POST | Add/remove a level reward role |
+| `/percy/dashboard/guild/:id/leveling/roles/preset` | POST | Generate the milestone reward-role preset (levels 5–100) |
+| `/percy/dashboard/guild/:id/leveling/multipliers` | POST | Set/clear a role or channel XP multiplier |
+| `/percy/dashboard/guild/:id/leveling/blacklist` | POST | Add/remove a leveling blacklist entry |
+| `/percy/dashboard/guild/:id/economy` | GET | Economy management (shop, balances, lottery) |
+| `/percy/dashboard/guild/:id/autoresponders` | GET | Autoresponder management |
+| `/percy/dashboard/guild/:id/autoresponders` | POST | Create autoresponder |
+| `/percy/dashboard/guild/:id/comics` | GET | Comic feed management |
+| `/percy/dashboard/guild/:id/comics/:brand/push` | POST | Manually push a comic feed |
+| `/percy/dashboard/guild/:id/temp-channels` | GET | Temp voice channel hub management |
+| `/percy/dashboard/guild/:id/highlights` | GET | Highlights admin view |
+| `/percy/dashboard/guild/:id/emoji-stats` | GET | Emoji usage statistics |
 | `/percy/dashboard/guild/:id/polls` | GET | Polls overview |
 | `/percy/dashboard/guild/:id/polls/:poll_id` | POST | Edit a running poll |
 | `/percy/dashboard/guild/:id/giveaways` | GET | Giveaways overview |
@@ -893,6 +912,15 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/commands/toggle` | POST | Enable/disable a command |
 | `/percy/dashboard/guild/:id/plonks` | POST | Add/remove plonked entities |
 | `/percy/dashboard/guild/:id/stats` | GET | Server and bot statistics |
+
+### Source layout
+
+The dashboard code is grouped under a `percy` namespace per file type:
+
+- `src/web/routes/dashboard/` — `mod.rs` (router + shared helpers), `templates.rs` (Askama view structs), `handlers.rs` (request handlers).
+- `src/integrations/percy/` — `mod.rs` (the typed `PercyClient` + `PercyError`) and `types.rs` (response models).
+- `templates/percy/*.html` — one Askama template per page.
+- `static/css/percy/dashboard.css`, `static/js/percy/percy-dashboard.js`, `static/js/percy/percy-members.js` — page styling and behavior.
 
 ### How it works
 
@@ -903,6 +931,7 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 5. Form submissions are proxied through the Rust BFF to Percy's internal API, which writes to PostgreSQL and invalidates the cache
 6. Member actions (kick/ban/role changes) call Discord's API through Percy — the BFF never touches Discord directly
 7. Stats, leaderboards, and browsing pages (polls/tags/giveaways) read data from Percy's repositories and format them for display
+8. Feature flags auto-enable/disable associated systems (gatekeeper toggle, clearing channels on flag disable) and show REQUIRED warnings when setup is incomplete
 
 ---
 

@@ -1,0 +1,92 @@
+{% extends "../layout.html" %}
+
+{% block title %}Emoji Stats — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Emoji Usage Stats</h1>
+            <p>Track custom emoji usage across this server.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <div class="nav-group">
+            <span class="nav-group-label">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats" class="active">Emoji Stats</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="metric-tiles">
+        <div class="metric-tile">
+            <span class="tile-label">Total Uses</span>
+            <span class="tile-value">{{ data.total_uses }}</span>
+        </div>
+        <div class="metric-tile">
+            <span class="tile-label">Distinct Emojis</span>
+            <span class="tile-value">{{ data.distinct_emojis }}</span>
+        </div>
+    </div>
+
+    {% if data.entries.is_empty() %}
+    <section class="config-section">
+        <p class="text-muted">No emoji usage data recorded yet.</p>
+    </section>
+    {% else %}
+    <section class="config-section">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Emoji</th>
+                    <th>Name</th>
+                    <th>Uses</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in data.entries %}
+                <tr>
+                    <td>
+                        {% match entry.emoji_url %}
+                        {% when Some with (url) %}
+                        <img src="{{ url }}" alt="{{ entry.emoji_name }}" style="width: 24px; height: 24px; vertical-align: middle;">
+                        {% when None %}
+                        <code>:{{ entry.emoji_name }}:</code>
+                        {% endmatch %}
+                    </td>
+                    <td><code>{{ entry.emoji_name }}</code></td>
+                    <td>{{ entry.total }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

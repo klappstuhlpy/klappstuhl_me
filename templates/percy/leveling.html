@@ -3,7 +3,7 @@
 {% block title %}Leveling — {{ guild_name }} | Dashboard{% endblock %}
 
 {% block css %}
-<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
 {% endblock %}
 
 {% block body %}
@@ -20,13 +20,120 @@
     <nav class="dashboard-nav">
         <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
         <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/leveling" class="active">Leveling</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
         <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <div class="nav-group">
+            <span class="nav-group-label">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling" class="active">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
+            </div>
+        </div>
     </nav>
+
+    {# ─── Configuration ──────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Configuration</h2>
+        <p class="config-section-description">Toggle leveling and configure XP settings.</p>
+        <form id="leveling-config-form">
+            <div class="config-grid">
+                <label class="config-toggle">
+                    <div>
+                        <span class="config-label">Enabled</span>
+                        <span class="config-description">Toggle the leveling system on or off</span>
+                    </div>
+                    <input type="checkbox" name="enabled" {% if config.enabled %}checked{% endif %}>
+                </label>
+                <label class="config-toggle">
+                    <div>
+                        <span class="config-label">Voice XP</span>
+                        <span class="config-description">Members earn XP while in voice channels</span>
+                    </div>
+                    <input type="checkbox" name="voice_enabled" {% if config.voice_enabled %}checked{% endif %}>
+                </label>
+                <label class="config-toggle">
+                    <div>
+                        <span class="config-label">Stack Roles</span>
+                        <span class="config-description">Keep lower-level roles when earning higher ones</span>
+                    </div>
+                    <input type="checkbox" name="role_stack" {% if config.role_stack %}checked{% endif %}>
+                </label>
+                <label class="config-toggle">
+                    <div>
+                        <span class="config-label">Clear XP on Leave</span>
+                        <span class="config-description">Delete a member's level data when they leave</span>
+                    </div>
+                    <input type="checkbox" name="delete_after_leave" {% if config.delete_after_leave %}checked{% endif %}>
+                </label>
+                <div class="config-field">
+                    <label class="config-label" for="factor">XP Curve Factor</label>
+                    <span class="config-description">Steepness of the level curve (1.0 = linear)</span>
+                    <input type="number" name="factor" id="factor" class="config-input" step="0.1" min="0.1" max="10" value="{{ config.factor }}">
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="base">Base XP</label>
+                    <span class="config-description">XP required for the first level</span>
+                    <input type="number" name="base" id="base" class="config-input" step="1" min="1" value="{{ config.base }}">
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="min_gain">Min XP per Message</label>
+                    <span class="config-description">Lowest XP awarded for a message</span>
+                    <input type="number" name="min_gain" id="min_gain" class="config-input" step="1" min="0" value="{{ config.min_gain }}">
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="max_gain">Max XP per Message</label>
+                    <span class="config-description">Highest XP awarded for a message</span>
+                    <input type="number" name="max_gain" id="max_gain" class="config-input" step="1" min="0" value="{{ config.max_gain }}">
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="cooldown_per">XP Cooldown (seconds)</label>
+                    <span class="config-description">Minimum seconds between XP-earning messages</span>
+                    <input type="number" name="cooldown_per" id="cooldown_per" class="config-input" step="1" min="0" value="{{ config.cooldown_per }}">
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="lvl-channel-mode">Level-Up Announcements</label>
+                    <span class="config-description">Where to send level-up messages</span>
+                    <select id="lvl-channel-mode" class="config-input">
+                        <option value="1">Same channel as the message</option>
+                        <option value="2">Direct message</option>
+                        <option value="0">Don't send</option>
+                        <option value="channel">A specific channel…</option>
+                    </select>
+                </div>
+                <div class="config-field" id="lvl-channel-picker-field" hidden>
+                    <label class="config-label" for="lvl-channel-picker">Announcement Channel</label>
+                    <span class="config-description">Channel that receives level-up messages</span>
+                    <select id="lvl-channel-picker" class="config-input">
+                        {% for ch in text_channels %}
+                        <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="config-field" style="grid-column: 1 / -1;">
+                    <label class="config-label" for="level_up_message">Level-Up Message</label>
+                    <span class="config-description">Template shown on level up. Use {user} and {level}.</span>
+                    <input type="text" name="level_up_message" id="level_up_message" class="config-input" placeholder="Congrats {user}, you reached level {level}!" value="{{ config.level_up_message.as_deref().unwrap_or("") }}">
+                </div>
+            </div>
+            <div class="config-actions">
+                <button type="button" class="button small" id="lvl-cancel-btn">Cancel</button>
+                <button type="submit" class="button primary small">Save Configuration</button>
+            </div>
+        </form>
+    </section>
 
     {# ─── Status Tiles ────────────────────────────────────────────── #}
     <div class="metric-tiles">
@@ -36,9 +143,9 @@
             <span class="tile-sub">{% if config.configured %}Configured{% else %}Not configured{% endif %}</span>
         </div>
         <div class="metric-tile">
-            <span class="tile-label">XP Rate</span>
-            <span class="tile-value">{{ config.xp_rate }}x</span>
-            <span class="tile-sub">Multiplier</span>
+            <span class="tile-label">XP per Message</span>
+            <span class="tile-value">{{ config.min_gain }}–{{ config.max_gain }}</span>
+            <span class="tile-sub">Every {{ config.cooldown_per }}s</span>
         </div>
         <div class="metric-tile">
             <span class="tile-label">Voice XP</span>
@@ -47,10 +154,209 @@
         </div>
         <div class="metric-tile">
             <span class="tile-label">Stack Roles</span>
-            <span class="tile-value">{% if config.stack_roles %}Yes{% else %}No{% endif %}</span>
+            <span class="tile-value">{% if config.role_stack %}Yes{% else %}No{% endif %}</span>
             <span class="tile-sub">Keep lower-level roles</span>
         </div>
     </div>
+
+    {# ─── Level Rewards ───────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Level Rewards</h2>
+        <p class="config-section-description">Roles automatically granted when members reach a level.</p>
+        <div class="data-table-wrap">
+            <table class="data-table" id="level-roles-table">
+                <thead>
+                    <tr><th>Role</th><th class="numeric">Level</th><th class="col-actions">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in level_roles %}
+                    <tr data-level="{{ row.level }}" data-role-id="{{ row.role_id }}">
+                        <td>
+                            <span class="role-swatch" style="background: {{ row.color_hex }}"></span>
+                            <span class="role-name" style="color: {{ row.color_hex }}">{{ row.role_name }}</span>
+                        </td>
+                        <td class="numeric">{{ row.level }}</td>
+                        <td class="col-actions"><button class="button small danger lvl-role-remove" data-level="{{ row.level }}">Remove</button></td>
+                    </tr>
+                    {% endfor %}
+                    {% if level_roles.is_empty() %}
+                    <tr class="empty-row"><td colspan="3" class="text-muted">No level reward roles configured.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="inline-add-form">
+            <select id="add-role-select" class="config-input">
+                {% for role in roles %}
+                <option value="{{ role.id }}">{{ role.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" id="add-role-level" class="config-input" placeholder="Level" min="1">
+            <button type="button" class="button primary small" id="add-role-btn">Add Reward</button>
+        </div>
+        <div class="preset-row">
+            <button type="button" class="button small outline" id="preset-roles-btn">✨ Generate preset roles (levels 5–100)</button>
+            <span class="config-description">Creates 12 milestone roles (Newcomer → Immortal) with names &amp; colors, then assigns them.</span>
+        </div>
+    </section>
+
+    {# ─── XP Multipliers ──────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>XP Multipliers</h2>
+        <p class="config-section-description">Boost (or reduce) XP gains for specific roles or channels.</p>
+
+        <h3 class="subsection-title">Role Multipliers</h3>
+        <div class="data-table-wrap">
+            <table class="data-table" id="mult-roles-table">
+                <thead>
+                    <tr><th>Role</th><th class="numeric">Multiplier</th><th class="col-actions">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in multiplier_roles %}
+                    <tr><td>{{ row.name }}</td><td class="numeric">{{ row.multiplier }}x</td>
+                        <td class="col-actions"><button class="button small danger mult-remove" data-type="role" data-id="{{ row.id }}">Remove</button></td></tr>
+                    {% endfor %}
+                    {% if multiplier_roles.is_empty() %}
+                    <tr class="empty-row"><td colspan="3" class="text-muted">No role multipliers configured.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="inline-add-form">
+            <select id="add-mult-role-select" class="config-input">
+                {% for role in roles %}
+                <option value="{{ role.id }}">{{ role.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" id="add-mult-role-value" class="config-input" placeholder="e.g. 2.0" step="0.1" min="0">
+            <button type="button" class="button primary small add-mult-btn" data-type="role" data-select="add-mult-role-select" data-value="add-mult-role-value">Add</button>
+        </div>
+
+        <h3 class="subsection-title">Channel Multipliers</h3>
+        <div class="data-table-wrap">
+            <table class="data-table" id="mult-channels-table">
+                <thead>
+                    <tr><th>Channel</th><th class="numeric">Multiplier</th><th class="col-actions">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in multiplier_channels %}
+                    <tr><td>{{ row.name }}</td><td class="numeric">{{ row.multiplier }}x</td>
+                        <td class="col-actions"><button class="button small danger mult-remove" data-type="channel" data-id="{{ row.id }}">Remove</button></td></tr>
+                    {% endfor %}
+                    {% if multiplier_channels.is_empty() %}
+                    <tr class="empty-row"><td colspan="3" class="text-muted">No channel multipliers configured.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="inline-add-form">
+            <select id="add-mult-channel-select" class="config-input">
+                {% for ch in all_channels %}
+                <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" id="add-mult-channel-value" class="config-input" placeholder="e.g. 2.0" step="0.1" min="0">
+            <button type="button" class="button primary small add-mult-btn" data-type="channel" data-select="add-mult-channel-select" data-value="add-mult-channel-value">Add</button>
+        </div>
+    </section>
+
+    {# ─── Blacklists ──────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>XP Blacklists</h2>
+        <p class="config-section-description">Roles, channels, or users excluded from earning XP.</p>
+
+        <h3 class="subsection-title">Blacklisted Roles</h3>
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <tbody>
+                    {% for row in blacklisted_roles %}
+                    <tr><td>{{ row.name }}</td><td class="col-actions"><button class="button small danger bl-remove" data-type="role" data-id="{{ row.id }}">Remove</button></td></tr>
+                    {% endfor %}
+                    {% if blacklisted_roles.is_empty() %}
+                    <tr class="empty-row"><td class="text-muted">No blacklisted roles.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="inline-add-form">
+            <select id="add-bl-role-select" class="config-input">
+                {% for role in roles %}
+                <option value="{{ role.id }}">{{ role.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="button primary small bl-add-btn" data-type="role" data-select="add-bl-role-select">Add</button>
+        </div>
+
+        <h3 class="subsection-title">Blacklisted Channels</h3>
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <tbody>
+                    {% for row in blacklisted_channels %}
+                    <tr><td>{{ row.name }}</td><td class="col-actions"><button class="button small danger bl-remove" data-type="channel" data-id="{{ row.id }}">Remove</button></td></tr>
+                    {% endfor %}
+                    {% if blacklisted_channels.is_empty() %}
+                    <tr class="empty-row"><td class="text-muted">No blacklisted channels.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="inline-add-form">
+            <select id="add-bl-channel-select" class="config-input">
+                {% for ch in all_channels %}
+                <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="button primary small bl-add-btn" data-type="channel" data-select="add-bl-channel-select">Add</button>
+        </div>
+
+        <h3 class="subsection-title">Blacklisted Users</h3>
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <tbody>
+                    {% for row in blacklisted_users %}
+                    <tr><td>{{ row.name }}</td><td class="col-actions"><button class="button small danger bl-remove" data-type="user" data-id="{{ row.id }}">Remove</button></td></tr>
+                    {% endfor %}
+                    {% if blacklisted_users.is_empty() %}
+                    <tr class="empty-row"><td class="text-muted">No blacklisted users.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="inline-add-form">
+            <input type="text" id="add-bl-user-id" class="config-input" placeholder="User ID" inputmode="numeric">
+            <button type="button" class="button primary small bl-add-btn" data-type="user" data-input="add-bl-user-id">Add</button>
+        </div>
+    </section>
+
+    {# ─── Special Level-Up Messages ───────────────────────────────── #}
+    <section class="config-section">
+        <h2>Special Level-Up Messages</h2>
+        <p class="config-section-description">Custom announcement text for specific levels (overrides the default). Use {user} and {level}.</p>
+        <div class="data-table-wrap">
+            <table class="data-table" id="special-msg-table">
+                <thead>
+                    <tr><th class="numeric">Level</th><th>Message</th><th class="col-actions">Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for row in special_messages %}
+                    <tr data-level="{{ row.level }}" data-message="{{ row.message }}">
+                        <td class="numeric">{{ row.level }}</td>
+                        <td>{{ row.message }}</td>
+                        <td class="col-actions"><button class="button small danger special-remove" data-level="{{ row.level }}">Remove</button></td>
+                    </tr>
+                    {% endfor %}
+                    {% if special_messages.is_empty() %}
+                    <tr class="empty-row"><td colspan="3" class="text-muted">No special messages configured.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="inline-add-form">
+            <input type="number" id="add-special-level" class="config-input" placeholder="Level" min="1">
+            <input type="text" id="add-special-message" class="config-input" placeholder="Message for {user} at level {level}">
+            <button type="button" class="button primary small" id="add-special-btn">Add Message</button>
+        </div>
+    </section>
 
     {# ─── Leaderboard ─────────────────────────────────────────────── #}
     <section class="config-section">
@@ -128,8 +434,196 @@
 
 <script>
 const GUILD_ID = '{{ guild_id }}';
+const LEVEL_UP_CHANNEL = {{ config.level_up_channel }};
 let editingUserId = null;
 
+function showToast(level, message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + level;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('visible'));
+    setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
+async function postJSON(path, body) {
+    const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    return resp.json();
+}
+
+// ─── Level-up channel mode selector ──────────────────────────────────────────
+const lvlChannelMode = document.getElementById('lvl-channel-mode');
+const lvlChannelPickerField = document.getElementById('lvl-channel-picker-field');
+const lvlChannelPicker = document.getElementById('lvl-channel-picker');
+
+function syncChannelPickerVisibility() {
+    lvlChannelPickerField.hidden = lvlChannelMode.value !== 'channel';
+}
+(function initChannelMode() {
+    if (LEVEL_UP_CHANNEL === 0 || LEVEL_UP_CHANNEL === 1 || LEVEL_UP_CHANNEL === 2) {
+        lvlChannelMode.value = String(LEVEL_UP_CHANNEL);
+    } else {
+        lvlChannelMode.value = 'channel';
+        if (lvlChannelPicker) lvlChannelPicker.value = String(LEVEL_UP_CHANNEL);
+    }
+    syncChannelPickerVisibility();
+})();
+lvlChannelMode.addEventListener('change', syncChannelPickerVisibility);
+
+function computeLevelUpChannel() {
+    if (lvlChannelMode.value === 'channel') {
+        const cid = lvlChannelPicker ? lvlChannelPicker.value : '';
+        return cid ? parseInt(cid) : 1;
+    }
+    return parseInt(lvlChannelMode.value);
+}
+
+// ─── Leveling Config Form ────────────────────────────────────────────────────
+const configForm = document.getElementById('leveling-config-form');
+if (configForm) {
+    configForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = {
+            enabled: configForm.querySelector('[name="enabled"]').checked,
+            voice_enabled: configForm.querySelector('[name="voice_enabled"]').checked,
+            role_stack: configForm.querySelector('[name="role_stack"]').checked,
+            delete_after_leave: configForm.querySelector('[name="delete_after_leave"]').checked,
+            factor: parseFloat(configForm.querySelector('[name="factor"]').value) || 1.0,
+            base: parseInt(configForm.querySelector('[name="base"]').value) || 100,
+            min_gain: parseInt(configForm.querySelector('[name="min_gain"]').value) || 0,
+            max_gain: parseInt(configForm.querySelector('[name="max_gain"]').value) || 0,
+            cooldown_per: parseInt(configForm.querySelector('[name="cooldown_per"]').value) || 0,
+            level_up_channel: computeLevelUpChannel(),
+            level_up_message: configForm.querySelector('[name="level_up_message"]').value.trim() || null,
+        };
+        try {
+            const data = await postJSON('/leveling/config', body);
+            if (data.ok) { showToast('success', 'Configuration saved.'); setTimeout(() => location.reload(), 400); }
+            else { showToast('error', data.error || 'Failed to save.'); }
+        } catch { showToast('error', 'Network error.'); }
+    });
+    document.getElementById('lvl-cancel-btn').addEventListener('click', () => location.reload());
+}
+
+// ─── Level Rewards ───────────────────────────────────────────────────────────
+document.getElementById('add-role-btn').addEventListener('click', async () => {
+    const roleId = document.getElementById('add-role-select').value;
+    const level = parseInt(document.getElementById('add-role-level').value);
+    if (!roleId || !Number.isFinite(level)) { showToast('error', 'Pick a role and level.'); return; }
+    try {
+        const data = await postJSON('/leveling/roles', { role_id: roleId, level });
+        if (data.ok) { showToast('success', 'Reward added.'); setTimeout(() => location.reload(), 400); }
+        else { showToast('error', data.error || 'Failed.'); }
+    } catch { showToast('error', 'Network error.'); }
+});
+document.querySelectorAll('.lvl-role-remove').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const level = parseInt(btn.dataset.level);
+        try {
+            const data = await postJSON('/leveling/roles', { level, role_id: null });
+            if (data.ok) { showToast('success', 'Reward removed.'); setTimeout(() => location.reload(), 400); }
+            else { showToast('error', data.error || 'Failed.'); }
+        } catch { showToast('error', 'Network error.'); }
+    });
+});
+const presetBtn = document.getElementById('preset-roles-btn');
+if (presetBtn) {
+    presetBtn.addEventListener('click', async () => {
+        if (!confirm('Are you sure? This creates 12 milestone roles (levels 5–100) with preset names and colors in your server and assigns them as level rewards.')) return;
+        presetBtn.disabled = true;
+        try {
+            const data = await postJSON('/leveling/roles/preset', {});
+            if (data.ok) { showToast('success', 'Preset roles created.'); setTimeout(() => location.reload(), 600); }
+            else { showToast('error', data.error || 'Failed.'); presetBtn.disabled = false; }
+        } catch { showToast('error', 'Network error.'); presetBtn.disabled = false; }
+    });
+}
+
+// ─── XP Multipliers ──────────────────────────────────────────────────────────
+document.querySelectorAll('.add-mult-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const type = btn.dataset.type;
+        const id = document.getElementById(btn.dataset.select).value;
+        const multiplier = parseFloat(document.getElementById(btn.dataset.value).value);
+        if (!id || !Number.isFinite(multiplier) || multiplier <= 0) { showToast('error', 'Pick a target and a positive multiplier.'); return; }
+        try {
+            const data = await postJSON('/leveling/multipliers', { type, id, multiplier });
+            if (data.ok) { showToast('success', 'Multiplier saved.'); setTimeout(() => location.reload(), 400); }
+            else { showToast('error', data.error || 'Failed.'); }
+        } catch { showToast('error', 'Network error.'); }
+    });
+});
+document.querySelectorAll('.mult-remove').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        try {
+            const data = await postJSON('/leveling/multipliers', { type: btn.dataset.type, id: btn.dataset.id, multiplier: 0 });
+            if (data.ok) { showToast('success', 'Multiplier removed.'); setTimeout(() => location.reload(), 400); }
+            else { showToast('error', data.error || 'Failed.'); }
+        } catch { showToast('error', 'Network error.'); }
+    });
+});
+
+// ─── Blacklists ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.bl-add-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const type = btn.dataset.type;
+        const id = btn.dataset.input
+            ? document.getElementById(btn.dataset.input).value.trim()
+            : document.getElementById(btn.dataset.select).value;
+        if (!id) { showToast('error', 'Pick or enter a target.'); return; }
+        try {
+            const data = await postJSON('/leveling/blacklist', { type, id, action: 'add' });
+            if (data.ok) { showToast('success', 'Added to blacklist.'); setTimeout(() => location.reload(), 400); }
+            else { showToast('error', data.error || 'Failed.'); }
+        } catch { showToast('error', 'Network error.'); }
+    });
+});
+document.querySelectorAll('.bl-remove').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        try {
+            const data = await postJSON('/leveling/blacklist', { type: btn.dataset.type, id: btn.dataset.id, action: 'remove' });
+            if (data.ok) { showToast('success', 'Removed from blacklist.'); setTimeout(() => location.reload(), 400); }
+            else { showToast('error', data.error || 'Failed.'); }
+        } catch { showToast('error', 'Network error.'); }
+    });
+});
+
+// ─── Special Level-Up Messages ───────────────────────────────────────────────
+function collectSpecialMessages() {
+    const map = {};
+    document.querySelectorAll('#special-msg-table tbody tr[data-level]').forEach(tr => {
+        map[tr.dataset.level] = tr.dataset.message;
+    });
+    return map;
+}
+async function saveSpecialMessages(map) {
+    try {
+        const data = await postJSON('/leveling/config', { special_level_up_messages: map });
+        if (data.ok) { showToast('success', 'Messages updated.'); setTimeout(() => location.reload(), 400); }
+        else { showToast('error', data.error || 'Failed.'); }
+    } catch { showToast('error', 'Network error.'); }
+}
+document.getElementById('add-special-btn').addEventListener('click', () => {
+    const level = parseInt(document.getElementById('add-special-level').value);
+    const message = document.getElementById('add-special-message').value.trim();
+    if (!Number.isFinite(level) || !message) { showToast('error', 'Enter a level and message.'); return; }
+    const map = collectSpecialMessages();
+    map[String(level)] = message;
+    saveSpecialMessages(map);
+});
+document.querySelectorAll('.special-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const map = collectSpecialMessages();
+        delete map[btn.dataset.level];
+        saveSpecialMessages(map);
+    });
+});
+
+// ─── Edit Level/XP Modal ─────────────────────────────────────────────────────
 function editLevel(userId, username, level, xp) {
     editingUserId = userId;
     document.getElementById('level-modal-desc').textContent = 'Editing ' + username;
@@ -152,12 +646,13 @@ document.getElementById('level-save-btn').addEventListener('click', async () => 
         const data = await resp.json();
         if (data.ok) {
             document.getElementById('level-modal').hidden = true;
-            location.reload();
+            showToast('success', 'Level updated.');
+            setTimeout(() => location.reload(), 400);
         } else {
-            alert(data.error || 'Failed to update');
+            showToast('error', data.error || 'Failed to update');
         }
     } catch {
-        alert('Network error');
+        showToast('error', 'Network error');
     }
 });
 </script>

@@ -3,7 +3,7 @@
 {% block title %}Polls — {{ guild_name }} | Dashboard{% endblock %}
 
 {% block css %}
-<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
 {% endblock %}
 
 {% block body %}
@@ -20,12 +20,28 @@
     <nav class="dashboard-nav">
         <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
         <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/polls" class="active">Polls</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
         <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <div class="nav-group">
+            <span class="nav-group-label">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls" class="active">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
+            </div>
+        </div>
     </nav>
 
     {# ─── Summary Tiles ───────────────────────────────────────────── #}

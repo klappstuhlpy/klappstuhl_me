@@ -28,6 +28,13 @@
         });
     });
 
+    document.querySelectorAll('.mod-setup-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchTab('moderation');
+        });
+    });
+
     // -- Form state tracking ---------------------------------------------------
 
     function captureFormState(form) {
@@ -172,7 +179,8 @@
                     formStates.set(form, captureFormState(form));
                     hideBanner();
                     const section = form.querySelector('input[name="_section"]');
-                    if (section && section.value === 'flags') {
+                    const isGatekeeper = form.action && form.action.includes('/gatekeeper');
+                    if ((section && (section.value === 'flags' || section.value === 'moderation')) || isGatekeeper) {
                         setTimeout(() => location.reload(), 400);
                     }
                 } else {
@@ -201,4 +209,67 @@
     }
 
     window.showToast = showToast;
+
+    // -- Gatekeeper starter message modal ----------------------------------------
+
+    const gkChannel = document.getElementById('gk_channel');
+    const gkModal = document.getElementById('gk-message-modal');
+    const gkModalTitle = document.getElementById('gk_modal_title');
+    const gkModalContent = document.getElementById('gk_modal_content');
+    const gkModalCancel = document.getElementById('gk-modal-cancel');
+    const gkModalConfirm = document.getElementById('gk-modal-confirm');
+    const gkHiddenTitle = document.getElementById('gk_starter_title');
+    const gkHiddenContent = document.getElementById('gk_starter_content');
+
+    if (gkChannel && gkModal) {
+        const gkForm = gkChannel.closest('form');
+        let channelChanged = false;
+
+        gkChannel.addEventListener('change', () => {
+            const initial = gkChannel.dataset.initial || '';
+            const current = gkChannel.value;
+            channelChanged = current !== initial && current !== '';
+        });
+
+        // Intercept form submission to show modal when channel changed
+        if (gkForm) {
+            gkForm.addEventListener('submit', (e) => {
+                if (channelChanged && !gkHiddenTitle.value) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    gkModal.hidden = false;
+                }
+            }, true); // capture phase to run before the async handler
+        }
+
+        gkModalCancel.addEventListener('click', () => {
+            gkModal.hidden = true;
+            // Revert channel selection
+            gkChannel.value = gkChannel.dataset.initial || '';
+            channelChanged = false;
+            gkHiddenTitle.value = '';
+            gkHiddenContent.value = '';
+            if (gkForm) checkDirty(gkForm);
+        });
+
+        gkModal.addEventListener('click', (e) => {
+            if (e.target === gkModal) {
+                gkModal.hidden = true;
+            }
+        });
+
+        gkModalConfirm.addEventListener('click', () => {
+            const title = gkModalTitle.value.trim();
+            const content = gkModalContent.value.trim();
+            if (!title || !content) {
+                showToast('error', 'Both title and content are required.');
+                return;
+            }
+            gkHiddenTitle.value = title;
+            gkHiddenContent.value = content;
+            gkModal.hidden = true;
+            // Now submit the form
+            if (gkForm) gkForm.requestSubmit();
+        });
+    }
 })();

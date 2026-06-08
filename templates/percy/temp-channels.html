@@ -1,0 +1,202 @@
+{% extends "../layout.html" %}
+
+{% block title %}Temp Channels — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Temporary Voice Channels</h1>
+            <p>Configure hub channels that spawn temporary voice channels.</p>
+        </div>
+        <button class="button primary small" id="add-hub-btn">Add Hub</button>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <div class="nav-group">
+            <span class="nav-group-label">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels" class="active">Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
+            </div>
+        </div>
+    </nav>
+
+    {% if data.entries.is_empty() %}
+    <section class="config-section">
+        <p class="text-muted">No temp channel hubs configured. Click "Add Hub" to create one.</p>
+    </section>
+    {% else %}
+    <section class="config-section">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Channel</th>
+                    <th>Format</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in data.entries %}
+                <tr>
+                    <td><strong>{{ entry.channel_name }}</strong> <code class="text-muted">{{ entry.channel_id }}</code></td>
+                    <td><code>{{ entry.format }}</code></td>
+                    <td style="white-space: nowrap;">
+                        <button class="button small edit-hub-btn" data-channel-id="{{ entry.channel_id }}" data-format="{{ entry.format }}" style="display: inline-block;">Edit</button>
+                        <button class="button small danger delete-hub-btn" data-channel-id="{{ entry.channel_id }}" style="display: inline-block;">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+</div>
+
+<!-- Add/Edit Hub Modal -->
+<div class="modal-overlay" id="hub-modal" hidden>
+    <div class="modal-card" style="max-width: 520px;">
+        <h3 id="hub-modal-title">Add Hub Channel</h3>
+        <div style="margin-top: 1rem;">
+            <label class="config-label" for="hub_channel">Channel</label>
+            <select id="hub_channel" class="config-select" style="margin-bottom: 0.75rem;">
+                {% for ch in channels %}
+                <option value="{{ ch.id }}">{{ ch.name }}</option>
+                {% endfor %}
+            </select>
+            <label class="config-label" for="hub_format">Name Format</label>
+            <input type="text" id="hub_format" class="config-input" placeholder="%display_name's Channel" style="margin-bottom: 0.5rem;">
+            <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 0;">Placeholders: <code>%name</code>, <code>%display_name</code>, <code>%guild</code>, <code>%channel</code></p>
+        </div>
+        <div class="modal-actions" style="margin-top: 1rem;">
+            <button type="button" class="button small" id="hub-modal-cancel">Cancel</button>
+            <button type="button" class="button primary small" id="hub-modal-confirm">Create</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const guildId = '{{ guild_id }}';
+    const baseUrl = `/percy/dashboard/guild/${guildId}/temp-channels`;
+    let editingChannelId = null;
+
+    function showToast(level, message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast toast-' + level;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('visible'));
+        setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    const addBtn = document.getElementById('add-hub-btn');
+    const modal = document.getElementById('hub-modal');
+    const modalTitle = document.getElementById('hub-modal-title');
+    const cancelBtn = document.getElementById('hub-modal-cancel');
+    const confirmBtn = document.getElementById('hub-modal-confirm');
+
+    function openModal(editing) {
+        editingChannelId = editing || null;
+        modalTitle.textContent = editing ? 'Edit Hub Channel' : 'Add Hub Channel';
+        confirmBtn.textContent = editing ? 'Save' : 'Create';
+        document.getElementById('hub_channel').disabled = !!editing;
+        modal.hidden = false;
+    }
+
+    function closeModal() {
+        modal.hidden = true;
+        editingChannelId = null;
+        document.getElementById('hub_channel').disabled = false;
+        document.getElementById('hub_format').value = '';
+    }
+
+    addBtn.addEventListener('click', () => openModal(null));
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    confirmBtn.addEventListener('click', async () => {
+        const channel_id = editingChannelId || document.getElementById('hub_channel').value;
+        const format = document.getElementById('hub_format').value.trim();
+
+        if (!channel_id) { showToast('error', 'Please select a channel.'); return; }
+        if (!format) { showToast('error', 'Format string is required.'); return; }
+
+        const body = { channel_id, format };
+
+        try {
+            let resp;
+            if (editingChannelId) {
+                resp = await fetch(`${baseUrl}/${encodeURIComponent(editingChannelId)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+            } else {
+                resp = await fetch(baseUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+            }
+            const data = await resp.json();
+            if (data.ok) {
+                showToast('success', editingChannelId ? 'Hub updated.' : 'Hub created.');
+                setTimeout(() => location.reload(), 400);
+            } else {
+                showToast('error', data.error || 'Failed.');
+            }
+        } catch { showToast('error', 'Network error.'); }
+    });
+
+    // Edit buttons
+    document.querySelectorAll('.edit-hub-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('hub_channel').value = btn.dataset.channelId;
+            document.getElementById('hub_format').value = btn.dataset.format;
+            openModal(btn.dataset.channelId);
+        });
+    });
+
+    // Delete buttons
+    document.querySelectorAll('.delete-hub-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const channelId = btn.dataset.channelId;
+            if (!confirm('Remove this temp channel hub?')) return;
+            try {
+                const resp = await fetch(`${baseUrl}/${encodeURIComponent(channelId)}`, {
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json' },
+                });
+                const data = await resp.json();
+                if (data.ok) { showToast('success', 'Hub removed.'); setTimeout(() => location.reload(), 400); }
+                else { showToast('error', data.error || 'Failed to delete.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    });
+})();
+</script>
+{% endblock %}

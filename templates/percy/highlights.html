@@ -1,0 +1,112 @@
+{% extends "../layout.html" %}
+
+{% block title %}Highlights — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Highlights</h1>
+            <p>View and manage highlight configurations set by members.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <div class="nav-group">
+            <span class="nav-group-label">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights" class="active">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
+            </div>
+        </div>
+    </nav>
+
+    {% if data.entries.is_empty() %}
+    <section class="config-section">
+        <p class="text-muted">No highlights configured by any members in this server.</p>
+    </section>
+    {% else %}
+    <section class="config-section">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Triggers</th>
+                    <th>Blocked</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in data.entries %}
+                <tr>
+                    <td><strong>{{ entry.username }}</strong> <code class="text-muted">{{ entry.user_id }}</code></td>
+                    <td>{{ entry.triggers.join(", ") }}</td>
+                    <td>{{ entry.blocked_count }}</td>
+                    <td>
+                        <button class="button small danger delete-highlight-btn" data-user-id="{{ entry.user_id }}" data-username="{{ entry.username }}">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+</div>
+
+<script>
+(function() {
+    const guildId = '{{ guild_id }}';
+    const baseUrl = `/percy/dashboard/guild/${guildId}/highlights`;
+
+    function showToast(level, message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast toast-' + level;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('visible'));
+        setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    // Delete buttons
+    document.querySelectorAll('.delete-highlight-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const userId = btn.dataset.userId;
+            const username = btn.dataset.username;
+            if (!confirm(`Delete all highlights for "${username}"?`)) return;
+            try {
+                const resp = await fetch(`${baseUrl}/${encodeURIComponent(userId)}`, {
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json' },
+                });
+                const data = await resp.json();
+                if (data.ok) { showToast('success', 'Highlights removed.'); setTimeout(() => location.reload(), 400); }
+                else { showToast('error', data.error || 'Failed to delete.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    });
+})();
+</script>
+{% endblock %}

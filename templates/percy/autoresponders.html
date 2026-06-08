@@ -1,0 +1,206 @@
+{% extends "../layout.html" %}
+
+{% block title %}Autoresponders — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Autoresponders</h1>
+            <p>Automatic message replies triggered by keywords or patterns.</p>
+        </div>
+        <button class="button primary small" id="add-responder-btn">Add Responder</button>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <div class="nav-group">
+            <span class="nav-group-label">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders" class="active">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="metric-tiles">
+        <div class="metric-tile">
+            <span class="tile-label">Total</span>
+            <span class="tile-value">{{ data.total }}</span>
+        </div>
+    </div>
+
+    {% if data.entries.is_empty() %}
+    <section class="config-section">
+        <p class="text-muted">No autoresponders configured. Click "Add Responder" to create one.</p>
+    </section>
+    {% else %}
+    <section class="config-section">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Trigger</th>
+                    <th>Response</th>
+                    <th>Type</th>
+                    <th>Uses</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in data.entries %}
+                <tr>
+                    <td><code>{{ entry.trigger }}</code></td>
+                    <td class="text-truncate" title="{{ entry.response }}">{{ entry.response }}</td>
+                    <td><span class="badge badge-muted">{{ entry.match_type }}</span></td>
+                    <td>{{ entry.uses }}</td>
+                    <td>
+                        <button class="toggle-btn {% if entry.enabled %}active{% endif %}" data-trigger="{{ entry.trigger }}" data-enabled="{{ entry.enabled }}">
+                            {% if entry.enabled %}ON{% else %}OFF{% endif %}
+                        </button>
+                    </td>
+                    <td>
+                        <button class="button small danger delete-btn" data-trigger="{{ entry.trigger }}">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+</div>
+
+<!-- Add Responder Modal -->
+<div class="modal-overlay" id="add-modal" hidden>
+    <div class="modal-card" style="max-width: 520px;">
+        <h3>Add Autoresponder</h3>
+        <div style="margin-top: 1rem;">
+            <label class="config-label" for="ar_trigger">Trigger</label>
+            <input type="text" id="ar_trigger" class="config-input" placeholder="hello" maxlength="200" style="margin-bottom: 0.75rem;">
+            <label class="config-label" for="ar_response">Response</label>
+            <textarea id="ar_response" class="config-input" rows="3" maxlength="2000" placeholder="Hi {user}! Welcome to {server}." style="resize: vertical; margin-bottom: 0.75rem;"></textarea>
+            <label class="config-label" for="ar_match_type">Match Type</label>
+            <select id="ar_match_type" class="config-select" style="margin-bottom: 0.75rem;">
+                <option value="contains">Contains</option>
+                <option value="exact">Exact</option>
+                <option value="starts">Starts With</option>
+                <option value="ends">Ends With</option>
+                <option value="regex">Regex</option>
+            </select>
+            <label class="config-toggle" style="margin-bottom: 0;">
+                <div>
+                    <span class="config-label">Ignore Case</span>
+                </div>
+                <input type="checkbox" id="ar_ignore_case" checked>
+            </label>
+        </div>
+        <div class="modal-actions" style="margin-top: 1rem;">
+            <button type="button" class="button small" id="add-modal-cancel">Cancel</button>
+            <button type="button" class="button primary small" id="add-modal-confirm">Create</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const guildId = '{{ guild_id }}';
+    const baseUrl = `/percy/dashboard/guild/${guildId}/autoresponders`;
+
+    function showToast(level, message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast toast-' + level;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('visible'));
+        setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    // Add modal
+    const addBtn = document.getElementById('add-responder-btn');
+    const addModal = document.getElementById('add-modal');
+    const addCancel = document.getElementById('add-modal-cancel');
+    const addConfirm = document.getElementById('add-modal-confirm');
+
+    addBtn.addEventListener('click', () => { addModal.hidden = false; });
+    addCancel.addEventListener('click', () => { addModal.hidden = true; });
+    addModal.addEventListener('click', (e) => { if (e.target === addModal) addModal.hidden = true; });
+
+    addConfirm.addEventListener('click', async () => {
+        const trigger = document.getElementById('ar_trigger').value.trim();
+        const response = document.getElementById('ar_response').value.trim();
+        const match_type = document.getElementById('ar_match_type').value;
+        const ignore_case = document.getElementById('ar_ignore_case').checked;
+
+        if (!trigger || !response) { showToast('error', 'Trigger and response are required.'); return; }
+
+        try {
+            const resp = await fetch(baseUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ trigger, response, match_type, ignore_case }),
+            });
+            const data = await resp.json();
+            if (data.ok) { showToast('success', 'Autoresponder created.'); setTimeout(() => location.reload(), 400); }
+            else { showToast('error', data.error || 'Failed to create.'); }
+        } catch { showToast('error', 'Network error.'); }
+    });
+
+    // Toggle buttons
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const trigger = btn.dataset.trigger;
+            const enabled = btn.dataset.enabled === 'true';
+            try {
+                const resp = await fetch(`${baseUrl}/${encodeURIComponent(trigger)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ enabled: !enabled }),
+                });
+                const data = await resp.json();
+                if (data.ok) { location.reload(); }
+                else { showToast('error', data.error || 'Failed to toggle.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    });
+
+    // Delete buttons
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const trigger = btn.dataset.trigger;
+            if (!confirm(`Delete autoresponder "${trigger}"?`)) return;
+            try {
+                const resp = await fetch(`${baseUrl}/${encodeURIComponent(trigger)}`, {
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json' },
+                });
+                const data = await resp.json();
+                if (data.ok) { showToast('success', 'Deleted.'); setTimeout(() => location.reload(), 400); }
+                else { showToast('error', data.error || 'Failed to delete.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    });
+})();
+</script>
+{% endblock %}

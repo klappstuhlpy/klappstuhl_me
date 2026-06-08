@@ -1,0 +1,506 @@
+//! Typed response models for Percy's internal API.
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UserGuild {
+    pub id: String,
+    pub name: String,
+    pub icon_url: Option<String>,
+    pub member_count: Option<u32>,
+    pub owner: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChannelRef {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub channel_type: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RoleRef {
+    pub id: String,
+    pub name: String,
+    pub color: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GuildInfo {
+    pub id: u64,
+    pub name: String,
+    pub icon_url: Option<String>,
+    pub member_count: Option<u32>,
+    pub flags: GuildFlags,
+    pub audit_log_channel: Option<ChannelRef>,
+    #[serde(default)]
+    pub mod_log_channel: Option<ChannelRef>,
+    #[serde(default)]
+    pub message_log_channel: Option<ChannelRef>,
+    #[serde(default)]
+    pub voice_log_channel: Option<ChannelRef>,
+    pub poll_channel: Option<ChannelRef>,
+    pub poll_ping_role: Option<RoleRef>,
+    pub poll_reason_channel: Option<ChannelRef>,
+    pub mention_count: Option<u32>,
+    pub mute_role: Option<RoleRef>,
+    pub alert_channel: Option<ChannelRef>,
+    pub music_panel_channel: Option<ChannelRef>,
+    pub use_music_panel: bool,
+    pub prefixes: Vec<String>,
+    #[serde(default)]
+    pub is_new_config: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GuildFlags {
+    pub audit_log: bool,
+    pub raid: bool,
+    pub alerts: bool,
+    pub gatekeeper: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Role {
+    pub id: String,
+    pub name: String,
+    pub color: u32,
+    pub position: i32,
+    pub permissions: u64,
+    pub mentionable: bool,
+    pub managed: bool,
+    pub hoist: bool,
+    pub icon_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Channel {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub channel_type: String,
+    pub position: i32,
+    pub category_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Member {
+    pub id: String,
+    pub name: String,
+    pub display_name: String,
+    pub avatar_url: String,
+    pub joined_at: Option<String>,
+    pub roles: Vec<String>,
+    pub bot: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GatekeeperInfo {
+    pub channel: Option<ChannelRef>,
+    pub role: Option<RoleRef>,
+    pub message: Option<u64>,
+    pub starter_role: Option<RoleRef>,
+    pub bypass_action: String,
+    pub rate: Option<String>,
+    pub started_at: Option<String>,
+    pub member_count: u32,
+    pub needs_setup: bool,
+}
+
+// -- Leveling types ----------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LevelingConfig {
+    pub enabled: bool,
+    #[serde(default)]
+    pub configured: bool,
+    /// 0 = don't send, 1 = source channel, 2 = DM, else channel id.
+    #[serde(default = "default_level_up_channel")]
+    pub level_up_channel: i64,
+    pub level_up_message: Option<String>,
+    /// Map of level (as string) -> custom message.
+    #[serde(default)]
+    pub special_level_up_messages: HashMap<String, String>,
+    #[serde(default)]
+    pub blacklisted_roles: Vec<i64>,
+    #[serde(default)]
+    pub blacklisted_channels: Vec<i64>,
+    #[serde(default)]
+    pub blacklisted_users: Vec<i64>,
+    /// Map of role id (as string) -> level threshold.
+    #[serde(default)]
+    pub level_roles: HashMap<String, i64>,
+    /// Map of role id (as string) -> XP multiplier.
+    #[serde(default)]
+    pub multiplier_roles: HashMap<String, f64>,
+    /// Map of channel id (as string) -> XP multiplier.
+    #[serde(default)]
+    pub multiplier_channels: HashMap<String, f64>,
+    #[serde(default)]
+    pub role_stack: bool,
+    #[serde(default)]
+    pub voice_enabled: bool,
+    #[serde(default)]
+    pub delete_after_leave: bool,
+    #[serde(default = "default_factor")]
+    pub factor: f64,
+    #[serde(default = "default_base")]
+    pub base: i64,
+    #[serde(default = "default_min_gain")]
+    pub min_gain: i64,
+    #[serde(default = "default_max_gain")]
+    pub max_gain: i64,
+    #[serde(default = "default_cooldown_per")]
+    pub cooldown_per: i64,
+}
+
+fn default_factor() -> f64 {
+    1.0
+}
+fn default_level_up_channel() -> i64 {
+    1
+}
+fn default_base() -> i64 {
+    100
+}
+fn default_min_gain() -> i64 {
+    8
+}
+fn default_max_gain() -> i64 {
+    15
+}
+fn default_cooldown_per() -> i64 {
+    40
+}
+
+impl Default for LevelingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            configured: false,
+            level_up_channel: default_level_up_channel(),
+            level_up_message: None,
+            special_level_up_messages: HashMap::new(),
+            blacklisted_roles: Vec::new(),
+            blacklisted_channels: Vec::new(),
+            blacklisted_users: Vec::new(),
+            level_roles: HashMap::new(),
+            multiplier_roles: HashMap::new(),
+            multiplier_channels: HashMap::new(),
+            role_stack: false,
+            voice_enabled: false,
+            delete_after_leave: false,
+            factor: default_factor(),
+            base: default_base(),
+            min_gain: default_min_gain(),
+            max_gain: default_max_gain(),
+            cooldown_per: default_cooldown_per(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LeaderboardEntry {
+    pub user_id: String,
+    pub username: String,
+    pub avatar_url: Option<String>,
+    pub level: u32,
+    pub xp: u64,
+    pub total_xp: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LeaderboardResponse {
+    pub entries: Vec<LeaderboardEntry>,
+    pub total: u32,
+}
+
+// -- Polls types -------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PollInfo {
+    pub id: i64,
+    pub channel_id: String,
+    pub message_id: String,
+    pub question: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub options: Vec<String>,
+    #[serde(default)]
+    pub image_url: String,
+    #[serde(default)]
+    pub color: String,
+    pub published: Option<String>,
+    pub expires: Option<String>,
+    #[serde(default)]
+    pub ended: bool,
+    #[serde(default)]
+    pub total_votes: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PollsResponse {
+    pub polls: Vec<PollInfo>,
+}
+
+// -- Giveaways types ---------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GiveawayInfo {
+    pub id: i64,
+    pub channel_id: String,
+    pub message_id: String,
+    pub author_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub winners_count: u32,
+    pub entries: u32,
+    #[serde(default)]
+    pub ended: bool,
+    pub ends_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GiveawaysResponse {
+    pub giveaways: Vec<GiveawayInfo>,
+}
+
+// -- Tags types --------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TagInfo {
+    pub id: i64,
+    pub name: String,
+    pub owner_id: Option<String>,
+    pub owner_name: Option<String>,
+    pub uses: u32,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TagCreator {
+    pub user_id: Option<String>,
+    pub username: String,
+    pub count: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TagsResponse {
+    pub total: u32,
+    pub total_uses: u64,
+    pub tags: Vec<TagInfo>,
+    pub top_creators: Vec<TagCreator>,
+}
+
+// -- Commands types ----------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CommandInfo {
+    pub name: String,
+    pub category: String,
+    pub description: String,
+    #[serde(default)]
+    pub disabled_in: Vec<String>,
+    pub globally_disabled: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PlonkEntry {
+    pub entity_id: String,
+    #[serde(rename = "type")]
+    pub entity_type: String,
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CommandsResponse {
+    pub commands: Vec<CommandInfo>,
+    pub plonks: Vec<PlonkEntry>,
+}
+
+// -- Stats types -------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CommandUsage {
+    pub command: String,
+    pub uses: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GuildStats {
+    pub member_count: Option<u32>,
+    pub online_count: u32,
+    pub bot_count: u32,
+    pub human_count: u32,
+    pub channel_count: u32,
+    pub role_count: u32,
+    pub emoji_count: u32,
+    pub boost_count: u32,
+    pub boost_tier: u32,
+    pub total_commands: u64,
+    pub top_commands: Vec<CommandUsage>,
+    pub created_at: String,
+    pub owner_id: String,
+    pub owner_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BotStats {
+    pub guild_count: u32,
+    pub user_count: u32,
+    pub channel_count: u32,
+    pub total_commands_used: u64,
+    pub cog_count: u32,
+    pub command_count: u32,
+    pub latency_ms: f64,
+    #[serde(default)]
+    pub uptime_seconds: f64,
+}
+
+// -- Autoresponders types ----------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AutoresponderEntry {
+    pub id: u64,
+    pub trigger: String,
+    pub response: String,
+    pub match_type: String,
+    pub ignore_case: bool,
+    pub enabled: bool,
+    pub uses: u64,
+    pub created_by: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AutorespondersResponse {
+    pub entries: Vec<AutoresponderEntry>,
+    pub total: u32,
+}
+
+// -- Economy types -----------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ShopItem {
+    pub id: u64,
+    pub name: String,
+    pub description: Option<String>,
+    pub price: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LotteryInfo {
+    pub ticket_price: u64,
+    pub jackpot: u64,
+    pub channel_id: String,
+    pub ends_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EconomyInfo {
+    pub items: Vec<ShopItem>,
+    pub lottery: Option<LotteryInfo>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BalanceEntry {
+    pub user_id: String,
+    pub username: String,
+    pub avatar_url: Option<String>,
+    pub cash: i64,
+    pub bank: i64,
+    pub total: i64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BalancesResponse {
+    pub entries: Vec<BalanceEntry>,
+}
+
+// -- Comics types ------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ComicFeedEntry {
+    pub id: u64,
+    pub brand: String,
+    pub channel_id: String,
+    pub format: String,
+    pub day: u8,
+    pub ping: Option<String>,
+    pub pin: bool,
+    pub next_pull: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ComicsResponse {
+    pub feeds: Vec<ComicFeedEntry>,
+}
+
+// -- Temp Channels types -----------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TempChannelEntry {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub format: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TempChannelsResponse {
+    pub entries: Vec<TempChannelEntry>,
+}
+
+// -- Status Feed types -------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct StatusFeedInfo {
+    pub subscribed: bool,
+    pub channel: Option<ChannelRef>,
+}
+
+// -- Lockdowns types ---------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LockdownEntry {
+    pub channel_id: String,
+    pub channel_name: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct LockdownsResponse {
+    pub entries: Vec<LockdownEntry>,
+}
+
+// -- Highlights types --------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct HighlightEntry {
+    pub user_id: String,
+    pub username: String,
+    pub triggers: Vec<String>,
+    pub blocked_count: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct HighlightsResponse {
+    pub entries: Vec<HighlightEntry>,
+}
+
+// -- Emoji Stats types -------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EmojiStatEntry {
+    pub emoji_id: String,
+    pub emoji_name: String,
+    pub emoji_url: Option<String>,
+    pub total: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EmojiStatsResponse {
+    pub total_uses: u64,
+    pub distinct_emojis: u64,
+    pub entries: Vec<EmojiStatEntry>,
+}

@@ -3,7 +3,7 @@
 {% block title %}{{ guild.name }} | Dashboard{% endblock %}
 
 {% block css %}
-<link rel="stylesheet" href="/static/css/dashboard.css" type="text/css"/>
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
 {% endblock %}
 
 {% block body %}
@@ -38,12 +38,28 @@
     <nav class="dashboard-nav">
         <a href="/percy/dashboard/guild/{{ guild.id }}" class="active">Configuration</a>
         <a href="/percy/dashboard/guild/{{ guild.id }}/members">Members</a>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/leveling">Leveling</a>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/polls">Polls</a>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/giveaways">Giveaways</a>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/tags">Tags</a>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/commands">Commands</a>
         <a href="/percy/dashboard/guild/{{ guild.id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild.id }}/commands">Commands</a>
+        <div class="nav-group">
+            <span class="nav-group-label">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild.id }}/leveling">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild.id }}/economy">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild.id }}/autoresponders">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild.id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild.id }}/temp-channels">Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild.id }}/polls">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild.id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild.id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild.id }}/highlights">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild.id }}/emoji-stats">Emoji Stats</a>
+            </div>
+        </div>
     </nav>
 
     {# ─── Tab Navigation (config sub-tabs) ─────────────────────────── #}
@@ -86,12 +102,12 @@
                         </div>
                         <input type="checkbox" name="alerts" value="true" {% if guild.flags.alerts %}checked{% endif %}>
                     </label>
-                    <label class="config-toggle{% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %} gk-disabled{% endif %}{% when None %} gk-disabled{% endmatch %}{% endif %}">
+                    <label class="config-toggle">
                         <div>
                             <span class="config-label">Gatekeeper</span>
                             <span class="config-description">Require captcha verification for new joins</span>
                         </div>
-                        <input type="checkbox" name="gatekeeper" value="true" {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if !gk.needs_setup %}checked{% endif %}{% when None %}{% endmatch %}{% endif %}{% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %} disabled{% endif %}{% when None %} disabled{% endmatch %}{% endif %}>
+                        <input type="checkbox" name="gatekeeper" value="true" {% if guild.flags.gatekeeper %}checked{% endif %}>
                     </label>
                     {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %}
                     <input type="hidden" name="gatekeeper" value="true">
@@ -106,25 +122,63 @@
             </form>
         </section>
 
-        {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %}
+        {% if guild.flags.gatekeeper %}
+            {% match gatekeeper %}
+                {% when Some with (gk) %}
+                    {% if gk.needs_setup %}
+                        <div class="gk-setup-callout">
+                            <div class="gk-setup-callout-pulse"></div>
+                            <div class="gk-setup-callout-content">
+                                <span class="gk-setup-callout-title">&#9888; Gatekeeper needs setup</span>
+                                <p>The flag is enabled but configuration is incomplete. Complete setup in the <a href="#gatekeeper" class="gk-setup-link">Gatekeeper tab</a> or run <code>/moderation gatekeeper setup</code> in Discord.</p>
+                                <span class="gk-setup-callout-hint">If you don't want to use gatekeeper, just uncheck the flag.</span>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% when None %}
+                    <div class="gk-setup-callout">
+                        <div class="gk-setup-callout-pulse"></div>
+                        <div class="gk-setup-callout-content">
+                            <span class="gk-setup-callout-title">&#9888; Gatekeeper needs setup</span>
+                            <p>The flag is enabled but configuration is incomplete. Complete setup in the <a href="#gatekeeper" class="gk-setup-link">Gatekeeper tab</a> or run <code>/moderation gatekeeper setup</code> in Discord.</p>
+                            <span class="gk-setup-callout-hint">If you don't want to use gatekeeper, just uncheck the flag.</span>
+                        </div>
+                    </div>
+            {% endmatch %}
+        {% endif %}
+
+        {% if guild.flags.audit_log && guild.audit_log_channel.is_none() %}
         <div class="gk-setup-callout">
             <div class="gk-setup-callout-pulse"></div>
             <div class="gk-setup-callout-content">
-                <span class="gk-setup-callout-title">&#9888; Gatekeeper needs setup</span>
-                <p>The flag is enabled but configuration is incomplete. Complete setup in the <a href="#gatekeeper" class="gk-setup-link">Gatekeeper tab</a> or run <code>/moderation gatekeeper setup</code> in Discord.</p>
-                <span class="gk-setup-callout-hint">Toggle is locked until setup is complete.</span>
+                <span class="gk-setup-callout-title">&#9888; Audit Log needs setup</span>
+                <p>The Audit Log flag is enabled but no channel is configured. Set the <strong>Audit Log Channel</strong> in the <a href="#moderation" class="mod-setup-link">Moderation tab</a>.</p>
+                <span class="gk-setup-callout-hint">If you don't want to use audit logging, just uncheck the flag.</span>
             </div>
         </div>
-        {% endif %}{% when None %}
+        {% endif %}
+
+        {% if guild.flags.alerts && guild.alert_channel.is_none() %}
         <div class="gk-setup-callout">
             <div class="gk-setup-callout-pulse"></div>
             <div class="gk-setup-callout-content">
-                <span class="gk-setup-callout-title">&#9888; Gatekeeper needs setup</span>
-                <p>The flag is enabled but configuration is incomplete. Complete setup in the <a href="#gatekeeper" class="gk-setup-link">Gatekeeper tab</a> or run <code>/moderation gatekeeper setup</code> in Discord.</p>
-                <span class="gk-setup-callout-hint">Toggle is locked until setup is complete.</span>
+                <span class="gk-setup-callout-title">&#9888; Alerts needs setup</span>
+                <p>The Alerts flag is enabled but no channel is configured. Set the <strong>Alert Channel</strong> in the <a href="#moderation" class="mod-setup-link">Moderation tab</a>.</p>
+                <span class="gk-setup-callout-hint">If you don't want to use alerts, just uncheck the flag.</span>
             </div>
         </div>
-        {% endmatch %}{% endif %}
+        {% endif %}
+
+        {% if guild.flags.raid && guild.mention_count.is_none() %}
+        <div class="gk-setup-callout">
+            <div class="gk-setup-callout-pulse"></div>
+            <div class="gk-setup-callout-content">
+                <span class="gk-setup-callout-title">&#9888; Raid Protection needs setup</span>
+                <p>The Raid Protection flag is enabled but no mention threshold is set. Configure the <strong>Mention Threshold</strong> in the <a href="#moderation" class="mod-setup-link">Moderation tab</a>.</p>
+                <span class="gk-setup-callout-hint">If you don't want to use raid protection, just uncheck the flag.</span>
+            </div>
+        </div>
+        {% endif %}
 
         {# ─── Polls ──────────────────────────────────────────────────── #}
         <section class="config-section">
@@ -244,7 +298,10 @@
                 <input type="hidden" name="_section" value="moderation">
                 <div class="config-grid">
                     <div class="config-field">
-                        <label class="config-label" for="audit_log_channel">Audit Log Channel</label>
+                        <label class="config-label" for="audit_log_channel">
+                            Audit Log Channel
+                            {% if guild.flags.audit_log && guild.audit_log_channel.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
+                        </label>
                         <span class="config-description">Where mod actions are logged</span>
                         <select name="audit_log_channel_id" id="audit_log_channel" class="config-select">
                             <option value="">Not set</option>
@@ -256,7 +313,10 @@
                         </select>
                     </div>
                     <div class="config-field">
-                        <label class="config-label" for="alert_channel">Alert Channel</label>
+                        <label class="config-label" for="alert_channel">
+                            Alert Channel
+                            {% if guild.flags.alerts && guild.alert_channel.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
+                        </label>
                         <span class="config-description">Channel for raid/automod alerts</span>
                         <select name="alert_channel_id" id="alert_channel" class="config-select">
                             <option value="">Not set</option>
@@ -280,7 +340,10 @@
                         </select>
                     </div>
                     <div class="config-field">
-                        <label class="config-label" for="mention_count">Mention Threshold</label>
+                        <label class="config-label" for="mention_count">
+                            Mention Threshold
+                            {% if guild.flags.raid && guild.mention_count.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
+                        </label>
                         <span class="config-description">Auto-mute after this many mentions in one message</span>
                         <input type="number" name="mention_count" id="mention_count" class="config-input" min="0" max="100" placeholder="Off" value="{% match guild.mention_count %}{% when Some with (n) %}{{ n }}{% when None %}{% endmatch %}">
                     </div>
@@ -355,11 +418,16 @@
             </div>
             {% endmatch %}
             <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/gatekeeper">
+                <input type="hidden" name="starter_title" id="gk_starter_title" value="">
+                <input type="hidden" name="starter_content" id="gk_starter_content" value="">
                 <div class="config-grid">
                     <div class="config-field">
-                        <label class="config-label" for="gk_channel">Verification Channel</label>
-                        <span class="config-description">Where captcha challenges are posted</span>
-                        <select name="channel_id" id="gk_channel" class="config-select">
+                        <label class="config-label" for="gk_channel">
+                            Verification Channel
+                            {% if guild.flags.gatekeeper && gk.needs_setup && gk.channel.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
+                        </label>
+                        <span class="config-description">Where captcha challenges are posted (Changing this resends the Verification Message!)</span>
+                        <select name="channel_id" id="gk_channel" class="config-select" data-initial="{% match gk.channel %}{% when Some with (ref) %}{{ ref.id }}{% when None %}{% endmatch %}">
                             <option value="">Not set</option>
                             {% for ch in channels %}
                             <option value="{{ ch.id }}" {% match gk.channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
@@ -369,7 +437,10 @@
                         </select>
                     </div>
                     <div class="config-field">
-                        <label class="config-label" for="gk_role">Gatekeeper Role</label>
+                        <label class="config-label" for="gk_role">
+                            Gatekeeper Role
+                            {% if guild.flags.gatekeeper && gk.needs_setup && gk.role.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
+                        </label>
                         <span class="config-description">Assigned to unverified members on join</span>
                         <select name="role_id" id="gk_role" class="config-select">
                             <option value="">Not set</option>
@@ -379,6 +450,19 @@
                             </option>
                             {% endfor %}
                         </select>
+                    </div>
+                    <div class="config-field">
+                        <label class="config-label" for="gk_message_status">
+                            Verification Message
+                            {% if guild.flags.gatekeeper && gk.needs_setup && gk.message.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
+                        </label>
+                        <span class="config-description">Embed sent to the channel with the verify button (set by selecting a channel)</span>
+                        {% match gk.message %}
+                        {% when Some with (_msg_id) %}
+                        <span class="gk-message-status sent">Sent</span>
+                        {% when None %}
+                        <span class="gk-message-status not-sent">Not sent — select a channel above to configure</span>
+                        {% endmatch %}
                     </div>
                     <div class="config-field">
                         <label class="config-label" for="gk_starter_role">Starter Role (post-verify)</label>
@@ -424,11 +508,30 @@
                 </div>
             </form>
             {% when None %}
-            <p class="text-muted">Gatekeeper has not been configured for this server. Enable the Gatekeeper flag and use the bot's <code>/gatekeeper setup</code> command to initialize it.</p>
+            <p class="text-muted">Gatekeeper has not been configured for this server. Enable the Gatekeeper flag and use the bot's <code>/moderation gatekeeper setup</code> command to initialize it.</p>
             {% endmatch %}
         </section>
     </div>
 </div>
 
-<script src="/static/js/percy-dashboard.js"></script>
+<!-- Gatekeeper Starter Message Modal -->
+<div class="modal-overlay" id="gk-message-modal" hidden>
+    <div class="modal-card">
+        <h3>Starter Message</h3>
+        <p>Configure the verification embed that will be sent to the selected channel.</p>
+        <div style="margin-top: 1rem;">
+            <label class="config-label" for="gk_modal_title">Title</label>
+            <input type="text" id="gk_modal_title" class="config-input" maxlength="256" value="Verification Required" style="margin-bottom: 0.75rem;">
+            <label class="config-label" for="gk_modal_content">Content</label>
+            <textarea id="gk_modal_content" class="config-input" rows="4" maxlength="2000" style="resize: vertical;">This server requires verification in order to continue participating.
+**Press the button below to verify your account.**</textarea>
+        </div>
+        <div class="modal-actions" style="margin-top: 1rem;">
+            <button type="button" class="button small" id="gk-modal-cancel">Cancel</button>
+            <button type="button" class="button primary small" id="gk-modal-confirm">Send Message</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/percy/percy-dashboard.js"></script>
 {% endblock %}

@@ -280,6 +280,78 @@
     margin-bottom: 1rem;
 }
 
+/* -- Subsection titles within a config-section (e.g. Role/Channel Multipliers) -- */
+.subsection-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin: 1.75rem 0 0.75rem;
+}
+.subsection-title:first-of-type {
+    margin-top: 0.75rem;
+}
+
+/* -- Inline "add" rows: select(s) + value + button on a single line -- */
+.inline-add-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.9rem;
+}
+/* Override the default full-width form fields so they sit inline. */
+.inline-add-form .config-input {
+    width: auto;
+}
+.inline-add-form select.config-input {
+    flex: 0 1 14rem;
+    min-width: 9rem;
+}
+.inline-add-form input[type="number"].config-input {
+    flex: 0 0 7rem;
+    width: 7rem;
+}
+.inline-add-form input[type="text"].config-input {
+    flex: 1 1 14rem;
+    min-width: 10rem;
+}
+.inline-add-form .button {
+    flex-shrink: 0;
+}
+
+/* -- Role color swatch + colored name (level reward roles table) -- */
+.role-swatch {
+    display: inline-block;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 50%;
+    margin-right: 0.45rem;
+    vertical-align: middle;
+    border: 1px solid var(--box-border);
+}
+.role-name {
+    vertical-align: middle;
+}
+
+/* -- Preset action row (e.g. "Generate preset roles") -- */
+.preset-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+}
+.preset-row .config-description {
+    margin-top: 0;
+}
+
+/* Add a touch of breathing room between a table and the add-row below it. */
+.config-section .data-table-wrap + .inline-add-form {
+    margin-top: 1rem;
+}
+
 /* -- Login page discord button (lives here to avoid modifying auth.css) -- */
 
 .login-divider {
@@ -485,12 +557,14 @@
     border-radius: 3px;
     background: color-mix(in srgb, var(--warning-border) 30%, transparent);
 }
-.gk-setup-link {
+.gk-setup-link,
+.mod-setup-link {
     color: var(--warning-text);
     text-decoration: underline;
     text-underline-offset: 2px;
 }
-.gk-setup-link:hover {
+.gk-setup-link:hover,
+.mod-setup-link:hover {
     color: var(--text);
 }
 .gk-setup-callout-hint {
@@ -506,6 +580,42 @@
 .config-toggle.gk-disabled {
     opacity: 0.5;
     pointer-events: none;
+}
+
+/* -- Gatekeeper required tag -- */
+
+.gk-required-tag {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.1em 0.4em;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--warning-text);
+    background: color-mix(in srgb, var(--warning-border) 25%, transparent);
+    border: 1px solid var(--warning-border);
+    border-radius: 3px;
+    vertical-align: middle;
+}
+
+/* -- Gatekeeper message status -- */
+
+.gk-message-status {
+    display: inline-block;
+    font-size: 0.8rem;
+    padding: 0.3em 0.6em;
+    border-radius: 4px;
+}
+.gk-message-status.sent {
+    color: var(--success-text);
+    background: var(--success-bg);
+    border: 1px solid var(--success-border);
+}
+.gk-message-status.not-sent {
+    color: var(--text-muted);
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
 }
 
 /* -- Members page -- */
@@ -686,16 +796,18 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
+    border: none;
 }
 
 /* -- Dashboard navigation (sub-page links) -- */
 
 .dashboard-nav {
     display: flex;
+    flex-wrap: wrap;
     gap: 0;
     border-bottom: 1px solid var(--box-border);
     margin-bottom: 1.5rem;
-    overflow-x: auto;
+    position: relative;
 }
 .dashboard-nav a {
     padding: 0.6rem 1rem;
@@ -714,6 +826,104 @@
 .dashboard-nav a.active {
     color: var(--branding);
     border-bottom-color: var(--branding);
+}
+.dashboard-nav .nav-group {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+}
+.dashboard-nav .nav-group-label {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 1rem;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+    border-bottom: 2px solid transparent;
+}
+.dashboard-nav .nav-group-label::after {
+    content: " \25BE";
+    font-size: 0.6rem;
+}
+.dashboard-nav .nav-group:hover .nav-group-label {
+    color: var(--foreground);
+}
+.dashboard-nav .nav-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 6px;
+    padding: 0.4rem 0;
+    min-width: 160px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+.dashboard-nav .nav-group:hover .nav-dropdown {
+    display: block;
+}
+.dashboard-nav .nav-dropdown a {
+    display: block;
+    padding: 0.45rem 1rem;
+    border-bottom: none;
+}
+.dashboard-nav .nav-dropdown a:hover {
+    background: var(--box-shade);
+}
+.dashboard-nav .nav-dropdown a.active {
+    color: var(--branding);
+    border-bottom-color: transparent;
+}
+
+/* -- Comic feed cards -- */
+
+.comic-feeds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.comic-feed-card {
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+}
+.comic-feed-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+.comic-feed-brand {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--foreground);
+}
+.comic-feed-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+.comic-feed-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+}
+.comic-feed-label {
+    color: var(--text-muted);
+}
+.comic-feed-card-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
 }
 
 /* -- Metric tiles -- */
@@ -805,6 +1015,21 @@
     gap: 0.35rem;
     justify-content: flex-end;
     flex-wrap: nowrap;
+    align-items: center;
+}
+
+/* Right-align action buttons in any row cell, even those not tagged
+   .col-actions (e.g. economy, temp-channels, highlights). Matches only
+   .button (real actions) so status toggles keep their place. Kept as a
+   separate rule so a browser without :has() support only drops this, not
+   the .col-actions rule above. */
+.data-table tbody td:has(> .button) {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    text-align: right;
 }
 
 /* -- Status pills -- */

@@ -1,0 +1,232 @@
+{% extends "../layout.html" %}
+
+{% block title %}Economy — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Economy</h1>
+            <p>Manage shop items, member balances, and lottery.</p>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <div class="nav-group">
+            <span class="nav-group-label">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy" class="active">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
+            </div>
+        </div>
+    </nav>
+
+    {# ─── Shop Items ─────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Shop Items</h2>
+        <p class="config-section-description">Items available for purchase in this server's shop.</p>
+        <button class="button primary small" id="add-item-btn" style="margin-bottom: 1rem;">Add Item</button>
+        {% if economy.items.is_empty() %}
+        <p class="text-muted">No shop items configured.</p>
+        {% else %}
+        <table class="data-table">
+            <thead><tr><th>Name</th><th>Price</th><th>Description</th><th></th></tr></thead>
+            <tbody>
+                {% for item in economy.items %}
+                <tr>
+                    <td><strong>{{ item.name }}</strong></td>
+                    <td>{{ item.price }}</td>
+                    <td class="text-muted">{{ item.description.as_deref().unwrap_or("-") }}</td>
+                    <td><button class="button small danger delete-item-btn" data-name="{{ item.name }}">Delete</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </section>
+
+    {# ─── Lottery ────────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Lottery</h2>
+        {% match economy.lottery %}
+        {% when Some with (lot) %}
+        <div class="gatekeeper-status active">
+            <span>Active — Jackpot: {{ lot.jackpot }} | Ticket: {{ lot.ticket_price }}</span>
+            {% match lot.ends_at %}{% when Some with (t) %}<span class="badge">Ends: {{ t }}</span>{% when None %}{% endmatch %}
+        </div>
+        <button class="button small danger" id="cancel-lottery-btn">Cancel Lottery</button>
+        {% when None %}
+        <p class="text-muted">No active lottery.</p>
+        <button class="button primary small" id="start-lottery-btn">Start Lottery</button>
+        {% endmatch %}
+    </section>
+
+    {# ─── Balances ───────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Top Balances</h2>
+        {% if balances.entries.is_empty() %}
+        <p class="text-muted">No balance data available.</p>
+        {% else %}
+        <table class="data-table">
+            <thead><tr><th>Member</th><th>Cash</th><th>Bank</th><th>Total</th></tr></thead>
+            <tbody>
+                {% for b in balances.entries %}
+                <tr>
+                    <td>{{ b.username }}</td>
+                    <td>{{ b.cash }}</td>
+                    <td>{{ b.bank }}</td>
+                    <td><strong>{{ b.total }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </section>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal-overlay" id="add-item-modal" hidden>
+    <div class="modal-card">
+        <h3>Add Shop Item</h3>
+        <div style="margin-top: 1rem;">
+            <label class="config-label">Name</label>
+            <input type="text" id="item_name" class="config-input" maxlength="64" style="margin-bottom: 0.75rem;">
+            <label class="config-label">Price</label>
+            <input type="number" id="item_price" class="config-input" min="1" style="margin-bottom: 0.75rem;">
+            <label class="config-label">Description</label>
+            <input type="text" id="item_desc" class="config-input" maxlength="256">
+        </div>
+        <div class="modal-actions" style="margin-top: 1rem;">
+            <button type="button" class="button small" id="item-modal-cancel">Cancel</button>
+            <button type="button" class="button primary small" id="item-modal-confirm">Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Start Lottery Modal -->
+<div class="modal-overlay" id="lottery-modal" hidden>
+    <div class="modal-card">
+        <h3>Start Lottery</h3>
+        <div style="margin-top: 1rem;">
+            <label class="config-label">Ticket Price</label>
+            <input type="number" id="lottery_price" class="config-input" min="1" value="100" style="margin-bottom: 0.75rem;">
+            <label class="config-label">Duration (minutes)</label>
+            <input type="number" id="lottery_duration" class="config-input" min="5" max="43200" value="60" style="margin-bottom: 0.75rem;">
+            <label class="config-label">Announcement Channel ID</label>
+            <input type="text" id="lottery_channel" class="config-input" placeholder="Channel ID">
+        </div>
+        <div class="modal-actions" style="margin-top: 1rem;">
+            <button type="button" class="button small" id="lottery-modal-cancel">Cancel</button>
+            <button type="button" class="button primary small" id="lottery-modal-confirm">Start</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const guildId = '{{ guild_id }}';
+    const base = `/percy/dashboard/guild/${guildId}/economy`;
+
+    function showToast(level, msg) {
+        const t = document.createElement('div');
+        t.className = 'toast toast-' + level; t.textContent = msg;
+        document.body.appendChild(t);
+        requestAnimationFrame(() => t.classList.add('visible'));
+        setTimeout(() => { t.classList.remove('visible'); setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    // Add item
+    const addItemBtn = document.getElementById('add-item-btn');
+    const addItemModal = document.getElementById('add-item-modal');
+    if (addItemBtn && addItemModal) {
+        addItemBtn.addEventListener('click', () => { addItemModal.hidden = false; });
+        document.getElementById('item-modal-cancel').addEventListener('click', () => { addItemModal.hidden = true; });
+        addItemModal.addEventListener('click', (e) => { if (e.target === addItemModal) addItemModal.hidden = true; });
+        document.getElementById('item-modal-confirm').addEventListener('click', async () => {
+            const name = document.getElementById('item_name').value.trim();
+            const price = parseInt(document.getElementById('item_price').value);
+            const description = document.getElementById('item_desc').value.trim() || null;
+            if (!name || !price) { showToast('error', 'Name and price required.'); return; }
+            try {
+                const r = await fetch(`${base}/items`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ name, price, description }) });
+                const d = await r.json();
+                if (d.ok) { showToast('success', 'Item created.'); setTimeout(() => location.reload(), 400); }
+                else { showToast('error', d.error || 'Failed.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    }
+
+    // Delete item
+    document.querySelectorAll('.delete-item-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const name = btn.dataset.name;
+            if (!confirm(`Delete item "${name}"?`)) return;
+            try {
+                const r = await fetch(`${base}/items/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { 'Accept': 'application/json' } });
+                const d = await r.json();
+                if (d.ok) { showToast('success', 'Deleted.'); setTimeout(() => location.reload(), 400); }
+                else { showToast('error', d.error || 'Failed.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    });
+
+    // Lottery start
+    const startBtn = document.getElementById('start-lottery-btn');
+    const lotteryModal = document.getElementById('lottery-modal');
+    if (startBtn && lotteryModal) {
+        startBtn.addEventListener('click', () => { lotteryModal.hidden = false; });
+        document.getElementById('lottery-modal-cancel').addEventListener('click', () => { lotteryModal.hidden = true; });
+        lotteryModal.addEventListener('click', (e) => { if (e.target === lotteryModal) lotteryModal.hidden = true; });
+        document.getElementById('lottery-modal-confirm').addEventListener('click', async () => {
+            const ticket_price = parseInt(document.getElementById('lottery_price').value);
+            const duration_minutes = parseInt(document.getElementById('lottery_duration').value);
+            const channel_id = document.getElementById('lottery_channel').value.trim();
+            if (!ticket_price || !duration_minutes || !channel_id) { showToast('error', 'All fields required.'); return; }
+            try {
+                const r = await fetch(`${base}/lottery`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ ticket_price, duration_minutes, channel_id }) });
+                const d = await r.json();
+                if (d.ok) { showToast('success', 'Lottery started.'); setTimeout(() => location.reload(), 400); }
+                else { showToast('error', d.error || 'Failed.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    }
+
+    // Lottery cancel
+    const cancelBtn = document.getElementById('cancel-lottery-btn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', async () => {
+            if (!confirm('Cancel the active lottery?')) return;
+            try {
+                const r = await fetch(`${base}/lottery`, { method: 'DELETE', headers: { 'Accept': 'application/json' } });
+                const d = await r.json();
+                if (d.ok) { showToast('success', 'Lottery cancelled.'); setTimeout(() => location.reload(), 400); }
+                else { showToast('error', d.error || 'Failed.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    }
+})();
+</script>
+{% endblock %}
