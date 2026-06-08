@@ -22,8 +22,18 @@ use time::OffsetDateTime;
 struct OAuthState {
     /// If the user is logged in when initiating, their account ID (linking mode).
     account_id: Option<i64>,
+    /// Post-login redirect target carried from the login/signup page.
+    #[serde(default)]
+    next: Option<String>,
     /// Expiry as unix timestamp.
     exp: i64,
+}
+
+/// Query string carrying a post-auth redirect target (`?next=/some/path`).
+#[derive(Deserialize)]
+struct NextQuery {
+    #[serde(default)]
+    next: Option<String>,
 }
 
 /// Discord's token exchange response.
@@ -52,7 +62,11 @@ struct CallbackQuery {
 // -- Handlers ----------------------------------------------------------------
 
 /// `GET /auth/discord` — Initiate Discord OAuth2 flow.
-async fn discord_login(State(state): State<AppState>, account: Option<Account>) -> Response {
+async fn discord_login(
+    State(state): State<AppState>,
+    account: Option<Account>,
+    Query(query): Query<NextQuery>,
+) -> Response {
     let cfg = &state.config().discord;
     if !cfg.enabled() {
         return Redirect::to("/login").into_response();
@@ -61,6 +75,7 @@ async fn discord_login(State(state): State<AppState>, account: Option<Account>) 
     let key = &state.config().secret_key;
     let oauth_state = OAuthState {
         account_id: account.map(|a| a.id),
+        next: crate::utils::safe_next(query.next.as_deref()),
         exp: (OffsetDateTime::now_utc() + time::Duration::minutes(10)).unix_timestamp(),
     };
     let signed = match key.sign(&oauth_state) {
@@ -180,7 +195,8 @@ async fn discord_callback(
     if let Some(account_id) = oauth_state.account_id {
         link_discord(&state, &flasher, client_ip, account_id, &discord_user).await
     } else {
-        login_or_create(&state, &flasher, client_ip, &discord_user).await
+        let target = crate::utils::safe_next(oauth_state.next.as_deref()).unwrap_or_else(|| "/".to_string());
+        login_or_create(&state, &flasher, client_ip, &discord_user, &target).await
     }
 }
 
@@ -236,6 +252,7 @@ async fn login_or_create(
     flasher: &Flasher,
     client_ip: Option<std::net::IpAddr>,
     user: &DiscordUser,
+    target: &str,
 ) -> Response {
     let discord_id = user.id.clone();
 
@@ -268,7 +285,7 @@ async fn login_or_create(
         // verifying ownership of the linked Discord account stands in for the
         // password+TOTP path, so we skip the TOTP challenge here even when the
         // account has 2FA enabled for username/password logins.
-        create_session_response(state, &account, client_ip, "auth.discord.login").await
+        create_session_response(state, &account, client_ip, "auth.discord.login", target).await
     } else {
         // No existing link — create a new account.
         let username = sanitize_username(&user.username);
@@ -322,7 +339,7 @@ async fn login_or_create(
                     totp_secret: None,
                     totp_enabled: false,
                 };
-                create_session_response(state, &account, client_ip, "auth.discord.login").await
+                create_session_response(state, &account, client_ip, "auth.discord.login", target).await
             }
             Err(e) => {
                 let msg = e.to_string();
@@ -375,7 +392,7 @@ async fn login_or_create(
                                 totp_secret: None,
                                 totp_enabled: false,
                             };
-                            create_session_response(state, &account, client_ip, "auth.discord.login").await
+                            create_session_response(state, &account, client_ip, "auth.discord.login", target).await
                         }
                         Err(e) => {
                             tracing::error!(error = %e, "Failed to create Discord account (retry)");
@@ -430,6 +447,7 @@ async fn create_session_response(
     account: &Account,
     client_ip: Option<std::net::IpAddr>,
     audit_action: &'static str,
+    target: &str,
 ) -> Response {
     let Ok(token) = Token::new(account.id) else {
         return Redirect::to("/login").into_response();
@@ -439,7 +457,7 @@ async fn create_session_response(
     state.save_session(&token, Some("Discord OAuth".to_string())).await;
     state.audit(audit_action).actor(account).ip_opt(client_ip).fire();
 
-    let mut response = Redirect::to("/").into_response();
+    let mut response = Redirect::to(target).into_response();
     if let Ok(val) = HeaderValue::from_str(&cookie.to_string()) {
         response.headers_mut().insert(SET_COOKIE, val);
     }

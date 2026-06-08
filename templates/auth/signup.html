@@ -47,6 +47,7 @@
             </div>
 
             <input type="hidden" id="session-description" name="session_description" value="">
+            <input type="hidden" name="next" value="{{ next }}">
             <button class="button primary login-submit" type="submit">Create account</button>
         </form>
 
@@ -54,14 +55,14 @@
         <div class="login-divider">
             <span>or</span>
         </div>
-        <a href="/auth/discord" class="login-discord">
+        <a href="/auth/discord{{ next_query }}" class="login-discord">
             <img src="/static/img/discord.svg" alt="" width="20" height="20">
             Sign up with Discord
         </a>
         {% endif %}
 
         <p class="login-subtitle" style="margin-top: 1rem; margin-bottom: 0;">
-            Already have an account? <a href="/login">Log in</a>
+            Already have an account? <a href="/login{{ next_query }}">Log in</a>
         </p>
     </div>
 </div>

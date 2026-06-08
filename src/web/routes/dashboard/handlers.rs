@@ -21,7 +21,13 @@ use super::{
     build_general_invite_url, build_invite_url, check_guild_access, get_discord_id, get_percy_client, json_or_flash,
 };
 
-pub(super) async fn guild_list(State(state): State<AppState>, account: Account, flashes: Flashes) -> Response {
+pub(super) async fn guild_list(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
+    // Logged-out visitors get a welcome/landing page that introduces the bot
+    // and links to login/signup (which redirect back here afterwards).
+    let Some(account) = account else {
+        return PercyLandingTemplate { account: None, flashes }.into_response();
+    };
+
     let Some(percy) = get_percy_client(&state) else {
         return Redirect::to("/").into_response();
     };

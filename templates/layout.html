@@ -49,9 +49,9 @@
                 <a class="nav-item" href="/projects">Projects</a>
                 {% endblock %}
                 <span class="not-mobile nav-item spacer"></span>
+                <a class="nav-item" href="/percy/dashboard">Dashboard</a>
                 {% match account %}
                 {% when Some with (account) %}
-                <a class="nav-item account" href="/percy/dashboard">Dashboard</a>
                 <a class="nav-item account" href="/images">Images</a>
                 <a class="nav-item account" href="/account">{{ account.name }}</a>
                 {% when None %}

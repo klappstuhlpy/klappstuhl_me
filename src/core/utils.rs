@@ -34,9 +34,64 @@ pub fn join_iter<T: ToString>(sep: impl AsRef<str>, mut iter: impl Iterator<Item
     buffer
 }
 
+/// Validate a post-authentication redirect target.
+///
+/// Only accepts same-origin **absolute paths** (e.g. `/percy/dashboard`).
+/// Rejects protocol-relative (`//evil.com`) and absolute URLs (`https://…`)
+/// so a crafted `?next=` cannot turn login into an open redirect. Returns the
+/// trimmed path when safe, otherwise `None`.
+pub fn safe_next(next: Option<&str>) -> Option<String> {
+    let n = next?.trim();
+    // Reject backslashes too: some browsers fold `/\evil.com` into the
+    // protocol-relative `//evil.com`, which would be an open redirect.
+    if !n.is_empty() && n.starts_with('/') && !n.starts_with("//") && !n.contains("://") && !n.contains('\\') {
+        Some(n.to_string())
+    } else {
+        None
+    }
+}
+
+/// Percent-encode a string for use as a URL query-parameter value
+/// (RFC 3986 unreserved characters pass through unchanged).
+pub fn urlencode(s: &str) -> String {
+    s.bytes()
+        .flat_map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => vec![b as char],
+            _ => format!("%{b:02X}").chars().collect(),
+        })
+        .collect()
+}
+
 /// Returns the directory where logs are stored.
 pub fn logs_directory() -> PathBuf {
     dirs::state_dir()
         .map(|p| p.join(crate::PROGRAM_NAME))
         .unwrap_or_else(|| PathBuf::from("./logs"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::safe_next;
+
+    #[test]
+    fn safe_next_accepts_internal_paths() {
+        assert_eq!(safe_next(Some("/percy/dashboard")).as_deref(), Some("/percy/dashboard"));
+        assert_eq!(safe_next(Some("/a?b=c#d")).as_deref(), Some("/a?b=c#d"));
+    }
+
+    #[test]
+    fn safe_next_rejects_open_redirects() {
+        for bad in [
+            "//evil.com",
+            "https://evil.com",
+            "/\\evil.com",
+            "javascript:alert(1)",
+            "",
+            "  ",
+            "relative",
+        ] {
+            assert_eq!(safe_next(Some(bad)), None, "should reject {bad:?}");
+        }
+        assert_eq!(safe_next(None), None);
+    }
 }

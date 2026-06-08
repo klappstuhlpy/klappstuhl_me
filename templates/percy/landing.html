@@ -1,0 +1,50 @@
+{% extends "../layout.html" %}
+
+{% block title %}Percy Dashboard | Klappstuhl.me{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <section class="percy-hero">
+        <span class="percy-hero-badge">Discord Bot</span>
+        <h1 class="percy-hero-title">Meet <span class="branding">Percy</span></h1>
+        <p class="percy-hero-lead">
+            Percy is the Discord bot that powers leveling, economy, moderation, autoresponders,
+            temporary voice channels and more across your server — all configurable from one place.
+        </p>
+        <p class="percy-hero-sub">
+            This is the <strong>Klappstuhl.me</strong> control panel: a web dashboard for configuring
+            every part of Percy without touching a single command. Manage members, set up reward roles,
+            tune the economy, browse polls and giveaways, and watch live server stats.
+        </p>
+
+        <div class="percy-hero-actions">
+            <a href="/login?next=/percy/dashboard" class="invite-percy-btn">Log in to continue</a>
+            <a href="/signup?next=/percy/dashboard" class="percy-hero-secondary">Create an account</a>
+        </div>
+        <p class="percy-hero-note">You need to be signed in to manage your servers.</p>
+    </section>
+
+    <section class="percy-feature-grid">
+        <div class="percy-feature">
+            <h3>Leveling &amp; Economy</h3>
+            <p>Configure XP curves, reward roles, multipliers, shops and lotteries — then watch the leaderboard.</p>
+        </div>
+        <div class="percy-feature">
+            <h3>Moderation &amp; Gatekeeper</h3>
+            <p>Kick, ban and manage members, set up the gatekeeper, and handle lockdowns from the browser.</p>
+        </div>
+        <div class="percy-feature">
+            <h3>Automation</h3>
+            <p>Autoresponders, comic feeds, status feeds and temporary voice channels, all point-and-click.</p>
+        </div>
+        <div class="percy-feature">
+            <h3>Insights</h3>
+            <p>Browse polls, giveaways, tags and highlights, with live server and bot statistics.</p>
+        </div>
+    </section>
+</div>
+{% endblock %}

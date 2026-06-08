@@ -92,6 +92,116 @@
     flex-shrink: 0;
 }
 
+/* -- Logged-out welcome / landing page -- */
+
+.percy-hero {
+    text-align: center;
+    max-width: 680px;
+    margin: 2rem auto 3rem;
+    padding: 3rem 1.5rem 0;
+}
+
+.percy-hero-badge {
+    display: inline-block;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px;
+    background: var(--branding-dim);
+    color: var(--branding);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 1.25rem;
+}
+
+.percy-hero-title {
+    font-size: clamp(2rem, 6vw, 3.25rem);
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 0 0 1.25rem;
+}
+.percy-hero-title .branding { color: var(--branding); }
+
+.percy-hero-lead {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--foreground);
+    margin: 0 0 1rem;
+}
+
+.percy-hero-sub {
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+    margin: 0 0 2rem;
+}
+
+.percy-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+}
+
+/* The hero reuses the gradient pill button but sizes it to its content
+   inside the flex row (overrides the centered full-width empty-state rule). */
+.percy-hero-actions .invite-percy-btn {
+    width: auto;
+    margin: 0;
+}
+
+.percy-hero-secondary {
+    color: var(--foreground);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+}
+.percy-hero-secondary:hover {
+    color: var(--branding);
+    border-color: var(--branding);
+}
+
+.percy-hero-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.percy-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 1rem;
+    margin-bottom: 3rem;
+}
+
+.percy-feature {
+    padding: 1.25rem 1.35rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.625rem;
+    transition: border-color 0.15s, transform 0.15s;
+}
+.percy-feature:hover {
+    border-color: var(--branding);
+    transform: translateY(-2px);
+}
+.percy-feature h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.98rem;
+    font-weight: 700;
+}
+.percy-feature p {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
 /* -- Guild grid (server list) -- */
 
 .guild-grid {

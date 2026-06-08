@@ -13,7 +13,7 @@ use crate::{
 };
 use askama::Template;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header::SET_COOKIE, HeaderValue, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
@@ -29,20 +29,42 @@ struct LoginTemplate {
     account: Option<Account>,
     flashes: Flashes,
     discord_enabled: bool,
+    /// Sanitized post-login redirect path (empty = none). Submitted as a hidden
+    /// form field so the password POST can honour it.
+    next: String,
+    /// `?next=<encoded>` query suffix (empty = none) for the Discord / signup links.
+    next_query: String,
 }
 
-async fn login(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
+/// Query string carrying a post-auth redirect target (`?next=/some/path`).
+#[derive(Deserialize)]
+struct NextQuery {
+    #[serde(default)]
+    next: Option<String>,
+}
+
+async fn login(
+    State(state): State<AppState>,
+    account: Option<Account>,
+    flashes: Flashes,
+    Query(query): Query<NextQuery>,
+) -> Response {
+    let next = crate::utils::safe_next(query.next.as_deref());
     if account.is_some() {
-        Redirect::to("/").into_response()
-    } else {
-        let discord_enabled = state.config().discord.enabled();
-        LoginTemplate {
-            account,
-            flashes,
-            discord_enabled,
-        }
-        .into_response()
+        return Redirect::to(next.as_deref().unwrap_or("/")).into_response();
     }
+    let next_query = next
+        .as_deref()
+        .map(|n| format!("?next={}", crate::utils::urlencode(n)))
+        .unwrap_or_default();
+    LoginTemplate {
+        account,
+        flashes,
+        discord_enabled: state.config().discord.enabled(),
+        next: next.unwrap_or_default(),
+        next_query,
+    }
+    .into_response()
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,14 +77,22 @@ struct Credentials {
     /// Absent when unchecked – HTML form checkboxes omit the field entirely.
     #[serde(default)]
     remember_me: Option<String>,
+    /// Post-login redirect target carried from the login page (validated server-side).
+    #[serde(default, deserialize_with = "crate::utils::empty_string_is_none")]
+    next: Option<String>,
 }
 
-fn cookie_to_response(cookie: Cookie<'static>) -> Response {
-    let mut response = Redirect::to("/").into_response();
+/// Set the session cookie and redirect to `target` (an already-validated path).
+fn cookie_redirect(cookie: Cookie<'static>, target: &str) -> Response {
+    let mut response = Redirect::to(target).into_response();
     response
         .headers_mut()
         .insert(SET_COOKIE, HeaderValue::from_str(&cookie.to_string()).unwrap());
     response
+}
+
+fn cookie_to_response(cookie: Cookie<'static>) -> Response {
+    cookie_redirect(cookie, "/")
 }
 
 async fn authenticate(
@@ -90,6 +120,7 @@ async fn authenticate(
         .map(|a| &a.password)
         .unwrap_or(&state.incorrect_default_password_hash);
 
+    let next = crate::utils::safe_next(credentials.next.as_deref());
     if validate_password(&credentials.password, hash).is_ok() {
         match account {
             Some(acc) => {
@@ -104,6 +135,7 @@ async fn authenticate(
                         account_id: acc.id,
                         remember: credentials.remember_me.is_some(),
                         description: credentials.session_description.clone(),
+                        next: next.clone(),
                         exp: (OffsetDateTime::now_utc() + time::Duration::minutes(5)).unix_timestamp(),
                     };
                     let Ok(signed) = key.sign(&pending) else {
@@ -125,7 +157,7 @@ async fn authenticate(
                 };
                 state.save_session(&token, credentials.session_description).await;
                 state.audit("auth.login.success").actor(&acc).ip_opt(client_ip).fire();
-                Ok(cookie_to_response(cookie))
+                Ok(cookie_redirect(cookie, next.as_deref().unwrap_or("/")))
             }
             None => {
                 state
@@ -294,10 +326,16 @@ async fn login_form(
     flasher: Flasher,
     Form(credentials): Form<Credentials>,
 ) -> Response {
+    // Preserve the redirect target across a failed attempt so the user stays
+    // in the "log in to continue" flow.
+    let bail_url = match crate::utils::safe_next(credentials.next.as_deref()) {
+        Some(n) => format!("/login?next={}", crate::utils::urlencode(&n)),
+        None => "/login".to_string(),
+    };
     match authenticate(&state, credentials, client_ip).await {
         Ok(r) => r,
         Err(e) => {
-            let mut response = flasher.add(e.error.into_owned()).bail("/login");
+            let mut response = flasher.add(e.error.into_owned()).bail(&bail_url);
             response.extensions_mut().insert(BadRequestReason::IncorrectLogin);
             response
         }
@@ -313,17 +351,32 @@ struct SignupTemplate {
     flashes: Flashes,
     /// Whether Discord OAuth is configured (controls showing the Discord signup button).
     discord_enabled: bool,
+    /// Sanitized post-signup redirect path (empty = none), for the hidden form field.
+    next: String,
+    /// `?next=<encoded>` query suffix (empty = none) for the Discord / login links.
+    next_query: String,
 }
 
-async fn signup_page(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
+async fn signup_page(
+    State(state): State<AppState>,
+    account: Option<Account>,
+    flashes: Flashes,
+    Query(query): Query<NextQuery>,
+) -> Response {
+    let next = crate::utils::safe_next(query.next.as_deref());
     if account.is_some() {
-        return Redirect::to("/").into_response();
+        return Redirect::to(next.as_deref().unwrap_or("/")).into_response();
     }
-
+    let next_query = next
+        .as_deref()
+        .map(|n| format!("?next={}", crate::utils::urlencode(n)))
+        .unwrap_or_default();
     SignupTemplate {
         account,
         flashes,
         discord_enabled: state.config().discord.enabled(),
+        next: next.unwrap_or_default(),
+        next_query,
     }
     .into_response()
 }
@@ -334,6 +387,8 @@ struct SignupForm {
     password: String,
     #[serde(deserialize_with = "crate::utils::empty_string_is_none")]
     session_description: Option<String>,
+    #[serde(default, deserialize_with = "crate::utils::empty_string_is_none")]
+    next: Option<String>,
 }
 
 async fn signup_submit(
@@ -342,19 +397,25 @@ async fn signup_submit(
     flasher: Flasher,
     Form(form): Form<SignupForm>,
 ) -> Response {
+    let next = crate::utils::safe_next(form.next.as_deref());
+    let bail_url = match &next {
+        Some(n) => format!("/signup?next={}", crate::utils::urlencode(n)),
+        None => "/signup".to_string(),
+    };
+
     if !is_valid_username(&form.username) {
         return flasher
             .add("Username must be 3-32 characters, lowercase letters, digits, dot, dash, or underscore.")
-            .bail("/signup");
+            .bail(&bail_url);
     }
     if !(8..=128).contains(&form.password.len()) {
         return flasher
             .add("Password length must be 8 to 128 characters")
-            .bail("/signup");
+            .bail(&bail_url);
     }
 
     let Ok(password_hash) = hash_password(&form.password) else {
-        return flasher.add("Failed to hash password. Try again?").bail("/signup");
+        return flasher.add("Failed to hash password. Try again?").bail(&bail_url);
     };
 
     let username = form.username.clone();
@@ -378,7 +439,7 @@ async fn signup_submit(
             } else {
                 format!("Failed to create account: {msg}")
             };
-            return flasher.add(user_msg).bail("/signup");
+            return flasher.add(user_msg).bail(&bail_url);
         }
     };
 
@@ -396,7 +457,7 @@ async fn signup_submit(
         .meta(serde_json::json!({ "new_account_id": new_account_id }))
         .fire();
     flasher.add(FlashMessage::success(format!("Welcome, {}!", form.username)));
-    cookie_to_response(cookie)
+    cookie_redirect(cookie, next.as_deref().unwrap_or("/"))
 }
 
 #[derive(Template)]
@@ -559,6 +620,9 @@ struct PendingTotp {
     account_id: i64,
     remember: bool,
     description: Option<String>,
+    /// Post-login redirect target carried from the password step.
+    #[serde(default)]
+    next: Option<String>,
     exp: i64,
 }
 
@@ -711,7 +775,8 @@ async fn login_totp_verify(
         .meta(serde_json::json!({ "second_factor": "totp" }))
         .fire();
 
-    let mut resp = Redirect::to("/").into_response();
+    let target = crate::utils::safe_next(pending.next.as_deref());
+    let mut resp = Redirect::to(target.as_deref().unwrap_or("/")).into_response();
     let headers = resp.headers_mut();
     headers.append(SET_COOKIE, HeaderValue::from_str(&session_cookie.to_string()).unwrap());
     headers.append(
