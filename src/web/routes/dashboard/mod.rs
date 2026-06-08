@@ -40,17 +40,29 @@ async fn check_guild_access(percy: &PercyClient, discord_id: &str, guild_id: u64
     guilds.iter().any(|g| g.id == guild_id_str)
 }
 
-fn build_invite_url(state: &AppState, guild_id: u64) -> String {
-    let client_id = state
+fn invite_client_id(state: &AppState) -> String {
+    state
         .config()
         .percy
         .bot_client_id
         .as_deref()
         .or(state.config().discord.client_id.as_deref())
-        .unwrap_or("MISSING_CLIENT_ID");
+        .unwrap_or("MISSING_CLIENT_ID")
+        .to_string()
+}
+
+fn build_invite_url(state: &AppState, guild_id: u64) -> String {
+    let client_id = invite_client_id(state);
     format!(
         "https://discord.com/oauth2/authorize?client_id={client_id}&scope=bot+applications.commands&permissions=8&guild_id={guild_id}"
     )
+}
+
+/// Invite URL without a pre-selected guild — lets the user pick which server to
+/// add Percy to from Discord's own dropdown.
+fn build_general_invite_url(state: &AppState) -> String {
+    let client_id = invite_client_id(state);
+    format!("https://discord.com/oauth2/authorize?client_id={client_id}&scope=bot+applications.commands&permissions=8")
 }
 
 fn is_ajax(headers: &HeaderMap) -> bool {

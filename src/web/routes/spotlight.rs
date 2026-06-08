@@ -82,7 +82,6 @@ fn contains_ci(haystack: &str, needle: &str) -> bool {
 fn static_nav() -> Vec<SpotlightItem> {
     vec![
         SpotlightItem::nav("Dashboard", "Admin overview", "/admin"),
-        SpotlightItem::nav("Invites", "Manage invite codes", "/admin/invites"),
         SpotlightItem::nav("Docker", "Services, graph, start/stop/restart", "/admin/docker"),
         SpotlightItem::nav("Snapshots", "Capture and restore containers", "/admin/docker/snapshots"),
         SpotlightItem::nav("Proxy", "Reverse-proxy route mapping", "/admin/proxy"),

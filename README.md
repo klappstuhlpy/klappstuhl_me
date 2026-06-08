@@ -4,7 +4,7 @@ Personal website, image-hosting service, and homelab admin platform built with R
 
 What started as a small image host has grown into a single binary that also runs
 the admin tooling for the machine it sits on: live system metrics, container
-management, security analytics, virus scanning, and an invite-only user system.
+management, security analytics, virus scanning, and a user account system.
 
 ## Highlights
 
@@ -15,8 +15,6 @@ management, security analytics, virus scanning, and an invite-only user system.
   `/account/sharex.sxcu`) pre-filled with your API token for screenshot-to-gallery uploads.
 - **Admin shell at `/admin`** — sidebar layout with the following pages:
     - **Dashboard** — request analytics, popular routes, referring sites, API consumers.
-    - **Invites** — invite-only signup. Admins generate one-time codes (with optional expiry + note), copy a
-      `/signup?code=…` URL, share it with the invitee. No public registration.
     - **Docker** — combined services dashboard and dependency graph.
         - Per-service cards for every entry in `config.services`: live running/offline badge, uptime, image name, short
           container ID, restart count, live CPU % and RAM bar (auto-refreshed every 15 s). Start / Stop / Restart / Pull
@@ -82,7 +80,7 @@ management, security analytics, virus scanning, and an invite-only user system.
       Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with
       first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
     - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth
-      events (login success/fail, 2FA challenge/fail, signup, password change, logout), invite create/revoke,
+      events (login success/fail, 2FA challenge/fail, signup, password change, logout),
       service/snapshot/script actions, secret status changes, backup create/delete, and admin cache invalidation are all
       tracked. Filterable by action prefix and actor.
     - **Logs** — interactive viewer over the rolling tracing log files. Parses the JSON application log (one object per
@@ -158,7 +156,7 @@ management, security analytics, virus scanning, and an invite-only user system.
 
 - **Backend** — Rust, [Axum](https://github.com/tokio-rs/axum) 0.7, Tokio, SQLite (rusqlite, bundled).
 - **Templates** — [Askama](https://github.com/djc/askama) (compile-time server-side rendering).
-- **Storage** — two SQLite files in the data dir: `main.db` (accounts, sessions, images, invites, metrics, snapshots,
+- **Storage** — two SQLite files in the data dir: `main.db` (accounts, sessions, images, metrics, snapshots,
   SSH keys, file scans, health monitors, firewall rules, proxy routes, TOTP secrets/recovery codes), `requests.db` (HTTP
   access log). Periodic `VACUUM INTO` backups land in `<data>/backups/`.
 - **Auth** — HMAC-signed session tokens, Argon2 password hashing, optional TOTP 2FA (RFC 6238; secret encrypted at rest

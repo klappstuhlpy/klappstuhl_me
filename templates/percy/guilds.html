@@ -19,6 +19,10 @@
     <div class="dashboard-empty">
         <h1>No servers found</h1>
         <p>Make sure Percy is in your server and you have <strong>Manage Server</strong> or <strong>Administrator</strong> permissions.</p>
+        <a href="{{ invite_url }}" target="_blank" rel="noopener" class="invite-percy-btn">
+            <img src="/static/img/discord.svg" alt="" width="20" height="20">
+            Invite Percy
+        </a>
     </div>
     {% else %}
     <div class="guild-grid">

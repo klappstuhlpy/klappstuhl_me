@@ -17,7 +17,9 @@ use crate::{
 };
 
 use super::templates::*;
-use super::{build_invite_url, check_guild_access, get_discord_id, get_percy_client, json_or_flash};
+use super::{
+    build_general_invite_url, build_invite_url, check_guild_access, get_discord_id, get_percy_client, json_or_flash,
+};
 
 pub(super) async fn guild_list(State(state): State<AppState>, account: Account, flashes: Flashes) -> Response {
     let Some(percy) = get_percy_client(&state) else {
@@ -41,6 +43,7 @@ pub(super) async fn guild_list(State(state): State<AppState>, account: Account, 
         account: Some(account),
         flashes,
         guilds,
+        invite_url: build_general_invite_url(&state),
     }
     .into_response()
 }

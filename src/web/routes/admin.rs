@@ -1,18 +1,11 @@
-use crate::{
-    database::Table,
-    filters,
-    flash::{FlashMessage, Flasher, Flashes},
-    headers::ClientIp,
-    logging::RequestLogEntry,
-    utils::logs_directory,
-};
+use crate::{headers::ClientIp, logging::RequestLogEntry, utils::logs_directory};
 use askama::Template;
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{IntoResponse, Redirect, Response},
-    routing::{get, post},
-    Extension, Form, Json, Router,
+    response::Redirect,
+    routing::get,
+    Extension, Json, Router,
 };
 use serde::Deserialize;
 use time::OffsetDateTime;
@@ -191,206 +184,6 @@ async fn invalidate_caches(
     Redirect::to("/")
 }
 
-// ─── Invites ────────────────────────────────────────────────────────────
-
-/// Joined view of an `invite` row plus the redeemer's username (when used).
-///
-/// Used by the template directly — not a database table, hence the empty
-/// COLUMNS / placeholder NAME on the Table impl (we always provide a custom
-/// SELECT to `Database::all`).
-pub struct InviteRow {
-    pub code: String,
-    pub created_at: OffsetDateTime,
-    pub expires_at: Option<OffsetDateTime>,
-    pub used_at: Option<OffsetDateTime>,
-    pub used_by_name: Option<String>,
-    pub note: Option<String>,
-}
-
-impl InviteRow {
-    pub fn label(&self) -> &str {
-        self.note.as_deref().unwrap_or("Unnamed invite")
-    }
-}
-
-impl Table for InviteRow {
-    const NAME: &'static str = "invite";
-    const COLUMNS: &'static [&'static str] = &[];
-    type Id = String;
-
-    fn from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
-        Ok(Self {
-            code: row.get("code")?,
-            created_at: row.get("created_at")?,
-            expires_at: row.get("expires_at")?,
-            used_at: row.get("used_at")?,
-            used_by_name: row.get("used_by_name")?,
-            note: row.get("note")?,
-        })
-    }
-}
-
-#[derive(Template)]
-#[template(path = "admin/admin_invites.html")]
-struct AdminInvitesTemplate {
-    account: Option<Account>,
-    active_page: &'static str,
-    flashes: Flashes,
-    active: Vec<InviteRow>,
-    used: Vec<InviteRow>,
-    base_url: String,
-}
-
-async fn admin_invites(
-    State(state): State<AppState>,
-    account: Account,
-    flashes: Flashes,
-) -> Result<AdminInvitesTemplate, StatusCode> {
-    if !account.flags.is_admin() {
-        return Err(StatusCode::FORBIDDEN);
-    }
-
-    // Active = unused AND (no expiry OR expiry is in the future)
-    let active = state
-        .database()
-        .all::<InviteRow, _, _>(
-            "SELECT i.code, i.created_at, i.expires_at, i.used_at, i.note,
-                    NULL AS used_by_name
-             FROM invite i
-             WHERE i.used_at IS NULL
-               AND (i.expires_at IS NULL OR i.expires_at > CURRENT_TIMESTAMP)
-             ORDER BY i.created_at DESC",
-            [],
-        )
-        .await
-        .unwrap_or_default();
-
-    let used = state
-        .database()
-        .all::<InviteRow, _, _>(
-            "SELECT i.code, i.created_at, i.expires_at, i.used_at, i.note,
-                    a.name AS used_by_name
-             FROM invite i
-             LEFT JOIN account a ON i.used_by = a.id
-             WHERE i.used_at IS NOT NULL
-             ORDER BY i.used_at DESC
-             LIMIT 50",
-            [],
-        )
-        .await
-        .unwrap_or_default();
-
-    Ok(AdminInvitesTemplate {
-        account: Some(account),
-        active_page: "invites",
-        flashes,
-        active,
-        used,
-        base_url: state.config().canonical_url(),
-    })
-}
-
-#[derive(Deserialize)]
-struct CreateInviteForm {
-    #[serde(deserialize_with = "crate::utils::empty_string_is_none")]
-    note: Option<String>,
-    /// 0 = never, otherwise number of days from now.
-    expires_in_days: i64,
-}
-
-async fn create_invite(
-    State(state): State<AppState>,
-    ClientIp(client_ip): ClientIp,
-    account: Account,
-    flasher: Flasher,
-    Form(form): Form<CreateInviteForm>,
-) -> Response {
-    if !account.flags.is_admin() {
-        return StatusCode::FORBIDDEN.into_response();
-    }
-
-    let code = nanoid::nanoid!(
-        20,
-        &[
-            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u',
-            'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-            'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        ]
-    );
-
-    let expires_at = if form.expires_in_days > 0 {
-        Some(OffsetDateTime::now_utc() + time::Duration::days(form.expires_in_days))
-    } else {
-        None
-    };
-
-    let result = state
-        .database()
-        .execute(
-            "INSERT INTO invite(code, created_by, expires_at, note) VALUES (?, ?, ?, ?)",
-            (code.clone(), account.id, expires_at, form.note.clone()),
-        )
-        .await;
-
-    match result {
-        Ok(_) => {
-            state
-                .audit("invite.create")
-                .actor(&account)
-                .target(code.clone())
-                .ip_opt(client_ip)
-                .meta(serde_json::json!({
-                    "expires_in_days": form.expires_in_days,
-                    "note": form.note,
-                }))
-                .fire();
-            flasher.add(FlashMessage::success(format!("Invite created: {code}")));
-        }
-        Err(e) => {
-            flasher.add(format!("Failed to create invite: {e}"));
-        }
-    }
-
-    Redirect::to("/admin/invites").into_response()
-}
-
-async fn delete_invite(
-    State(state): State<AppState>,
-    ClientIp(client_ip): ClientIp,
-    account: Account,
-    flasher: Flasher,
-    Path(code): Path<String>,
-) -> Response {
-    if !account.flags.is_admin() {
-        return StatusCode::FORBIDDEN.into_response();
-    }
-
-    let result = state
-        .database()
-        .execute("DELETE FROM invite WHERE code = ? AND used_at IS NULL", [code.clone()])
-        .await;
-
-    match result {
-        Ok(0) => {
-            flasher.add("Invite not found or already redeemed");
-        }
-        Ok(_) => {
-            state
-                .audit("invite.revoke")
-                .actor(&account)
-                .target(code.clone())
-                .ip_opt(client_ip)
-                .fire();
-            flasher.add(FlashMessage::success("Invite revoked"));
-        }
-        Err(e) => {
-            flasher.add(format!("Failed to revoke invite: {e}"));
-        }
-    }
-
-    Redirect::to("/admin/invites").into_response()
-}
-
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/admin/logs", get(get_last_logs))
@@ -398,6 +191,4 @@ pub fn routes() -> Router<AppState> {
         .route("/admin", get(admin_index))
         .route("/admin/user/:id", get(admin_user_by_id))
         .route("/admin/cache/invalidate", get(invalidate_caches))
-        .route("/admin/invites", get(admin_invites).post(create_invite))
-        .route("/admin/invites/:code/delete", post(delete_invite))
 }

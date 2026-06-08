@@ -17,28 +17,12 @@
             <span class="login-brand-mark">K</span>
         </div>
         <h1 class="login-title">Create your account</h1>
-        <p class="login-subtitle">
-            {% match invite_label %}
-            {% when Some with (label) %}Invited as <strong>{{ label }}</strong>{% when None %}You'll need a valid invite code{% endmatch %}
-        </p>
+        <p class="login-subtitle">Sign up to get started</p>
 
         <form id="login-form" method="POST" action="/signup">
             {% for flash in flashes %}
             {{ flash.html()|safe }}
             {% endfor %}
-            {% match error %}
-            {% when Some with (msg) %}
-            <div class="alert-flash error" role="alert"><p>{{ msg }}</p></div>
-            {% when None %}{% endmatch %}
-
-            <div class="field-group">
-                <label class="field-label" for="code">Invite code</label>
-                <input class="form-field" required placeholder=" "
-                       name="code" id="code"
-                       type="text" autocomplete="off"
-                       value="{{ prefilled_code }}"
-                       {% if !prefilled_code.is_empty() %}readonly{% endif %}>
-            </div>
 
             <div class="field-group">
                 <label class="field-label" for="username">Username</label>
@@ -65,6 +49,16 @@
             <input type="hidden" id="session-description" name="session_description" value="">
             <button class="button primary login-submit" type="submit">Create account</button>
         </form>
+
+        {% if discord_enabled %}
+        <div class="login-divider">
+            <span>or</span>
+        </div>
+        <a href="/auth/discord" class="login-discord">
+            <img src="/static/img/discord.svg" alt="" width="20" height="20">
+            Sign up with Discord
+        </a>
+        {% endif %}
 
         <p class="login-subtitle" style="margin-top: 1rem; margin-bottom: 0;">
             Already have an account? <a href="/login">Log in</a>

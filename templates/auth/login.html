@@ -63,8 +63,15 @@
         <div class="login-divider">
             <span>or</span>
         </div>
-        <a href="/auth/discord" class="button outline login-discord">Login with Discord</a>
+        <a href="/auth/discord" class="login-discord">
+            <img src="/static/img/discord.svg" alt="" width="40" height="40">
+            Login with Discord
+        </a>
         {% endif %}
+
+        <p class="login-subtitle" style="margin-top: 1rem; margin-bottom: 0;">
+            Don't have an account? <a href="/signup">Sign up</a>
+        </p>
     </div>
 </div>
 {% endblock %}

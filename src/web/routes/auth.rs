@@ -6,14 +6,14 @@ use crate::{
     headers::{ClientIp, Referrer},
     key::SecretKey,
     logging::BadRequestReason,
-    models::{is_valid_username, Account, ImageEntry, Invite, Scope, Session},
+    models::{is_valid_username, Account, ImageEntry, Scope, Session},
     ratelimit::RateLimit,
     token::{Token, TokenRejection},
     AppState,
 };
 use askama::Template;
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::{header::SET_COOKIE, HeaderValue, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
@@ -36,7 +36,12 @@ async fn login(State(state): State<AppState>, account: Option<Account>, flashes:
         Redirect::to("/").into_response()
     } else {
         let discord_enabled = state.config().discord.enabled();
-        LoginTemplate { account, flashes, discord_enabled }.into_response()
+        LoginTemplate {
+            account,
+            flashes,
+            discord_enabled,
+        }
+        .into_response()
     }
 }
 
@@ -299,80 +304,32 @@ async fn login_form(
     }
 }
 
-// ─── Invite-only signup ─────────────────────────────────────────────────
+// ─── Open signup ────────────────────────────────────────────────────────
 
 #[derive(Template)]
 #[template(path = "auth/signup.html")]
 struct SignupTemplate {
     account: Option<Account>,
     flashes: Flashes,
-    /// The code from the URL query string (or empty if none was provided).
-    prefilled_code: String,
-    /// The invite's note shown above the form when a valid code is supplied.
-    invite_label: Option<String>,
-    /// An inline error displayed on this render (not via flash cookie).
-    /// Used when the user lands on /signup?code=… with an invalid code.
-    error: Option<&'static str>,
+    /// Whether Discord OAuth is configured (controls showing the Discord signup button).
+    discord_enabled: bool,
 }
 
-#[derive(Deserialize)]
-struct SignupQuery {
-    #[serde(default)]
-    code: Option<String>,
-}
-
-async fn signup_page(
-    State(state): State<AppState>,
-    account: Option<Account>,
-    flashes: Flashes,
-    Query(query): Query<SignupQuery>,
-) -> Response {
+async fn signup_page(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
     if account.is_some() {
         return Redirect::to("/").into_response();
-    }
-
-    let mut prefilled_code = String::new();
-    let mut invite_label: Option<String> = None;
-    let mut error: Option<&'static str> = None;
-
-    if let Some(code) = query.code.filter(|c| !c.is_empty()) {
-        match state
-            .database()
-            .get::<Invite, _, _>("SELECT * FROM invite WHERE code = ?", [code.clone()])
-            .await
-        {
-            Ok(Some(invite)) if invite.is_redeemable() => {
-                invite_label = invite.note.clone();
-                prefilled_code = code;
-            }
-            Ok(Some(invite)) if invite.is_used() => {
-                error = Some("This invite has already been used.");
-            }
-            Ok(Some(_)) => {
-                error = Some("This invite has expired.");
-            }
-            Ok(None) => {
-                error = Some("Invite code not recognised.");
-            }
-            Err(_) => {
-                error = Some("Failed to look up invite. Please try again.");
-            }
-        }
     }
 
     SignupTemplate {
         account,
         flashes,
-        prefilled_code,
-        invite_label,
-        error,
+        discord_enabled: state.config().discord.enabled(),
     }
     .into_response()
 }
 
 #[derive(Deserialize)]
 struct SignupForm {
-    code: String,
     username: String,
     password: String,
     #[serde(deserialize_with = "crate::utils::empty_string_is_none")]
@@ -385,71 +342,30 @@ async fn signup_submit(
     flasher: Flasher,
     Form(form): Form<SignupForm>,
 ) -> Response {
-    let bail_url = format!("/signup?code={}", form.code);
-
     if !is_valid_username(&form.username) {
         return flasher
             .add("Username must be 3-32 characters, lowercase letters, digits, dot, dash, or underscore.")
-            .bail(&bail_url);
+            .bail("/signup");
     }
     if !(8..=128).contains(&form.password.len()) {
         return flasher
             .add("Password length must be 8 to 128 characters")
-            .bail(&bail_url);
-    }
-
-    // Look up + validate the invite
-    let invite: Invite = match state
-        .database()
-        .get::<Invite, _, _>("SELECT * FROM invite WHERE code = ?", [form.code.clone()])
-        .await
-    {
-        Ok(Some(inv)) => inv,
-        Ok(None) => return flasher.add("Invalid invite code").bail("/signup"),
-        Err(e) => return flasher.add(format!("Database error: {e}")).bail(&bail_url),
-    };
-
-    if invite.is_used() {
-        return flasher.add("This invite has already been used").bail("/signup");
-    }
-    if invite.is_expired() {
-        return flasher.add("This invite has expired").bail("/signup");
+            .bail("/signup");
     }
 
     let Ok(password_hash) = hash_password(&form.password) else {
-        return flasher.add("Failed to hash password. Try again?").bail(&bail_url);
+        return flasher.add("Failed to hash password. Try again?").bail("/signup");
     };
 
-    let code = form.code.clone();
     let username = form.username.clone();
-    let now = OffsetDateTime::now_utc();
-
-    // Atomic: create account AND consume the invite (or do neither).
-    // The UPDATE's `WHERE used_at IS NULL` guard prevents a race where two
-    // concurrent signups redeem the same invite — the second one finds
-    // 0 rows affected and we roll back its account insert.
     let tx_result: rusqlite::Result<i64> = state
         .database()
         .call(move |conn| {
-            let tx = conn.transaction()?;
-            tx.execute(
+            conn.execute(
                 "INSERT INTO account(name, password) VALUES (?, ?)",
                 rusqlite::params![username, password_hash],
             )?;
-            let new_id: i64 = tx.last_insert_rowid();
-            let rows = tx.execute(
-                "UPDATE invite SET used_at = ?, used_by = ? WHERE code = ? AND used_at IS NULL",
-                rusqlite::params![now, new_id, code],
-            )?;
-            if rows == 0 {
-                // Invite was claimed by someone else between our checks. Roll back.
-                return Err(rusqlite::Error::SqliteFailure(
-                    rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CONSTRAINT),
-                    Some("invite already redeemed".to_string()),
-                ));
-            }
-            tx.commit()?;
-            Ok(new_id)
+            Ok(conn.last_insert_rowid())
         })
         .await;
 
@@ -459,12 +375,10 @@ async fn signup_submit(
             let msg = e.to_string();
             let user_msg = if msg.contains("UNIQUE constraint failed: account.name") {
                 "That username is already taken".to_string()
-            } else if msg.contains("invite already redeemed") {
-                "This invite was just used by someone else.".to_string()
             } else {
                 format!("Failed to create account: {msg}")
             };
-            return flasher.add(user_msg).bail(&bail_url);
+            return flasher.add(user_msg).bail("/signup");
         }
     };
 
@@ -478,7 +392,6 @@ async fn signup_submit(
     state
         .audit("auth.signup")
         .actor_label(form.username.clone())
-        .target(form.code.clone())
         .ip_opt(client_ip)
         .meta(serde_json::json!({ "new_account_id": new_account_id }))
         .fire();

@@ -54,6 +54,44 @@
     margin-bottom: 1.5rem;
 }
 
+/* -- "Invite Percy" call-to-action (empty state) -- */
+
+.invite-percy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    width: min(22rem, 100%);
+    margin: 2rem auto 0;
+    padding: 0.9rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #fff;
+    text-decoration: none;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #5865f2 0%, #7d5cff 100%);
+    box-shadow: 0 8px 24px -8px rgba(88, 101, 242, 0.65);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.invite-percy-btn:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.07);
+    box-shadow: 0 12px 30px -8px rgba(88, 101, 242, 0.8);
+}
+
+.invite-percy-btn:active {
+    transform: translateY(0);
+}
+
+.invite-percy-btn img {
+    width: 1.4rem;
+    height: 1.4rem;
+    flex-shrink: 0;
+}
+
 /* -- Guild grid (server list) -- */
 
 .guild-grid {

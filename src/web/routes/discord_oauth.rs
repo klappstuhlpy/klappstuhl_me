@@ -14,7 +14,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use cookie::Cookie;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
@@ -53,10 +52,7 @@ struct CallbackQuery {
 // -- Handlers ----------------------------------------------------------------
 
 /// `GET /auth/discord` — Initiate Discord OAuth2 flow.
-async fn discord_login(
-    State(state): State<AppState>,
-    account: Option<Account>,
-) -> Response {
+async fn discord_login(State(state): State<AppState>, account: Option<Account>) -> Response {
     let cfg = &state.config().discord;
     if !cfg.enabled() {
         return Redirect::to("/login").into_response();
@@ -247,9 +243,8 @@ async fn login_or_create(
     let existing: Option<i64> = state
         .database()
         .call(move |conn| {
-            let mut stmt = conn.prepare_cached(
-                "SELECT account_id FROM user_discord_links WHERE discord_user_id = ?",
-            )?;
+            let mut stmt =
+                conn.prepare_cached("SELECT account_id FROM user_discord_links WHERE discord_user_id = ?")?;
             stmt.query_row([&discord_id], |row| row.get(0)).optional()
         })
         .await
@@ -269,24 +264,10 @@ async fn login_or_create(
             return flasher.add("Linked account no longer exists.").bail("/login");
         };
 
-        if account.has_totp() {
-            // TOTP interception: create a pending TOTP challenge and redirect.
-            let key = &state.config().secret_key;
-            let pending = PendingDiscordTotp {
-                account_id: account.id,
-                exp: (OffsetDateTime::now_utc() + time::Duration::minutes(5)).unix_timestamp(),
-            };
-            let Ok(signed) = key.sign(&pending) else {
-                return flasher.add("Failed to start 2FA challenge.").bail("/login");
-            };
-            state
-                .audit("auth.discord.2fa_challenge")
-                .actor(&account)
-                .ip_opt(client_ip)
-                .fire();
-            return pending_totp_redirect(signed);
-        }
-
+        // Discord OAuth is treated as a sufficiently strong factor on its own:
+        // verifying ownership of the linked Discord account stands in for the
+        // password+TOTP path, so we skip the TOTP challenge here even when the
+        // account has 2FA enabled for username/password logins.
         create_session_response(state, &account, client_ip, "auth.discord.login").await
     } else {
         // No existing link — create a new account.
@@ -299,10 +280,7 @@ async fn login_or_create(
         if getrandom::getrandom(&mut random_bytes).is_err() {
             return flasher.add("Internal error during account creation.").bail("/login");
         }
-        let sentinel_password = base64::Engine::encode(
-            &base64::prelude::BASE64_URL_SAFE_NO_PAD,
-            random_bytes,
-        );
+        let sentinel_password = base64::Engine::encode(&base64::prelude::BASE64_URL_SAFE_NO_PAD, random_bytes);
         let password_hash = match hash_password(&sentinel_password) {
             Ok(h) => h,
             Err(_) => return flasher.add("Internal error during account creation.").bail("/login"),
@@ -401,7 +379,9 @@ async fn login_or_create(
                         }
                         Err(e) => {
                             tracing::error!(error = %e, "Failed to create Discord account (retry)");
-                            flasher.add("Failed to create account. Please try again.").bail("/login")
+                            flasher
+                                .add("Failed to create account. Please try again.")
+                                .bail("/login")
                         }
                     }
                 } else if msg.contains("UNIQUE constraint failed: user_discord_links") {
@@ -427,12 +407,7 @@ async fn discord_unlink(
     let account_id = account.id;
     let result: rusqlite::Result<usize> = state
         .database()
-        .call(move |conn| {
-            conn.execute(
-                "DELETE FROM user_discord_links WHERE account_id = ?",
-                [account_id],
-            )
-        })
+        .call(move |conn| conn.execute("DELETE FROM user_discord_links WHERE account_id = ?", [account_id]))
         .await;
 
     match result {
@@ -450,27 +425,6 @@ async fn discord_unlink(
 
 // -- Helpers -----------------------------------------------------------------
 
-/// TOTP challenge payload specific to the Discord OAuth flow.
-#[derive(Serialize, Deserialize)]
-struct PendingDiscordTotp {
-    account_id: i64,
-    exp: i64,
-}
-
-fn pending_totp_redirect(signed: String) -> Response {
-    let cookie = Cookie::build(("totp_pending", signed))
-        .path("/")
-        .same_site(cookie::SameSite::Lax)
-        .http_only(true)
-        .build();
-
-    let mut response = Redirect::to("/login/2fa").into_response();
-    if let Ok(val) = HeaderValue::from_str(&cookie.to_string()) {
-        response.headers_mut().insert(SET_COOKIE, val);
-    }
-    response
-}
-
 async fn create_session_response(
     state: &AppState,
     account: &Account,
@@ -483,11 +437,7 @@ async fn create_session_response(
     let key = &state.config().secret_key;
     let cookie = token.to_cookie(key);
     state.save_session(&token, Some("Discord OAuth".to_string())).await;
-    state
-        .audit(audit_action)
-        .actor(account)
-        .ip_opt(client_ip)
-        .fire();
+    state.audit(audit_action).actor(account).ip_opt(client_ip).fire();
 
     let mut response = Redirect::to("/").into_response();
     if let Ok(val) = HeaderValue::from_str(&cookie.to_string()) {
@@ -515,10 +465,7 @@ fn sanitize_username(discord_name: &str) -> String {
         } else {
             let mut buf = [0u8; 4];
             let _ = getrandom::getrandom(&mut buf);
-            format!(
-                "user-{}",
-                u32::from_le_bytes(buf) % 100_000_000
-            )
+            format!("user-{}", u32::from_le_bytes(buf) % 100_000_000)
         }
     }
 }

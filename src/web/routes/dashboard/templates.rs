@@ -11,6 +11,8 @@ pub(crate) struct GuildsTemplate {
     pub(crate) account: Option<Account>,
     pub(crate) flashes: Flashes,
     pub(crate) guilds: Vec<UserGuild>,
+    /// Invite URL (no guild pre-selected) for the "Invite Percy" empty-state button.
+    pub(crate) invite_url: String,
 }
 
 #[allow(dead_code)]
