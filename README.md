@@ -897,12 +897,18 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/leveling/multipliers` | POST | Set/clear a role or channel XP multiplier |
 | `/percy/dashboard/guild/:id/leveling/blacklist` | POST | Add/remove a leveling blacklist entry |
 | `/percy/dashboard/guild/:id/economy` | GET | Economy management (shop, balances, lottery) |
-| `/percy/dashboard/guild/:id/autoresponders` | GET | Autoresponder management |
-| `/percy/dashboard/guild/:id/autoresponders` | POST | Create autoresponder |
-| `/percy/dashboard/guild/:id/comics` | GET | Comic feed management |
+| `/percy/dashboard/guild/:id/economy/items` | POST | Create a shop item |
+| `/percy/dashboard/guild/:id/economy/items/:name` | DELETE | Delete a shop item |
+| `/percy/dashboard/guild/:id/economy/lottery` | POST/DELETE | Start / cancel the lottery |
+| `/percy/dashboard/guild/:id/autoresponders` | GET/POST | List / create autoresponders |
+| `/percy/dashboard/guild/:id/autoresponders/:trigger` | PATCH/DELETE | Toggle / delete an autoresponder |
+| `/percy/dashboard/guild/:id/comics` | GET/POST | List / subscribe to a comic feed |
+| `/percy/dashboard/guild/:id/comics/:brand` | PATCH/DELETE | Edit / unsubscribe a feed |
 | `/percy/dashboard/guild/:id/comics/:brand/push` | POST | Manually push a comic feed |
-| `/percy/dashboard/guild/:id/temp-channels` | GET | Temp voice channel hub management |
+| `/percy/dashboard/guild/:id/temp-channels` | GET/POST | List / create temp voice channel hubs |
+| `/percy/dashboard/guild/:id/temp-channels/:cid` | PATCH/DELETE | Edit / remove a hub |
 | `/percy/dashboard/guild/:id/highlights` | GET | Highlights admin view |
+| `/percy/dashboard/guild/:id/highlights/:uid` | DELETE | Remove a user's highlights |
 | `/percy/dashboard/guild/:id/emoji-stats` | GET | Emoji usage statistics |
 | `/percy/dashboard/guild/:id/polls` | GET | Polls overview |
 | `/percy/dashboard/guild/:id/polls/:poll_id` | POST | Edit a running poll |
