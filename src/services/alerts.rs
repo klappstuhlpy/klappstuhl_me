@@ -233,7 +233,11 @@ fn b64(s: &str) -> String {
 /// The hostname we announce in EHLO — the domain of the `from` address, or
 /// `localhost` if it has no `@`. Purely cosmetic to most servers.
 fn ehlo_name(cfg: &EmailConfig) -> &str {
-    cfg.from.split_once('@').map(|(_, domain)| domain).filter(|d| !d.is_empty()).unwrap_or("localhost")
+    cfg.from
+        .split_once('@')
+        .map(|(_, domain)| domain)
+        .filter(|d| !d.is_empty())
+        .unwrap_or("localhost")
 }
 
 /// Reads one (possibly multi-line) SMTP reply and returns its 3-digit code.
@@ -269,7 +273,10 @@ where
     w.flush().await?;
     let code = read_reply(reader).await?;
     if code != expect {
-        return Err(smtp_err(&format!("expected {expect}, got {code} after `{}`", line.split(' ').next().unwrap_or(line))));
+        return Err(smtp_err(&format!(
+            "expected {expect}, got {code} after `{}`",
+            line.split(' ').next().unwrap_or(line)
+        )));
     }
     Ok(())
 }
@@ -278,7 +285,11 @@ where
 fn tls_config() -> Arc<rustls::ClientConfig> {
     let mut roots = rustls::RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    Arc::new(rustls::ClientConfig::builder().with_root_certificates(roots).with_no_client_auth())
+    Arc::new(
+        rustls::ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth(),
+    )
 }
 
 /// Runs the EHLO → AUTH → MAIL → DATA exchange over an established stream.
@@ -366,8 +377,8 @@ pub async fn send_email(cfg: &EmailConfig, note: &AlertNotification) -> IoResult
     }
     let message = build_message(cfg, note);
 
-    let server_name = rustls_pki_types::ServerName::try_from(cfg.host.clone())
-        .map_err(|_| smtp_err("invalid host name"))?;
+    let server_name =
+        rustls_pki_types::ServerName::try_from(cfg.host.clone()).map_err(|_| smtp_err("invalid host name"))?;
     let connector = tokio_rustls::TlsConnector::from(tls_config());
 
     let tcp = TcpStream::connect((cfg.host.as_str(), cfg.port)).await?;
@@ -431,15 +442,15 @@ mod tests {
     fn strips_discord_markdown_for_ntfy() {
         let input = "**Target:** `web`\n**Kind:** http\n\nCheck the [/admin/health](/admin/health) dashboard.";
         let out = strip_markdown(input);
-        assert_eq!(
-            out,
-            "Target: web\nKind: http\n\nCheck the /admin/health dashboard."
-        );
+        assert_eq!(out, "Target: web\nKind: http\n\nCheck the /admin/health dashboard.");
     }
 
     #[test]
     fn delink_keeps_distinct_targets() {
-        assert_eq!(delink("see [the docs](https://x.test)"), "see the docs (https://x.test)");
+        assert_eq!(
+            delink("see [the docs](https://x.test)"),
+            "see the docs (https://x.test)"
+        );
         // Identical label/target collapses to a single copy.
         assert_eq!(delink("[/admin/health](/admin/health)"), "/admin/health");
     }
@@ -447,7 +458,10 @@ mod tests {
     #[test]
     fn strip_leaves_single_markers_and_other_text() {
         // Lone underscores in identifiers must survive.
-        assert_eq!(strip_markdown("cpu_percent over threshold"), "cpu_percent over threshold");
+        assert_eq!(
+            strip_markdown("cpu_percent over threshold"),
+            "cpu_percent over threshold"
+        );
         // Strikethrough + underline pairs are removed.
         assert_eq!(strip_markdown("~~old~~ __new__"), "old new");
     }

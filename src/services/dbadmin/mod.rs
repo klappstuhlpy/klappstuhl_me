@@ -21,8 +21,8 @@
 //! - Danger mode skips both layers and is only reachable through an
 //!   admin-only checkbox plus an explicit confirmation in the UI.
 
-mod safety;
 pub mod postgres;
+mod safety;
 pub mod sqlite;
 
 pub use safety::is_safe_query;

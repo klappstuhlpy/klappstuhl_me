@@ -131,7 +131,7 @@ a:not(.button) {
 }
 
 a:not(.button, .button-card):hover {
-    text-decoration: underline;
+    text-decoration: none;
     color: var(--link-hover-text);
 }
 

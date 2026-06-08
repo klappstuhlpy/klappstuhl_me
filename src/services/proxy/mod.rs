@@ -121,7 +121,12 @@ pub async fn regenerate_all(state: &AppState) -> anyhow::Result<ApplyReport> {
 }
 
 /// nginx / caddy backend: one config file per enabled route, plus prune + reload.
-async fn regenerate_files(state: &AppState, dir: &std::path::Path, kind: ProxyKind, routes: &[ProxyRoute]) -> ApplyReport {
+async fn regenerate_files(
+    state: &AppState,
+    dir: &std::path::Path,
+    kind: ProxyKind,
+    routes: &[ProxyRoute],
+) -> ApplyReport {
     let mut report = ApplyReport {
         dir: Some(dir.display().to_string()),
         ..Default::default()

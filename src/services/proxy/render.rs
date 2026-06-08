@@ -296,7 +296,11 @@ fn render_cloudflared_preview(route: &ProxyRoute) -> String {
 /// every enabled route. `tunnel` and `credentials_file` come from config; when
 /// unset, editable placeholders are emitted so the file is still valid to hand
 /// off. The required catch-all `http_status:404` ingress rule is always last.
-pub fn render_cloudflared_config(routes: &[&ProxyRoute], tunnel: Option<&str>, credentials_file: Option<&str>) -> String {
+pub fn render_cloudflared_config(
+    routes: &[&ProxyRoute],
+    tunnel: Option<&str>,
+    credentials_file: Option<&str>,
+) -> String {
     let mut out = String::new();
     out.push_str("# Managed by klappstuhl.me — Cloudflare Tunnel\n");
     out.push_str("# Edits to managed sections are overwritten on the next apply.\n");

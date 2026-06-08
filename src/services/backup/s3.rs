@@ -70,7 +70,10 @@ pub async fn upload_file(
     path: &std::path::Path,
 ) -> anyhow::Result<String> {
     if !cfg.kind.eq_ignore_ascii_case("s3") {
-        anyhow::bail!("unsupported backup_remote.kind: {} (only \"s3\" is supported)", cfg.kind);
+        anyhow::bail!(
+            "unsupported backup_remote.kind: {} (only \"s3\" is supported)",
+            cfg.kind
+        );
     }
     let filename = path
         .file_name()
@@ -107,13 +110,9 @@ pub async fn upload_file(
     let payload_hash = sha256_hex(&body);
 
     // ── Canonical request ──────────────────────────────────────────────────
-    let canonical_headers = format!(
-        "host:{host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n"
-    );
+    let canonical_headers = format!("host:{host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n");
     let signed_headers = "host;x-amz-content-sha256;x-amz-date";
-    let canonical_request = format!(
-        "PUT\n{canonical_uri}\n\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
-    );
+    let canonical_request = format!("PUT\n{canonical_uri}\n\n{canonical_headers}\n{signed_headers}\n{payload_hash}");
 
     // ── String to sign ─────────────────────────────────────────────────────
     let scope = format!("{datestamp}/{}/{SERVICE}/aws4_request", cfg.region);
@@ -123,7 +122,10 @@ pub async fn upload_file(
     );
 
     // ── Signing key (HMAC chain) ───────────────────────────────────────────
-    let k_date = hmac(format!("AWS4{}", cfg.secret_access_key).as_bytes(), datestamp.as_bytes());
+    let k_date = hmac(
+        format!("AWS4{}", cfg.secret_access_key).as_bytes(),
+        datestamp.as_bytes(),
+    );
     let k_region = hmac(&k_date, cfg.region.as_bytes());
     let k_service = hmac(&k_region, SERVICE.as_bytes());
     let k_signing = hmac(&k_service, b"aws4_request");
@@ -174,7 +176,10 @@ fn extract_keys(xml: &str) -> Vec<String> {
 /// show which local backups also exist off-site, so it carries a short timeout.
 pub async fn list_keys(client: &reqwest::Client, cfg: &BackupRemoteConfig) -> anyhow::Result<Vec<String>> {
     if !cfg.kind.eq_ignore_ascii_case("s3") {
-        anyhow::bail!("unsupported backup_remote.kind: {} (only \"s3\" is supported)", cfg.kind);
+        anyhow::bail!(
+            "unsupported backup_remote.kind: {} (only \"s3\" is supported)",
+            cfg.kind
+        );
     }
 
     let endpoint = cfg.endpoint.trim_end_matches('/');
@@ -195,21 +200,27 @@ pub async fn list_keys(client: &reqwest::Client, cfg: &BackupRemoteConfig) -> an
     let amz_date = now
         .format(format_description!("[year][month][day]T[hour][minute][second]Z"))
         .context("formatting amz date")?;
-    let datestamp = now.format(format_description!("[year][month][day]")).context("formatting datestamp")?;
+    let datestamp = now
+        .format(format_description!("[year][month][day]"))
+        .context("formatting datestamp")?;
 
     // GET with an empty body — the payload hash is SHA-256 of "".
     let payload_hash = sha256_hex(b"");
     let canonical_headers = format!("host:{host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n");
     let signed_headers = "host;x-amz-content-sha256;x-amz-date";
-    let canonical_request = format!(
-        "GET\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
-    );
+    let canonical_request =
+        format!("GET\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}");
 
     let scope = format!("{datestamp}/{}/{SERVICE}/aws4_request", cfg.region);
-    let string_to_sign =
-        format!("{ALGORITHM}\n{amz_date}\n{scope}\n{}", sha256_hex(canonical_request.as_bytes()));
+    let string_to_sign = format!(
+        "{ALGORITHM}\n{amz_date}\n{scope}\n{}",
+        sha256_hex(canonical_request.as_bytes())
+    );
 
-    let k_date = hmac(format!("AWS4{}", cfg.secret_access_key).as_bytes(), datestamp.as_bytes());
+    let k_date = hmac(
+        format!("AWS4{}", cfg.secret_access_key).as_bytes(),
+        datestamp.as_bytes(),
+    );
     let k_region = hmac(&k_date, cfg.region.as_bytes());
     let k_service = hmac(&k_region, SERVICE.as_bytes());
     let k_signing = hmac(&k_service, b"aws4_request");

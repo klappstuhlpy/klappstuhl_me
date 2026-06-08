@@ -175,7 +175,9 @@ async fn upload_now(
         return StatusCode::FORBIDDEN.into_response();
     }
     if state.config().backup.remote.is_none() {
-        flasher.add(crate::flash::FlashMessage::warning("No off-site backup target is configured."));
+        flasher.add(crate::flash::FlashMessage::warning(
+            "No off-site backup target is configured.",
+        ));
         return flasher.bail("/admin/backups");
     }
     let Some(path) = backup::resolve(&name) else {

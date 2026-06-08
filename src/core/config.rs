@@ -304,7 +304,10 @@ impl AiConfig {
 
     /// The configured model, or a free default with reliable tool-calling.
     pub fn model_id(&self) -> &str {
-        self.model.as_deref().filter(|m| !m.is_empty()).unwrap_or("llama-3.3-70b-versatile")
+        self.model
+            .as_deref()
+            .filter(|m| !m.is_empty())
+            .unwrap_or("llama-3.3-70b-versatile")
     }
 }
 
@@ -489,7 +492,9 @@ impl Config {
     /// Effective per-file upload size limit in bytes, applying the
     /// [`DEFAULT_MAX_UPLOAD_BYTES`] fallback when unset or zero.
     pub fn effective_max_upload_bytes(&self) -> u64 {
-        self.max_upload_bytes.filter(|&n| n > 0).unwrap_or(DEFAULT_MAX_UPLOAD_BYTES)
+        self.max_upload_bytes
+            .filter(|&n| n > 0)
+            .unwrap_or(DEFAULT_MAX_UPLOAD_BYTES)
     }
 
     pub fn path() -> anyhow::Result<PathBuf> {
@@ -506,8 +511,7 @@ impl Config {
             // Migrate any legacy flat keys (`cloudflare_api_token`, `proxy_kind`,
             // …) into their grouped sub-maps before deserialising, so existing
             // configs keep working after the regrouping.
-            let mut value: serde_json::Value =
-                serde_json::from_str(&text).context("could not parse config file")?;
+            let mut value: serde_json::Value = serde_json::from_str(&text).context("could not parse config file")?;
             migrate_flat_to_grouped(&mut value);
             let config: Config = serde_json::from_value(value).context("could not parse config file")?;
 

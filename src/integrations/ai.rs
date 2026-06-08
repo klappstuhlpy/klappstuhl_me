@@ -208,7 +208,10 @@ async fn site_status_text(state: &AppState) -> String {
             "degraded" => degraded += 1,
             _ => {}
         }
-        lines.push(format!("- {}: {} ({:.2}% 24h uptime)", s.target.name, status, s.uptime_24h));
+        lines.push(format!(
+            "- {}: {} ({:.2}% 24h uptime)",
+            s.target.name, status, s.uptime_24h
+        ));
     }
 
     if total == 0 {
@@ -223,7 +226,10 @@ async fn site_status_text(state: &AppState) -> String {
     } else {
         "status unknown"
     };
-    format!("Overall: {overall} ({up} of {total} operational).\n{}", lines.join("\n"))
+    format!(
+        "Overall: {overall} ({up} of {total} operational).\n{}",
+        lines.join("\n")
+    )
 }
 
 /// Drive a full ask: stream the model's answer to `tx`, running the tool loop
@@ -236,7 +242,9 @@ pub async fn stream_answer(state: AppState, history: Vec<ChatTurn>, tx: mpsc::Se
             Some(k) if !k.is_empty() => (k, cfg.ai.model_id().to_string()),
             _ => {
                 let _ = tx
-                    .send(AskEvent::Error { message: "The assistant is not configured on this server.".into() })
+                    .send(AskEvent::Error {
+                        message: "The assistant is not configured on this server.".into(),
+                    })
                     .await;
                 return;
             }
@@ -276,7 +284,11 @@ pub async fn stream_answer(state: AppState, history: Vec<ChatTurn>, tx: mpsc::Se
             Ok(r) => r,
             Err(e) => {
                 tracing::error!(error = %e, "groq request failed");
-                let _ = tx.send(AskEvent::Error { message: "Could not reach the AI service.".into() }).await;
+                let _ = tx
+                    .send(AskEvent::Error {
+                        message: "Could not reach the AI service.".into(),
+                    })
+                    .await;
                 return;
             }
         };
@@ -289,8 +301,7 @@ pub async fn stream_answer(state: AppState, history: Vec<ChatTurn>, tx: mpsc::Se
             // visitor a friendly message instead of a raw status code.
             let message = if status.as_u16() == 429 {
                 tracing::warn!(%status, "groq quota / rate limit hit");
-                "The AI is rate-limited or out of free quota right now — please try again in a minute."
-                    .to_string()
+                "The AI is rate-limited or out of free quota right now — please try again in a minute.".to_string()
             } else {
                 tracing::error!(%status, detail = %detail, "groq returned an error");
                 format!("The AI service returned an error ({status}).")
@@ -308,7 +319,11 @@ pub async fn stream_answer(state: AppState, history: Vec<ChatTurn>, tx: mpsc::Se
                 Ok(c) => c,
                 Err(e) => {
                     tracing::error!(error = %e, "groq stream error");
-                    let _ = tx.send(AskEvent::Error { message: "The AI stream was interrupted.".into() }).await;
+                    let _ = tx
+                        .send(AskEvent::Error {
+                            message: "The AI stream was interrupted.".into(),
+                        })
+                        .await;
                     return;
                 }
             };
@@ -382,7 +397,11 @@ struct StreamParser {
 
 impl StreamParser {
     fn new() -> Self {
-        Self { buf: String::new(), text: String::new(), tool_calls: Vec::new() }
+        Self {
+            buf: String::new(),
+            text: String::new(),
+            tool_calls: Vec::new(),
+        }
     }
 
     /// Feed a chunk of bytes; returns Err if the client receiver is gone.
@@ -391,7 +410,9 @@ impl StreamParser {
         while let Some(nl) = self.buf.find('\n') {
             let line = self.buf[..nl].trim_end_matches('\r').to_string();
             self.buf.drain(..=nl);
-            let Some(data) = line.strip_prefix("data:") else { continue };
+            let Some(data) = line.strip_prefix("data:") else {
+                continue;
+            };
             let data = data.trim();
             if data.is_empty() || data == "[DONE]" {
                 continue;
@@ -408,9 +429,11 @@ impl StreamParser {
         if let Some(err) = ev.get("error") {
             let msg = err.get("message").and_then(Value::as_str).unwrap_or("stream error");
             tracing::error!(msg, "groq stream reported an error");
-            tx.send(AskEvent::Error { message: "The AI service reported an error.".into() })
-                .await
-                .map_err(|_| ())?;
+            tx.send(AskEvent::Error {
+                message: "The AI service reported an error.".into(),
+            })
+            .await
+            .map_err(|_| ())?;
             return Ok(());
         }
 

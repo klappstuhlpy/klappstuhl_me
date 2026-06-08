@@ -90,7 +90,10 @@ impl CfTunnel {
         let parsed: CfResponse<TunnelConfigResult> =
             serde_json::from_str(&text).with_context(|| format!("parse tunnel config response ({status}): {text}"))?;
         if !parsed.success {
-            anyhow::bail!("Cloudflare API error ({status}) reading tunnel config: {}", parsed.detail_with_hint());
+            anyhow::bail!(
+                "Cloudflare API error ({status}) reading tunnel config: {}",
+                parsed.detail_with_hint()
+            );
         }
         Ok(parsed
             .result
@@ -116,7 +119,10 @@ impl CfTunnel {
         let parsed: CfResponse<serde_json::Value> =
             serde_json::from_str(&text).with_context(|| format!("parse PUT response ({status}): {text}"))?;
         if !parsed.success {
-            anyhow::bail!("Cloudflare API error ({status}) writing tunnel config: {}", parsed.detail_with_hint());
+            anyhow::bail!(
+                "Cloudflare API error ({status}) writing tunnel config: {}",
+                parsed.detail_with_hint()
+            );
         }
         Ok(())
     }
@@ -150,7 +156,10 @@ impl CfTunnel {
             .await
             .context("parse DNS list")?;
         if !listed.success {
-            anyhow::bail!("Cloudflare API error listing DNS for {hostname}: {}", listed.detail_with_hint());
+            anyhow::bail!(
+                "Cloudflare API error listing DNS for {hostname}: {}",
+                listed.detail_with_hint()
+            );
         }
 
         let existing = listed.result.unwrap_or_default().into_iter().next();
@@ -174,7 +183,10 @@ impl CfTunnel {
         let parsed: CfResponse<serde_json::Value> =
             serde_json::from_str(&text).with_context(|| format!("parse DNS upsert ({status}): {text}"))?;
         if !parsed.success {
-            anyhow::bail!("Cloudflare API error upserting DNS for {hostname}: {}", parsed.detail_with_hint());
+            anyhow::bail!(
+                "Cloudflare API error upserting DNS for {hostname}: {}",
+                parsed.detail_with_hint()
+            );
         }
         Ok(())
     }

@@ -119,11 +119,7 @@ impl DockerClient {
     /// the image-update checker to compare the pulled digest against what the
     /// registry currently serves for the same tag.
     pub async fn image_repo_digests(&self, image: &str) -> anyhow::Result<Vec<String>> {
-        let info = self
-            .docker
-            .inspect_image(image)
-            .await
-            .context("inspect_image")?;
+        let info = self.docker.inspect_image(image).await.context("inspect_image")?;
         Ok(info.repo_digests.unwrap_or_default())
     }
 

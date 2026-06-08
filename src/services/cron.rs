@@ -68,7 +68,9 @@ fn parse_field(spec: &str, min: u8, max: u8) -> Result<Field, String> {
             let b: u8 = b.parse().map_err(|_| format!("invalid range end `{b}`"))?;
             (a, b)
         } else {
-            let v: u8 = range_part.parse().map_err(|_| format!("invalid value `{range_part}`"))?;
+            let v: u8 = range_part
+                .parse()
+                .map_err(|_| format!("invalid value `{range_part}`"))?;
             (v, v)
         };
 

@@ -191,9 +191,14 @@ async fn run_docker(args: &[&str], cwd: Option<&str>) -> (bool, String) {
 fn compose_dir_usable(path: &str) -> bool {
     let dir = std::path::Path::new(path);
     dir.is_dir()
-        && ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"]
-            .iter()
-            .any(|f| dir.join(f).exists())
+        && [
+            "docker-compose.yml",
+            "docker-compose.yaml",
+            "compose.yml",
+            "compose.yaml",
+        ]
+        .iter()
+        .any(|f| dir.join(f).exists())
 }
 
 /// Perform one service action, returning `(success, captured_output)`.
@@ -456,11 +461,7 @@ async fn services_data(State(state): State<AppState>, account: Account) -> Resul
 /// Runs an image-update check across all services on demand and returns the
 /// fresh results. Synchronous — a homelab has a handful of services, and the
 /// operator clicked "Check" expecting an answer.
-async fn check_updates_now(
-    State(state): State<AppState>,
-    ClientIp(client_ip): ClientIp,
-    account: Account,
-) -> Response {
+async fn check_updates_now(State(state): State<AppState>, ClientIp(client_ip): ClientIp, account: Account) -> Response {
     if !account.flags.is_admin() {
         return StatusCode::FORBIDDEN.into_response();
     }

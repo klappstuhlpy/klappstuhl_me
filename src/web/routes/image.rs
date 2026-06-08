@@ -603,10 +603,7 @@ async fn bulk_download_files(
         }))
         .fire();
 
-    let filename = format!(
-        "klappstuhl-images-{}.zip",
-        OffsetDateTime::now_utc().unix_timestamp(),
-    );
+    let filename = format!("klappstuhl-images-{}.zip", OffsetDateTime::now_utc().unix_timestamp(),);
     Ok((
         [
             (header::CONTENT_TYPE, "application/zip".to_string()),
@@ -769,7 +766,10 @@ fn inline_disposition(name: &str) -> String {
     let mut encoded = String::new();
     for &b in name.as_bytes() {
         let unreserved = b.is_ascii_alphanumeric()
-            || matches!(b, b'!' | b'#' | b'$' | b'&' | b'+' | b'-' | b'.' | b'^' | b'_' | b'`' | b'|' | b'~');
+            || matches!(
+                b,
+                b'!' | b'#' | b'$' | b'&' | b'+' | b'-' | b'.' | b'^' | b'_' | b'`' | b'|' | b'~'
+            );
         if unreserved {
             encoded.push(b as char);
         } else {

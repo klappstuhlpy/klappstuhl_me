@@ -80,7 +80,10 @@ async fn page(State(state): State<AppState>, account: Account) -> Result<AdminCe
     let backend_is_edge = proxy::configured_kind(&state).label() == "cloudflared";
 
     // SSL monitors keyed by bare host, for the join.
-    let ssl_monitors: Vec<&_> = summaries.iter().filter(|s| s.target.kind.eq_ignore_ascii_case("ssl")).collect();
+    let ssl_monitors: Vec<&_> = summaries
+        .iter()
+        .filter(|s| s.target.kind.eq_ignore_ascii_case("ssl"))
+        .collect();
 
     let mut matched_monitor_ids: std::collections::HashSet<i64> = std::collections::HashSet::new();
     let mut routes = Vec::with_capacity(proxy_routes.len());

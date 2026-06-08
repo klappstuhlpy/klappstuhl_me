@@ -261,16 +261,16 @@ impl AppState {
 
     /// A snapshot clone of the current image-update map, keyed by service name.
     pub fn image_updates_map(&self) -> std::collections::HashMap<String, crate::updates::ImageUpdate> {
-        self.inner
-            .image_updates
-            .lock()
-            .map(|g| g.clone())
-            .unwrap_or_default()
+        self.inner.image_updates.lock().map(|g| g.clone()).unwrap_or_default()
     }
 
     /// The current image-update status for one service, if checked.
     pub fn image_update(&self, service: &str) -> Option<crate::updates::ImageUpdate> {
-        self.inner.image_updates.lock().ok().and_then(|g| g.get(service).cloned())
+        self.inner
+            .image_updates
+            .lock()
+            .ok()
+            .and_then(|g| g.get(service).cloned())
     }
 
     /// Stores a processed media blob for sharing and returns its short id.

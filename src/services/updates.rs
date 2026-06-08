@@ -173,11 +173,7 @@ fn parse_www_authenticate(header: &str) -> HashMap<String, String> {
 /// Fetches a bearer token for a registry challenge. The realm + service come
 /// from the challenge; the scope falls back to a read-only repository scope if
 /// the registry didn't specify one.
-async fn fetch_token(
-    client: &reqwest::Client,
-    challenge: &str,
-    image: &ImageRef,
-) -> anyhow::Result<String> {
+async fn fetch_token(client: &reqwest::Client, challenge: &str, image: &ImageRef) -> anyhow::Result<String> {
     let params = parse_www_authenticate(challenge);
     let realm = params.get("realm").context("auth challenge missing realm")?;
     let scope = params
@@ -454,8 +450,7 @@ mod tests {
 
     #[test]
     fn parses_www_authenticate_with_comma_in_scope() {
-        let challenge =
-            r#"Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull,push""#;
+        let challenge = r#"Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull,push""#;
         let map = parse_www_authenticate(challenge);
         assert_eq!(map.get("realm").unwrap(), "https://auth.docker.io/token");
         assert_eq!(map.get("service").unwrap(), "registry.docker.io");
