@@ -89,6 +89,7 @@ fn json_or_flash(headers: &HeaderMap, flasher: &Flasher, ok: bool, msg: &str, re
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .route("/percy", get(|| async { axum::response::Redirect::to("/percy/dashboard") }))
         .route("/percy/dashboard", get(guild_list))
         .route("/percy/dashboard/guild/:guild_id", get(guild_detail))
         .route("/percy/dashboard/guild/:guild_id/config", post(guild_config_update))
