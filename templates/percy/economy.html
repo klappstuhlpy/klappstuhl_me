@@ -135,8 +135,15 @@
             <input type="number" id="lottery_price" class="config-input" min="1" value="100" style="margin-bottom: 0.75rem;">
             <label class="config-label">Duration (minutes)</label>
             <input type="number" id="lottery_duration" class="config-input" min="5" max="43200" value="60" style="margin-bottom: 0.75rem;">
-            <label class="config-label">Announcement Channel ID</label>
-            <input type="text" id="lottery_channel" class="config-input" placeholder="Channel ID">
+            <label class="config-label">Announcement Channel</label>
+            <select id="lottery_channel" class="config-select">
+                <option value="">Select a channel…</option>
+                {% for ch in channels %}
+                {% if ch.channel_type == "text" || ch.channel_type == "news" %}
+                <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
         </div>
         <div class="modal-actions" style="margin-top: 1rem;">
             <button type="button" class="button small" id="lottery-modal-cancel">Cancel</button>

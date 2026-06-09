@@ -203,6 +203,7 @@ pub(crate) struct EconomyTemplate {
     pub(crate) guild_name: String,
     pub(crate) economy: EconomyInfo,
     pub(crate) balances: BalancesResponse,
+    pub(crate) channels: Vec<Channel>,
 }
 
 #[allow(dead_code)]

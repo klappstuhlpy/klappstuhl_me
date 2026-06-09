@@ -1169,6 +1169,7 @@ pub(super) async fn guild_economy(
         .get_economy_balances(guild_id, 25)
         .await
         .unwrap_or(BalancesResponse { entries: Vec::new() });
+    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
     EconomyTemplate {
         account: Some(account),
         flashes,
@@ -1176,6 +1177,7 @@ pub(super) async fn guild_economy(
         guild_name: guild.name,
         economy,
         balances,
+        channels,
     }
     .into_response()
 }
