@@ -2,11 +2,47 @@
 //
 // Each `.js-ts` element carries the raw value in its `datetime` attribute (or
 // its text content). The visible text becomes a relative phrase ("2 hours ago",
-// "in 3 days"); hovering swaps it for the full local date and back out again.
-// Invalid / placeholder values (e.g. "—") are left untouched. Idempotent — safe
-// to call again after injecting new DOM via `window.formatTimestamps(root)`.
+// "in 3 days"); hovering shows the full local date in a floating tooltip. The
+// tooltip is a fixed-position node on <body>, so it never reflows the table or
+// gets clipped by a scroll container. Invalid / placeholder values (e.g. "—")
+// are left untouched. Idempotent — safe to call again after injecting new DOM
+// via `window.formatTimestamps(root)`.
 (function () {
     "use strict";
+
+    var tip = null;
+
+    function tooltip() {
+        if (!tip) {
+            tip = document.createElement("div");
+            tip.className = "ts-tooltip";
+            tip.setAttribute("role", "tooltip");
+            document.body.appendChild(tip);
+        }
+        return tip;
+    }
+
+    function showTip(el) {
+        var t = tooltip();
+        t.textContent = el.dataset.abs || "";
+        t.style.display = "block";
+        var r = el.getBoundingClientRect();
+        var tr = t.getBoundingClientRect();
+        var left = r.left + (r.width - tr.width) / 2;
+        left = Math.max(6, Math.min(left, window.innerWidth - tr.width - 6));
+        var top = r.top - tr.height - 8;
+        if (top < 6) top = r.bottom + 8; // flip below when there's no room above
+        t.style.left = left + "px";
+        t.style.top = top + "px";
+        t.classList.add("visible");
+    }
+
+    function hideTip() {
+        if (tip) {
+            tip.classList.remove("visible");
+            tip.style.display = "none";
+        }
+    }
 
     var ABS_OPTS = {
         year: "numeric", month: "short", day: "numeric",
@@ -65,14 +101,13 @@
 
         el.setAttribute("datetime", raw);
         el.removeAttribute("title");
-        el.dataset.rel = relative;
         el.dataset.abs = absolute;
         el.textContent = relative;
         el.classList.add("ts-formatted");
 
-        // Hovering reveals the full date; leaving restores the relative phrase.
-        el.addEventListener("mouseenter", function () { el.textContent = absolute; });
-        el.addEventListener("mouseleave", function () { el.textContent = relative; });
+        // Hovering shows the full date in a floating tooltip (no layout shift).
+        el.addEventListener("mouseenter", function () { showTip(el); });
+        el.addEventListener("mouseleave", hideTip);
     }
 
     function run(root) {
