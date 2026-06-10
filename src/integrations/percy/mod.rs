@@ -889,11 +889,49 @@ impl PercyClient {
         Ok(resp.json().await?)
     }
 
+    /// Lock channels (apply lockdown overwrites).
+    pub async fn lock_channels(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/lockdowns/lock")))
+            .bearer_auth(&self.token)
+            .json(body)
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(())
+    }
+
     /// Unlock channels.
     pub async fn unlock_channels(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
         let resp = self
             .client
             .post(self.url(&format!("/api/internal/guilds/{guild_id}/lockdowns/unlock")))
+            .bearer_auth(&self.token)
+            .json(body)
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(())
+    }
+
+    /// Add or remove a moderation ignored entity (safe automod entity).
+    pub async fn manage_moderation_ignore(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/moderation/ignore")))
             .bearer_auth(&self.token)
             .json(body)
             .send()

@@ -191,5 +191,17 @@ pub fn routes() -> Router<AppState> {
             post(guild_command_toggle),
         )
         .route("/percy/dashboard/guild/:guild_id/plonks", post(guild_plonk_manage))
+        .route(
+            "/percy/dashboard/guild/:guild_id/lockdowns/lock",
+            post(guild_lockdown_lock),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/lockdowns/unlock",
+            post(guild_lockdown_unlock),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/moderation/ignore",
+            post(guild_moderation_ignore),
+        )
         .route("/percy/dashboard/guild/:guild_id/stats", get(guild_stats))
 }

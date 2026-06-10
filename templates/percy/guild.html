@@ -394,6 +394,74 @@
                 </div>
             </form>
         </section>
+
+        {# ─── Ignored Entities ───────────────────────────────────────── #}
+        <section class="config-section">
+            <h2>Ignored Entities</h2>
+            <p class="config-section-description">Roles, members, or channels that Moderation inspections (auto-bans, raid &amp; mention-spam) skip entirely. Members with Manage Server already bypass these.</p>
+
+            <div class="mod-ignore-add">
+                <select id="ignore-select" class="config-select">
+                    <option value="">Select a channel or role…</option>
+                    <optgroup label="Channels">
+                        {% for ch in channels %}<option value="{{ ch.id }}">#{{ ch.name }}</option>{% endfor %}
+                    </optgroup>
+                    <optgroup label="Roles">
+                        {% for r in roles %}<option value="{{ r.id }}">@{{ r.name }}</option>{% endfor %}
+                    </optgroup>
+                </select>
+                <input type="text" id="ignore-id-input" class="config-input" placeholder="…or paste a user ID" inputmode="numeric" autocomplete="off">
+                <button type="button" class="button primary small" id="ignore-add-btn">Add</button>
+            </div>
+
+            <div class="data-table-wrap" id="ignore-table-wrap" {% if guild.ignored_entities.is_empty() %}hidden{% endif %}>
+                <table class="data-table">
+                    <thead><tr><th>Name</th><th>Type</th><th class="col-actions">Actions</th></tr></thead>
+                    <tbody id="ignore-tbody">
+                        {% for ent in guild.ignored_entities %}
+                        <tr data-entity-id="{{ ent.id }}">
+                            <td><strong>{{ ent.name }}</strong></td>
+                            <td><span class="pill pending">{{ ent.entity_type }}</span></td>
+                            <td class="col-actions"><button type="button" class="button small danger ignore-remove-btn" data-entity-id="{{ ent.id }}">Remove</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted" id="ignore-empty" {% if !guild.ignored_entities.is_empty() %}hidden{% endif %}>No ignored entities configured.</p>
+        </section>
+
+        {# ─── Channel Lockdown ───────────────────────────────────────── #}
+        <section class="config-section">
+            <h2>Channel Lockdown</h2>
+            <p class="config-section-description">Lock channels so <code>@everyone</code> can no longer send messages, react, or use threads. The original permissions are restored on unlock.</p>
+
+            <div class="mod-lockdown-add">
+                <select id="lockdown-select" class="config-select" multiple size="6">
+                    {% for ch in channels %}
+                    {% if ch.channel_type == "text" || ch.channel_type == "voice" || ch.channel_type == "news" %}
+                    <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <button type="button" class="button primary small danger" id="lockdown-lock-btn">Lock selected</button>
+            </div>
+
+            <div class="data-table-wrap" id="lockdown-table-wrap" {% if lockdowns.entries.is_empty() %}hidden{% endif %}>
+                <table class="data-table">
+                    <thead><tr><th>Locked Channel</th><th class="col-actions">Actions</th></tr></thead>
+                    <tbody id="lockdown-tbody">
+                        {% for entry in lockdowns.entries %}
+                        <tr data-channel-id="{{ entry.channel_id }}">
+                            <td><strong>#{{ entry.channel_name }}</strong></td>
+                            <td class="col-actions"><button type="button" class="button small lockdown-unlock-btn" data-channel-id="{{ entry.channel_id }}">Unlock</button></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted" id="lockdown-empty" {% if !lockdowns.entries.is_empty() %}hidden{% endif %}>No channels are currently locked down.</p>
+        </section>
     </div>
 
     {# ═══════════════════════════════════════════════════════════════ #}
@@ -404,6 +472,30 @@
         <section class="config-section">
             <h2>Gatekeeper Settings</h2>
             <p class="config-section-description">Captcha-based verification system for new members joining the server.</p>
+
+            <div class="gk-info">
+                <p>Gatekeeper automatically assigns a role to a member when they join, for the sole purpose of
+                    blocking them from accessing the server. The user must press a button to verify themselves and
+                    have that role removed.</p>
+                <p class="gk-info-heading">To set up gatekeeper, a few things are required:</p>
+                <ul>
+                    <li>A <strong>channel</strong> that locked users will see but regular users will not.</li>
+                    <li>A <strong>role</strong> that is assigned when users join.</li>
+                    <li>A <strong>message</strong> that the bot sends in the channel with the verify button.</li>
+                </ul>
+                <p class="gk-info-heading">Optional settings:</p>
+                <ul>
+                    <li>A role that is assigned when users finish verification (<strong>Starter Role</strong>).</li>
+                </ul>
+                <p class="gk-info-heading">There are also settings to help configure some aspects of it:</p>
+                <ul>
+                    <li><strong>Auto (Rate Limit)</strong> automatically triggers the gatekeeper if N members join within a span of M seconds.</li>
+                    <li><strong>Bypass Action</strong> configures what action is taken when a user talks or joins voice before verifying.</li>
+                </ul>
+                <p class="gk-info-note">Note that once gatekeeper is enabled — even automatically — it must be manually disabled.</p>
+                <p class="gk-info-discord"><span class="gk-info-icon">&#9432;</span> Users verify by solving an image captcha consisting of 6 random letters they need to type into the chat.</p>
+            </div>
+
             {% match gatekeeper %}
             {% when Some with (gk) %}
             {% match gk.started_at %}
@@ -534,4 +626,83 @@
 </div>
 
 <script src="/static/js/percy/percy-dashboard.js"></script>
+<script>
+(function() {
+    var GUILD_ID = '{{ guild.id }}';
+    function toast(level, msg) { (window.showToast || function(){})(level, msg); }
+
+    async function postJSON(url, body) {
+        var resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        return resp.json();
+    }
+
+    // -- Ignored entities --
+    var ignoreAdd = document.getElementById('ignore-add-btn');
+    if (ignoreAdd) {
+        ignoreAdd.addEventListener('click', async function() {
+            var input = document.getElementById('ignore-id-input');
+            var sel = document.getElementById('ignore-select');
+            var id = (input.value.trim() || sel.value || '').trim();
+            if (!/^\d{15,20}$/.test(id)) { toast('error', 'Select an entity or paste a valid Discord ID.'); return; }
+            ignoreAdd.disabled = true;
+            try {
+                var data = await postJSON('/percy/dashboard/guild/' + GUILD_ID + '/moderation/ignore', { action: 'add', entity_id: id });
+                if (data.ok) { toast('success', 'Added to ignore list.'); setTimeout(function() { location.reload(); }, 400); }
+                else { toast('error', data.error || 'Failed.'); ignoreAdd.disabled = false; }
+            } catch (e) { toast('error', 'Network error'); ignoreAdd.disabled = false; }
+        });
+    }
+
+    function bindRemove(selector, url, rowSel, tbodyId, emptyId, wrapId, key) {
+        document.querySelectorAll(selector).forEach(function(btn) {
+            btn.addEventListener('click', async function() {
+                var id = btn.getAttribute('data-' + key);
+                btn.disabled = true;
+                var payload = {};
+                if (url.indexOf('/ignore') !== -1) { payload = { action: 'remove', entity_id: id }; }
+                else { payload = { channel_ids: [id] }; }
+                try {
+                    var data = await postJSON(url, payload);
+                    if (data.ok) {
+                        var row = document.querySelector(rowSel.replace('{id}', id));
+                        if (row) row.remove();
+                        var tbody = document.getElementById(tbodyId);
+                        if (tbody && tbody.children.length === 0) {
+                            var wrap = document.getElementById(wrapId); if (wrap) wrap.hidden = true;
+                            var empty = document.getElementById(emptyId); if (empty) empty.hidden = false;
+                        }
+                        toast('success', 'Done.');
+                    } else { toast('error', data.error || 'Failed.'); btn.disabled = false; }
+                } catch (e) { toast('error', 'Network error'); btn.disabled = false; }
+            });
+        });
+    }
+
+    bindRemove('.ignore-remove-btn', '/percy/dashboard/guild/' + GUILD_ID + '/moderation/ignore',
+        '#ignore-tbody tr[data-entity-id="{id}"]', 'ignore-tbody', 'ignore-empty', 'ignore-table-wrap', 'entity-id');
+    bindRemove('.lockdown-unlock-btn', '/percy/dashboard/guild/' + GUILD_ID + '/lockdowns/unlock',
+        '#lockdown-tbody tr[data-channel-id="{id}"]', 'lockdown-tbody', 'lockdown-empty', 'lockdown-table-wrap', 'channel-id');
+
+    // -- Lockdown (lock selected) --
+    var lockBtn = document.getElementById('lockdown-lock-btn');
+    if (lockBtn) {
+        lockBtn.addEventListener('click', async function() {
+            var sel = document.getElementById('lockdown-select');
+            var ids = Array.prototype.map.call(sel.selectedOptions, function(o) { return o.value; });
+            if (!ids.length) { toast('error', 'Select at least one channel.'); return; }
+            if (!confirm('Lock ' + ids.length + ' channel(s)? @everyone will not be able to send messages.')) return;
+            lockBtn.disabled = true;
+            try {
+                var data = await postJSON('/percy/dashboard/guild/' + GUILD_ID + '/lockdowns/lock', { channel_ids: ids });
+                if (data.ok) { toast('success', 'Channels locked.'); setTimeout(function() { location.reload(); }, 400); }
+                else { toast('error', data.error || 'Failed.'); lockBtn.disabled = false; }
+            } catch (e) { toast('error', 'Network error'); lockBtn.disabled = false; }
+        });
+    }
+})();
+</script>
 {% endblock %}

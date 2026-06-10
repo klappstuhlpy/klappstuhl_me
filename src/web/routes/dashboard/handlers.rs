@@ -784,6 +784,72 @@ pub(super) async fn guild_plonk_manage(
     }
 }
 
+pub(super) async fn guild_lockdown_lock(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.lock_channels(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_lockdown_unlock(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.unlock_channels(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_moderation_ignore(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.manage_moderation_ignore(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
 pub(super) async fn guild_stats(
     State(state): State<AppState>,
     account: Account,

@@ -45,6 +45,8 @@ pub struct GuildInfo {
     pub poll_ping_role: Option<RoleRef>,
     pub poll_reason_channel: Option<ChannelRef>,
     pub mention_count: Option<u32>,
+    #[serde(default)]
+    pub ignored_entities: Vec<IgnoredEntity>,
     pub mute_role: Option<RoleRef>,
     pub alert_channel: Option<ChannelRef>,
     pub music_panel_channel: Option<ChannelRef>,
@@ -52,6 +54,14 @@ pub struct GuildInfo {
     pub prefixes: Vec<String>,
     #[serde(default)]
     pub is_new_config: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct IgnoredEntity {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub entity_type: String,
+    pub name: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
