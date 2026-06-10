@@ -1206,6 +1206,7 @@ pub(super) async fn guild_comics(
         .await
         .unwrap_or(ComicsResponse { feeds: Vec::new() });
     let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
+    let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
     ComicsTemplate {
         account: Some(account),
         flashes,
@@ -1213,6 +1214,7 @@ pub(super) async fn guild_comics(
         guild_name: guild.name,
         data,
         channels,
+        roles,
     }
     .into_response()
 }

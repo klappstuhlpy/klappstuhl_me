@@ -24,6 +24,15 @@
     border-radius: 50%;
     background: currentColor;
 }
+.config-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+.config-section-head h2 { margin-bottom: 0.25rem; }
+.config-section-head .button { flex-shrink: 0; white-space: nowrap; }
 .command-card {
     cursor: pointer;
 }
@@ -164,11 +173,15 @@
     </div>
 
     {# ─── Plonks (Ignored) ────────────────────────────────────────── #}
-    {% if !commands.plonks.is_empty() %}
     <section class="config-section">
-        <h2>Plonked Entities</h2>
-        <p class="config-section-description">Members and channels completely ignored by the bot.</p>
-        <div class="data-table-wrap">
+        <div class="config-section-head">
+            <div>
+                <h2>Plonked Entities</h2>
+                <p class="config-section-description">Members and channels completely ignored by the bot — a plonked user cannot run any command. Users with <strong>Manage Server</strong> always bypass this.</p>
+            </div>
+            <button class="button small" id="add-plonk-btn">Plonk a user</button>
+        </div>
+        <div class="data-table-wrap" id="plonks-table-wrap" {% if commands.plonks.is_empty() %}hidden{% endif %}>
             <table class="data-table">
                 <thead>
                     <tr>
@@ -177,7 +190,7 @@
                         <th class="col-actions">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="plonks-tbody">
                     {% for plonk in commands.plonks %}
                     <tr data-entity-id="{{ plonk.entity_id }}">
                         <td><strong>{{ plonk.name }}</strong></td>
@@ -190,8 +203,8 @@
                 </tbody>
             </table>
         </div>
+        <p class="text-muted" id="plonks-empty" {% if !commands.plonks.is_empty() %}hidden{% endif %}>No plonked entities. Click "Plonk a user" to block someone.</p>
     </section>
-    {% endif %}
 
     {# ─── Command List ────────────────────────────────────────────── #}
     <section class="config-section">
@@ -236,9 +249,9 @@
                 <span class="config-description" style="margin-bottom:0.75rem;">Choose how this command is available in your server.</span>
 
                 <div class="cmd-mode-select">
-                    <button type="button" class="cmd-mode-btn" data-mode="enabled" onclick="setMode('enabled')">Enabled</button>
-                    <button type="button" class="cmd-mode-btn" data-mode="partial" onclick="setMode('partial')">Per-Channel</button>
-                    <button type="button" class="cmd-mode-btn" data-mode="disabled" onclick="setMode('disabled')">Disabled</button>
+                    <button type="button" class="cmd-mode-btn" data-mode="enabled">Enabled</button>
+                    <button type="button" class="cmd-mode-btn" data-mode="partial">Per-Channel</button>
+                    <button type="button" class="cmd-mode-btn" data-mode="disabled">Disabled</button>
                 </div>
 
                 <div id="channel-select-wrap" hidden>
@@ -256,8 +269,22 @@
             </div>
 
             <div class="modal-actions">
-                <button class="button small" onclick="closeCommandEdit()">Cancel</button>
+                <button type="button" class="button small" id="cmd-cancel-btn">Cancel</button>
                 <button class="button primary small" id="cmd-save-btn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    {# ─── Add Plonk Modal ─────────────────────────────────────────── #}
+    <div class="modal-overlay" id="plonk-modal" hidden>
+        <div class="modal-card" style="max-width:440px;">
+            <h3>Plonk a user or channel</h3>
+            <p class="text-muted" style="margin-bottom:1rem;">Enter a Discord <strong>user ID</strong> (or channel ID) to block it from using the bot entirely. Right-click a user in Discord with Developer Mode on to copy their ID.</p>
+            <label class="config-label" for="plonk-id-input">User / Channel ID</label>
+            <input type="text" id="plonk-id-input" class="config-input" placeholder="e.g. 123456789012345678" inputmode="numeric" autocomplete="off">
+            <div class="modal-actions" style="margin-top:1rem;">
+                <button type="button" class="button small" id="plonk-cancel-btn">Cancel</button>
+                <button type="button" class="button primary small" id="plonk-add-btn">Plonk</button>
             </div>
         </div>
     </div>
@@ -390,9 +417,46 @@
         }
     });
 
-    // Close modal on overlay click
+    // Cancel button + overlay click close the edit modal.
+    document.getElementById('cmd-cancel-btn').addEventListener('click', closeCommandEdit);
     document.getElementById('cmd-edit-modal').addEventListener('click', function(e) {
         if (e.target === e.currentTarget) closeCommandEdit();
+    });
+
+    // -- Add Plonk modal --
+    var plonkModal = document.getElementById('plonk-modal');
+    var plonkInput = document.getElementById('plonk-id-input');
+    function openPlonkModal() { plonkInput.value = ''; plonkModal.hidden = false; plonkInput.focus(); }
+    function closePlonkModal() { plonkModal.hidden = true; }
+
+    document.getElementById('add-plonk-btn').addEventListener('click', openPlonkModal);
+    document.getElementById('plonk-cancel-btn').addEventListener('click', closePlonkModal);
+    plonkModal.addEventListener('click', function(e) { if (e.target === e.currentTarget) closePlonkModal(); });
+
+    document.getElementById('plonk-add-btn').addEventListener('click', async function() {
+        var id = plonkInput.value.trim();
+        if (!/^\d{15,20}$/.test(id)) { showToast('error', 'Enter a valid Discord ID (15-20 digits).'); return; }
+        var btn = this;
+        btn.disabled = true;
+        try {
+            var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/plonks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ action: 'add', entity_id: id }),
+            });
+            var data = await resp.json();
+            if (data.ok) {
+                showToast('success', 'Entity plonked.');
+                closePlonkModal();
+                setTimeout(function() { location.reload(); }, 400);
+            } else {
+                showToast('error', data.error || 'Failed to plonk.');
+            }
+        } catch(err) {
+            showToast('error', 'Network error');
+        } finally {
+            btn.disabled = false;
+        }
     });
 
     // Search filter

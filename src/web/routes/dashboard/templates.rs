@@ -216,6 +216,7 @@ pub(crate) struct ComicsTemplate {
     pub(crate) guild_name: String,
     pub(crate) data: ComicsResponse,
     pub(crate) channels: Vec<Channel>,
+    pub(crate) roles: Vec<Role>,
 }
 
 #[allow(dead_code)]

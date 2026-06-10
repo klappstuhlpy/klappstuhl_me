@@ -52,17 +52,19 @@
     {% else %}
     <div class="comic-feeds-grid">
         {% for feed in data.feeds %}
-        <div class="comic-feed-card">
-            <div class="comic-feed-card-header">
-                <span class="comic-feed-brand">{{ feed.brand }}</span>
-                <span class="badge badge-muted">{{ feed.format }}</span>
+        <div class="comic-feed-card brand-{{ feed.brand|lower }}">
+            <div class="comic-feed-banner">
+                <img class="comic-feed-logo" loading="lazy"
+                     src="{% if feed.brand == "MARVEL" %}https://klappstuhl.me/gallery/raw/HTBFL.png{% else if feed.brand == "DC" %}https://klappstuhl.me/gallery/raw/VmiCY.png{% else %}https://klappstuhl.me/gallery/raw/nsTxu.png{% endif %}"
+                     alt="{{ feed.brand }} logo">
+                <span class="comic-feed-format-badge">{{ feed.format }}</span>
             </div>
             <div class="comic-feed-card-body">
-                <div class="comic-feed-row"><span class="comic-feed-label">Channel</span><code>{{ feed.channel_id }}</code></div>
-                <div class="comic-feed-row"><span class="comic-feed-label">Day</span><span>{% if feed.day == 1 %}Monday{% else if feed.day == 2 %}Tuesday{% else if feed.day == 3 %}Wednesday{% else if feed.day == 4 %}Thursday{% else if feed.day == 5 %}Friday{% else if feed.day == 6 %}Saturday{% else %}Sunday{% endif %}</span></div>
-                <div class="comic-feed-row"><span class="comic-feed-label">Pin</span><span>{% if feed.pin %}Yes{% else %}No{% endif %}</span></div>
-                {% match feed.ping %}{% when Some with (role) %}<div class="comic-feed-row"><span class="comic-feed-label">Ping Role</span><code>{{ role }}</code></div>{% when None %}{% endmatch %}
-                {% match feed.next_pull %}{% when Some with (next) %}<div class="comic-feed-row"><span class="comic-feed-label">Next Pull</span><span>{{ next }}</span></div>{% when None %}{% endmatch %}
+                <div class="comic-feed-row"><span class="comic-feed-label">Channel</span><span class="comic-feed-value">{% for ch in channels %}{% if ch.id == feed.channel_id %}#{{ ch.name }}{% endif %}{% endfor %}</span></div>
+                <div class="comic-feed-row"><span class="comic-feed-label">Day</span><span class="comic-feed-value">{% if feed.day == 1 %}Monday{% else if feed.day == 2 %}Tuesday{% else if feed.day == 3 %}Wednesday{% else if feed.day == 4 %}Thursday{% else if feed.day == 5 %}Friday{% else if feed.day == 6 %}Saturday{% else %}Sunday{% endif %}</span></div>
+                <div class="comic-feed-row"><span class="comic-feed-label">Pin</span><span class="comic-feed-value">{% if feed.pin %}Yes{% else %}No{% endif %}</span></div>
+                {% match feed.ping %}{% when Some with (role) %}<div class="comic-feed-row"><span class="comic-feed-label">Ping</span><span class="comic-feed-value">{% for r in roles %}{% if r.id == role.as_str() %}@{{ r.name }}{% endif %}{% endfor %}</span></div>{% when None %}{% endmatch %}
+                {% match feed.next_pull %}{% when Some with (next) %}<div class="comic-feed-row"><span class="comic-feed-label">Next Pull</span><span class="comic-feed-value">{{ next }}</span></div>{% when None %}{% endmatch %}
             </div>
             <div class="comic-feed-card-actions">
                 <button class="button small edit-feed-btn" data-brand="{{ feed.brand }}" data-channel="{{ feed.channel_id }}" data-format="{{ feed.format }}" data-day="{{ feed.day }}" data-ping="{{ feed.ping.as_deref().unwrap_or("") }}" data-pin="{{ feed.pin }}">Edit</button>
@@ -82,9 +84,9 @@
         <div style="margin-top: 1rem;">
             <label class="config-label" for="feed_brand">Brand</label>
             <select id="feed_brand" class="config-select" style="margin-bottom: 0.75rem;">
-                <option value="Marvel">Marvel</option>
+                <option value="MARVEL">Marvel</option>
                 <option value="DC">DC</option>
-                <option value="Manga">Manga</option>
+                <option value="MANGA">Manga</option>
             </select>
             <label class="config-label" for="feed_channel">Channel</label>
             <select id="feed_channel" class="config-select" style="margin-bottom: 0.75rem;">
@@ -109,7 +111,12 @@
                 <option value="7">7 (Sunday)</option>
             </select>
             <label class="config-label" for="feed_ping">Ping Role (optional)</label>
-            <input type="text" id="feed_ping" class="config-input" placeholder="Role ID or name" style="margin-bottom: 0.75rem;">
+            <select id="feed_ping" class="config-select" style="margin-bottom: 0.75rem;">
+                <option value="">No ping</option>
+                {% for r in roles %}
+                <option value="{{ r.id }}">@{{ r.name }}</option>
+                {% endfor %}
+            </select>
             <label class="config-toggle" style="margin-bottom: 0;">
                 <div>
                     <span class="config-label">Pin Messages</span>
@@ -129,6 +136,17 @@
     const guildId = '{{ guild_id }}';
     const baseUrl = `/percy/dashboard/guild/${guildId}/comics`;
     let editingBrand = null;
+    let original = null; // snapshot of the feed being edited, for change detection
+
+    // Select an <option> by value, case-insensitively (feed.format may come back
+    // as "SUMMARY" while the options are "Summary"); falls back to the first option.
+    function setSelectValue(sel, val) {
+        val = (val == null ? '' : String(val)).toLowerCase();
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value.toLowerCase() === val) { sel.selectedIndex = i; return; }
+        }
+        sel.selectedIndex = 0;
+    }
 
     function showToast(level, message) {
         const toast = document.createElement('div');
@@ -156,6 +174,7 @@
     function closeModal() {
         modal.hidden = true;
         editingBrand = null;
+        original = null;
         document.getElementById('feed_brand').disabled = false;
         document.getElementById('feed_brand').value = 'Marvel';
         document.getElementById('feed_channel').value = '';
@@ -177,23 +196,31 @@
         const ping = document.getElementById('feed_ping').value.trim() || null;
         const pin = document.getElementById('feed_pin').checked;
 
-        if (!channel_id) { showToast('error', 'Channel ID is required.'); return; }
-
-        const body = { brand, channel_id, format, day, ping, pin };
+        if (!channel_id) { showToast('error', 'Channel is required.'); return; }
 
         try {
             let resp;
             if (editingBrand) {
+                // Only send the fields that actually changed from the current config.
+                const patch = {};
+                if (channel_id !== original.channel_id) patch.channel_id = channel_id;
+                if (format.toLowerCase() !== (original.format || '').toLowerCase()) patch.format = format;
+                if (day !== parseInt(original.day || '0')) patch.day = day;
+                if ((ping || '') !== (original.ping || '')) patch.ping = ping;
+                if (pin !== (original.pin === 'true')) patch.pin = pin;
+
+                if (Object.keys(patch).length === 0) { showToast('info', 'No changes to save.'); return; }
+
                 resp = await fetch(`${baseUrl}/${encodeURIComponent(editingBrand)}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify(body),
+                    body: JSON.stringify(patch),
                 });
             } else {
                 resp = await fetch(baseUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                    body: JSON.stringify(body),
+                    body: JSON.stringify({ brand, channel_id, format, day, ping, pin }),
                 });
             }
             const data = await resp.json();
@@ -209,11 +236,19 @@
     // Edit buttons
     document.querySelectorAll('.edit-feed-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+            // Keep the raw current values so we can diff on save.
+            original = {
+                channel_id: btn.dataset.channel,
+                format: btn.dataset.format,
+                day: btn.dataset.day,
+                ping: btn.dataset.ping,
+                pin: btn.dataset.pin,
+            };
             document.getElementById('feed_brand').value = btn.dataset.brand;
-            document.getElementById('feed_channel').value = btn.dataset.channel;
-            document.getElementById('feed_format').value = btn.dataset.format;
-            document.getElementById('feed_day').value = btn.dataset.day;
-            document.getElementById('feed_ping').value = btn.dataset.ping;
+            setSelectValue(document.getElementById('feed_channel'), btn.dataset.channel);
+            setSelectValue(document.getElementById('feed_format'), btn.dataset.format);
+            setSelectValue(document.getElementById('feed_day'), btn.dataset.day);
+            setSelectValue(document.getElementById('feed_ping'), btn.dataset.ping);
             document.getElementById('feed_pin').checked = btn.dataset.pin === 'true';
             openModal(btn.dataset.brand);
         });
