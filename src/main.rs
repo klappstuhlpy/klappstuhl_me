@@ -150,6 +150,12 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // none do).
     klappstuhl_me::cron::spawn_scheduler(state.clone());
 
+    // Percy bot stats poller → "percy" WS topic (no-op without Percy config).
+    klappstuhl_me::percy_stats::spawn_poller(state.clone());
+
+    // Percy moderation events poller → "moderation" WS topic.
+    klappstuhl_me::percy_moderation::spawn_poller(state.clone());
+
     // Reap expired image uploads (TTL) hourly.
     klappstuhl_me::routes::spawn_expiry_reaper(state.clone());
 

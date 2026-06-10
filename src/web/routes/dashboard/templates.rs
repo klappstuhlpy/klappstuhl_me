@@ -90,6 +90,19 @@ pub(crate) struct LevelingTemplate {
     pub(crate) blacklisted_channels: Vec<BlacklistRow>,
     pub(crate) blacklisted_users: Vec<BlacklistRow>,
     pub(crate) special_messages: Vec<SpecialMsgRow>,
+    /// Pre-serialized JSON array of `{day,total_xp,gainers}` for the uPlot chart.
+    pub(crate) xp_history_json: String,
+}
+
+#[allow(dead_code)]
+#[derive(Template)]
+#[template(path = "percy/user.html")]
+pub(crate) struct UserLookupTemplate {
+    pub(crate) account: Option<Account>,
+    pub(crate) flashes: Flashes,
+    pub(crate) guild_id: u64,
+    pub(crate) guild_name: String,
+    pub(crate) member: MemberDetail,
 }
 
 /// A resolved level-reward row (role granted at a level threshold).
@@ -251,4 +264,19 @@ pub(crate) struct EmojiStatsTemplate {
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
     pub(crate) data: EmojiStatsResponse,
+}
+
+#[allow(dead_code)]
+#[derive(Template)]
+#[template(path = "percy/audit-log.html")]
+pub(crate) struct AuditLogTemplate {
+    pub(crate) account: Option<Account>,
+    pub(crate) flashes: Flashes,
+    pub(crate) guild_id: u64,
+    pub(crate) guild_name: String,
+    pub(crate) cases: CasesResponse,
+    pub(crate) filter_action: String,
+    pub(crate) filter_moderator: String,
+    pub(crate) filter_after: String,
+    pub(crate) filter_before: String,
 }

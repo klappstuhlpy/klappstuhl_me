@@ -135,39 +135,72 @@
     {# ─── Bot Stats ───────────────────────────────────────────────── #}
     <section class="config-section">
         <h2>Bot Stats</h2>
-        <p class="config-section-description">Global bot statistics across all servers.</p>
-        <div class="metric-tiles">
+        <p class="config-section-description">Global bot statistics across all servers. Updates live via WebSocket.</p>
+        <div class="metric-tiles" id="bot-stats-tiles">
             <div class="metric-tile">
                 <span class="tile-label">Servers</span>
-                <span class="tile-value">{{ bot_stats.guild_count }}</span>
+                <span class="tile-value" data-key="guild_count">{{ bot_stats.guild_count }}</span>
             </div>
             <div class="metric-tile">
                 <span class="tile-label">Users</span>
-                <span class="tile-value">{{ bot_stats.user_count }}</span>
+                <span class="tile-value" data-key="user_count">{{ bot_stats.user_count }}</span>
                 <span class="tile-sub">Across all servers</span>
             </div>
             <div class="metric-tile">
                 <span class="tile-label">Commands</span>
-                <span class="tile-value">{{ bot_stats.command_count }}</span>
+                <span class="tile-value" data-key="command_count">{{ bot_stats.command_count }}</span>
                 <span class="tile-sub">Available commands</span>
             </div>
             <div class="metric-tile">
                 <span class="tile-label">Total Used</span>
-                <span class="tile-value">{{ bot_stats.total_commands_used }}</span>
+                <span class="tile-value" data-key="total_commands_used">{{ bot_stats.total_commands_used }}</span>
                 <span class="tile-sub">All-time invocations</span>
             </div>
             <div class="metric-tile">
                 <span class="tile-label">Latency</span>
-                <span class="tile-value">{{ bot_stats.latency_ms }}ms</span>
+                <span class="tile-value" data-key="latency_ms">{{ bot_stats.latency_ms }}ms</span>
                 <span class="tile-sub">Gateway ping</span>
             </div>
             <div class="metric-tile">
                 <span class="tile-label">Modules</span>
-                <span class="tile-value">{{ bot_stats.cog_count }}</span>
+                <span class="tile-value" data-key="cog_count">{{ bot_stats.cog_count }}</span>
                 <span class="tile-sub">Loaded cogs</span>
             </div>
         </div>
     </section>
 </div>
 
+<script>
+(function percyLiveStats() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+    ws.addEventListener('open', () => {
+        ws.send(JSON.stringify({ action: 'subscribe', topics: ['percy'] }));
+    });
+
+    ws.addEventListener('message', (e) => {
+        let msg;
+        try { msg = JSON.parse(e.data); } catch { return; }
+        if (msg.topic !== 'percy' || !msg.data) return;
+
+        const tiles = document.getElementById('bot-stats-tiles');
+        if (!tiles) return;
+
+        for (const [key, value] of Object.entries(msg.data)) {
+            const el = tiles.querySelector(`[data-key="${key}"]`);
+            if (!el) continue;
+            if (key === 'latency_ms') {
+                el.textContent = Math.round(value) + 'ms';
+            } else {
+                el.textContent = typeof value === 'number' ? value.toLocaleString() : value;
+            }
+        }
+    });
+
+    ws.addEventListener('close', () => {
+        setTimeout(percyLiveStats, 5000);
+    });
+})();
+</script>
 {% endblock %}

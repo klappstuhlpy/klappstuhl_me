@@ -429,6 +429,10 @@ pub(super) async fn guild_leveling(
             total: 0,
         });
 
+    // Daily cumulative-XP snapshots for the chart; serialize for the inline uPlot script.
+    let xp_history = percy.get_leveling_xp_history(guild_id, 30).await.unwrap_or_default();
+    let xp_history_json = serde_json::to_string(&xp_history.points).unwrap_or_else(|_| "[]".to_string());
+
     let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
     let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
 
@@ -550,8 +554,70 @@ pub(super) async fn guild_leveling(
         blacklisted_channels,
         blacklisted_users,
         special_messages,
+        xp_history_json,
     }
     .into_response()
+}
+
+/// Aggregated profile page for a single user: identity, leveling, moderation
+/// history (warnings/cases), and note count.
+pub(super) async fn guild_user_lookup(
+    State(state): State<AppState>,
+    account: Account,
+    flashes: Flashes,
+    Path((guild_id, user_id)): Path<(u64, String)>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Redirect::to("/percy/dashboard").into_response();
+    }
+
+    let guild = match percy.get_guild(guild_id).await {
+        Ok(g) => g,
+        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+    };
+
+    let member = match percy.get_member_detail(guild_id, &user_id).await {
+        Ok(m) => m,
+        Err(_) => {
+            return Redirect::to(&format!("/percy/dashboard/guild/{guild_id}/members")).into_response();
+        }
+    };
+
+    UserLookupTemplate {
+        account: Some(account),
+        flashes,
+        guild_id,
+        guild_name: guild.name,
+        member,
+    }
+    .into_response()
+}
+
+pub(super) async fn guild_member_avatars(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, user_id)): Path<(u64, String)>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "percy unavailable"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "unauthorized"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "forbidden"})).into_response();
+    }
+
+    match percy.get_member_avatars(guild_id, &user_id, 20).await {
+        Ok(data) => Json(serde_json::json!(data)).into_response(),
+        Err(_) => Json(serde_json::json!({"avatars": [], "total": 0})).into_response(),
+    }
 }
 
 pub(super) async fn guild_polls(
@@ -1679,5 +1745,255 @@ pub(super) async fn guild_highlight_delete(
     match percy.delete_highlight(guild_id, &user_id).await {
         Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+// -- Phase 5: Audit log, bulk actions, activity, export, notifications --------
+
+#[derive(Deserialize)]
+pub(super) struct CasesQuery {
+    #[serde(default)]
+    action: String,
+    #[serde(default)]
+    moderator_id: String,
+    #[serde(default)]
+    after: String,
+    #[serde(default)]
+    before: String,
+    #[serde(default = "default_cases_limit")]
+    limit: u32,
+    #[serde(default)]
+    offset: u32,
+}
+
+fn default_cases_limit() -> u32 {
+    50
+}
+
+pub(super) async fn guild_audit_log(
+    State(state): State<AppState>,
+    account: Account,
+    flashes: Flashes,
+    Path(guild_id): Path<u64>,
+    Query(q): Query<CasesQuery>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Redirect::to("/percy/dashboard").into_response();
+    }
+
+    let guild = match percy.get_guild(guild_id).await {
+        Ok(g) => g,
+        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+    };
+
+    let action = if q.action.is_empty() { None } else { Some(q.action.as_str()) };
+    let moderator_id = if q.moderator_id.is_empty() { None } else { Some(q.moderator_id.as_str()) };
+    let after = if q.after.is_empty() { None } else { Some(q.after.as_str()) };
+    let before = if q.before.is_empty() { None } else { Some(q.before.as_str()) };
+
+    let cases = percy
+        .get_cases(guild_id, q.limit, q.offset, action, moderator_id, None, after, before)
+        .await
+        .unwrap_or(CasesResponse { cases: Vec::new(), total: 0 });
+
+    AuditLogTemplate {
+        account: Some(account),
+        flashes,
+        guild_id,
+        guild_name: guild.name,
+        cases,
+        filter_action: q.action,
+        filter_moderator: q.moderator_id,
+        filter_after: q.after,
+        filter_before: q.before,
+    }
+    .into_response()
+}
+
+pub(super) async fn guild_audit_log_json(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Query(q): Query<CasesQuery>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    let action = if q.action.is_empty() { None } else { Some(q.action.as_str()) };
+    let moderator_id = if q.moderator_id.is_empty() { None } else { Some(q.moderator_id.as_str()) };
+    let after = if q.after.is_empty() { None } else { Some(q.after.as_str()) };
+    let before = if q.before.is_empty() { None } else { Some(q.before.as_str()) };
+
+    match percy.get_cases(guild_id, q.limit, q.offset, action, moderator_id, None, after, before).await {
+        Ok(data) => Json(serde_json::json!(data)).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_bulk_action(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.bulk_member_action(guild_id, &body).await {
+        Ok(resp) => Json(serde_json::json!(resp)).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_member_activity(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, user_id)): Path<(u64, String)>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.get_member_activity(guild_id, &user_id, 365).await {
+        Ok(data) => Json(serde_json::json!(data)).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_export_leaderboard(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Redirect::to("/percy/dashboard").into_response();
+    }
+
+    let leaderboard = percy.get_leveling_leaderboard(guild_id, 500).await.unwrap_or(LeaderboardResponse {
+        entries: Vec::new(),
+        total: 0,
+    });
+
+    let mut csv = String::from("Rank,Username,Level,XP,Total XP\n");
+    for (i, entry) in leaderboard.entries.iter().enumerate() {
+        csv.push_str(&format!(
+            "{},{},{},{},{}\n",
+            i + 1,
+            entry.username.replace(',', " "),
+            entry.level,
+            entry.xp,
+            entry.total_xp,
+        ));
+    }
+
+    (
+        [
+            ("Content-Type", "text/csv; charset=utf-8"),
+            ("Content-Disposition", "attachment; filename=\"leaderboard.csv\""),
+        ],
+        csv,
+    )
+        .into_response()
+}
+
+pub(super) async fn guild_export_cases(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Redirect::to("/percy/dashboard").into_response();
+    }
+
+    let cases = percy
+        .get_cases(guild_id, 100, 0, None, None, None, None, None)
+        .await
+        .unwrap_or(CasesResponse { cases: Vec::new(), total: 0 });
+
+    let mut csv = String::from("Case #,Action,Target,Moderator,Reason,Date\n");
+    for case in &cases.cases {
+        csv.push_str(&format!(
+            "{},{},{},{},{},{}\n",
+            case.case_index,
+            case.action,
+            case.target_name.replace(',', " "),
+            case.moderator_name.as_deref().unwrap_or("Unknown").replace(',', " "),
+            case.reason.as_deref().unwrap_or("").replace(',', " ").replace('\n', " "),
+            case.created_at.as_deref().unwrap_or(""),
+        ));
+    }
+
+    (
+        [
+            ("Content-Type", "text/csv; charset=utf-8"),
+            ("Content-Disposition", "attachment; filename=\"moderation_history.csv\""),
+        ],
+        csv,
+    )
+        .into_response()
+}
+
+pub(super) async fn guild_cases_recent(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    let since = params.get("since").map(|s| s.as_str()).unwrap_or("");
+    if since.is_empty() {
+        return Json(serde_json::json!({"error": "since parameter required"})).into_response();
+    }
+
+    match percy.get_recent_cases(guild_id, since).await {
+        Ok(data) => Json(serde_json::json!(data)).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
     }
 }

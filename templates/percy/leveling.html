@@ -4,6 +4,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.min.css">
 {% endblock %}
 
 {% block body %}
@@ -358,6 +359,15 @@
         </div>
     </section>
 
+    {# ─── XP over time ────────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>XP Over Time</h2>
+        <p class="config-section-description">Daily XP earned across the server, from a snapshot taken once a day. The chart fills in as more days are recorded.</p>
+        <div id="xp-chart" class="xp-chart" data-points='{{ xp_history_json|safe }}'>
+            <div class="chart-message">Loading chart…</div>
+        </div>
+    </section>
+
     {# ─── Leaderboard ─────────────────────────────────────────────── #}
     <section class="config-section">
         <h2>Leaderboard</h2>
@@ -655,5 +665,62 @@ document.getElementById('level-save-btn').addEventListener('click', async () => 
         showToast('error', 'Network error');
     }
 });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.iife.min.js"></script>
+<script>
+// ─── XP-over-time chart ─────────────────────────────────────────────
+(function renderXpChart() {
+    const el = document.getElementById('xp-chart');
+    if (!el) return;
+
+    let points;
+    try {
+        points = JSON.parse(el.dataset.points || '[]');
+    } catch {
+        points = [];
+    }
+
+    const message = (msg) => { el.innerHTML = `<div class="chart-message">${msg}</div>`; };
+
+    if (!window.uPlot) { message('Chart library failed to load (CDN blocked?).'); return; }
+    if (points.length === 0) { message('No snapshots yet — the first lands within a day of enabling leveling.'); return; }
+    if (points.length < 2) { message('Only one day recorded so far — the trend appears after the next daily snapshot.'); return; }
+
+    // Daily XP gained = difference between consecutive cumulative-total snapshots.
+    const xs = points.map(p => Math.floor(Date.parse(p.day + 'T00:00:00Z') / 1000));
+    const gains = points.map((p, i) => i === 0 ? null : Math.max(0, p.total_xp - points[i - 1].total_xp));
+
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--branding').trim() || '#d97757';
+    const size = () => ({ width: Math.max(220, el.clientWidth - 4), height: 240 });
+
+    el.innerHTML = '';
+    const chart = new uPlot({
+        ...size(),
+        cursor: { drag: { setScale: false } },
+        legend: { live: true },
+        scales: { x: { time: true }, y: { auto: true } },
+        series: [
+            {},
+            {
+                label: 'XP gained',
+                stroke: accent,
+                width: 2,
+                fill: accent + '22',
+                points: { show: true, size: 4 },
+            },
+        ],
+        axes: [
+            { stroke: '#71717a' },
+            { stroke: '#71717a', grid: { stroke: 'rgba(127,127,127,0.15)' } },
+        ],
+    }, [xs, gains], el);
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => chart.setSize(size()), 150);
+    });
+})();
 </script>
 {% endblock %}

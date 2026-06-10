@@ -1,0 +1,436 @@
+{% extends "../layout.html" %}
+
+{% block title %}{{ member.display_name }} — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+<style>
+.activity-heatmap-container {
+    overflow-x: auto;
+    padding: 0.5rem 0;
+}
+.heatmap-grid {
+    display: flex;
+    gap: 2px;
+}
+.heatmap-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.heatmap-cell {
+    width: 11px;
+    height: 11px;
+    border-radius: 2px;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+}
+.heatmap-cell.l1 { background: #0e4429; border-color: #0e4429; }
+.heatmap-cell.l2 { background: #006d32; border-color: #006d32; }
+.heatmap-cell.l3 { background: #26a641; border-color: #26a641; }
+.heatmap-cell.l4 { background: #39d353; border-color: #39d353; }
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+.heatmap-legend .heatmap-cell { cursor: default; }
+.heatmap-months {
+    display: flex;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+    padding-left: 0;
+}
+.heatmap-months span {
+    flex: 1;
+    text-align: left;
+}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}/members" class="dashboard-back">&larr; Members</a>
+
+    {# ─── Profile Header ─────────────────────────────────────────── #}
+    <div class="user-profile-header">
+        <img class="user-profile-avatar" src="{{ member.avatar_url }}?size=128" alt="" width="80" height="80">
+        <div class="user-profile-info">
+            <h2>{{ member.display_name }}</h2>
+            <div class="user-username">{{ member.name }}</div>
+            <div class="user-meta">
+                <span>ID: {{ member.id }}</span>
+                <span>Created: <time class="js-ts" datetime="{{ member.created_at }}">{{ member.created_at }}</time></span>
+                {% match member.joined_at %}
+                {% when Some with (ts) %}
+                <span>Joined: <time class="js-ts" datetime="{{ ts }}">{{ ts }}</time></span>
+                {% when None %}
+                {% endmatch %}
+            </div>
+            <div class="user-profile-badges">
+                {% if member.bot %}
+                <span class="badge">BOT</span>
+                {% endif %}
+                {% if !member.in_guild %}
+                <span class="user-not-in-guild">Not in server</span>
+                {% endif %}
+                {% match member.status %}
+                {% when Some with (s) %}
+                <span class="badge badge-status badge-{{ s }}">{{ s }}</span>
+                {% when None %}
+                {% endmatch %}
+                {% for flag in member.public_flags %}
+                <span class="badge badge-flag">{{ flag }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {# ─── Guild Info ─────────────────────────────────────────────── #}
+    {% if member.in_guild %}
+    <section class="config-section">
+        <h2>Guild Info</h2>
+        <div class="user-stats-grid">
+            {% match member.join_position %}
+            {% when Some with (pos) %}
+            <div class="metric-tile">
+                <span class="tile-label">Join Position</span>
+                <span class="tile-value">#{{ pos }}<span class="tile-sub"> / {{ member.member_count }}</span></span>
+            </div>
+            {% when None %}
+            {% endmatch %}
+            {% match member.top_role %}
+            {% when Some with (role) %}
+            <div class="metric-tile">
+                <span class="tile-label">Top Role</span>
+                <span class="tile-value" style="color: {% if member.top_role_color != 0 %}{{ member.top_role_color_hex() }}{% else %}inherit{% endif %};">{{ role }}</span>
+            </div>
+            {% when None %}
+            {% endmatch %}
+            <div class="metric-tile">
+                <span class="tile-label">Mutual Servers</span>
+                <span class="tile-value">{{ member.mutual_guilds }}</span>
+            </div>
+            {% match member.boosting_since %}
+            {% when Some with (ts) %}
+            <div class="metric-tile">
+                <span class="tile-label">Boosting Since</span>
+                <span class="tile-value"><time class="js-ts" datetime="{{ ts }}">{{ ts }}</time></span>
+            </div>
+            {% when None %}
+            {% endmatch %}
+            {% if member.permissions != 0 %}
+            <div class="metric-tile">
+                <span class="tile-label">Permissions</span>
+                <span class="tile-value tile-value-small">{{ member.permissions }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    {# ─── Roles ──────────────────────────────────────────────────── #}
+    {% if !member.roles.is_empty() %}
+    <section class="config-section">
+        <h2>Roles</h2>
+        <div class="member-roles" style="max-height: none;">
+            {% for role in member.roles %}
+            <span class="role-chip" style="border-color: {{ role.color_hex() }}; color: {% if role.color != 0 %}{{ role.color_hex() }}{% else %}var(--foreground){% endif %};">{{ role.name }}</span>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {# ─── Leveling Stats ─────────────────────────────────────────── #}
+    {% match member.leveling %}
+    {% when Some with (lvl) %}
+    <section class="config-section">
+        <h2>Leveling</h2>
+        <div class="user-stats-grid">
+            <div class="metric-tile">
+                <span class="tile-label">Level</span>
+                <span class="tile-value">{{ lvl.level }}</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">XP</span>
+                <span class="tile-value">{{ lvl.xp }}</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Messages</span>
+                <span class="tile-value">{{ lvl.messages }}</span>
+            </div>
+            <div class="metric-tile">
+                <span class="tile-label">Rank</span>
+                <span class="tile-value">#{{ lvl.rank }}</span>
+            </div>
+        </div>
+    </section>
+    {% when None %}
+    {% endmatch %}
+
+    {# ─── Command Usage ──────────────────────────────────────────── #}
+    {% match member.command_stats %}
+    {% when Some with (stats) %}
+    {% if stats.total_commands > 0 %}
+    <section class="config-section">
+        <h2>Command Usage</h2>
+        <div class="user-stats-grid">
+            <div class="metric-tile">
+                <span class="tile-label">Total Commands</span>
+                <span class="tile-value">{{ stats.total_commands }}</span>
+            </div>
+            {% match stats.first_command_at %}
+            {% when Some with (ts) %}
+            <div class="metric-tile">
+                <span class="tile-label">First Used</span>
+                <span class="tile-value"><time class="js-ts" datetime="{{ ts }}">{{ ts }}</time></span>
+            </div>
+            {% when None %}
+            {% endmatch %}
+        </div>
+        {% if !stats.top_commands.is_empty() %}
+        <div class="user-top-commands">
+            <h3>Top Commands</h3>
+            <ul class="top-commands-list">
+                {% for cmd in stats.top_commands %}
+                <li>
+                    <span class="cmd-name">{{ cmd.command }}</span>
+                    <span class="cmd-uses">{{ cmd.uses }} uses</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+    {% when None %}
+    {% endmatch %}
+
+    {# ─── Activity ───────────────────────────────────────────────── #}
+    {% match member.last_seen %}
+    {% when Some with (ts) %}
+    <section class="config-section">
+        <h2>Activity</h2>
+        <div class="user-stats-grid">
+            <div class="metric-tile">
+                <span class="tile-label">Last Seen</span>
+                <span class="tile-value"><time class="js-ts" datetime="{{ ts }}">{{ ts }}</time></span>
+            </div>
+        </div>
+    </section>
+    {% when None %}
+    {% endmatch %}
+
+    {# ─── Activity Heatmap ───────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Activity Graph</h2>
+        <p class="config-section-description">Command usage over the past year (similar to a GitHub contribution graph).</p>
+        <div id="activity-heatmap" class="activity-heatmap-container">
+            <div class="avatar-grid-loading">Loading activity data&hellip;</div>
+        </div>
+    </section>
+
+    {# ─── Name History ───────────────────────────────────────────── #}
+    {% match member.names %}
+    {% when Some with (names) %}
+    {% if !names.usernames.is_empty() || !names.nicknames.is_empty() %}
+    <section class="config-section">
+        <h2>Name History</h2>
+        {% if !names.usernames.is_empty() %}
+        <div class="name-history-group">
+            <h3>Usernames</h3>
+            <ul class="name-history-list">
+                {% for entry in names.usernames %}
+                <li>
+                    <span class="name-value">{{ entry.name }}</span>
+                    <time class="js-ts name-date" datetime="{{ entry.changed_at }}">{{ entry.changed_at }}</time>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {% if !names.nicknames.is_empty() %}
+        <div class="name-history-group">
+            <h3>Nicknames</h3>
+            <ul class="name-history-list">
+                {% for entry in names.nicknames %}
+                <li>
+                    <span class="name-value">{{ entry.name }}</span>
+                    <time class="js-ts name-date" datetime="{{ entry.changed_at }}">{{ entry.changed_at }}</time>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+    {% when None %}
+    {% endmatch %}
+
+    {# ─── Avatar History ────────────────────────────────────────── #}
+    {% if member.avatar_count > 0 %}
+    <section class="config-section">
+        <h2>Avatar History <span class="section-count">({{ member.avatar_count }})</span></h2>
+        <div class="avatar-grid" id="avatar-grid">
+            <div class="avatar-grid-loading">Loading avatars&hellip;</div>
+        </div>
+    </section>
+    {% endif %}
+
+    {# ─── Moderation Summary ─────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Moderation</h2>
+        <p class="config-section-description">
+            {{ member.case_count }} case{% if member.case_count != 1 %}s{% endif %},
+            {{ member.warning_count }} warning{% if member.warning_count != 1 %}s{% endif %},
+            {{ member.note_count }} note{% if member.note_count != 1 %}s{% endif %}
+        </p>
+
+        {% if member.cases.is_empty() %}
+        <div class="empty-state">
+            <h3>Clean record</h3>
+            <p>No moderation cases on file for this member.</p>
+        </div>
+        {% else %}
+        <ul class="case-timeline">
+            {% for c in member.cases %}
+            <li class="case-entry">
+                <span class="case-index">#{{ c.case_index }}</span>
+                <div class="case-body">
+                    <span class="case-action {{ c.action }}">{{ c.action }}</span>
+                    {% match c.reason %}
+                    {% when Some with (r) %}
+                    <div class="case-reason">{{ r }}</div>
+                    {% when None %}
+                    <div class="case-reason"><em>No reason given</em></div>
+                    {% endmatch %}
+                    <div class="case-meta">
+                        {% match c.moderator_name %}
+                        {% when Some with (name) %}
+                        By {{ name }}
+                        {% when None %}
+                        {% endmatch %}
+                        {% match c.created_at %}
+                        {% when Some with (ts) %}
+                        &middot; <time class="js-ts" datetime="{{ ts }}">{{ ts }}</time>
+                        {% when None %}
+                        {% endmatch %}
+                    </div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </section>
+</div>
+
+{% if member.avatar_count > 0 %}
+<script>
+(function() {
+    const grid = document.getElementById('avatar-grid');
+    if (!grid) return;
+    fetch('/percy/dashboard/guild/{{ guild_id }}/members/{{ member.id }}/avatars')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.avatars || !data.avatars.length) {
+                grid.innerHTML = '<div class="empty-state"><p>No avatars stored.</p></div>';
+                return;
+            }
+            grid.innerHTML = data.avatars.map(a => {
+                const date = a.changed_at ? new Date(a.changed_at).toLocaleDateString() : '';
+                return `<div class="avatar-history-item">
+                    <img src="data:image/png;base64,${a.image}" alt="Avatar" loading="lazy">
+                    <span class="avatar-date">${date}</span>
+                </div>`;
+            }).join('');
+        })
+        .catch(() => {
+            grid.innerHTML = '<div class="empty-state"><p>Failed to load avatars.</p></div>';
+        });
+})();
+</script>
+{% endif %}
+
+<script>
+(function() {
+    const container = document.getElementById('activity-heatmap');
+    if (!container) return;
+
+    fetch('/percy/dashboard/guild/{{ guild_id }}/members/{{ member.id }}/activity')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.activity || data.error) {
+                container.innerHTML = '<div class="empty-state"><p>No activity data available.</p></div>';
+                return;
+            }
+
+            const activityMap = {};
+            let maxCount = 0;
+            data.activity.forEach(d => {
+                activityMap[d.day] = d.count;
+                if (d.count > maxCount) maxCount = d.count;
+            });
+
+            const today = new Date();
+            const startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - 364);
+            // Align to Sunday
+            startDate.setDate(startDate.getDate() - startDate.getDay());
+
+            function getLevel(count) {
+                if (count === 0) return '';
+                const q = maxCount / 4;
+                if (count <= q) return 'l1';
+                if (count <= q * 2) return 'l2';
+                if (count <= q * 3) return 'l3';
+                return 'l4';
+            }
+
+            function fmt(d) {
+                return d.toISOString().split('T')[0];
+            }
+
+            // Build weeks (columns of 7 days)
+            let html = '<div class="heatmap-grid">';
+            const d = new Date(startDate);
+            while (d <= today) {
+                html += '<div class="heatmap-col">';
+                for (let row = 0; row < 7; row++) {
+                    const key = fmt(d);
+                    const count = activityMap[key] || 0;
+                    const level = getLevel(count);
+                    const title = `${key}: ${count} command${count !== 1 ? 's' : ''}`;
+                    if (d <= today) {
+                        html += `<div class="heatmap-cell ${level}" title="${title}"></div>`;
+                    } else {
+                        html += `<div class="heatmap-cell" style="visibility:hidden;"></div>`;
+                    }
+                    d.setDate(d.getDate() + 1);
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+
+            // Legend
+            html += `<div class="heatmap-legend">
+                <span>Less</span>
+                <div class="heatmap-cell"></div>
+                <div class="heatmap-cell l1"></div>
+                <div class="heatmap-cell l2"></div>
+                <div class="heatmap-cell l3"></div>
+                <div class="heatmap-cell l4"></div>
+                <span>More</span>
+            </div>`;
+
+            container.innerHTML = html;
+        })
+        .catch(() => {
+            container.innerHTML = '<div class="empty-state"><p>Failed to load activity data.</p></div>';
+        });
+})();
+</script>
+{% endblock %}

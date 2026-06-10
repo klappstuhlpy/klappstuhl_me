@@ -126,7 +126,8 @@ management, security analytics, virus scanning, and a user account system.
   processing / render / scan all require `images:read`; upload/delete require `images:write`; `GET /api/admin/updates`
   requires `admin:read`). Legacy keys (created without selecting scopes) keep full access for back-compat.
 - **Live updates over WebSocket** — `/ws` push topic events to dashboards. Metrics tiles refresh on every scrape,
-  audit-log entries appear instantly, and Docker graph updates on container events; polling is the automatic fallback
+  audit-log entries appear instantly, Docker graph updates on container events, and Percy bot stats update live on the
+  dashboard stats page (topic `percy`, available to non-admin authenticated users); polling is the automatic fallback
   when the socket is closed.
 - **Installable PWA** — `site.webmanifest` + service worker shell-cache the static assets. iOS standalone-mode meta
   tags + a black theme colour so the app looks native when installed to the home screen. Network-only for everything
@@ -866,6 +867,9 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 - **Giveaways** — Track active and completed giveaways with entry counts, winner counts, and end times.
 - **Tags** — View most-used tags ranked by usage, top creators leaderboard, total tag count and total usage statistics.
 - **Command management** — Three-state system: Enabled/Partial/Disabled. Click any command to configure per-channel state. Plonk management to ignore specific users or channels.
+- **XP over-time chart** — Daily XP gain trend chart (uPlot) on the leveling page, fed by Percy's `xp_history` daily snapshots. Shows as a filled line chart once two or more days of data are recorded; graceful empty states for zero or one snapshot.
+- **User lookup** — click a member to see a full profile: avatar, display name, username, account/join dates, badges (BOT, not-in-guild), role chips with Discord colors, leveling stats (level, XP, messages, rank), and a moderation timeline showing each case (action type color-coded, reason, moderator, timestamp).
+- **Live bot stats** — the Stats page's "Bot Stats" tiles update in real time over WebSocket (topic `percy`). A background poller fetches Percy's global stats every 60 seconds and publishes them to the broadcast hub; the browser subscribes on page load and patches tiles as new data arrives, with automatic reconnection.
 - **Server & bot stats** — Real-time server metrics and bot-wide statistics.
 - **Bot invite flow** — if Percy is not in a guild, displays an invite link instead of an error.
 - **Setup wizard** — a first-time configuration banner for guilds with a fresh config.
@@ -885,6 +889,7 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/gatekeeper` | POST | Save gatekeeper settings |
 | `/percy/dashboard/guild/:id/members` | GET | Member management page |
 | `/percy/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API) |
+| `/percy/dashboard/guild/:id/members/:uid` | GET | User lookup page (profile, leveling, moderation cases) |
 | `/percy/dashboard/guild/:id/members/:uid/action` | POST | Execute moderation action (kick/ban/unban) |
 | `/percy/dashboard/guild/:id/members/:uid/roles` | POST | Add/remove member roles |
 | `/percy/dashboard/guild/:id/leveling` | GET | Leveling config + leaderboard + collection editors |
@@ -923,7 +928,8 @@ The dashboard code is grouped under a `percy` namespace per file type:
 
 - `src/web/routes/dashboard/` — `mod.rs` (router + shared helpers), `templates.rs` (Askama view structs), `handlers.rs` (request handlers).
 - `src/integrations/percy/` — `mod.rs` (the typed `PercyClient` + `PercyError`) and `types.rs` (response models).
-- `templates/percy/*.html` — one Askama template per page.
+- `src/services/percy_stats.rs` — background poller that fetches bot stats every 60s and publishes to the `"percy"` WebSocket topic.
+- `templates/percy/*.html` — one Askama template per page (including `user.html` for the member detail/lookup view).
 - `static/css/percy/dashboard.css`, `static/js/percy/percy-dashboard.js`, `static/js/percy/percy-members.js` — page styling and behavior.
 
 ### How it works
@@ -1002,6 +1008,7 @@ src/
 ├── media/                — image manipulation/conversion, metadata, code-to-image, shared SSRF-guarded fetch (scan.rs)
 ├── services/             — background/admin domains:
 │   ├── docker.rs         — bollard client wrapper + event watcher
+│   ├── percy_stats.rs    — background poller: fetches Percy bot stats every 60s → "percy" WS topic
 │   ├── backup/           — VACUUM INTO backups + scheduler (mod.rs) and S3 off-site upload (s3.rs)
 │   ├── updates.rs        — container image-update detection (registry digest checks)
 │   ├── cron.rs           — 5-field cron parser + scheduler for spotlight scripts

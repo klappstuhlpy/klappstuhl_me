@@ -227,6 +227,148 @@ pub struct LeaderboardResponse {
     pub total: u32,
 }
 
+/// One day of the cumulative-XP time series for a guild.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct XpHistoryPoint {
+    /// ISO date (YYYY-MM-DD).
+    pub day: String,
+    pub total_xp: i64,
+    pub gainers: i64,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct XpHistoryResponse {
+    #[serde(default)]
+    pub points: Vec<XpHistoryPoint>,
+    #[serde(default)]
+    pub days: u32,
+}
+
+// -- Member detail (user lookup) ---------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MemberRoleBadge {
+    pub id: String,
+    pub name: String,
+    pub color: u32,
+}
+
+impl MemberRoleBadge {
+    pub fn color_hex(&self) -> String {
+        format!("#{:06x}", self.color)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MemberLeveling {
+    pub level: i64,
+    pub xp: i64,
+    pub messages: i64,
+    pub rank: i64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MemberCase {
+    pub case_index: i64,
+    pub action: String,
+    pub reason: Option<String>,
+    pub moderator_id: Option<String>,
+    pub moderator_name: Option<String>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MemberCommandStats {
+    #[serde(default)]
+    pub total_commands: i64,
+    pub first_command_at: Option<String>,
+    #[serde(default)]
+    pub top_commands: Vec<CommandUsageEntry>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CommandUsageEntry {
+    pub command: String,
+    pub uses: i64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NameHistoryEntry {
+    pub name: String,
+    pub changed_at: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MemberNameHistory {
+    #[serde(default)]
+    pub usernames: Vec<NameHistoryEntry>,
+    #[serde(default)]
+    pub nicknames: Vec<NameHistoryEntry>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MemberDetail {
+    pub id: String,
+    pub name: String,
+    pub display_name: String,
+    pub avatar_url: String,
+    pub joined_at: Option<String>,
+    pub created_at: String,
+    #[serde(default)]
+    pub roles: Vec<MemberRoleBadge>,
+    pub bot: bool,
+    #[serde(default)]
+    pub in_guild: bool,
+    pub leveling: Option<MemberLeveling>,
+    #[serde(default)]
+    pub cases: Vec<MemberCase>,
+    #[serde(default)]
+    pub case_count: u32,
+    #[serde(default)]
+    pub warning_count: u32,
+    #[serde(default)]
+    pub note_count: u32,
+    // Extended user info
+    pub top_role: Option<String>,
+    #[serde(default)]
+    pub top_role_color: u32,
+    pub join_position: Option<u32>,
+    #[serde(default)]
+    pub member_count: u32,
+    #[serde(default)]
+    pub mutual_guilds: u32,
+    #[serde(default)]
+    pub permissions: u64,
+    pub boosting_since: Option<String>,
+    #[serde(default)]
+    pub public_flags: Vec<String>,
+    pub status: Option<String>,
+    pub command_stats: Option<MemberCommandStats>,
+    pub last_seen: Option<String>,
+    pub names: Option<MemberNameHistory>,
+    #[serde(default)]
+    pub avatar_count: u32,
+}
+
+impl MemberDetail {
+    pub fn top_role_color_hex(&self) -> String {
+        format!("#{:06x}", self.top_role_color)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AvatarEntry {
+    pub image: String,
+    pub changed_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AvatarHistoryResponse {
+    pub avatars: Vec<AvatarEntry>,
+    #[serde(default)]
+    pub total: u32,
+}
+
 // -- Polls types -------------------------------------------------------------
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -513,4 +655,58 @@ pub struct EmojiStatsResponse {
     pub total_uses: u64,
     pub distinct_emojis: u64,
     pub entries: Vec<EmojiStatEntry>,
+}
+
+// -- Audit log (cases) types -------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CaseEntry {
+    pub case_index: i64,
+    pub action: String,
+    pub target_id: String,
+    pub target_name: String,
+    pub moderator_id: Option<String>,
+    pub moderator_name: Option<String>,
+    pub reason: Option<String>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CasesResponse {
+    pub cases: Vec<CaseEntry>,
+    pub total: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RecentCasesResponse {
+    pub cases: Vec<CaseEntry>,
+}
+
+// -- Activity heatmap types --------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ActivityDay {
+    pub day: String,
+    pub count: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ActivityResponse {
+    pub activity: Vec<ActivityDay>,
+    pub days: u32,
+}
+
+// -- Bulk action types -------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BulkActionFailure {
+    pub user_id: String,
+    pub error: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BulkActionResponse {
+    pub ok: bool,
+    pub successes: u32,
+    pub failures: Vec<BulkActionFailure>,
 }

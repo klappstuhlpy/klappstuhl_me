@@ -4,6 +4,21 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+<style>
+.bulk-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    margin-bottom: 1rem;
+    background: var(--box-shade);
+    border: 1px solid var(--branding);
+    border-radius: 0.5rem;
+}
+.bulk-toolbar .bulk-count { font-size: 0.82rem; color: var(--foreground); }
+.bulk-check { width: 1rem; height: 1rem; accent-color: var(--branding); cursor: pointer; }
+#bulk-select-all { width: 1rem; height: 1rem; accent-color: var(--branding); cursor: pointer; }
+</style>
 {% endblock %}
 
 {% block body %}
@@ -50,10 +65,19 @@
         <span class="members-count" id="member-count">{{ members.len() }} loaded</span>
     </div>
 
+    {# ─── Bulk Action Toolbar ─────────────────────────────────────── #}
+    <div class="bulk-toolbar" id="bulk-toolbar" hidden>
+        <span class="bulk-count"><strong id="bulk-selected-count">0</strong> selected</span>
+        <button class="button small" id="bulk-kick">Kick Selected</button>
+        <button class="button small danger" id="bulk-ban">Ban Selected</button>
+        <button class="button small" id="bulk-deselect">Deselect All</button>
+    </div>
+
     <div class="members-table-wrap">
         <table class="members-table sortable" id="members-table">
             <thead>
                 <tr>
+                    <th style="width:2rem;"><input type="checkbox" id="bulk-select-all" title="Select all"></th>
                     <th data-sort="text">Member</th>
                     <th data-sort="date">Joined</th>
                     <th>Roles</th>
@@ -62,15 +86,16 @@
             </thead>
             <tbody id="members-tbody">
                 {% for member in members %}
-                <tr data-user-id="{{ member.id }}" data-name="{{ member.display_name|lower }}">
+                <tr data-user-id="{{ member.id }}" data-name="{{ member.display_name|lower }}" data-bot="{{ member.bot }}">
+                    <td><input type="checkbox" class="bulk-check" data-user-id="{{ member.id }}" {% if member.bot %}disabled{% endif %}></td>
                     <td>
-                        <div class="member-cell">
+                        <a class="member-cell" href="/percy/dashboard/guild/{{ guild_id }}/members/{{ member.id }}">
                             <img class="member-avatar" src="{{ member.avatar_url }}?size=64" alt="" width="36" height="36">
                             <div class="member-info">
                                 <span class="member-name">{{ member.display_name }}</span>
                                 <span class="member-username">{{ member.name }}{% if member.bot %} <span class="badge">BOT</span>{% endif %}</span>
                             </div>
-                        </div>
+                        </a>
                     </td>
                     <td class="member-joined"><time class="js-ts">{{ member.joined_at.as_deref().unwrap_or("—") }}</time></td>
                     <td>

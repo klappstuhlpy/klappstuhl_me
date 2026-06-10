@@ -287,6 +287,47 @@ impl PercyClient {
         Ok(resp.json().await?)
     }
 
+    /// Fetch the daily cumulative-XP history for the leveling chart.
+    pub async fn get_leveling_xp_history(&self, guild_id: u64, days: u32) -> Result<XpHistoryResponse, PercyError> {
+        let resp = self
+            .client
+            .get(self.url(&format!("/api/internal/guilds/{guild_id}/leveling/xp-history")))
+            .bearer_auth(&self.token)
+            .query(&[("days", days.to_string())])
+            .send()
+            .await?;
+        resp.error_for_status_ref().map_err(PercyError::Http)?;
+        Ok(resp.json().await?)
+    }
+
+    /// Fetch an aggregated member profile (identity, leveling, moderation history, notes).
+    pub async fn get_member_detail(&self, guild_id: u64, user_id: &str) -> Result<MemberDetail, PercyError> {
+        let resp = self
+            .client
+            .get(self.url(&format!("/api/internal/guilds/{guild_id}/members/{user_id}/detail")))
+            .bearer_auth(&self.token)
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        resp.error_for_status_ref().map_err(PercyError::Http)?;
+        Ok(resp.json().await?)
+    }
+
+    /// Fetch a user's avatar history (base64 images + timestamps).
+    pub async fn get_member_avatars(&self, guild_id: u64, user_id: &str, limit: u32) -> Result<AvatarHistoryResponse, PercyError> {
+        let resp = self
+            .client
+            .get(self.url(&format!("/api/internal/guilds/{guild_id}/members/{user_id}/avatars")))
+            .query(&[("limit", limit.to_string())])
+            .bearer_auth(&self.token)
+            .send()
+            .await?;
+        resp.error_for_status_ref().map_err(PercyError::Http)?;
+        Ok(resp.json().await?)
+    }
+
     /// Update a user's level/xp.
     pub async fn patch_leveling_user(
         &self,
@@ -1099,6 +1140,99 @@ impl PercyClient {
             return Err(PercyError::Api(text));
         }
         Ok(())
+    }
+
+    // -- Audit log (moderation cases) -----------------------------------------
+
+    /// Fetch paginated, filterable moderation cases.
+    pub async fn get_cases(
+        &self,
+        guild_id: u64,
+        limit: u32,
+        offset: u32,
+        action: Option<&str>,
+        moderator_id: Option<&str>,
+        target_id: Option<&str>,
+        after: Option<&str>,
+        before: Option<&str>,
+    ) -> Result<CasesResponse, PercyError> {
+        let mut req = self
+            .client
+            .get(self.url(&format!("/api/internal/guilds/{guild_id}/cases")))
+            .bearer_auth(&self.token)
+            .query(&[("limit", limit.to_string()), ("offset", offset.to_string())]);
+        if let Some(a) = action {
+            req = req.query(&[("action", a)]);
+        }
+        if let Some(m) = moderator_id {
+            req = req.query(&[("moderator_id", m)]);
+        }
+        if let Some(t) = target_id {
+            req = req.query(&[("target_id", t)]);
+        }
+        if let Some(a) = after {
+            req = req.query(&[("after", a)]);
+        }
+        if let Some(b) = before {
+            req = req.query(&[("before", b)]);
+        }
+        let resp = req.send().await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        resp.error_for_status_ref().map_err(PercyError::Http)?;
+        Ok(resp.json().await?)
+    }
+
+    /// Fetch cases created since a given timestamp (for live notifications).
+    pub async fn get_recent_cases(&self, guild_id: u64, since: &str) -> Result<RecentCasesResponse, PercyError> {
+        let resp = self
+            .client
+            .get(self.url(&format!("/api/internal/guilds/{guild_id}/cases/recent")))
+            .bearer_auth(&self.token)
+            .query(&[("since", since)])
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        resp.error_for_status_ref().map_err(PercyError::Http)?;
+        Ok(resp.json().await?)
+    }
+
+    /// Perform a bulk moderation action on multiple members.
+    pub async fn bulk_member_action(&self, guild_id: u64, body: &serde_json::Value) -> Result<BulkActionResponse, PercyError> {
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/members/bulk-action")))
+            .bearer_auth(&self.token)
+            .json(body)
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(resp.json().await?)
+    }
+
+    /// Fetch per-day activity data for a member (heatmap).
+    pub async fn get_member_activity(&self, guild_id: u64, user_id: &str, days: u32) -> Result<ActivityResponse, PercyError> {
+        let resp = self
+            .client
+            .get(self.url(&format!("/api/internal/guilds/{guild_id}/members/{user_id}/activity")))
+            .bearer_auth(&self.token)
+            .query(&[("days", days.to_string())])
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        resp.error_for_status_ref().map_err(PercyError::Http)?;
+        Ok(resp.json().await?)
     }
 }
 

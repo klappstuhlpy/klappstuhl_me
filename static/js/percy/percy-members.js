@@ -165,4 +165,79 @@
             }, 3000);
         };
     }
+
+    // ─── Bulk Selection ──────────────────────────────────────────────
+    const bulkToolbar = document.getElementById('bulk-toolbar');
+    const bulkCount = document.getElementById('bulk-selected-count');
+    const selectAll = document.getElementById('bulk-select-all');
+
+    function getSelected() {
+        return Array.from(tbody.querySelectorAll('.bulk-check:checked')).map(cb => cb.dataset.userId);
+    }
+
+    function updateBulkUI() {
+        const selected = getSelected();
+        if (bulkToolbar) {
+            bulkToolbar.hidden = selected.length === 0;
+            bulkCount.textContent = selected.length;
+        }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', () => {
+            const checked = selectAll.checked;
+            tbody.querySelectorAll('.bulk-check:not(:disabled)').forEach(cb => {
+                if (!cb.closest('tr').hidden) cb.checked = checked;
+            });
+            updateBulkUI();
+        });
+    }
+
+    tbody.addEventListener('change', (e) => {
+        if (e.target.classList.contains('bulk-check')) updateBulkUI();
+    });
+
+    const bulkDeselect = document.getElementById('bulk-deselect');
+    if (bulkDeselect) {
+        bulkDeselect.addEventListener('click', () => {
+            tbody.querySelectorAll('.bulk-check:checked').forEach(cb => cb.checked = false);
+            if (selectAll) selectAll.checked = false;
+            updateBulkUI();
+        });
+    }
+
+    async function doBulkAction(action) {
+        const userIds = getSelected();
+        if (!userIds.length) return;
+        if (!confirm(`Are you sure you want to ${action} ${userIds.length} member(s)?`)) return;
+
+        try {
+            const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/members/bulk-action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_ids: userIds, action }),
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                showToast('success', `${data.successes} member(s) ${action === 'ban' ? 'banned' : 'kicked'}.`);
+                if (data.failures && data.failures.length > 0) {
+                    showToast('warning', `${data.failures.length} failed.`);
+                }
+                userIds.forEach(uid => {
+                    const row = tbody.querySelector(`tr[data-user-id="${uid}"]`);
+                    if (row && !data.failures.some(f => f.user_id === uid)) row.remove();
+                });
+                updateBulkUI();
+            } else {
+                showToast('error', data.error || 'Bulk action failed.');
+            }
+        } catch {
+            showToast('error', 'Network error.');
+        }
+    }
+
+    const bulkKick = document.getElementById('bulk-kick');
+    const bulkBan = document.getElementById('bulk-ban');
+    if (bulkKick) bulkKick.addEventListener('click', () => doBulkAction('kick'));
+    if (bulkBan) bulkBan.addEventListener('click', () => doBulkAction('ban'));
 })();

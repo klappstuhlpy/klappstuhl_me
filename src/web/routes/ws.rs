@@ -49,9 +49,7 @@ fn topic_allowed(topic: &str, is_admin: bool) -> bool {
     if is_admin {
         return true;
     }
-    // Future: add user-scope topics here (e.g. "my-uploads").
-    let _ = topic;
-    false
+    matches!(topic, "percy" | "moderation")
 }
 
 async fn ws_upgrade(State(state): State<AppState>, account: Account, ws: WebSocketUpgrade) -> Response {

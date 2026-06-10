@@ -1,0 +1,307 @@
+{% extends "../layout.html" %}
+
+{% block title %}Audit Log — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+<style>
+.filter-bar {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+}
+.filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+    min-width: 140px;
+}
+.filter-field label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted);
+}
+.filter-field select,
+.filter-field input {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.82rem;
+    background: var(--form-input-background);
+    border: 1px solid var(--form-input-border);
+    border-radius: 0.375rem;
+    color: var(--foreground);
+}
+.filter-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+.action-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    border-radius: 0.25rem;
+    letter-spacing: 0.02em;
+}
+.action-pill.warn { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
+.action-pill.kick { background: #2d1f00; color: #ffa726; border: 1px solid #5c3d00; }
+.action-pill.ban { background: var(--error-bg); color: var(--error-text); border: 1px solid var(--error-border); }
+.action-pill.unban { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+.action-pill.mute { background: #1a1a2e; color: #7c7cf0; border: 1px solid #3a3a6e; }
+.action-pill.unmute { background: #0d2818; color: #66bb6a; border: 1px solid #2e5e3a; }
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1rem;
+    padding: 0.75rem 0;
+}
+.pagination-bar .page-info {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.pagination-bar .page-btns {
+    display: flex;
+    gap: 0.5rem;
+}
+.export-link {
+    font-size: 0.78rem;
+    color: var(--branding);
+    text-decoration: none;
+    border: 1px solid var(--branding);
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.375rem;
+}
+.export-link:hover {
+    background: var(--branding);
+    color: var(--background);
+}
+.live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--success-text);
+}
+.live-indicator::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success-text);
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+
+    <div class="dashboard-header">
+        <div>
+            <h1>Audit Log</h1>
+            <p>Browse moderation cases with filters. New cases appear live.</p>
+        </div>
+        <div style="display:flex;gap:0.75rem;align-items:center;">
+            <span class="live-indicator" id="live-status">Live</span>
+            <a href="/percy/dashboard/guild/{{ guild_id }}/export/cases.csv" class="export-link">Export CSV</a>
+        </div>
+    </div>
+
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/audit-log" class="active">Audit Log</a>
+        <div class="nav-group">
+            <span class="nav-group-label">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
+            </div>
+        </div>
+    </nav>
+
+    {# ─── Summary Tiles ───────────────────────────────────────────── #}
+    <div class="metric-tiles">
+        <div class="metric-tile">
+            <span class="tile-label">Total Cases</span>
+            <span class="tile-value" id="total-cases">{{ cases.total }}</span>
+        </div>
+    </div>
+
+    {# ─── Filters ─────────────────────────────────────────────────── #}
+    <form class="filter-bar" id="filter-form" method="get">
+        <div class="filter-field">
+            <label for="filter-action">Action Type</label>
+            <select name="action" id="filter-action">
+                <option value="">All</option>
+                <option value="warn" {% if filter_action == "warn" %}selected{% endif %}>Warn</option>
+                <option value="kick" {% if filter_action == "kick" %}selected{% endif %}>Kick</option>
+                <option value="ban" {% if filter_action == "ban" %}selected{% endif %}>Ban</option>
+                <option value="unban" {% if filter_action == "unban" %}selected{% endif %}>Unban</option>
+                <option value="mute" {% if filter_action == "mute" %}selected{% endif %}>Mute</option>
+                <option value="unmute" {% if filter_action == "unmute" %}selected{% endif %}>Unmute</option>
+            </select>
+        </div>
+        <div class="filter-field">
+            <label for="filter-moderator">Moderator ID</label>
+            <input type="text" name="moderator_id" id="filter-moderator" placeholder="User ID" value="{{ filter_moderator }}">
+        </div>
+        <div class="filter-field">
+            <label for="filter-after">After</label>
+            <input type="date" name="after" id="filter-after" value="{{ filter_after }}">
+        </div>
+        <div class="filter-field">
+            <label for="filter-before">Before</label>
+            <input type="date" name="before" id="filter-before" value="{{ filter_before }}">
+        </div>
+        <div class="filter-actions">
+            <button type="submit" class="button small primary">Filter</button>
+            <a href="/percy/dashboard/guild/{{ guild_id }}/audit-log" class="button small">Clear</a>
+        </div>
+    </form>
+
+    {# ─── Cases Table ─────────────────────────────────────────────── #}
+    {% if cases.cases.is_empty() %}
+    <div class="empty-state">
+        <h3>No cases found</h3>
+        <p>Moderation actions will appear here as they occur.</p>
+    </div>
+    {% else %}
+    <div class="data-table-wrap">
+        <table class="data-table sortable" id="cases-table">
+            <thead>
+                <tr>
+                    <th data-sort="number">#</th>
+                    <th data-sort="text">Action</th>
+                    <th data-sort="text">Target</th>
+                    <th data-sort="text">Moderator</th>
+                    <th data-sort="text">Reason</th>
+                    <th data-sort="date">Date</th>
+                </tr>
+            </thead>
+            <tbody id="cases-tbody">
+                {% for case in cases.cases %}
+                <tr>
+                    <td>{{ case.case_index }}</td>
+                    <td><span class="action-pill {{ case.action }}">{{ case.action }}</span></td>
+                    <td>
+                        <a href="/percy/dashboard/guild/{{ guild_id }}/members/{{ case.target_id }}">{{ case.target_name }}</a>
+                    </td>
+                    <td>{{ case.moderator_name.as_deref().unwrap_or("System") }}</td>
+                    <td class="text-muted" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ case.reason.as_deref().unwrap_or("") }}">
+                        {{ case.reason.as_deref().unwrap_or("—") }}
+                    </td>
+                    <td class="member-joined"><time class="js-ts">{{ case.created_at.as_deref().unwrap_or("—") }}</time></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# ─── Pagination ──────────────────────────────────────────────── #}
+    <div class="pagination-bar">
+        <span class="page-info">Showing {{ cases.cases.len() }} of {{ cases.total }} cases</span>
+        <div class="page-btns">
+            <!-- Pagination handled via JS for seamless navigation -->
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+const GUILD_ID = '{{ guild_id }}';
+let lastPollTime = new Date().toISOString();
+let pollInterval = null;
+
+function showToast(level, message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + level;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('visible'));
+    setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
+function actionPillHtml(action) {
+    return `<span class="action-pill ${action}">${action}</span>`;
+}
+
+function prependCase(c) {
+    const tbody = document.getElementById('cases-tbody');
+    if (!tbody) return;
+    const tr = document.createElement('tr');
+    tr.style.animation = 'fadeIn 0.3s ease';
+    tr.innerHTML = `
+        <td>${c.case_index}</td>
+        <td>${actionPillHtml(c.action)}</td>
+        <td><a href="/percy/dashboard/guild/${GUILD_ID}/members/${c.target_id}">${c.target_name}</a></td>
+        <td>${c.moderator_name || 'System'}</td>
+        <td class="text-muted" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c.reason || ''}">${c.reason || '—'}</td>
+        <td class="member-joined"><time class="js-ts">${c.created_at || '—'}</time></td>
+    `;
+    tbody.insertBefore(tr, tbody.firstChild);
+    const counter = document.getElementById('total-cases');
+    if (counter) counter.textContent = String(parseInt(counter.textContent) + 1);
+}
+
+async function pollNewCases() {
+    try {
+        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/audit-log/recent?since=${encodeURIComponent(lastPollTime)}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.cases && data.cases.length > 0) {
+            for (const c of data.cases) {
+                prependCase(c);
+                if (c.created_at) lastPollTime = c.created_at;
+            }
+            showToast('info', `${data.cases.length} new case(s)`);
+        }
+    } catch { /* silent */ }
+}
+
+// Poll every 15 seconds for new cases
+pollInterval = setInterval(pollNewCases, 15000);
+
+// Convert ISO dates in filter inputs to local format
+document.querySelectorAll('input[type="date"]').forEach(input => {
+    if (input.value && input.value.includes('T')) {
+        input.value = input.value.split('T')[0];
+    }
+});
+</script>
+{% endblock %}

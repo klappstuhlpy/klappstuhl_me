@@ -100,6 +100,14 @@ pub fn routes() -> Router<AppState> {
         .route("/percy/dashboard/guild/:guild_id/members", get(guild_members))
         .route("/percy/dashboard/guild/:guild_id/members.json", get(guild_members_json))
         .route(
+            "/percy/dashboard/guild/:guild_id/members/:user_id",
+            get(guild_user_lookup),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/members/:user_id/avatars",
+            get(guild_member_avatars),
+        )
+        .route(
             "/percy/dashboard/guild/:guild_id/members/:user_id/action",
             post(guild_member_action),
         )
@@ -204,4 +212,30 @@ pub fn routes() -> Router<AppState> {
             post(guild_moderation_ignore),
         )
         .route("/percy/dashboard/guild/:guild_id/stats", get(guild_stats))
+        // Phase 5: Audit log, bulk actions, activity, export
+        .route("/percy/dashboard/guild/:guild_id/audit-log", get(guild_audit_log))
+        .route(
+            "/percy/dashboard/guild/:guild_id/audit-log.json",
+            get(guild_audit_log_json),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/audit-log/recent",
+            get(guild_cases_recent),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/members/bulk-action",
+            post(guild_bulk_action),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/members/:user_id/activity",
+            get(guild_member_activity),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/export/leaderboard.csv",
+            get(guild_export_leaderboard),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/export/cases.csv",
+            get(guild_export_cases),
+        )
 }
