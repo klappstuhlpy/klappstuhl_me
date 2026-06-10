@@ -99,7 +99,7 @@
                     </td>
                     <td class="numeric">{{ poll.total_votes }}</td>
                     <td>{{ poll.options.len() }} options</td>
-                    <td class="member-joined">{{ poll.published.as_deref().unwrap_or("—") }}</td>
+                    <td class="member-joined"><time class="js-ts">{{ poll.published.as_deref().unwrap_or("—") }}</time></td>
                     <td class="col-actions">
                         {% if !poll.ended %}
                         <button class="button small" onclick='openEditPoll({{ poll.id }}, this)'>Edit</button>

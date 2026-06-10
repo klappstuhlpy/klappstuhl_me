@@ -75,7 +75,7 @@
         {% when Some with (lot) %}
         <div class="gatekeeper-status active">
             <span>Active — Jackpot: {{ lot.jackpot }} | Ticket: {{ lot.ticket_price }}</span>
-            {% match lot.ends_at %}{% when Some with (t) %}<span class="badge">Ends: {{ t }}</span>{% when None %}{% endmatch %}
+            {% match lot.ends_at %}{% when Some with (t) %}<span class="badge">Ends: <time class="js-ts" datetime="{{ t }}">{{ t }}</time></span>{% when None %}{% endmatch %}
         </div>
         <button class="button small danger" id="cancel-lottery-btn">Cancel Lottery</button>
         {% when None %}

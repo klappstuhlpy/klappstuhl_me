@@ -800,7 +800,48 @@
 .mod-ignore-add .config-input { flex: 1 1 180px; }
 .mod-lockdown-add .config-select { flex: 1 1 260px; }
 .mod-ignore-add .button,
-.mod-lockdown-add .button { flex-shrink: 0; }
+.mod-lockdown-add .button { flex-shrink: 0; align-self: flex-start; }
+
+/* Multi-select needs to override the global `select { height: 2rem }` so all
+   rows are visible, and gets a modern padded/rounded option list. */
+.mod-lockdown-add select[multiple] {
+    height: auto;
+    min-height: 170px;
+    max-height: 260px;
+    padding: 0.35rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+.mod-lockdown-add select[multiple] option {
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 2px;
+    border-radius: 0.375rem;
+    font-size: 0.82rem;
+    color: var(--foreground);
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.mod-lockdown-add select[multiple] option:hover {
+    background: var(--box-shade);
+}
+.mod-lockdown-add select[multiple] option:checked {
+    background: var(--branding) linear-gradient(0deg, var(--branding), var(--branding));
+    color: #fff;
+    font-weight: 600;
+}
+
+/* -- Humanised timestamps (.js-ts -> .ts-formatted via timestamps.js) -- */
+
+.ts-formatted {
+    cursor: help;
+    text-decoration: underline dotted;
+    text-decoration-color: var(--text-muted);
+    text-underline-offset: 3px;
+    white-space: nowrap;
+}
+.ts-formatted:hover {
+    text-decoration-color: var(--branding);
+}
 
 /* -- Gatekeeper message status -- */
 

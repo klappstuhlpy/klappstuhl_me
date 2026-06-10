@@ -99,7 +99,7 @@
                     </td>
                     <td class="numeric">{{ giveaway.entries }}</td>
                     <td class="numeric">{{ giveaway.winners_count }}</td>
-                    <td class="member-joined">{{ giveaway.ends_at.as_deref().unwrap_or("—") }}</td>
+                    <td class="member-joined"><time class="js-ts">{{ giveaway.ends_at.as_deref().unwrap_or("—") }}</time></td>
                 </tr>
                 {% endfor %}
             </tbody>

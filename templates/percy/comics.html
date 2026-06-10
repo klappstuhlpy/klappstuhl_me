@@ -64,7 +64,7 @@
                 <div class="comic-feed-row"><span class="comic-feed-label">Day</span><span class="comic-feed-value">{% if feed.day == 1 %}Monday{% else if feed.day == 2 %}Tuesday{% else if feed.day == 3 %}Wednesday{% else if feed.day == 4 %}Thursday{% else if feed.day == 5 %}Friday{% else if feed.day == 6 %}Saturday{% else %}Sunday{% endif %}</span></div>
                 <div class="comic-feed-row"><span class="comic-feed-label">Pin</span><span class="comic-feed-value">{% if feed.pin %}Yes{% else %}No{% endif %}</span></div>
                 {% match feed.ping %}{% when Some with (role) %}<div class="comic-feed-row"><span class="comic-feed-label">Ping</span><span class="comic-feed-value">{% for r in roles %}{% if r.id == role.as_str() %}@{{ r.name }}{% endif %}{% endfor %}</span></div>{% when None %}{% endmatch %}
-                {% match feed.next_pull %}{% when Some with (next) %}<div class="comic-feed-row"><span class="comic-feed-label">Next Pull</span><span class="comic-feed-value">{{ next }}</span></div>{% when None %}{% endmatch %}
+                {% match feed.next_pull %}{% when Some with (next) %}<div class="comic-feed-row"><span class="comic-feed-label">Next Pull</span><span class="comic-feed-value"><time class="js-ts" datetime="{{ next }}">{{ next }}</time></span></div>{% when None %}{% endmatch %}
             </div>
             <div class="comic-feed-card-actions">
                 <button class="button small edit-feed-btn" data-brand="{{ feed.brand }}" data-channel="{{ feed.channel_id }}" data-format="{{ feed.format }}" data-day="{{ feed.day }}" data-ping="{{ feed.ping.as_deref().unwrap_or("") }}" data-pin="{{ feed.pin }}">Edit</button>

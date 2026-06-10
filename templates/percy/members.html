@@ -72,7 +72,7 @@
                             </div>
                         </div>
                     </td>
-                    <td class="member-joined">{{ member.joined_at.as_deref().unwrap_or("—") }}</td>
+                    <td class="member-joined"><time class="js-ts">{{ member.joined_at.as_deref().unwrap_or("—") }}</time></td>
                     <td>
                         <div class="member-roles">
                             {% for role_id in member.roles %}

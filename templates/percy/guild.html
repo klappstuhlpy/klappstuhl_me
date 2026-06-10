@@ -501,7 +501,7 @@
             {% match gk.started_at %}
             {% when Some with (ts) %}
             <div class="gatekeeper-status active">
-                <span>Active since {{ ts }}</span>
+                <span>Active since <time class="js-ts" datetime="{{ ts }}">{{ ts }}</time></span>
                 <span class="badge">{{ gk.member_count }} pending</span>
             </div>
             {% when None %}

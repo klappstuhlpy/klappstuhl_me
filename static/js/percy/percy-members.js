@@ -74,12 +74,13 @@
                                 <span class="member-username">${m.name}${m.bot ? ' <span class="badge">BOT</span>' : ''}</span>
                             </div>
                         </td>
-                        <td class="member-joined">${m.joined_at || '—'}</td>
+                        <td class="member-joined"><time class="js-ts">${m.joined_at || '—'}</time></td>
                         <td class="member-roles">${rolesHtml}</td>
                         <td class="member-actions">${actionsHtml}</td>
                     `;
                     tbody.appendChild(row);
                 });
+                if (window.formatTimestamps) window.formatTimestamps(tbody);
                 if (data.members.length < 100) loadMoreBtn.hidden = true;
             } else {
                 loadMoreBtn.hidden = true;

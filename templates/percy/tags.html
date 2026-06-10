@@ -88,7 +88,7 @@
                         <td><strong>{{ tag.name }}</strong></td>
                         <td>{{ tag.owner_name.as_deref().unwrap_or("Unknown") }}</td>
                         <td class="numeric">{{ tag.uses }}</td>
-                        <td class="member-joined">{{ tag.created_at.as_deref().unwrap_or("—") }}</td>
+                        <td class="member-joined"><time class="js-ts">{{ tag.created_at.as_deref().unwrap_or("—") }}</time></td>
                     </tr>
                     {% endfor %}
                 </tbody>
