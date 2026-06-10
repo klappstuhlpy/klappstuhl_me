@@ -833,14 +833,43 @@
 /* -- Humanised timestamps (.js-ts -> .ts-formatted via timestamps.js) -- */
 
 .ts-formatted {
-    cursor: help;
-    text-decoration: underline dotted;
-    text-decoration-color: var(--text-muted);
-    text-underline-offset: 3px;
+    cursor: default;
     white-space: nowrap;
+    border-bottom: 1px dashed transparent;
+    transition: border-color 0.12s, color 0.12s;
 }
 .ts-formatted:hover {
-    text-decoration-color: var(--branding);
+    color: var(--branding);
+    border-bottom-color: color-mix(in srgb, var(--branding) 45%, transparent);
+}
+
+/* -- Sortable table headers (table.sortable via table-sort.js) -- */
+
+th.th-sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color 0.12s;
+}
+th.th-sortable::after {
+    content: "\2195"; /* ↕ */
+    margin-left: 0.35rem;
+    font-size: 0.72em;
+    opacity: 0.35;
+    vertical-align: middle;
+}
+th.th-sortable:hover {
+    color: var(--foreground);
+}
+th.th-sortable[aria-sort="ascending"]::after {
+    content: "\2191"; /* ↑ */
+    opacity: 1;
+    color: var(--branding);
+}
+th.th-sortable[aria-sort="descending"]::after {
+    content: "\2193"; /* ↓ */
+    opacity: 1;
+    color: var(--branding);
 }
 
 /* -- Gatekeeper message status -- */

@@ -73,13 +73,13 @@
         </div>
         {% else %}
         <div class="data-table-wrap">
-            <table class="data-table">
+            <table class="data-table sortable">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Owner</th>
-                        <th class="numeric">Uses</th>
-                        <th>Created</th>
+                        <th data-sort="text">Name</th>
+                        <th data-sort="text">Owner</th>
+                        <th class="numeric" data-sort="number">Uses</th>
+                        <th data-sort="date">Created</th>
                     </tr>
                 </thead>
                 <tbody>

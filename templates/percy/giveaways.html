@@ -69,14 +69,14 @@
     </div>
     {% else %}
     <div class="data-table-wrap">
-        <table class="data-table">
+        <table class="data-table sortable">
             <thead>
                 <tr>
-                    <th>Title</th>
-                    <th>Status</th>
-                    <th class="numeric">Entries</th>
-                    <th class="numeric">Winners</th>
-                    <th>Ends At</th>
+                    <th data-sort="text">Title</th>
+                    <th data-sort="text">Status</th>
+                    <th class="numeric" data-sort="number">Entries</th>
+                    <th class="numeric" data-sort="number">Winners</th>
+                    <th data-sort="date">Ends At</th>
                 </tr>
             </thead>
             <tbody>

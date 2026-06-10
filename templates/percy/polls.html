@@ -70,14 +70,14 @@
     </div>
     {% else %}
     <div class="data-table-wrap">
-        <table class="data-table">
+        <table class="data-table sortable">
             <thead>
                 <tr>
-                    <th>Question</th>
-                    <th>Status</th>
-                    <th class="numeric">Votes</th>
-                    <th>Options</th>
-                    <th>Published</th>
+                    <th data-sort="text">Question</th>
+                    <th data-sort="text">Status</th>
+                    <th class="numeric" data-sort="number">Votes</th>
+                    <th data-sort="number">Options</th>
+                    <th data-sort="date">Published</th>
                     <th class="col-actions">Actions</th>
                 </tr>
             </thead>

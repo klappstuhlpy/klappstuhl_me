@@ -2,14 +2,14 @@
 //
 // Each `.js-ts` element carries the raw value in its `datetime` attribute (or
 // its text content). The visible text becomes a relative phrase ("2 hours ago",
-// "in 3 days") and the `title` attribute holds the full local date for hover.
+// "in 3 days"); hovering swaps it for the full local date and back out again.
 // Invalid / placeholder values (e.g. "—") are left untouched. Idempotent — safe
 // to call again after injecting new DOM via `window.formatTimestamps(root)`.
 (function () {
     "use strict";
 
     var ABS_OPTS = {
-        weekday: "long", year: "numeric", month: "long", day: "numeric",
+        year: "numeric", month: "short", day: "numeric",
         hour: "numeric", minute: "2-digit",
     };
 
@@ -60,10 +60,19 @@
         var d = new Date(raw);
         if (isNaN(d.getTime())) return; // not a real date (placeholder dash, etc.)
 
+        var relative = formatRelative(d);
+        var absolute = formatAbsolute(d);
+
         el.setAttribute("datetime", raw);
-        el.setAttribute("title", formatAbsolute(d));
-        el.textContent = formatRelative(d);
+        el.removeAttribute("title");
+        el.dataset.rel = relative;
+        el.dataset.abs = absolute;
+        el.textContent = relative;
         el.classList.add("ts-formatted");
+
+        // Hovering reveals the full date; leaving restores the relative phrase.
+        el.addEventListener("mouseenter", function () { el.textContent = absolute; });
+        el.addEventListener("mouseleave", function () { el.textContent = relative; });
     }
 
     function run(root) {
