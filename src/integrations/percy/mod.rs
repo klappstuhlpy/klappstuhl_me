@@ -374,6 +374,21 @@ impl PercyClient {
         Ok(())
     }
 
+    /// End a running poll.
+    pub async fn end_poll(&self, guild_id: u64, poll_id: i64) -> Result<(), PercyError> {
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/polls/{poll_id}/end")))
+            .bearer_auth(&self.token)
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        resp.error_for_status_ref().map_err(PercyError::Http)?;
+        Ok(())
+    }
+
     /// Fetch giveaways for a guild.
     pub async fn get_giveaways(&self, guild_id: u64) -> Result<GiveawaysResponse, PercyError> {
         let resp = self

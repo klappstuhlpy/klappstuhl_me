@@ -103,6 +103,7 @@
                     <td class="col-actions">
                         {% if !poll.ended %}
                         <button class="button small" onclick='openEditPoll({{ poll.id }}, this)'>Edit</button>
+                        <button class="button small danger" onclick='endPoll({{ poll.id }}, this)'>End</button>
                         {% endif %}
                     </td>
                 </tr>
@@ -285,6 +286,29 @@ document.getElementById('poll-save-btn').addEventListener('click', async () => {
         btn.disabled = false;
     }
 });
+
+async function endPoll(pollId, btn) {
+    if (!confirm('Are you sure you want to end this poll? This cannot be undone.')) return;
+
+    btn.disabled = true;
+    try {
+        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/polls/${pollId}/end`, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            showToast('success', 'Poll ended successfully.');
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showToast('error', data.error || 'Failed to end poll.');
+        }
+    } catch {
+        showToast('error', 'Network error.');
+    } finally {
+        btn.disabled = false;
+    }
+}
 
 // Close modal on overlay click
 document.getElementById('poll-edit-modal').addEventListener('click', (e) => {

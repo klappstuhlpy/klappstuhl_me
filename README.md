@@ -863,13 +863,16 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 - **Temporary Voice Channels** — Manage hub channels that spawn temp voice channels. Table with format string editing and placeholder reference (%name, %display_name, %guild, %channel).
 - **Highlights** — Admin view of all member highlight configurations (trigger words, blocked count) with the ability to remove a user's highlights.
 - **Emoji Stats** — Read-only usage statistics: total uses, distinct emojis, and a ranked table of top custom emojis with images and counts.
-- **Polls** — Browse all guild polls with status pills (Active/Ended), total vote counts, option counts, and publish/expiry dates. Edit running polls inline.
+- **Polls** — Browse all guild polls with status pills (Active/Ended), total vote counts, option counts, and publish/expiry dates. Edit running polls inline. End active polls with a confirmation dialog (archives thread, updates Discord message, removes timer).
 - **Giveaways** — Track active and completed giveaways with entry counts, winner counts, and end times.
 - **Tags** — View most-used tags ranked by usage, top creators leaderboard, total tag count and total usage statistics.
 - **Command management** — Three-state system: Enabled/Partial/Disabled. Click any command to configure per-channel state. Plonk management to ignore specific users or channels.
 - **XP over-time chart** — Daily XP gain trend chart (uPlot) on the leveling page, fed by Percy's `xp_history` daily snapshots. Shows as a filled line chart once two or more days of data are recorded; graceful empty states for zero or one snapshot.
-- **User lookup** — click a member to see a full profile: avatar, display name, username, account/join dates, badges (BOT, not-in-guild), role chips with Discord colors, leveling stats (level, XP, messages, rank), and a moderation timeline showing each case (action type color-coded, reason, moderator, timestamp).
-- **Live bot stats** — the Stats page's "Bot Stats" tiles update in real time over WebSocket (topic `percy`). A background poller fetches Percy's global stats every 60 seconds and publishes them to the broadcast hub; the browser subscribes on page load and patches tiles as new data arrives, with automatic reconnection.
+- **User lookup** — click a member to see a full profile: avatar, display name, username, account/join dates, badges (BOT, not-in-guild), role chips with Discord colors, leveling stats (level, XP, messages, rank), a moderation timeline showing each case (action type color-coded, reason, moderator, timestamp), and a GitHub-style **activity heatmap** showing daily command usage over the past year.
+- **Audit log** — browse all moderation cases with filters (action type, moderator ID, date range), paginated table with color-coded action pills, live polling every 15 seconds for new cases, and CSV export.
+- **Bulk moderation** — select multiple members via checkboxes on the members page for batch kick/ban actions with per-user success/failure reporting.
+- **CSV export** — download leaderboard data and moderation case history as CSV files.
+- **Live bot stats** — the Stats page's "Bot Stats" tiles update in real time over WebSocket (topic `percy`). A background poller fetches Percy's global stats every 60 seconds and publishes them to the broadcast hub; the browser subscribes on page load and patches tiles as new data arrives, with automatic reconnection. The `moderation` WS topic is also available to dashboard users for future live moderation event push.
 - **Server & bot stats** — Real-time server metrics and bot-wide statistics.
 - **Bot invite flow** — if Percy is not in a guild, displays an invite link instead of an error.
 - **Setup wizard** — a first-time configuration banner for guilds with a fresh config.
@@ -889,9 +892,11 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/gatekeeper` | POST | Save gatekeeper settings |
 | `/percy/dashboard/guild/:id/members` | GET | Member management page |
 | `/percy/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API) |
-| `/percy/dashboard/guild/:id/members/:uid` | GET | User lookup page (profile, leveling, moderation cases) |
+| `/percy/dashboard/guild/:id/members/:uid` | GET | User lookup page (profile, leveling, moderation cases, activity heatmap) |
 | `/percy/dashboard/guild/:id/members/:uid/action` | POST | Execute moderation action (kick/ban/unban) |
 | `/percy/dashboard/guild/:id/members/:uid/roles` | POST | Add/remove member roles |
+| `/percy/dashboard/guild/:id/members/:uid/activity` | GET | Daily activity data for heatmap (JSON) |
+| `/percy/dashboard/guild/:id/members/bulk-action` | POST | Batch moderation action on multiple members |
 | `/percy/dashboard/guild/:id/leveling` | GET | Leveling config + leaderboard + collection editors |
 | `/percy/dashboard/guild/:id/leveling/config` | POST | Update leveling configuration |
 | `/percy/dashboard/guild/:id/leveling/users/:uid` | POST | Update user level/XP |
@@ -915,11 +920,17 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/emoji-stats` | GET | Emoji usage statistics |
 | `/percy/dashboard/guild/:id/polls` | GET | Polls overview |
 | `/percy/dashboard/guild/:id/polls/:poll_id` | POST | Edit a running poll |
+| `/percy/dashboard/guild/:id/polls/:poll_id/end` | POST | End a running poll |
 | `/percy/dashboard/guild/:id/giveaways` | GET | Giveaways overview |
 | `/percy/dashboard/guild/:id/tags` | GET | Tags and usage stats |
 | `/percy/dashboard/guild/:id/commands` | GET | Command management |
 | `/percy/dashboard/guild/:id/commands/toggle` | POST | Enable/disable a command |
 | `/percy/dashboard/guild/:id/plonks` | POST | Add/remove plonked entities |
+| `/percy/dashboard/guild/:id/audit-log` | GET | Moderation audit log with filters |
+| `/percy/dashboard/guild/:id/audit-log.json` | GET | Filtered cases (JSON API) |
+| `/percy/dashboard/guild/:id/audit-log/recent` | GET | Recent cases since timestamp (live polling) |
+| `/percy/dashboard/guild/:id/export/leaderboard` | GET | CSV export of XP leaderboard |
+| `/percy/dashboard/guild/:id/export/cases` | GET | CSV export of moderation cases |
 | `/percy/dashboard/guild/:id/stats` | GET | Server and bot statistics |
 
 ### Source layout
@@ -929,6 +940,7 @@ The dashboard code is grouped under a `percy` namespace per file type:
 - `src/web/routes/dashboard/` — `mod.rs` (router + shared helpers), `templates.rs` (Askama view structs), `handlers.rs` (request handlers).
 - `src/integrations/percy/` — `mod.rs` (the typed `PercyClient` + `PercyError`) and `types.rs` (response models).
 - `src/services/percy_stats.rs` — background poller that fetches bot stats every 60s and publishes to the `"percy"` WebSocket topic.
+- `src/services/percy_moderation.rs` — placeholder for future server-push moderation notifications via the `"moderation"` WS topic.
 - `templates/percy/*.html` — one Askama template per page (including `user.html` for the member detail/lookup view).
 - `static/css/percy/dashboard.css`, `static/js/percy/percy-dashboard.js`, `static/js/percy/percy-members.js` — page styling and behavior.
 
@@ -986,7 +998,7 @@ The `static/` directory must be alongside the binary at runtime — it serves th
 ### Database migrations
 
 The schema is versioned via `PRAGMA user_version` and migrations are applied automatically on startup from `sql/0.sql`
-through `sql/N.sql` (currently up to `sql/12.sql`). To add a migration, drop a new `sql/<N+1>.sql` ending with
+through `sql/N.sql` (currently up to `sql/13.sql`). To add a migration, drop a new `sql/<N+1>.sql` ending with
 `PRAGMA user_version = <N+1>;` and bump the array length in `src/main.rs`.
 
 The `request` table (in `requests.db`, separate from `main.db`) uses idempotent `ALTER TABLE` for compatibility with
@@ -1033,7 +1045,7 @@ src/
 
 templates/                — Askama HTML templates (grouped into subfolders)
 static/                   — CSS, JS, images served verbatim (grouped into subfolders)
-sql/                      — Numbered migration files (0.sql … 12.sql)
+sql/                      — Numbered migration files (0.sql … 13.sql)
 ```
 
 ## License

@@ -185,6 +185,7 @@ pub fn routes() -> Router<AppState> {
         // Browse pages
         .route("/percy/dashboard/guild/:guild_id/polls", get(guild_polls))
         .route("/percy/dashboard/guild/:guild_id/polls/:poll_id", post(guild_poll_edit))
+        .route("/percy/dashboard/guild/:guild_id/polls/:poll_id/end", post(guild_poll_end))
         .route("/percy/dashboard/guild/:guild_id/giveaways", get(guild_giveaways))
         .route("/percy/dashboard/guild/:guild_id/tags", get(guild_tags))
         .route("/percy/dashboard/guild/:guild_id/highlights", get(guild_highlights))
