@@ -954,3 +954,39 @@ button:hover .spark,
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
+
+/* -- Humanised timestamps (.js-ts -> .ts-formatted via timestamps.js) --
+   Loaded globally so admin, account, images and dashboard all share the exact
+   same hover-highlight + floating tooltip treatment. */
+
+.ts-formatted {
+    cursor: default;
+    white-space: nowrap;
+    border-bottom: 1px dashed transparent;
+    transition: border-color 0.12s, color 0.12s;
+}
+.ts-formatted:hover {
+    color: var(--branding);
+    border-bottom-color: color-mix(in srgb, var(--branding) 45%, transparent);
+}
+.ts-tooltip {
+    position: fixed;
+    z-index: 3000;
+    display: none;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--foreground);
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.4rem;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+.ts-tooltip.visible {
+    opacity: 1;
+}

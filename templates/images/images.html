@@ -56,9 +56,12 @@
         <div class="card-meta">
             <a href="{{ file.url }}" class="file-name card-name" title="{{ file.download_name()|e }}">{{ file.id|e }}</a>
             <div class="card-info">
-                <span class="file-size">{{ file.size|filesizeformat }}</span>
+                <span class="card-stats">
+                    <span class="file-size">{{ file.size|filesizeformat }}</span>
+                    <span class="card-info-sep" aria-hidden="true">·</span>
+                    <span class="file-views">{{ file.views }} view{% if file.views != 1 %}s{% endif %}</span>
+                </span>
                 <span class="file-uploaded"><time class="js-ts" datetime="{{ file.uploaded_at|isoformat }}">{{ file.uploaded_at|isoformat }}</time></span>
-                <span class="file-views">{{ file.views }} view{% if file.views != 1 %}s{% endif %}</span>
             </div>
         </div>
     </div>
