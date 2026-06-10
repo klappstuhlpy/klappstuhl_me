@@ -39,7 +39,7 @@
         <span class="info-stats">
             {%- if let Some((w, h)) = dimensions %}<span>{{ w }}&times;{{ h }}</span>{%- endif %}
             <span>{{ entry.size|filesizeformat }}</span>
-            <span>{{ entry.uploaded_at|isoformat }}</span>
+            <span><time class="js-ts" datetime="{{ entry.uploaded_at|isoformat }}">{{ entry.uploaded_at|isoformat }}</time></span>
             <span>{{ views }} view{% if views != 1 %}s{% endif %}</span>
         </span>
     </div>

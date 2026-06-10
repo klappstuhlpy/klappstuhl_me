@@ -78,7 +78,7 @@ function renderTable(rows) {
             : `<span class="muted">—</span>`;
 
         return `<tr>
-            <td><span class="audit-when" title="${escapeHtml(fmtAbsolute(r.created_at))}">${fmtRelative(r.created_at)}</span></td>
+            <td><span class="audit-when">${window.tsHtml(r.created_at)}</span></td>
             <td>${accountCell}</td>
             <td>${keyCell}</td>
             <td><span class="action-pill ${cls}">${escapeHtml(r.action)}</span></td>

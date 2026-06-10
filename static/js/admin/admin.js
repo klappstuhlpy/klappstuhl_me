@@ -235,8 +235,7 @@ async function getRecentServerLogs() {
     let tr = document.createElement('tr');
     let ts = document.createElement('td');
     ts.setAttribute('data-th', 'Timestamp');
-    ts.setAttribute('title', log.timestamp);
-    ts.textContent = formatRelative(Math.floor(Date.parse(log.timestamp) / 1000));
+    ts.innerHTML = window.tsHtml(log.timestamp);
     let level = document.createElement('td');
     level.setAttribute('data-th', 'Level');
     level.textContent = log.level;

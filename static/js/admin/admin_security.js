@@ -193,7 +193,7 @@ function renderRecent(rows) {
         const cc = r.country_code ? `<td>${flagEmoji(r.country_code)}</td>` : (FLAGS.geoipEnabled ? "<td></td>" : "");
         const statusCls = r.status_code >= 500 ? "s5xx" : "s4xx";
         return `<tr>
-            <td><span title="${new Date(r.ts*1000).toLocaleString()}">${fmtRelative(r.ts)}</span></td>
+            <td>${window.tsHtml(new Date(r.ts * 1000).toISOString())}</td>
             <td><code>${escapeHtml(r.ip || "—")}</code></td>
             ${cc}
             <td><span class="status-pill ${statusCls}">${r.status_code}</span></td>
@@ -265,7 +265,7 @@ function renderCfEvents(events) {
     }
     tbody.innerHTML = events.map(e => `
         <tr>
-            <td><span title="${new Date(e.ts*1000).toLocaleString()}">${fmtRelative(e.ts)}</span></td>
+            <td>${window.tsHtml(new Date(e.ts * 1000).toISOString())}</td>
             <td><span class="reason-pill ${e.action === "block" ? "failed-login" : ""}">${escapeHtml(e.action)}</span></td>
             <td>${escapeHtml(e.source)}</td>
             <td>${escapeHtml(e.country)}</td>

@@ -96,8 +96,8 @@ function renderLockouts(rows) {
             <td>${escapeHtml(l.ip)}</td>
             <td>${escapeHtml(l.reason)}</td>
             <td>${fmtNumber(l.hit_count)}</td>
-            <td title="${escapeHtml(l.locked_at)}">${fmtRelative(l.locked_at)}</td>
-            <td title="${escapeHtml(l.expires_at || '')}">${fmtExpires(l.expires_at)}</td>
+            <td>${window.tsHtml(l.locked_at)}</td>
+            <td>${l.expires_at ? window.tsHtml(l.expires_at) : '<span class="muted">permanent</span>'}</td>
             <td>${l.status === "active"
                 ? `<button class="button outline" data-action="release">Release</button>`
                 : ""}</td>

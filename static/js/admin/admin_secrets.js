@@ -44,7 +44,7 @@ function renderTiles(data) {
 
     const ls = data.last_scan;
     if (ls && ls.started_at) {
-        document.getElementById("tile-last-scan").textContent = fmtRelative(ls.started_at);
+        document.getElementById("tile-last-scan").innerHTML = window.tsHtml(ls.started_at);
         document.getElementById("tile-last-scan-detail").textContent =
             `${fmtNumber(ls.files_scanned)} files · ${fmtNumber(ls.findings_new)} new / ${fmtNumber(ls.findings_total)} total`;
     } else {
@@ -73,7 +73,7 @@ function renderFindings(rows) {
             <td><div class="finding-file"><code>${escapeHtml(r.file_path)}</code>
                 <span class="line">:${r.line}</span></div></td>
             <td><code class="finding-snippet" title="${escapeHtml(r.snippet)}">${escapeHtml(r.snippet)}</code></td>
-            <td><span title="${escapeHtml(r.last_seen)}">${fmtRelative(r.last_seen)}</span></td>
+            <td>${r.last_seen ? window.tsHtml(r.last_seen) : '—'}</td>
             <td><div class="row-actions">${actions}</div></td>
         </tr>`;
     }).join("");

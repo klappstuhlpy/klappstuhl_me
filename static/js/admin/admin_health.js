@@ -96,7 +96,7 @@ function renderTargets(rows) {
                     <span>${fmtPercent(uptime)}</span>
                 </div>
             </td>
-            <td><span title="${escapeHtml(r.last_check || '')}">${fmtRelative(r.last_check)}</span></td>
+            <td>${r.last_check ? window.tsHtml(r.last_check) : '—'}</td>
             <td><div class="row-actions">
                 <button class="button outline" data-action="probe">Check now</button>
                 <button class="button outline" data-action="toggle">${r.enabled ? "Disable" : "Enable"}</button>
@@ -129,8 +129,8 @@ function renderIncidents(summaries) {
             return `<tr>
                 <td><span class="pill dot ${i.status}">${escapeHtml(i.status)}</span></td>
                 <td>${escapeHtml(i.target_name || ("#" + i.target_id))}</td>
-                <td title="${escapeHtml(i.started_at)}">${fmtRelative(i.started_at)}</td>
-                <td>${ongoing ? '<span class="ongoing">ongoing</span>' : fmtRelative(i.ended_at)}</td>
+                <td>${window.tsHtml(i.started_at)}</td>
+                <td>${ongoing ? '<span class="ongoing">ongoing</span>' : window.tsHtml(i.ended_at)}</td>
                 <td>${fmtDuration(i.started_at, i.ended_at)}</td>
                 <td>${escapeHtml(i.last_error || "")}</td>
             </tr>`;

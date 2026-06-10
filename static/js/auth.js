@@ -58,11 +58,6 @@ document.querySelector('#disable-2fa-modal .button[formmethod="dialog"]')?.addEv
 
 document.getElementById('session-description')?.setAttribute('value', deviceDescription());
 
-document.querySelectorAll('.created[data-timestamp]').forEach(el => {
-  let seconds = parseInt(el.dataset.timestamp, 10);
-  el.textContent = formatRelative(seconds);
-});
-
 document.querySelectorAll('.invalidate[data-token]').forEach(el => {
   const token = el.dataset.token;
   el.removeAttribute('data-token');

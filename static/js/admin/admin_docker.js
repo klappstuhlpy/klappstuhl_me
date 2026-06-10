@@ -458,7 +458,7 @@
 
         const time = document.createElement('span');
         time.className = 'event-time';
-        time.textContent = formatTime(ts);
+        time.innerHTML = (ts && isFinite(ts)) ? window.tsHtml(new Date(ts * 1000).toISOString()) : '';
 
         row.appendChild(badge);
         row.appendChild(info);

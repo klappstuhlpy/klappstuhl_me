@@ -81,7 +81,7 @@ function renderTable(rows) {
       } catch (_) {}
     }
     return `<tr>
-      <td><span class="audit-when" title="${escapeHtml(fmtAbsolute(r.ts))}">${fmtRelative(r.ts)}</span></td>
+      <td><span class="audit-when">${window.tsHtml(r.ts)}</span></td>
       <td>${escapeHtml(r.actor_label)}</td>
       <td><span class="action-pill ${cls}">${escapeHtml(r.action)}</span></td>
       <td>${target}</td>
@@ -136,7 +136,7 @@ function prependLiveEvent(evt) {
   }
   const tr = document.createElement("tr");
   tr.innerHTML = `
-    <td><span class="audit-when" title="${escapeHtml(fmtAbsolute(evt.ts))}">just now</span></td>
+    <td><span class="audit-when">${window.tsHtml(evt.ts)}</span></td>
     <td>${escapeHtml(evt.actor_label)}</td>
     <td><span class="action-pill ${cls}">${escapeHtml(evt.action)}</span></td>
     <td>${target}</td>

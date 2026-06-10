@@ -243,9 +243,13 @@ function updateCardFromView(card, view) {
   const started = card.querySelector("[data-role='started']");
   if (started) {
     if (view.running) {
-      const t = fmtIsoStarted(view.started_at);
-      started.textContent = t || "Start time unavailable";
-      if (!t) started.classList.add("muted"); else started.classList.remove("muted");
+      if (view.started_at) {
+        started.innerHTML = "Started " + window.tsHtml(view.started_at);
+        started.classList.remove("muted");
+      } else {
+        started.textContent = "Start time unavailable";
+        started.classList.add("muted");
+      }
     } else {
       started.textContent = "Not running";
       started.classList.add("muted");

@@ -45,7 +45,7 @@
                 <span class="detail-value" data-role="started">
                     {% if service.running %}
                     {% match service.started_at %}
-                    {% when Some with (started) %}Started {{ started|isoformat }}
+                    {% when Some with (started) %}Started <time class="js-ts" datetime="{{ started|isoformat }}">{{ started|isoformat }}</time>
                     {% when None %}<span class="muted">Start time unavailable</span>
                     {% endmatch %}
                     {% else %}

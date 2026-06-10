@@ -112,7 +112,43 @@
 
     function run(root) {
         var scope = root && root.querySelectorAll ? root : document;
+        if (scope.matches && scope.matches(".js-ts:not(.ts-formatted)")) formatOne(scope);
         scope.querySelectorAll(".js-ts:not(.ts-formatted)").forEach(formatOne);
+    }
+
+    function esc(s) {
+        return String(s == null ? "" : s)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    // Returns markup for a humanised timestamp. Use from any client renderer:
+    //   row.innerHTML = `<td>${tsHtml(iso)}</td>`
+    // Accepts an ISO string (or anything `Date` parses). The MutationObserver
+    // below formats it once it lands in the DOM — no manual call required.
+    function tsHtml(value) {
+        var v = esc(value);
+        return '<time class="js-ts" datetime="' + v + '">' + v + "</time>";
+    }
+
+    // Auto-format any `.js-ts` added to the DOM later (live tables, WS updates,
+    // pagination), so callers only need to emit the markup. Scans are coalesced
+    // into one rAF tick to stay cheap on frequently-updating admin pages.
+    if (typeof MutationObserver !== "undefined") {
+        var scheduled = false;
+        function schedule() {
+            if (scheduled) return;
+            scheduled = true;
+            var defer = window.requestAnimationFrame || function (fn) { return setTimeout(fn, 16); };
+            defer(function () { scheduled = false; run(document); });
+        }
+        var observer = new MutationObserver(function (mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+                if (mutations[i].addedNodes.length) { schedule(); return; }
+            }
+        });
+        function startObserver() { observer.observe(document.body, { childList: true, subtree: true }); }
+        if (document.body) startObserver();
+        else document.addEventListener("DOMContentLoaded", startObserver);
     }
 
     if (document.readyState === "loading") {
@@ -122,4 +158,5 @@
     }
 
     window.formatTimestamps = run;
+    window.tsHtml = tsHtml;
 })();

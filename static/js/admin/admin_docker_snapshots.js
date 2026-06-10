@@ -121,7 +121,7 @@
             document.getElementById('stat-total').textContent = snapshots.length;
             if (snapshots.length) {
                 const oldest = snapshots[snapshots.length - 1];
-                document.getElementById('stat-oldest').textContent = fmtDate(oldest.created_at);
+                document.getElementById('stat-oldest').innerHTML = window.tsHtml(oldest.created_at);
             } else {
                 document.getElementById('stat-oldest').textContent = '—';
             }
@@ -137,7 +137,7 @@
                     <td>${escHtml(s.container_name)}</td>
                     <td class="snap-image">${escHtml(s.original_image)}</td>
                     <td>${s.description ? escHtml(s.description) : '<span class="text-muted">—</span>'}</td>
-                    <td class="snap-date">${fmtDate(s.created_at)}</td>
+                    <td class="snap-date">${window.tsHtml(s.created_at)}</td>
                     <td class="col-actions">
                         <div class="row-actions">
                             <button class="button outline small" data-action="restore" data-id="${s.id}" data-name="${escAttr(s.container_name)}">Restore</button>

@@ -172,7 +172,7 @@
                     <td class="san-hash" title="${escHtml(s.sha256)}">${shortHash(s.sha256)}</td>
                     <td>${clamBadge(s.clamav_clean, s.clamav_virus)}</td>
                     <td>${vtBadge(s.vt_status, s.vt_positives, s.vt_total, s.vt_url)}</td>
-                    <td class="san-date">${fmtDate(s.scanned_at)}</td>
+                    <td class="san-date">${window.tsHtml(s.scanned_at)}</td>
                     <td class="col-actions">
                         <button class="button danger small" data-id="${s.id}">Delete</button>
                     </td>

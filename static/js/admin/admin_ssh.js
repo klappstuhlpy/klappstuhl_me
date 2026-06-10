@@ -303,13 +303,11 @@ function renderKeys(keys) {
 
         // ── Cell 5: added_at ──
         const addedCell = document.createElement("span");
-        addedCell.title = k.added_at ?? "";
-        addedCell.textContent = fmtRelative(k.added_at);
+        addedCell.innerHTML = k.added_at ? window.tsHtml(k.added_at) : fmtRelative(k.added_at);
 
         // ── Cell 6: last_used_at ──
         const lastCell = document.createElement("span");
-        lastCell.title = k.last_used_at ?? "";
-        lastCell.textContent = fmtRelative(k.last_used_at);
+        lastCell.innerHTML = k.last_used_at ? window.tsHtml(k.last_used_at) : fmtRelative(k.last_used_at);
 
         // ── Cell 7: status pill ──
         const statusCell = document.createElement("span");
@@ -478,16 +476,14 @@ function renderTokens(tokens) {
 
         // ── Cell 3: created_at ──
         const createdCell = document.createElement("span");
-        createdCell.title = t.created_at ?? "";
-        createdCell.textContent = fmtRelative(t.created_at);
+        createdCell.innerHTML = t.created_at ? window.tsHtml(t.created_at) : fmtRelative(t.created_at);
 
         // ── Cell 4: expires_at ──
         const expiresCell = buildExpiryCell(t.expires_at);
 
         // ── Cell 5: used_at ──
         const usedCell = document.createElement("span");
-        usedCell.title = t.used_at ?? "";
-        usedCell.textContent = fmtRelative(t.used_at);
+        usedCell.innerHTML = t.used_at ? window.tsHtml(t.used_at) : fmtRelative(t.used_at);
 
         // ── Cell 6: status ──
         const statusCell = document.createElement("span");

@@ -180,7 +180,7 @@
         <div class="session">
             <div class="session-info">
                 <span class="session-label">{{ session.label() }}</span>
-                <span class="session-time created" data-timestamp="{{ session.created_at.unix_timestamp() }}" title="{{ session.created_at|isoformat }}">{{ session.created_at|isoformat }}</span>
+                <time class="session-time js-ts" datetime="{{ session.created_at|isoformat }}">{{ session.created_at|isoformat }}</time>
             </div>
             <a class="button danger outline invalidate" href="/logout">Logout</a>
         </div>
@@ -195,7 +195,7 @@
         <div class="session">
             <div class="session-info">
                 <span class="session-label">{{ session.label() }}</span>
-                <span class="session-time created" data-timestamp="{{ session.created_at.unix_timestamp() }}" title="{{ session.created_at|isoformat }}">{{ session.created_at|isoformat }}</span>
+                <time class="session-time js-ts" datetime="{{ session.created_at|isoformat }}">{{ session.created_at|isoformat }}</time>
             </div>
             <button class="button danger outline invalidate" data-token="{{ session.signed(key)|as_ref|maybe_display }}">Logout</button>
         </div>

@@ -167,7 +167,8 @@ function filterEntries(query) {
 }
 
 parseEntryObjects();
-changeModifiedToRelative();
+// Upload times are now rendered as <time class="js-ts"> and humanised by
+// timestamps.js (relative text + hover tooltip), so no manual pass is needed.
 
 let sorters = Array.from(document.querySelectorAll('.files')).map(el => new TableSorter(el));
 document.getElementById('clear-search-filter')?.addEventListener('click', resetSearchFilter);
