@@ -1,48 +1,8 @@
-{% extends "../layout.html" %}
+{% extends "percy/dashboard_layout.html" %}
 
-{% block title %}Economy — {{ guild_name }} | Dashboard{% endblock %}
+{% block page_subtitle %}<p>Manage shop items, member balances, and lottery.</p>{% endblock %}
 
-{% block css %}
-<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
-{% endblock %}
-
-{% block body %}
-<div class="dashboard-container">
-    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
-
-    <div class="dashboard-header">
-        <div>
-            <h1>Economy</h1>
-            <p>Manage shop items, member balances, and lottery.</p>
-        </div>
-    </div>
-
-    <nav class="dashboard-nav">
-        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
-        <div class="nav-group">
-            <span class="nav-group-label">Features</span>
-            <div class="nav-dropdown">
-                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/economy" class="active">Economy</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
-            </div>
-        </div>
-        <div class="nav-group">
-            <span class="nav-group-label">Browse</span>
-            <div class="nav-dropdown">
-                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
-            </div>
-        </div>
-    </nav>
+{% block content %}
 
     {# ─── Shop Items ─────────────────────────────────────────────── #}
     <section class="config-section">
@@ -53,12 +13,28 @@
         <p class="text-muted">No shop items configured.</p>
         {% else %}
         <table class="data-table">
-            <thead><tr><th>Name</th><th>Price</th><th>Description</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Price</th><th>Effect</th><th>Description</th><th></th></tr></thead>
             <tbody>
                 {% for item in economy.items %}
                 <tr>
                     <td><strong>{{ item.name }}</strong></td>
                     <td>{{ item.price }}</td>
+                    <td>
+                        {% match item.effect.as_deref() %}
+                        {% when Some with ("cash") %}
+                            <span class="badge badge-info">Cash {{ item.effect_value.unwrap_or(0) }}</span>
+                        {% when Some with ("lootbox") %}
+                            <span class="badge badge-info">Lootbox ~{{ item.effect_value.unwrap_or(0) }}</span>
+                        {% when Some with ("role") %}
+                            <span class="badge badge-info">Role Grant</span>
+                        {% when Some with ("xp_boost") %}
+                            <span class="badge badge-info">+{{ item.effect_value.unwrap_or(0) }}% XP / {{ item.duration_minutes.unwrap_or(0) }}m</span>
+                        {% when Some with ("loot_boost") %}
+                            <span class="badge badge-info">+{{ item.effect_value.unwrap_or(0) }}% Loot / {{ item.duration_minutes.unwrap_or(0) }}m</span>
+                        {% when _ %}
+                            <span class="text-muted">None</span>
+                        {% endmatch %}
+                    </td>
                     <td class="text-muted">{{ item.description.as_deref().unwrap_or("-") }}</td>
                     <td><button class="button small danger delete-item-btn" data-name="{{ item.name }}">Delete</button></td>
                 </tr>
@@ -105,7 +81,6 @@
         </table>
         {% endif %}
     </section>
-</div>
 
 <!-- Add Item Modal -->
 <div class="modal-overlay" id="add-item-modal" hidden>
@@ -117,7 +92,35 @@
             <label class="config-label">Price</label>
             <input type="number" id="item_price" class="config-input" min="1" style="margin-bottom: 0.75rem;">
             <label class="config-label">Description</label>
-            <input type="text" id="item_desc" class="config-input" maxlength="256">
+            <input type="text" id="item_desc" class="config-input" maxlength="256" style="margin-bottom: 0.75rem;">
+            <label class="config-label">Effect</label>
+            <select id="item_effect" class="config-select" style="margin-bottom: 0.75rem;">
+                <option value="none">None (collectible)</option>
+                <option value="cash">Cash Voucher</option>
+                <option value="lootbox">Lootbox</option>
+                <option value="role">Role Grant</option>
+                <option value="xp_boost">XP Boost</option>
+                <option value="loot_boost">Loot Boost</option>
+            </select>
+            <div id="effect-value-group" hidden>
+                <label class="config-label" id="effect-value-label">Value</label>
+                <input type="number" id="item_effect_value" class="config-input" min="1" style="margin-bottom: 0.75rem;">
+            </div>
+            <div id="effect-role-group" hidden>
+                <label class="config-label">Role to Grant</label>
+                <select id="item_effect_role" class="config-select" style="margin-bottom: 0.75rem;">
+                    <option value="">Select a role…</option>
+                    {% for role in roles %}
+                    {% if !role.managed && role.name != "@everyone" %}
+                    <option value="{{ role.id }}">{{ role.name }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div id="effect-duration-group" hidden>
+                <label class="config-label">Duration (minutes)</label>
+                <input type="number" id="item_duration" class="config-input" min="1" max="10080" style="margin-bottom: 0.75rem;">
+            </div>
         </div>
         <div class="modal-actions" style="margin-top: 1rem;">
             <button type="button" class="button small" id="item-modal-cancel">Cancel</button>
@@ -168,7 +171,31 @@
     // Add item
     const addItemBtn = document.getElementById('add-item-btn');
     const addItemModal = document.getElementById('add-item-modal');
+    const effectSelect = document.getElementById('item_effect');
+    const effectValueGroup = document.getElementById('effect-value-group');
+    const effectValueLabel = document.getElementById('effect-value-label');
+    const effectRoleGroup = document.getElementById('effect-role-group');
+    const effectDurationGroup = document.getElementById('effect-duration-group');
+
+    function updateEffectFields() {
+        const effect = effectSelect.value;
+        effectValueGroup.hidden = true;
+        effectRoleGroup.hidden = true;
+        effectDurationGroup.hidden = true;
+        if (effect === 'cash' || effect === 'lootbox') {
+            effectValueGroup.hidden = false;
+            effectValueLabel.textContent = 'Cash Amount';
+        } else if (effect === 'xp_boost' || effect === 'loot_boost') {
+            effectValueGroup.hidden = false;
+            effectValueLabel.textContent = 'Bonus Percent (1-500)';
+            effectDurationGroup.hidden = false;
+        } else if (effect === 'role') {
+            effectRoleGroup.hidden = false;
+        }
+    }
+
     if (addItemBtn && addItemModal) {
+        effectSelect.addEventListener('change', updateEffectFields);
         addItemBtn.addEventListener('click', () => { addItemModal.hidden = false; });
         document.getElementById('item-modal-cancel').addEventListener('click', () => { addItemModal.hidden = true; });
         addItemModal.addEventListener('click', (e) => { if (e.target === addItemModal) addItemModal.hidden = true; });
@@ -177,8 +204,28 @@
             const price = parseInt(document.getElementById('item_price').value);
             const description = document.getElementById('item_desc').value.trim() || null;
             if (!name || !price) { showToast('error', 'Name and price required.'); return; }
+            const effect = effectSelect.value;
+            const body = { name, price, description };
+            if (effect !== 'none') {
+                body.effect = effect;
+                if (effect === 'cash' || effect === 'lootbox' || effect === 'xp_boost' || effect === 'loot_boost') {
+                    const val = parseInt(document.getElementById('item_effect_value').value);
+                    if (!val || val < 1) { showToast('error', 'Effect value is required.'); return; }
+                    body.effect_value = val;
+                }
+                if (effect === 'role') {
+                    const roleId = document.getElementById('item_effect_role').value;
+                    if (!roleId) { showToast('error', 'Please select a role.'); return; }
+                    body.effect_value = parseInt(roleId);
+                }
+                if (effect === 'xp_boost' || effect === 'loot_boost') {
+                    const dur = parseInt(document.getElementById('item_duration').value);
+                    if (!dur || dur < 1) { showToast('error', 'Duration is required for boost effects.'); return; }
+                    body.duration_minutes = dur;
+                }
+            }
             try {
-                const r = await fetch(`${base}/items`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ name, price, description }) });
+                const r = await fetch(`${base}/items`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) });
                 const d = await r.json();
                 if (d.ok) { showToast('success', 'Item created.'); setTimeout(() => location.reload(), 400); }
                 else { showToast('error', d.error || 'Failed.'); }

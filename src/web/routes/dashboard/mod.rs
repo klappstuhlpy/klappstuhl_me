@@ -157,6 +157,19 @@ pub fn routes() -> Router<AppState> {
             "/percy/dashboard/guild/:guild_id/economy/lottery",
             post(guild_economy_lottery_create).delete(guild_economy_lottery_delete),
         )
+        .route("/percy/dashboard/guild/:guild_id/music", get(guild_music))
+        .route(
+            "/percy/dashboard/guild/:guild_id/music/status",
+            get(guild_music_status),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/music/equalizer",
+            post(guild_music_equalizer),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/music/filters",
+            post(guild_music_filters),
+        )
         .route(
             "/percy/dashboard/guild/:guild_id/autoresponders",
             get(guild_autoresponders).post(guild_autoresponders_action),

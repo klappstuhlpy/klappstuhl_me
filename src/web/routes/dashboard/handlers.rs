@@ -278,6 +278,8 @@ pub(super) async fn guild_members(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "members",
+        page_title: "Members",
         members,
         roles,
     }
@@ -548,6 +550,8 @@ pub(super) async fn guild_leveling(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "leveling",
+        page_title: "Leveling",
         config,
         leaderboard,
         roles,
@@ -659,6 +663,8 @@ pub(super) async fn guild_polls(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "polls",
+        page_title: "Polls",
         polls,
         active_count,
         ended_count,
@@ -742,6 +748,8 @@ pub(super) async fn guild_giveaways(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "giveaways",
+        page_title: "Giveaways",
         giveaways,
         active_count,
         ended_count,
@@ -782,6 +790,8 @@ pub(super) async fn guild_tags(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "tags",
+        page_title: "Tags",
         tags,
     }
     .into_response()
@@ -825,6 +835,8 @@ pub(super) async fn guild_commands(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "commands",
+        page_title: "Commands",
         commands,
         channels,
         disabled_count,
@@ -985,6 +997,8 @@ pub(super) async fn guild_stats(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "stats",
+        page_title: "Stats",
         stats,
         bot_stats,
     }
@@ -1159,6 +1173,8 @@ pub(super) async fn guild_autoresponders(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "autoresponders",
+        page_title: "Autoresponders",
         data,
     }
     .into_response()
@@ -1329,16 +1345,136 @@ pub(super) async fn guild_economy(
         .await
         .unwrap_or(BalancesResponse { entries: Vec::new() });
     let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
+    let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
     EconomyTemplate {
         account: Some(account),
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "economy",
+        page_title: "Economy",
         economy,
         balances,
         channels,
+        roles,
     }
     .into_response()
+}
+
+pub(super) async fn guild_music(
+    State(state): State<AppState>,
+    account: Account,
+    flashes: Flashes,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Redirect::to("/percy/dashboard").into_response();
+    }
+    let guild = match percy.get_guild(guild_id).await {
+        Ok(g) => g,
+        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+    };
+    let music = percy.get_music(guild_id).await.unwrap_or(MusicInfo {
+        active: false,
+        equalizer: vec![0.0; 15],
+        filters: MusicFiltersState {
+            nightcore: false,
+            eight_d: false,
+            lowpass: None,
+        },
+        presets: vec![],
+        now_playing: None,
+        channel: None,
+    });
+    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
+    MusicTemplate {
+        account: Some(account),
+        flashes,
+        guild_id,
+        guild_name: guild.name.clone(),
+        nav_active: "music",
+        page_title: "Music",
+        music,
+        guild,
+        channels,
+    }
+    .into_response()
+}
+
+pub(super) async fn guild_music_equalizer(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.post_music_equalizer(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_music_filters(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.post_music_filters(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_music_status(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.get_music(guild_id).await {
+        Ok(music) => Json(serde_json::json!({
+            "ok": true,
+            "active": music.active,
+            "channel": music.channel,
+            "now_playing": music.now_playing,
+            "equalizer": music.equalizer,
+            "filters": music.filters,
+        }))
+        .into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
 }
 
 pub(super) async fn guild_comics(
@@ -1371,6 +1507,8 @@ pub(super) async fn guild_comics(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "comics",
+        page_title: "Comics",
         data,
         channels,
         roles,
@@ -1407,6 +1545,8 @@ pub(super) async fn guild_temp_channels(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "temp-channels",
+        page_title: "Temp Channels",
         data,
         channels,
     }
@@ -1441,6 +1581,8 @@ pub(super) async fn guild_highlights(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "highlights",
+        page_title: "Highlights",
         data,
     }
     .into_response()
@@ -1475,6 +1617,8 @@ pub(super) async fn guild_emoji_stats(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "emoji-stats",
+        page_title: "Emoji Stats",
         data,
     }
     .into_response()
@@ -1853,6 +1997,8 @@ pub(super) async fn guild_audit_log(
         flashes,
         guild_id,
         guild_name: guild.name,
+        nav_active: "audit-log",
+        page_title: "Audit Log",
         cases,
         filter_action: q.action,
         filter_moderator: q.moderator_id,

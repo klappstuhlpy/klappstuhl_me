@@ -1,9 +1,19 @@
-{% extends "../layout.html" %}
+{% extends "percy/dashboard_layout.html" %}
 
-{% block title %}Audit Log — {{ guild_name }} | Dashboard{% endblock %}
+{% block page_header %}
+<div class="dashboard-header">
+    <div>
+        <h1>{{ page_title }}</h1>
+        <p>View moderation cases, bans, warns, and mod actions.</p>
+    </div>
+    <div style="display:flex;gap:0.75rem;align-items:center;">
+        <span class="live-indicator" id="live-status">Live</span>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/export/cases.csv" class="export-link">Export CSV</a>
+    </div>
+</div>
+{% endblock %}
 
-{% block css %}
-<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+{% block page_css %}
 <style>
 .filter-bar {
     display: flex;
@@ -114,48 +124,7 @@
 </style>
 {% endblock %}
 
-{% block body %}
-<div class="dashboard-container">
-    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
-
-    <div class="dashboard-header">
-        <div>
-            <h1>Audit Log</h1>
-            <p>Browse moderation cases with filters. New cases appear live.</p>
-        </div>
-        <div style="display:flex;gap:0.75rem;align-items:center;">
-            <span class="live-indicator" id="live-status">Live</span>
-            <a href="/percy/dashboard/guild/{{ guild_id }}/export/cases.csv" class="export-link">Export CSV</a>
-        </div>
-    </div>
-
-    <nav class="dashboard-nav">
-        <a href="/percy/dashboard/guild/{{ guild_id }}">Configuration</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/audit-log" class="active">Audit Log</a>
-        <div class="nav-group">
-            <span class="nav-group-label">Features</span>
-            <div class="nav-dropdown">
-                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/economy">Economy</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
-            </div>
-        </div>
-        <div class="nav-group">
-            <span class="nav-group-label">Browse</span>
-            <div class="nav-dropdown">
-                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
-            </div>
-        </div>
-    </nav>
+{% block content %}
 
     {# ─── Summary Tiles ───────────────────────────────────────────── #}
     <div class="metric-tiles">
@@ -251,7 +220,6 @@
         </div>
     </div>
     {% endif %}
-</div>
 
 <script>
 const GUILD_ID = '{{ guild_id }}';

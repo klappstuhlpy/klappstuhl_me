@@ -540,6 +540,12 @@ pub struct ShopItem {
     pub name: String,
     pub description: Option<String>,
     pub price: u64,
+    #[serde(default)]
+    pub effect: Option<String>,
+    #[serde(default)]
+    pub effect_value: Option<i64>,
+    #[serde(default)]
+    pub duration_minutes: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -569,6 +575,38 @@ pub struct BalanceEntry {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BalancesResponse {
     pub entries: Vec<BalanceEntry>,
+}
+
+// -- Music types -------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NowPlaying {
+    pub title: String,
+    pub author: String,
+    pub duration: u64,
+    pub position: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MusicFiltersState {
+    #[serde(default)]
+    pub nightcore: bool,
+    #[serde(rename = "8d", default)]
+    pub eight_d: bool,
+    #[serde(default)]
+    pub lowpass: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MusicInfo {
+    pub active: bool,
+    pub equalizer: Vec<f64>,
+    pub filters: MusicFiltersState,
+    pub presets: Vec<String>,
+    #[serde(default)]
+    pub now_playing: Option<NowPlaying>,
+    #[serde(default)]
+    pub channel: Option<String>,
 }
 
 // -- Comics types ------------------------------------------------------------

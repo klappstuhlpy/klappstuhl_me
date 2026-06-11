@@ -1,0 +1,489 @@
+{% extends "percy/dashboard_layout.html" %}
+
+{% block page_subtitle %}<p>Player status, panel configuration, equalizer, and audio filters.</p>{% endblock %}
+
+{% block page_css %}
+<style>
+.eq-container { position: relative; width: 100%; max-width: 900px; }
+.eq-canvas { width: 100%; height: 320px; border: 1px solid var(--border, #2a2a2a); border-radius: 8px; background: var(--surface, #111); cursor: pointer; touch-action: none; }
+.eq-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+.eq-presets { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.eq-status { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted, #888); transition: color 0.2s; }
+.eq-status.applying { color: var(--branding, #d97757); }
+.eq-status.applied { color: #4caf50; }
+.eq-status .eq-spinner { width: 12px; height: 12px; border: 2px solid transparent; border-top-color: var(--branding, #d97757); border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
+.eq-status.applying .eq-spinner { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.eq-preset-label { font-size: 0.82rem; color: var(--text-muted, #888); }
+.eq-preset-label strong { color: var(--foreground, #eee); }
+.filter-toggles { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+.filter-toggle { padding: 0.4rem 0.9rem; border-radius: 6px; border: 1px solid var(--border, #2a2a2a); background: transparent; color: var(--text-muted, #888); cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
+.filter-toggle.active { background: var(--branding, #d97757); color: #fff; border-color: var(--branding, #d97757); }
+.filter-toggle:hover { border-color: var(--branding, #d97757); }
+.now-playing { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; border-radius: 8px; background: var(--surface, #111); border: 1px solid var(--border, #2a2a2a); }
+.now-playing .np-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--branding, #d97757); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+.lowpass-input { width: 80px; margin-left: 0.5rem; }
+.listener-status { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; border-radius: 8px; background: var(--surface, #111); border: 1px solid var(--border, #2a2a2a); margin-bottom: 1.5rem; }
+.listener-status .ls-indicator { width: 10px; height: 10px; border-radius: 50%; }
+.listener-status .ls-indicator.active { background: #4caf50; }
+.listener-status .ls-indicator.inactive { background: #555; }
+</style>
+{% endblock %}
+
+{% block content %}
+    {# ─── Listener Status ────────────────────────────────────────── #}
+    <section class="config-section" id="status-section">
+        <h2>Player Status</h2>
+        <div id="player-status">
+        {% if music.active %}
+        <div class="listener-status">
+            <span class="ls-indicator active"></span>
+            <span>Active in <strong>{% match music.channel %}{% when Some with (ch) %}{{ ch }}{% when None %}unknown channel{% endmatch %}</strong></span>
+        </div>
+        {% match music.now_playing %}
+        {% when Some with (np) %}
+        <div class="now-playing">
+            <span class="np-dot"></span>
+            <span><strong>{{ np.title }}</strong> &mdash; {{ np.author }}</span>
+        </div>
+        {% when None %}
+        <p class="text-muted">Connected but nothing playing.</p>
+        {% endmatch %}
+        {% else %}
+        <div class="listener-status">
+            <span class="ls-indicator inactive"></span>
+            <span class="text-muted">No active music session in this server.</span>
+        </div>
+        {% endif %}
+        </div>
+    </section>
+
+    {# ─── Panel Configuration ────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Music Panel</h2>
+        <p class="config-section-description">Control the persistent now-playing panel embed.</p>
+        <form id="panel-form">
+            <input type="hidden" name="_section" value="music">
+            <div class="config-grid">
+                <label class="config-toggle">
+                    <div>
+                        <span class="config-label">Music Panel</span>
+                        <span class="config-description">Show a persistent now-playing panel</span>
+                    </div>
+                    <input type="checkbox" name="use_music_panel" value="true" {% if guild.use_music_panel %}checked{% endif %}>
+                </label>
+                <div class="config-field">
+                    <label class="config-label" for="music_panel_channel">Panel Channel</label>
+                    <span class="config-description">Channel for the now-playing embed</span>
+                    <select name="music_panel_channel_id" id="music_panel_channel" class="config-select">
+                        <option value="">Not set</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% match guild.music_panel_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            #{{ ch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="config-actions">
+                <button type="button" class="button small cancel-btn">Cancel</button>
+                <button type="submit" class="button primary small">Save Changes</button>
+            </div>
+        </form>
+    </section>
+
+    {# ─── Equalizer ──────────────────────────────────────────────── #}
+    <section class="config-section" id="eq-section">
+        <div class="eq-header">
+            <h2 style="margin:0">Equalizer</h2>
+            <span class="eq-status" id="eq-status"><span class="eq-spinner"></span><span class="eq-status-text"></span></span>
+            <span class="eq-preset-label">Preset: <strong id="eq-preset-name">{% if music.active %}Custom{% else %}—{% endif %}</strong></span>
+        </div>
+        <p class="config-section-description">Drag the band nodes to adjust gain. Click a preset to apply it instantly.</p>
+
+        <div class="eq-presets" id="eq-presets">
+            {% for preset in music.presets %}
+            <button class="button small preset-btn" data-preset="{{ preset }}">{{ preset }}</button>
+            {% endfor %}
+            <button class="button small danger" id="eq-reset-btn">Reset</button>
+        </div>
+
+        <div class="eq-container">
+            <canvas class="eq-canvas" id="eq-canvas"></canvas>
+        </div>
+    </section>
+
+    {# ─── Filters ────────────────────────────────────────────────── #}
+    <section class="config-section" id="filters-section">
+        <h2>Filters</h2>
+        <p class="config-section-description">Toggle audio processing filters on the active player.</p>
+        <div class="filter-toggles" id="filter-toggles">
+            <button class="filter-toggle{% if music.filters.nightcore %} active{% endif %}" data-action="nightcore">Nightcore</button>
+            <button class="filter-toggle{% if music.filters.eight_d %} active{% endif %}" data-action="8d">8D Audio</button>
+            <button class="filter-toggle" data-action="reset">Reset All</button>
+            <span style="display: flex; align-items: center;">
+                <button class="filter-toggle{% if music.filters.lowpass.is_some() %} active{% endif %}" data-action="lowpass" id="lowpass-btn">Lowpass</button>
+                <input type="number" class="config-input lowpass-input" id="lowpass-val" min="2.5" max="50" step="0.5" value="{{ music.filters.lowpass.unwrap_or(20.0) }}">
+            </span>
+        </div>
+    </section>
+
+<script>
+(function() {
+    const guildId = '{{ guild_id }}';
+    const base = `/percy/dashboard/guild/${guildId}/music`;
+    const initialActive = {{ music.active }};
+
+    const BANDS = ['25', '40', '63', '100', '160', '250', '400', '630', '1K', '1.6K', '2.5K', '4K', '6.3K', '10K', '16K'];
+    const MIN_GAIN = -0.25, MAX_GAIN = 1.0;
+    let gains = [{% for g in music.equalizer %}{{ g }}{% if !loop.last %},{% endif %}{% endfor %}];
+    let currentPreset = 'Custom';
+
+    function showToast(level, msg) {
+        const t = document.createElement('div');
+        t.className = 'toast toast-' + level; t.textContent = msg;
+        document.body.appendChild(t);
+        requestAnimationFrame(() => t.classList.add('visible'));
+        setTimeout(() => { t.classList.remove('visible'); setTimeout(() => t.remove(), 300); }, 3000);
+    }
+
+    function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+    // Capitalize preset button labels
+    document.querySelectorAll('.preset-btn').forEach(function(btn) {
+        btn.textContent = capitalize(btn.textContent.trim());
+    });
+
+    // ─── Panel form (stay on music page) ───────────────────────────
+    const panelForm = document.getElementById('panel-form');
+    if (panelForm) {
+        panelForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const btn = panelForm.querySelector('button[type="submit"]');
+            if (btn) btn.disabled = true;
+            try {
+                const r = await fetch(`/percy/dashboard/guild/${guildId}/config`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json' },
+                    body: new URLSearchParams(new FormData(panelForm)),
+                });
+                const d = await r.json();
+                if (d.ok) showToast('success', d.message || 'Settings saved.');
+                else showToast('error', d.error || 'Failed to save.');
+            } catch { showToast('error', 'Network error.'); }
+            finally { if (btn) btn.disabled = false; }
+        });
+    }
+
+    // ─── EQ Status indicator ───────────────────────────────────────
+    const eqStatus = document.getElementById('eq-status');
+    const eqStatusText = eqStatus ? eqStatus.querySelector('.eq-status-text') : null;
+    const eqPresetName = document.getElementById('eq-preset-name');
+    let statusTimer = null;
+
+    function setEqStatus(state, text) {
+        if (!eqStatus) return;
+        eqStatus.className = 'eq-status ' + state;
+        eqStatusText.textContent = text;
+        if (statusTimer) clearTimeout(statusTimer);
+        if (state === 'applied') {
+            statusTimer = setTimeout(function() { setEqStatus('', ''); }, 3000);
+        }
+    }
+
+    function setPresetName(name) {
+        if (eqPresetName) eqPresetName.textContent = capitalize(name);
+        currentPreset = name;
+    }
+
+    // ─── Equalizer canvas ──────────────────────────────────────────
+    const canvas = document.getElementById('eq-canvas');
+    let dragging = -1;
+    var draw = function() {};
+    if (canvas) {
+    const ctx = canvas.getContext('2d');
+    let canvasW = 0, canvasH = 0;
+    const PAD_TOP = 40, PAD_BOTTOM = 30, PAD_LEFT = 55, PAD_RIGHT = 20;
+
+    function resize() {
+        const rect = canvas.getBoundingClientRect();
+        canvasW = rect.width;
+        canvasH = rect.height;
+        canvas.width = canvasW * devicePixelRatio;
+        canvas.height = canvasH * devicePixelRatio;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        draw();
+    }
+
+    function gainToY(gain) {
+        return PAD_TOP + (1 - (gain - MIN_GAIN) / (MAX_GAIN - MIN_GAIN)) * (canvasH - PAD_TOP - PAD_BOTTOM);
+    }
+
+    function yToGain(y) {
+        const raw = MAX_GAIN - (y - PAD_TOP) / (canvasH - PAD_TOP - PAD_BOTTOM) * (MAX_GAIN - MIN_GAIN);
+        return Math.max(MIN_GAIN, Math.min(MAX_GAIN, Math.round(raw * 100) / 100));
+    }
+
+    function bandX(i) {
+        return PAD_LEFT + i / (BANDS.length - 1) * (canvasW - PAD_LEFT - PAD_RIGHT);
+    }
+
+    draw = function() {
+        ctx.clearRect(0, 0, canvasW, canvasH);
+
+        const gridGains = [-0.25, 0, 0.25, 0.5, 0.75, 1.0];
+
+        // Grid lines
+        ctx.strokeStyle = '#2a2a2a'; ctx.lineWidth = 1;
+        for (const g of gridGains) {
+            const y = gainToY(g);
+            ctx.beginPath(); ctx.moveTo(PAD_LEFT, y); ctx.lineTo(canvasW - PAD_RIGHT, y); ctx.stroke();
+        }
+
+        // Zero line
+        ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+        const zy = gainToY(0);
+        ctx.beginPath(); ctx.moveTo(PAD_LEFT, zy); ctx.lineTo(canvasW - PAD_RIGHT, zy); ctx.stroke();
+
+        // Y-axis labels (gain values)
+        ctx.fillStyle = '#888'; ctx.font = '11px JetBrains Mono, monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        for (const g of gridGains) {
+            const label = g >= 0 ? '+' + g.toFixed(2) : g.toFixed(2);
+            ctx.fillText(label, PAD_LEFT - 8, gainToY(g));
+        }
+
+        // X-axis labels (band frequencies)
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        for (let i = 0; i < BANDS.length; i++) {
+            ctx.fillText(BANDS[i], bandX(i), canvasH - PAD_BOTTOM + 8);
+        }
+
+        // Axis labels
+        ctx.save();
+        ctx.fillStyle = '#666'; ctx.font = '10px JetBrains Mono, monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillText('Gain', PAD_LEFT / 2, PAD_TOP - 10);
+        ctx.fillText('Hz', canvasW / 2, canvasH - 2);
+        ctx.restore();
+
+        if (!gains.length) return;
+
+        // Build points array
+        var pts = [];
+        for (let i = 0; i < gains.length; i++) {
+            pts.push({ x: bandX(i), y: gainToY(gains[i]) });
+        }
+
+        // Monotone cubic spline that passes through all points
+        function drawSpline(points) {
+            ctx.moveTo(points[0].x, points[0].y);
+            if (points.length === 2) {
+                ctx.lineTo(points[1].x, points[1].y);
+                return;
+            }
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = points[Math.max(0, i - 1)];
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const p3 = points[Math.min(points.length - 1, i + 2)];
+                const cp1x = p1.x + (p2.x - p0.x) / 6;
+                const cp1y = p1.y + (p2.y - p0.y) / 6;
+                const cp2x = p2.x - (p3.x - p1.x) / 6;
+                const cp2y = p2.y - (p3.y - p1.y) / 6;
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+            }
+        }
+
+        // Fill under curve
+        ctx.beginPath();
+        drawSpline(pts);
+        ctx.lineTo(pts[pts.length - 1].x, zy);
+        ctx.lineTo(pts[0].x, zy);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(217, 119, 87, 0.15)';
+        ctx.fill();
+
+        // Stroke curve
+        ctx.beginPath();
+        drawSpline(pts);
+        ctx.strokeStyle = '#d97757'; ctx.lineWidth = 2.5; ctx.stroke();
+
+        // Dots (on exact data points — spline passes through these)
+        for (let i = 0; i < pts.length; i++) {
+            ctx.beginPath();
+            ctx.arc(pts[i].x, pts[i].y, 7, 0, Math.PI * 2);
+            ctx.fillStyle = '#e8956f'; ctx.fill();
+            ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.stroke();
+        }
+    };
+
+    function findBand(x, y) {
+        for (let i = 0; i < gains.length; i++) {
+            const bx = bandX(i), by = gainToY(gains[i]);
+            if (Math.hypot(x - bx, y - by) < 16) return i;
+        }
+        return -1;
+    }
+
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches ? e.touches[0] : e;
+        return [touch.clientX - rect.left, touch.clientY - rect.top];
+    }
+
+    canvas.addEventListener('mousedown', function(e) {
+        const [x, y] = getPos(e);
+        dragging = findBand(x, y);
+    });
+    canvas.addEventListener('mousemove', function(e) {
+        if (dragging < 0) return;
+        const [, y] = getPos(e);
+        gains[dragging] = yToGain(y);
+        setPresetName('Custom');
+        draw();
+    });
+    canvas.addEventListener('mouseup', function() {
+        if (dragging >= 0) { applyEQ(); dragging = -1; }
+    });
+    canvas.addEventListener('mouseleave', function() {
+        if (dragging >= 0) { applyEQ(); dragging = -1; }
+    });
+
+    // Touch support
+    canvas.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        const [x, y] = getPos(e);
+        dragging = findBand(x, y);
+    });
+    canvas.addEventListener('touchmove', function(e) {
+        if (dragging < 0) return;
+        e.preventDefault();
+        const [, y] = getPos(e);
+        gains[dragging] = yToGain(y);
+        setPresetName('Custom');
+        draw();
+    });
+    canvas.addEventListener('touchend', function() {
+        if (dragging >= 0) { applyEQ(); dragging = -1; }
+    });
+
+    window.addEventListener('resize', resize);
+    resize();
+    } // end if (canvas)
+
+    // ─── EQ apply ──────────────────────────────────────────────────
+    let applyDebounce = null;
+    async function applyEQ(preset) {
+        setEqStatus('applying', preset ? 'Applying ' + capitalize(preset) + '…' : 'Applying…');
+        const body = preset ? { preset } : { bands: gains };
+        try {
+            const r = await fetch(`${base}/equalizer`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) });
+            const d = await r.json();
+            if (!d.ok) { setEqStatus('', ''); showToast('error', d.error || 'Failed.'); }
+            else {
+                if (preset) setPresetName(preset);
+                setEqStatus('applied', 'Applied ✓');
+                if (preset) { refreshStatus(); }
+            }
+        } catch { setEqStatus('', ''); showToast('error', 'Network error.'); }
+    }
+
+    // Presets
+    document.querySelectorAll('.preset-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { applyEQ(btn.dataset.preset); });
+    });
+    const resetBtn = document.getElementById('eq-reset-btn');
+    if (resetBtn) resetBtn.addEventListener('click', function() { applyEQ('flat'); });
+
+    // ─── Filters ───────────────────────────────────────────────────
+    document.querySelectorAll('.filter-toggle').forEach(function(btn) {
+        btn.addEventListener('click', async function() {
+            const action = btn.dataset.action;
+            const body = { action: action };
+            if (action === 'lowpass') {
+                const val = parseFloat(document.getElementById('lowpass-val').value);
+                if (btn.classList.contains('active')) body.smoothing = null;
+                else body.smoothing = val || 20.0;
+            }
+            try {
+                const r = await fetch(`${base}/filters`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) });
+                const d = await r.json();
+                if (d.ok) { showToast('success', 'Filter updated.'); refreshStatus(); }
+                else showToast('error', d.error || 'Failed.');
+            } catch { showToast('error', 'Network error.'); }
+        });
+    });
+
+    // ─── Live status polling ───────────────────────────────────────
+    function updatePlayerStatus(data) {
+        const container = document.getElementById('player-status');
+        if (!container) return;
+        if (data.active) {
+            const ch = data.channel || 'unknown channel';
+            let html = '<div class="listener-status"><span class="ls-indicator active"></span><span>Active in <strong>' + ch + '</strong></span></div>';
+            if (data.now_playing) {
+                html += '<div class="now-playing"><span class="np-dot"></span><span><strong>' + escHtml(data.now_playing.title) + '</strong> &mdash; ' + escHtml(data.now_playing.author) + '</span></div>';
+            } else {
+                html += '<p class="text-muted">Connected but nothing playing.</p>';
+            }
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div class="listener-status"><span class="ls-indicator inactive"></span><span class="text-muted">No active music session in this server.</span></div>';
+        }
+
+        // Show/hide EQ and filters sections based on activity
+        const eqSec = document.getElementById('eq-section');
+        const filterSec = document.getElementById('filters-section');
+        if (eqSec) eqSec.style.display = data.active ? '' : 'none';
+        if (filterSec) filterSec.style.display = data.active ? '' : 'none';
+    }
+
+    function updateFilters(filters) {
+        if (!filters) return;
+        document.querySelectorAll('.filter-toggle').forEach(function(btn) {
+            const action = btn.dataset.action;
+            if (action === 'nightcore') btn.classList.toggle('active', filters.nightcore);
+            else if (action === '8d') btn.classList.toggle('active', filters['8d'] || false);
+            else if (action === 'lowpass') btn.classList.toggle('active', filters.lowpass != null);
+        });
+        const lpVal = document.getElementById('lowpass-val');
+        if (lpVal && filters.lowpass != null) lpVal.value = filters.lowpass;
+    }
+
+    function escHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    async function refreshStatus() {
+        try {
+            const r = await fetch(`${base}/status`, { headers: { 'Accept': 'application/json' } });
+            const d = await r.json();
+            if (!d.ok) return;
+            updatePlayerStatus(d);
+            updateFilters(d.filters);
+            if (d.equalizer && d.equalizer.length === 15) {
+                gains = d.equalizer;
+                if (document.getElementById('eq-canvas')) {
+                    // Redraw only if not currently dragging
+                    if (dragging < 0) draw();
+                }
+            }
+        } catch {}
+    }
+
+    // Hide EQ/filters if not active initially
+    if (!initialActive) {
+        const eqSec = document.getElementById('eq-section');
+        const filterSec = document.getElementById('filters-section');
+        if (eqSec) eqSec.style.display = 'none';
+        if (filterSec) filterSec.style.display = 'none';
+    }
+
+    // Poll every 10 seconds
+    setInterval(refreshStatus, 10000);
+})();
+</script>
+{% endblock %}

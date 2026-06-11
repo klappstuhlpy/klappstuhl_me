@@ -1,0 +1,71 @@
+{% extends "../layout.html" %}
+
+{% block title %}{{ page_title }} — {{ guild_name }} | Dashboard{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+{% block page_css %}{% endblock %}
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container">
+    {% block back_link %}
+    <a href="/percy/dashboard/guild/{{ guild_id }}" class="dashboard-back">&larr; {{ guild_name }}</a>
+    {% endblock %}
+
+    {% block page_header %}
+    <div class="dashboard-header">
+        <div>
+            <h1>{{ page_title }}</h1>
+            {% block page_subtitle %}<p></p>{% endblock %}
+        </div>
+    </div>
+    {% endblock %}
+
+    {# ─── Dashboard Navigation ─────────────────────────────────────── #}
+    <nav class="dashboard-nav">
+        <a href="/percy/dashboard/guild/{{ guild_id }}"{% if nav_active == "config" %} class="active"{% endif %}>Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members"{% if nav_active == "members" %} class="active"{% endif %}>Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats"{% if nav_active == "stats" %} class="active"{% endif %}>Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands"{% if nav_active == "commands" %} class="active"{% endif %}>Commands</a>
+        <div class="nav-group">
+            <span class="nav-group-label" tabindex="0">Features</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling"{% if nav_active == "leveling" %} class="active"{% endif %}>Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy"{% if nav_active == "economy" %} class="active"{% endif %}>Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/music"{% if nav_active == "music" %} class="active"{% endif %}>Music</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders"{% if nav_active == "autoresponders" %} class="active"{% endif %}>Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics"{% if nav_active == "comics" %} class="active"{% endif %}>Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels"{% if nav_active == "temp-channels" %} class="active"{% endif %}>Temp Channels</a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <span class="nav-group-label" tabindex="0">Browse</span>
+            <div class="nav-dropdown">
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls"{% if nav_active == "polls" %} class="active"{% endif %}>Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways"{% if nav_active == "giveaways" %} class="active"{% endif %}>Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags"{% if nav_active == "tags" %} class="active"{% endif %}>Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights"{% if nav_active == "highlights" %} class="active"{% endif %}>Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats"{% if nav_active == "emoji-stats" %} class="active"{% endif %}>Emoji Stats</a>
+            </div>
+        </div>
+    </nav>
+    <script>
+    document.querySelectorAll('.dashboard-nav .nav-group-label').forEach(function(label) {
+        label.addEventListener('click', function(e) {
+            var group = this.closest('.nav-group');
+            var wasOpen = group.classList.contains('open');
+            document.querySelectorAll('.dashboard-nav .nav-group').forEach(function(g) { g.classList.remove('open'); });
+            if (!wasOpen) group.classList.add('open');
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.nav-group')) {
+            document.querySelectorAll('.dashboard-nav .nav-group').forEach(function(g) { g.classList.remove('open'); });
+        }
+    });
+    </script>
+
+    {% block content %}{% endblock %}
+</div>
+{% endblock %}

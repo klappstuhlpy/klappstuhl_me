@@ -66,6 +66,8 @@ pub(crate) struct MembersTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) members: Vec<Member>,
     pub(crate) roles: Vec<Role>,
 }
@@ -78,6 +80,8 @@ pub(crate) struct LevelingTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) config: LevelingConfig,
     pub(crate) leaderboard: LeaderboardResponse,
     pub(crate) roles: Vec<Role>,
@@ -140,6 +144,8 @@ pub(crate) struct PollsTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) polls: PollsResponse,
     pub(crate) active_count: usize,
     pub(crate) ended_count: usize,
@@ -153,6 +159,8 @@ pub(crate) struct GiveawaysTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) giveaways: GiveawaysResponse,
     pub(crate) active_count: usize,
     pub(crate) ended_count: usize,
@@ -166,6 +174,8 @@ pub(crate) struct TagsTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) tags: TagsResponse,
 }
 
@@ -177,6 +187,8 @@ pub(crate) struct CommandsTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) commands: CommandsResponse,
     pub(crate) channels: Vec<Channel>,
     pub(crate) disabled_count: usize,
@@ -191,6 +203,8 @@ pub(crate) struct StatsTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) stats: GuildStats,
     pub(crate) bot_stats: BotStats,
 }
@@ -203,6 +217,8 @@ pub(crate) struct AutorespondersTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) data: AutorespondersResponse,
 }
 
@@ -214,8 +230,26 @@ pub(crate) struct EconomyTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) economy: EconomyInfo,
     pub(crate) balances: BalancesResponse,
+    pub(crate) channels: Vec<Channel>,
+    pub(crate) roles: Vec<Role>,
+}
+
+#[allow(dead_code)]
+#[derive(Template)]
+#[template(path = "percy/music.html")]
+pub(crate) struct MusicTemplate {
+    pub(crate) account: Option<Account>,
+    pub(crate) flashes: Flashes,
+    pub(crate) guild_id: u64,
+    pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
+    pub(crate) music: MusicInfo,
+    pub(crate) guild: GuildInfo,
     pub(crate) channels: Vec<Channel>,
 }
 
@@ -227,6 +261,8 @@ pub(crate) struct ComicsTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) data: ComicsResponse,
     pub(crate) channels: Vec<Channel>,
     pub(crate) roles: Vec<Role>,
@@ -240,6 +276,8 @@ pub(crate) struct TempChannelsTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) data: TempChannelsResponse,
     pub(crate) channels: Vec<Channel>,
 }
@@ -252,6 +290,8 @@ pub(crate) struct HighlightsTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) data: HighlightsResponse,
 }
 
@@ -263,6 +303,8 @@ pub(crate) struct EmojiStatsTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) data: EmojiStatsResponse,
 }
 
@@ -274,6 +316,8 @@ pub(crate) struct AuditLogTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
+    pub(crate) nav_active: &'static str,
+    pub(crate) page_title: &'static str,
     pub(crate) cases: CasesResponse,
     pub(crate) filter_action: String,
     pub(crate) filter_moderator: String,

@@ -702,6 +702,58 @@ impl PercyClient {
         Ok(())
     }
 
+    // -- Music ----------------------------------------------------------------
+
+    /// Fetch music/equalizer state for a guild.
+    pub async fn get_music(&self, guild_id: u64) -> Result<MusicInfo, PercyError> {
+        let resp = self
+            .client
+            .get(self.url(&format!("/api/internal/guilds/{guild_id}/music")))
+            .bearer_auth(&self.token)
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(resp.json().await?)
+    }
+
+    /// Apply equalizer settings (preset or custom bands).
+    pub async fn post_music_equalizer(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/music/equalizer")))
+            .bearer_auth(&self.token)
+            .json(body)
+            .send()
+            .await?;
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(())
+    }
+
+    /// Apply a filter action (nightcore, 8d, lowpass, reset).
+    pub async fn post_music_filters(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/music/filters")))
+            .bearer_auth(&self.token)
+            .json(body)
+            .send()
+            .await?;
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(())
+    }
+
     // -- Comics ---------------------------------------------------------------
 
     /// Fetch comic feeds for a guild.

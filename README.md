@@ -857,7 +857,8 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 - **Tabbed configuration** — General (feature flags, polls, music, prefixes, Discord status feed subscription), Moderation (audit/alert/mute/mention + mod/message/voice log channels, active lockdowns with unlock), and Gatekeeper (verification channel, roles, starter message modal, bypass action, rate limit, auto-enable/disable) tabs. REQUIRED tags appear when a flag is enabled but its associated config is missing. Cancel/Save Changes buttons with form-state tracking.
 - **Member management** — searchable, paginated member directory with kick/ban actions and role mutations. Confirmation modals gather moderation reasons.
 - **Leveling** — Full configuration form (enable/disable, voice XP, stack roles, clear-XP-on-leave, XP curve factor, base XP, min/max gain per message, XP cooldown, level-up announcement destination — same channel / DM / off / a specific channel — and level-up message template). Collection editors with add/remove and Discord role/channel pickers for **level rewards** (roles granted at a level, shown with their color swatch, plus a one-click "Generate preset roles" button that creates 12 themed milestone roles for levels 5–100 behind an "Are you sure?" confirm), **XP multipliers** (per role and per channel), **blacklists** (roles/channels/users excluded from XP), and **special level-up messages** (custom text per level). XP leaderboard with rank medals (gold/silver/bronze) and in-place level/XP editing per member via modal.
-- **Economy** — Shop item management (create/delete), top balance leaderboard, and lottery control (start/cancel active lotteries).
+- **Economy** — Shop item management (create/delete) with effect display (cash voucher, lootbox, role grant, XP/loot boosts with duration), top balance leaderboard, and lottery control (start/cancel active lotteries).
+- **Music** — Live player status with channel and now-playing info (auto-refreshes every 10 seconds), persistent music panel configuration (enable/channel), interactive 15-band equalizer with cubic spline visualization and drag-to-adjust nodes, preset buttons (flat/bassboost/treble/vocal), audio filter toggles (nightcore, 8D, lowpass), and a dynamic status indicator showing apply progress.
 - **Autoresponders** — Full CRUD table: create triggers with match type (contains/exact/starts/ends/regex), toggle enable/disable, view usage counts, delete. Add modal with response template and ignore-case option.
 - **Comic Feeds** — Card-based view per subscribed brand (Marvel/DC/Manga) showing delivery channel, format, schedule day, next pull time, and pin status. Subscribe/edit/delete feeds and manually push the current week's releases.
 - **Temporary Voice Channels** — Manage hub channels that spawn temp voice channels. Table with format string editing and placeholder reference (%name, %display_name, %guild, %channel).
@@ -876,7 +877,7 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 - **Server & bot stats** — Real-time server metrics and bot-wide statistics.
 - **Bot invite flow** — if Percy is not in a guild, displays an invite link instead of an error.
 - **Setup wizard** — a first-time configuration banner for guilds with a fresh config.
-- **Grouped dropdown navigation** — Pages organized into Core (Configuration, Members, Stats, Commands), Features (Leveling, Economy, Autoresponders, Comics, Temp Channels), and Browse (Polls, Giveaways, Tags, Highlights, Emoji Stats) groups.
+- **Grouped dropdown navigation** — Pages organized into Core (Configuration, Members, Stats, Commands), Features (Leveling, Economy, Music, Autoresponders, Comics, Temp Channels), and Browse (Polls, Giveaways, Tags, Highlights, Emoji Stats) groups. Mobile-friendly with tap-to-toggle dropdowns and 44px minimum touch targets.
 - **Async forms** — all config saves submit via JavaScript `fetch` with toast notifications; no-JS fallback via standard form POST with redirect.
 
 ### Routes
@@ -905,6 +906,10 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/leveling/multipliers` | POST | Set/clear a role or channel XP multiplier |
 | `/percy/dashboard/guild/:id/leveling/blacklist` | POST | Add/remove a leveling blacklist entry |
 | `/percy/dashboard/guild/:id/economy` | GET | Economy management (shop, balances, lottery) |
+| `/percy/dashboard/guild/:id/music` | GET | Music page (player status, equalizer, filters, panel config) |
+| `/percy/dashboard/guild/:id/music/status` | GET | Live music status (JSON, polled every 10s) |
+| `/percy/dashboard/guild/:id/music/equalizer` | POST | Apply equalizer bands or preset |
+| `/percy/dashboard/guild/:id/music/filters` | POST | Toggle audio filters (nightcore, 8D, lowpass) |
 | `/percy/dashboard/guild/:id/economy/items` | POST | Create a shop item |
 | `/percy/dashboard/guild/:id/economy/items/:name` | DELETE | Delete a shop item |
 | `/percy/dashboard/guild/:id/economy/lottery` | POST/DELETE | Start / cancel the lottery |
@@ -943,7 +948,7 @@ The dashboard code is grouped under a `percy` namespace per file type:
 - `src/integrations/percy/` — `mod.rs` (the typed `PercyClient` + `PercyError`) and `types.rs` (response models).
 - `src/services/percy_stats.rs` — background poller that fetches bot stats every 60s and publishes to the `"percy"` WebSocket topic.
 - `src/services/percy_moderation.rs` — placeholder for future server-push moderation notifications via the `"moderation"` WS topic.
-- `templates/percy/*.html` — one Askama template per page (including `user.html` for the member detail/lookup view).
+- `templates/percy/*.html` — one Askama template per page (including `user.html` for the member detail/lookup view). All guild sub-pages extend `dashboard_layout.html` which provides the shared container, navigation, and mobile-friendly dropdown toggle.
 - `static/css/percy/dashboard.css`, `static/js/percy/percy-dashboard.js`, `static/js/percy/percy-members.js` — page styling and behavior.
 
 ### How it works

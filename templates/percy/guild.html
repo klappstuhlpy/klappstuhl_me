@@ -35,32 +35,49 @@
     {% endif %}
 
     {# ─── Sub-page Navigation ─────────────────────────────────────── #}
+    {% let guild_id = guild.id %}
     <nav class="dashboard-nav">
-        <a href="/percy/dashboard/guild/{{ guild.id }}" class="active">Configuration</a>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/members">Members</a>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/stats">Stats</a>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/commands">Commands</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}" class="active">Configuration</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/members">Members</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/stats">Stats</a>
+        <a href="/percy/dashboard/guild/{{ guild_id }}/commands">Commands</a>
         <div class="nav-group">
-            <span class="nav-group-label">Features</span>
+            <span class="nav-group-label" tabindex="0">Features</span>
             <div class="nav-dropdown">
-                <a href="/percy/dashboard/guild/{{ guild.id }}/leveling">Leveling</a>
-                <a href="/percy/dashboard/guild/{{ guild.id }}/economy">Economy</a>
-                <a href="/percy/dashboard/guild/{{ guild.id }}/autoresponders">Autoresponders</a>
-                <a href="/percy/dashboard/guild/{{ guild.id }}/comics">Comics</a>
-                <a href="/percy/dashboard/guild/{{ guild.id }}/temp-channels">Temp Channels</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling">Leveling</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/economy">Economy</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/music">Music</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders">Autoresponders</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/comics">Comics</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels">Temp Channels</a>
             </div>
         </div>
         <div class="nav-group">
-            <span class="nav-group-label">Browse</span>
+            <span class="nav-group-label" tabindex="0">Browse</span>
             <div class="nav-dropdown">
-                <a href="/percy/dashboard/guild/{{ guild.id }}/polls">Polls</a>
-                <a href="/percy/dashboard/guild/{{ guild.id }}/giveaways">Giveaways</a>
-                <a href="/percy/dashboard/guild/{{ guild.id }}/tags">Tags</a>
-                <a href="/percy/dashboard/guild/{{ guild.id }}/highlights">Highlights</a>
-                <a href="/percy/dashboard/guild/{{ guild.id }}/emoji-stats">Emoji Stats</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/polls">Polls</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways">Giveaways</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/tags">Tags</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights">Highlights</a>
+                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats">Emoji Stats</a>
             </div>
         </div>
     </nav>
+    <script>
+    document.querySelectorAll('.dashboard-nav .nav-group-label').forEach(function(label) {
+        label.addEventListener('click', function(e) {
+            var group = this.closest('.nav-group');
+            var wasOpen = group.classList.contains('open');
+            document.querySelectorAll('.dashboard-nav .nav-group').forEach(function(g) { g.classList.remove('open'); });
+            if (!wasOpen) group.classList.add('open');
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.nav-group')) {
+            document.querySelectorAll('.dashboard-nav .nav-group').forEach(function(g) { g.classList.remove('open'); });
+        }
+    });
+    </script>
 
     {# ─── Tab Navigation (config sub-tabs) ─────────────────────────── #}
     <nav class="config-tabs" role="tablist">
@@ -219,40 +236,6 @@
                             {% for role in roles %}
                             <option value="{{ role.id }}" {% match guild.poll_ping_role %}{% when Some with (ref) %}{% if ref.id == role.id %}selected{% endif %}{% when None %}{% endmatch %}>
                                 @{{ role.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="config-actions">
-                    <button type="button" class="button small cancel-btn">Cancel</button>
-                    <button type="submit" class="button primary small">Save Changes</button>
-                </div>
-            </form>
-        </section>
-
-        {# ─── Music ──────────────────────────────────────────────────── #}
-        <section class="config-section">
-            <h2>Music</h2>
-            <p class="config-section-description">Control the persistent music panel and playback settings.</p>
-            <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
-                <input type="hidden" name="_section" value="music">
-                <div class="config-grid">
-                    <label class="config-toggle">
-                        <div>
-                            <span class="config-label">Music Panel</span>
-                            <span class="config-description">Show a persistent now-playing panel</span>
-                        </div>
-                        <input type="checkbox" name="use_music_panel" value="true" {% if guild.use_music_panel %}checked{% endif %}>
-                    </label>
-                    <div class="config-field">
-                        <label class="config-label" for="music_panel_channel">Panel Channel</label>
-                        <span class="config-description">Channel for the now-playing embed</span>
-                        <select name="music_panel_channel_id" id="music_panel_channel" class="config-select">
-                            <option value="">Not set</option>
-                            {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% match guild.music_panel_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
-                                #{{ ch.name }}
                             </option>
                             {% endfor %}
                         </select>
