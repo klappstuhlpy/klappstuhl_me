@@ -919,10 +919,11 @@ th.th-sortable[aria-sort="descending"]::after {
     background: var(--box-shade);
     white-space: nowrap;
 }
-.members-table th:nth-child(1) { width: 25%; }
-.members-table th:nth-child(2) { width: 15%; }
-.members-table th:nth-child(3) { width: auto; }
-.members-table th:nth-child(4) { width: 14%; }
+/* Column 1 is the select checkbox (sized by .col-check); the rest follow. */
+.members-table th:nth-child(2) { width: 25%; }  /* Member */
+.members-table th:nth-child(3) { width: 15%; }  /* Joined */
+.members-table th:nth-child(4) { width: auto; } /* Roles */
+.members-table th:nth-child(5) { width: 14%; }  /* Actions */
 
 .members-table td {
     padding: 0.6rem 1rem;
