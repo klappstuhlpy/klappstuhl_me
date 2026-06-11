@@ -1,5 +1,11 @@
 /* ── Service card button state ───────────────────────────────── */
 function syncCardButtons(card) {
+  // While an action (start/stop/restart/pull/recreate) is in flight, its
+  // buttons are intentionally locked and the submitter shows "Working…".
+  // The periodic refresh must not re-enable them mid-action — onActionSubmit
+  // owns the button state until it finishes and clears this flag.
+  if (card.dataset.actionBusy === "true") return;
+
   const isRunning  = card.dataset.running === "true";
   const startBtn   = card.querySelector(".start-btn");
   const restartBtn = card.querySelector(".restart-btn");
@@ -112,6 +118,9 @@ async function onActionSubmit(e) {
   if (!action || !name) return;
 
   // Busy state: lock every button on the card and show a spinner label.
+  // The actionBusy flag tells syncCardButtons (run by the periodic refresh)
+  // to leave this card's buttons alone until the action finishes.
+  if (card) card.dataset.actionBusy = "true";
   const buttons = card ? Array.from(card.querySelectorAll("button")) : [];
   buttons.forEach(b => { b.disabled = true; });
   const originalText = submitter ? submitter.textContent : "";
@@ -162,11 +171,13 @@ async function onActionSubmit(e) {
   } finally {
     if (submitter) submitter.textContent = originalText;
     if (actionLogBusy) actionLogBusy.hidden = true;
-    // Re-enable everything we locked (including the Logs button, which
-    // syncCardButtons doesn't manage), then refresh the live data so the card
-    // reflects the new running state / restart count / start time. A second
-    // delayed refresh catches containers that are still settling after a
-    // restart or recreate.
+    // Action done: drop the busy lock first so the refresh below can re-derive
+    // the correct per-button disabled states. Re-enable everything we locked
+    // (including the Logs button, which syncCardButtons doesn't manage), then
+    // refresh the live data so the card reflects the new running state /
+    // restart count / start time. A second delayed refresh catches containers
+    // that are still settling after a restart or recreate.
+    if (card) delete card.dataset.actionBusy;
     buttons.forEach(b => { b.disabled = false; });
     await refreshServices();
     await loadActionLog();
