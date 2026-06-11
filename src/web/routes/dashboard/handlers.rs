@@ -347,7 +347,13 @@ pub(super) async fn guild_member_action(
     }
 
     match percy
-        .member_action(guild_id, &user_id, &body.action, body.reason.as_deref())
+        .member_action(
+            guild_id,
+            &user_id,
+            &body.action,
+            body.reason.as_deref(),
+            Some(&discord_id),
+        )
         .await
     {
         Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
@@ -1813,15 +1819,34 @@ pub(super) async fn guild_audit_log(
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let action = if q.action.is_empty() { None } else { Some(q.action.as_str()) };
-    let moderator_id = if q.moderator_id.is_empty() { None } else { Some(q.moderator_id.as_str()) };
-    let after = if q.after.is_empty() { None } else { Some(q.after.as_str()) };
-    let before = if q.before.is_empty() { None } else { Some(q.before.as_str()) };
+    let action = if q.action.is_empty() {
+        None
+    } else {
+        Some(q.action.as_str())
+    };
+    let moderator_id = if q.moderator_id.is_empty() {
+        None
+    } else {
+        Some(q.moderator_id.as_str())
+    };
+    let after = if q.after.is_empty() {
+        None
+    } else {
+        Some(q.after.as_str())
+    };
+    let before = if q.before.is_empty() {
+        None
+    } else {
+        Some(q.before.as_str())
+    };
 
     let cases = percy
         .get_cases(guild_id, q.limit, q.offset, action, moderator_id, None, after, before)
         .await
-        .unwrap_or(CasesResponse { cases: Vec::new(), total: 0 });
+        .unwrap_or(CasesResponse {
+            cases: Vec::new(),
+            total: 0,
+        });
 
     AuditLogTemplate {
         account: Some(account),
@@ -1853,12 +1878,31 @@ pub(super) async fn guild_audit_log_json(
         return Json(serde_json::json!({"error": "access denied"})).into_response();
     }
 
-    let action = if q.action.is_empty() { None } else { Some(q.action.as_str()) };
-    let moderator_id = if q.moderator_id.is_empty() { None } else { Some(q.moderator_id.as_str()) };
-    let after = if q.after.is_empty() { None } else { Some(q.after.as_str()) };
-    let before = if q.before.is_empty() { None } else { Some(q.before.as_str()) };
+    let action = if q.action.is_empty() {
+        None
+    } else {
+        Some(q.action.as_str())
+    };
+    let moderator_id = if q.moderator_id.is_empty() {
+        None
+    } else {
+        Some(q.moderator_id.as_str())
+    };
+    let after = if q.after.is_empty() {
+        None
+    } else {
+        Some(q.after.as_str())
+    };
+    let before = if q.before.is_empty() {
+        None
+    } else {
+        Some(q.before.as_str())
+    };
 
-    match percy.get_cases(guild_id, q.limit, q.offset, action, moderator_id, None, after, before).await {
+    match percy
+        .get_cases(guild_id, q.limit, q.offset, action, moderator_id, None, after, before)
+        .await
+    {
         Ok(data) => Json(serde_json::json!(data)).into_response(),
         Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
     }
@@ -1868,7 +1912,7 @@ pub(super) async fn guild_bulk_action(
     State(state): State<AppState>,
     account: Account,
     Path(guild_id): Path<u64>,
-    Json(body): Json<serde_json::Value>,
+    Json(mut body): Json<serde_json::Value>,
 ) -> Response {
     let Some(percy) = get_percy_client(&state) else {
         return Json(serde_json::json!({"error": "not configured"})).into_response();
@@ -1880,6 +1924,7 @@ pub(super) async fn guild_bulk_action(
         return Json(serde_json::json!({"error": "access denied"})).into_response();
     }
 
+    body["moderator_id"] = serde_json::Value::String(discord_id.clone());
     match percy.bulk_member_action(guild_id, &body).await {
         Ok(resp) => Json(serde_json::json!(resp)).into_response(),
         Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
@@ -1922,10 +1967,13 @@ pub(super) async fn guild_export_leaderboard(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let leaderboard = percy.get_leveling_leaderboard(guild_id, 500).await.unwrap_or(LeaderboardResponse {
-        entries: Vec::new(),
-        total: 0,
-    });
+    let leaderboard = percy
+        .get_leveling_leaderboard(guild_id, 500)
+        .await
+        .unwrap_or(LeaderboardResponse {
+            entries: Vec::new(),
+            total: 0,
+        });
 
     let mut csv = String::from("Rank,Username,Level,XP,Total XP\n");
     for (i, entry) in leaderboard.entries.iter().enumerate() {
@@ -1967,7 +2015,10 @@ pub(super) async fn guild_export_cases(
     let cases = percy
         .get_cases(guild_id, 100, 0, None, None, None, None, None)
         .await
-        .unwrap_or(CasesResponse { cases: Vec::new(), total: 0 });
+        .unwrap_or(CasesResponse {
+            cases: Vec::new(),
+            total: 0,
+        });
 
     let mut csv = String::from("Case #,Action,Target,Moderator,Reason,Date\n");
     for case in &cases.cases {
@@ -1977,7 +2028,11 @@ pub(super) async fn guild_export_cases(
             case.action,
             case.target_name.replace(',', " "),
             case.moderator_name.as_deref().unwrap_or("Unknown").replace(',', " "),
-            case.reason.as_deref().unwrap_or("").replace(',', " ").replace('\n', " "),
+            case.reason
+                .as_deref()
+                .unwrap_or("")
+                .replace(',', " ")
+                .replace('\n', " "),
             case.created_at.as_deref().unwrap_or(""),
         ));
     }
@@ -1990,6 +2045,94 @@ pub(super) async fn guild_export_cases(
         csv,
     )
         .into_response()
+}
+
+#[derive(Deserialize)]
+pub(super) struct CaseCreateBody {
+    action: String,
+    target_id: String,
+    reason: Option<String>,
+}
+
+pub(super) async fn guild_case_create(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<CaseCreateBody>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy
+        .create_case(
+            guild_id,
+            &body.action,
+            &body.target_id,
+            Some(&discord_id),
+            body.reason.as_deref(),
+        )
+        .await
+    {
+        Ok(resp) => Json(serde_json::json!(resp)).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub(super) struct CaseUpdateBody {
+    reason: String,
+}
+
+pub(super) async fn guild_case_update(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, case_index)): Path<(u64, u64)>,
+    Json(body): Json<CaseUpdateBody>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.update_case_reason(guild_id, case_index, &body.reason).await {
+        Ok(resp) => Json(serde_json::json!(resp)).into_response(),
+        Err(crate::percy::PercyError::NotFound) => Json(serde_json::json!({"error": "case not found"})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_case_delete(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, case_index)): Path<(u64, u64)>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.delete_case(guild_id, case_index).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(crate::percy::PercyError::NotFound) => Json(serde_json::json!({"error": "case not found"})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
 }
 
 pub(super) async fn guild_cases_recent(

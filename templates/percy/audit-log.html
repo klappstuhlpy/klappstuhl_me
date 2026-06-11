@@ -56,11 +56,13 @@
     letter-spacing: 0.02em;
 }
 .action-pill.warn { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
-.action-pill.kick { background: #2d1f00; color: #ffa726; border: 1px solid #5c3d00; }
-.action-pill.ban { background: var(--error-bg); color: var(--error-text); border: 1px solid var(--error-border); }
+.action-pill.kick, .action-pill.softban { background: #2d1f00; color: #ffa726; border: 1px solid #5c3d00; }
+.action-pill.ban, .action-pill.tempban { background: var(--error-bg); color: var(--error-text); border: 1px solid var(--error-border); }
 .action-pill.unban { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
-.action-pill.mute { background: #1a1a2e; color: #7c7cf0; border: 1px solid #3a3a6e; }
+.action-pill.mute, .action-pill.tempmute { background: #1a1a2e; color: #7c7cf0; border: 1px solid #3a3a6e; }
 .action-pill.unmute { background: #0d2818; color: #66bb6a; border: 1px solid #2e5e3a; }
+.case-actions { white-space: nowrap; }
+.case-actions .button { margin-right: 0.25rem; }
 .pagination-bar {
     display: flex;
     align-items: center;
@@ -171,9 +173,12 @@
                 <option value="">All</option>
                 <option value="warn" {% if filter_action == "warn" %}selected{% endif %}>Warn</option>
                 <option value="kick" {% if filter_action == "kick" %}selected{% endif %}>Kick</option>
+                <option value="softban" {% if filter_action == "softban" %}selected{% endif %}>Softban</option>
                 <option value="ban" {% if filter_action == "ban" %}selected{% endif %}>Ban</option>
+                <option value="tempban" {% if filter_action == "tempban" %}selected{% endif %}>Tempban</option>
                 <option value="unban" {% if filter_action == "unban" %}selected{% endif %}>Unban</option>
                 <option value="mute" {% if filter_action == "mute" %}selected{% endif %}>Mute</option>
+                <option value="tempmute" {% if filter_action == "tempmute" %}selected{% endif %}>Tempmute</option>
                 <option value="unmute" {% if filter_action == "unmute" %}selected{% endif %}>Unmute</option>
             </select>
         </div>
@@ -212,21 +217,26 @@
                     <th data-sort="text">Moderator</th>
                     <th data-sort="text">Reason</th>
                     <th data-sort="date">Date</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody id="cases-tbody">
                 {% for case in cases.cases %}
-                <tr>
+                <tr data-case-index="{{ case.case_index }}">
                     <td>{{ case.case_index }}</td>
                     <td><span class="action-pill {{ case.action }}">{{ case.action }}</span></td>
                     <td>
                         <a href="/percy/dashboard/guild/{{ guild_id }}/members/{{ case.target_id }}">{{ case.target_name }}</a>
                     </td>
                     <td>{{ case.moderator_name.as_deref().unwrap_or("System") }}</td>
-                    <td class="text-muted" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ case.reason.as_deref().unwrap_or("") }}">
+                    <td class="text-muted case-reason-cell" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ case.reason.as_deref().unwrap_or("") }}">
                         {{ case.reason.as_deref().unwrap_or("—") }}
                     </td>
                     <td class="member-joined"><time class="js-ts">{{ case.created_at.as_deref().unwrap_or("—") }}</time></td>
+                    <td class="case-actions">
+                        <button type="button" class="button small" onclick="editCase({{ case.case_index }})">Edit</button>
+                        <button type="button" class="button small danger outline" onclick="closeCase({{ case.case_index }})">Close</button>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -265,18 +275,63 @@ function prependCase(c) {
     const tbody = document.getElementById('cases-tbody');
     if (!tbody) return;
     const tr = document.createElement('tr');
+    tr.dataset.caseIndex = c.case_index;
     tr.style.animation = 'fadeIn 0.3s ease';
     tr.innerHTML = `
         <td>${c.case_index}</td>
         <td>${actionPillHtml(c.action)}</td>
         <td><a href="/percy/dashboard/guild/${GUILD_ID}/members/${c.target_id}">${c.target_name}</a></td>
         <td>${c.moderator_name || 'System'}</td>
-        <td class="text-muted" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c.reason || ''}">${c.reason || '—'}</td>
+        <td class="text-muted case-reason-cell" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c.reason || ''}">${c.reason || '—'}</td>
         <td class="member-joined"><time class="js-ts">${c.created_at || '—'}</time></td>
+        <td class="case-actions">
+            <button type="button" class="button small" onclick="editCase(${c.case_index})">Edit</button>
+            <button type="button" class="button small danger outline" onclick="closeCase(${c.case_index})">Close</button>
+        </td>
     `;
     tbody.insertBefore(tr, tbody.firstChild);
     const counter = document.getElementById('total-cases');
     if (counter) counter.textContent = String(parseInt(counter.textContent) + 1);
+}
+
+function caseRow(idx) {
+    return document.querySelector(`#cases-tbody tr[data-case-index="${idx}"]`);
+}
+
+async function editCase(idx) {
+    const row = caseRow(idx);
+    const current = row?.querySelector('.case-reason-cell')?.title || '';
+    const reason = prompt(`New reason for case #${idx}:`, current);
+    if (reason === null || !reason.trim()) return;
+    try {
+        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/cases/${idx}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: reason.trim() }),
+        });
+        const data = await resp.json();
+        if (data.error) { showToast('error', data.error); return; }
+        const cell = row?.querySelector('.case-reason-cell');
+        if (cell) { cell.textContent = reason.trim(); cell.title = reason.trim(); }
+        showToast('success', `Case #${idx} updated`);
+    } catch {
+        showToast('error', 'Failed to update case');
+    }
+}
+
+async function closeCase(idx) {
+    if (!confirm(`Close (delete) case #${idx}? This removes the case and its modlog post permanently.`)) return;
+    try {
+        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/cases/${idx}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.error) { showToast('error', data.error); return; }
+        caseRow(idx)?.remove();
+        const counter = document.getElementById('total-cases');
+        if (counter) counter.textContent = String(Math.max(0, parseInt(counter.textContent) - 1));
+        showToast('success', `Case #${idx} closed`);
+    } catch {
+        showToast('error', 'Failed to close case');
+    }
 }
 
 async function pollNewCases() {

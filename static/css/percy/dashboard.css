@@ -1674,8 +1674,9 @@ th.th-sortable[aria-sort="descending"]::after {
     text-transform: capitalize;
 }
 .case-action.warn { color: var(--warning-text); }
-.case-action.ban, .case-action.kick { color: var(--error-text); }
-.case-action.mute, .case-action.timeout { color: var(--info-text, #60a5fa); }
+.case-action.ban, .case-action.tempban, .case-action.softban, .case-action.kick { color: var(--error-text); }
+.case-action.mute, .case-action.tempmute, .case-action.timeout { color: var(--info-text, #60a5fa); }
+.case-action.unban, .case-action.unmute { color: var(--success-text); }
 .case-reason {
     font-size: 0.78rem;
     color: var(--text-muted);

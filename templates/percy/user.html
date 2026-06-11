@@ -49,6 +49,42 @@
     flex: 1;
     text-align: left;
 }
+.open-case-form {
+    margin-bottom: 1.25rem;
+    padding: 1rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+}
+.open-case-fields {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.open-case-fields select,
+.open-case-fields input {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.82rem;
+    background: var(--form-input-background);
+    border: 1px solid var(--form-input-border);
+    border-radius: 0.375rem;
+    color: var(--foreground);
+}
+.open-case-fields input {
+    flex: 1;
+    min-width: 180px;
+}
+.open-case-hint {
+    margin: 0.5rem 0 0;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.open-case-status {
+    margin: 0.5rem 0 0;
+    font-size: 0.78rem;
+}
+.open-case-status.error { color: var(--error-text); }
+.open-case-status.success { color: var(--success-text); }
 </style>
 {% endblock %}
 
@@ -290,6 +326,26 @@
             {{ member.note_count }} note{% if member.note_count != 1 %}s{% endif %}
         </p>
 
+        <form id="open-case-form" class="open-case-form">
+            <div class="open-case-fields">
+                <select id="case-action" required>
+                    <option value="warn" selected>Warn</option>
+                    <option value="mute">Mute</option>
+                    <option value="tempmute">Tempmute</option>
+                    <option value="unmute">Unmute</option>
+                    <option value="kick">Kick</option>
+                    <option value="softban">Softban</option>
+                    <option value="ban">Ban</option>
+                    <option value="tempban">Tempban</option>
+                    <option value="unban">Unban</option>
+                </select>
+                <input type="text" id="case-reason" placeholder="Reason (optional)" maxlength="500">
+                <button type="submit" class="button small primary">Open Case</button>
+            </div>
+            <p class="open-case-hint">Records a case in the modlog (and announces it in the modlog channel). It does not kick/ban/mute by itself — use member actions for that.</p>
+            <p class="open-case-status" id="open-case-status" hidden></p>
+        </form>
+
         {% if member.cases.is_empty() %}
         <div class="empty-state">
             <h3>Clean record</h3>
@@ -354,6 +410,46 @@
 })();
 </script>
 {% endif %}
+
+<script>
+(function() {
+    const form = document.getElementById('open-case-form');
+    if (!form) return;
+    const status = document.getElementById('open-case-status');
+
+    function setStatus(kind, message) {
+        status.textContent = message;
+        status.className = 'open-case-status ' + kind;
+        status.hidden = false;
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const action = document.getElementById('case-action').value;
+        const reason = document.getElementById('case-reason').value.trim();
+        const button = form.querySelector('button[type="submit"]');
+        button.disabled = true;
+        try {
+            const resp = await fetch('/percy/dashboard/guild/{{ guild_id }}/cases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, target_id: '{{ member.id }}', reason: reason || null }),
+            });
+            const data = await resp.json();
+            if (data.error) {
+                setStatus('error', data.error);
+                return;
+            }
+            setStatus('success', `Case #${data.case.case_index} opened — reloading…`);
+            setTimeout(() => location.reload(), 600);
+        } catch {
+            setStatus('error', 'Failed to open case.');
+        } finally {
+            button.disabled = false;
+        }
+    });
+})();
+</script>
 
 <script>
 (function() {

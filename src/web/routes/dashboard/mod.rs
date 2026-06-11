@@ -89,7 +89,10 @@ fn json_or_flash(headers: &HeaderMap, flasher: &Flasher, ok: bool, msg: &str, re
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/percy", get(|| async { axum::response::Redirect::to("/percy/dashboard") }))
+        .route(
+            "/percy",
+            get(|| async { axum::response::Redirect::to("/percy/dashboard") }),
+        )
         .route("/percy/dashboard", get(guild_list))
         .route("/percy/dashboard/guild/:guild_id", get(guild_detail))
         .route("/percy/dashboard/guild/:guild_id/config", post(guild_config_update))
@@ -185,7 +188,10 @@ pub fn routes() -> Router<AppState> {
         // Browse pages
         .route("/percy/dashboard/guild/:guild_id/polls", get(guild_polls))
         .route("/percy/dashboard/guild/:guild_id/polls/:poll_id", post(guild_poll_edit))
-        .route("/percy/dashboard/guild/:guild_id/polls/:poll_id/end", post(guild_poll_end))
+        .route(
+            "/percy/dashboard/guild/:guild_id/polls/:poll_id/end",
+            post(guild_poll_end),
+        )
         .route("/percy/dashboard/guild/:guild_id/giveaways", get(guild_giveaways))
         .route("/percy/dashboard/guild/:guild_id/tags", get(guild_tags))
         .route("/percy/dashboard/guild/:guild_id/highlights", get(guild_highlights))
@@ -222,6 +228,11 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/percy/dashboard/guild/:guild_id/audit-log/recent",
             get(guild_cases_recent),
+        )
+        .route("/percy/dashboard/guild/:guild_id/cases", post(guild_case_create))
+        .route(
+            "/percy/dashboard/guild/:guild_id/cases/:case_index",
+            patch(guild_case_update).delete(guild_case_delete),
         )
         .route(
             "/percy/dashboard/guild/:guild_id/members/bulk-action",

@@ -682,6 +682,12 @@ pub struct RecentCasesResponse {
     pub cases: Vec<CaseEntry>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CaseActionResponse {
+    pub ok: bool,
+    pub case: CaseEntry,
+}
+
 // -- Activity heatmap types --------------------------------------------------
 
 #[derive(Debug, Deserialize, Serialize)]

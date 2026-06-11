@@ -136,10 +136,14 @@ impl PercyClient {
         user_id: &str,
         action: &str,
         reason: Option<&str>,
+        moderator_id: Option<&str>,
     ) -> Result<(), PercyError> {
         let mut body = serde_json::json!({"action": action});
         if let Some(r) = reason {
             body["reason"] = serde_json::Value::String(r.to_string());
+        }
+        if let Some(m) = moderator_id {
+            body["moderator_id"] = serde_json::Value::String(m.to_string());
         }
         let resp = self
             .client
@@ -316,7 +320,12 @@ impl PercyClient {
     }
 
     /// Fetch a user's avatar history (base64 images + timestamps).
-    pub async fn get_member_avatars(&self, guild_id: u64, user_id: &str, limit: u32) -> Result<AvatarHistoryResponse, PercyError> {
+    pub async fn get_member_avatars(
+        &self,
+        guild_id: u64,
+        user_id: &str,
+        limit: u32,
+    ) -> Result<AvatarHistoryResponse, PercyError> {
         let resp = self
             .client
             .get(self.url(&format!("/api/internal/guilds/{guild_id}/members/{user_id}/avatars")))
@@ -1215,8 +1224,87 @@ impl PercyClient {
         Ok(resp.json().await?)
     }
 
+    /// Manually open a moderation case (records + announces it; does not perform the action).
+    pub async fn create_case(
+        &self,
+        guild_id: u64,
+        action: &str,
+        target_id: &str,
+        moderator_id: Option<&str>,
+        reason: Option<&str>,
+    ) -> Result<CaseActionResponse, PercyError> {
+        let mut body = serde_json::json!({"action": action, "target_id": target_id});
+        if let Some(m) = moderator_id {
+            body["moderator_id"] = serde_json::Value::String(m.to_string());
+        }
+        if let Some(r) = reason {
+            body["reason"] = serde_json::Value::String(r.to_string());
+        }
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/cases")))
+            .bearer_auth(&self.token)
+            .json(&body)
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(resp.json().await?)
+    }
+
+    /// Update a case's reason (also syncs the modlog channel post).
+    pub async fn update_case_reason(
+        &self,
+        guild_id: u64,
+        case_index: u64,
+        reason: &str,
+    ) -> Result<CaseActionResponse, PercyError> {
+        let resp = self
+            .client
+            .patch(self.url(&format!("/api/internal/guilds/{guild_id}/cases/{case_index}")))
+            .bearer_auth(&self.token)
+            .json(&serde_json::json!({"reason": reason}))
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(resp.json().await?)
+    }
+
+    /// Close (delete) a case, removing its modlog channel post.
+    pub async fn delete_case(&self, guild_id: u64, case_index: u64) -> Result<(), PercyError> {
+        let resp = self
+            .client
+            .delete(self.url(&format!("/api/internal/guilds/{guild_id}/cases/{case_index}")))
+            .bearer_auth(&self.token)
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(())
+    }
+
     /// Perform a bulk moderation action on multiple members.
-    pub async fn bulk_member_action(&self, guild_id: u64, body: &serde_json::Value) -> Result<BulkActionResponse, PercyError> {
+    pub async fn bulk_member_action(
+        &self,
+        guild_id: u64,
+        body: &serde_json::Value,
+    ) -> Result<BulkActionResponse, PercyError> {
         let resp = self
             .client
             .post(self.url(&format!("/api/internal/guilds/{guild_id}/members/bulk-action")))
@@ -1235,7 +1323,12 @@ impl PercyClient {
     }
 
     /// Fetch per-day activity data for a member (heatmap).
-    pub async fn get_member_activity(&self, guild_id: u64, user_id: &str, days: u32) -> Result<ActivityResponse, PercyError> {
+    pub async fn get_member_activity(
+        &self,
+        guild_id: u64,
+        user_id: &str,
+        days: u32,
+    ) -> Result<ActivityResponse, PercyError> {
         let resp = self
             .client
             .get(self.url(&format!("/api/internal/guilds/{guild_id}/members/{user_id}/activity")))

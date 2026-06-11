@@ -892,7 +892,7 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/gatekeeper` | POST | Save gatekeeper settings |
 | `/percy/dashboard/guild/:id/members` | GET | Member management page |
 | `/percy/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API) |
-| `/percy/dashboard/guild/:id/members/:uid` | GET | User lookup page (profile, leveling, moderation cases, activity heatmap) |
+| `/percy/dashboard/guild/:id/members/:uid` | GET | User lookup page (profile, leveling, moderation cases incl. opening new ones, activity heatmap) |
 | `/percy/dashboard/guild/:id/members/:uid/action` | POST | Execute moderation action (kick/ban/unban) |
 | `/percy/dashboard/guild/:id/members/:uid/roles` | POST | Add/remove member roles |
 | `/percy/dashboard/guild/:id/members/:uid/activity` | GET | Daily activity data for heatmap (JSON) |
@@ -926,9 +926,11 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/commands` | GET | Command management |
 | `/percy/dashboard/guild/:id/commands/toggle` | POST | Enable/disable a command |
 | `/percy/dashboard/guild/:id/plonks` | POST | Add/remove plonked entities |
-| `/percy/dashboard/guild/:id/audit-log` | GET | Moderation audit log with filters |
+| `/percy/dashboard/guild/:id/audit-log` | GET | Moderation audit log with filters, inline reason editing and case closing |
 | `/percy/dashboard/guild/:id/audit-log.json` | GET | Filtered cases (JSON API) |
 | `/percy/dashboard/guild/:id/audit-log/recent` | GET | Recent cases since timestamp (live polling) |
+| `/percy/dashboard/guild/:id/cases` | POST | Open a moderation case manually (action, target, reason) |
+| `/percy/dashboard/guild/:id/cases/:case_index` | PATCH/DELETE | Edit a case's reason / close (delete) a case |
 | `/percy/dashboard/guild/:id/export/leaderboard` | GET | CSV export of XP leaderboard |
 | `/percy/dashboard/guild/:id/export/cases` | GET | CSV export of moderation cases |
 | `/percy/dashboard/guild/:id/stats` | GET | Server and bot statistics |
