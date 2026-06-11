@@ -951,7 +951,7 @@ The dashboard code is grouped under a `percy` namespace per file type:
 - `src/services/percy_stats.rs` — background poller that fetches bot stats every 60s and publishes to the `"percy"` WebSocket topic.
 - `src/services/percy_moderation.rs` — placeholder for future server-push moderation notifications via the `"moderation"` WS topic.
 - `templates/percy/*.html` — one Askama template per page (including `user.html` for the member detail/lookup view). All guild sub-pages extend `dashboard_layout.html` which provides the shared container, navigation, and mobile-friendly dropdown toggle.
-- `static/css/percy/dashboard.css` — the shared base: layout, components, and reusable primitives (spacing/width utilities, `.modal-card`/`.modal-form`, status-colour helpers, shared `pulse`/`spin` keyframes). Page-specific styling lives in `static/css/percy/pages/<page>.css` and is pulled in per template via the `page_css` block; templates carry no inline `<style>` blocks (only genuinely dynamic, template-computed colours remain inline). `static/js/percy/percy-dashboard.js`, `static/js/percy/percy-members.js` — page behavior.
+- `static/css/percy/dashboard.css` — the shared base: layout, components, and reusable primitives (spacing/width utilities, `.modal-card`/`.modal-form`, status-colour helpers, shared `pulse`/`spin` keyframes). Page-specific styling lives in `static/css/percy/pages/<page>.css` and is pulled in per template via the `page_css` block; templates carry no inline `<style>` blocks (only genuinely dynamic, template-computed colours remain inline). `static/js/percy/percy_dashboard.js`, `static/js/percy/percy_members.js` — page behavior.
 
 ### How it works
 

@@ -3,7 +3,7 @@
 {% block page_subtitle %}<p>View and manage server members, roles, and moderation.</p>{% endblock %}
 
 {% block page_css %}
-<link rel="stylesheet" href="/static/css/percy/pages/members.css" type="text/css"/>
+<link rel="stylesheet" href="/css/percy/members.css" type="text/css"/>
 {% endblock %}
 
 {% block content %}
@@ -91,5 +91,5 @@
 const GUILD_ID = '{{ guild_id }}';
 const ROLES = [{% for role in roles %}{ id: '{{ role.id }}', name: '{{ role.name }}', color: {{ role.color }} },{% endfor %}];
 </script>
-<script src="/static/js/percy/percy-members.js"></script>
+<script src="/js/percy/percy_members.js"></script>
 {% endblock %}

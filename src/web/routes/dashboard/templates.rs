@@ -273,7 +273,7 @@ pub(crate) struct ComicsTemplate {
 
 #[allow(dead_code)]
 #[derive(Template)]
-#[template(path = "percy/temp-channels.html")]
+#[template(path = "percy/temp_channels.html")]
 pub(crate) struct TempChannelsTemplate {
     pub(crate) account: Option<Account>,
     pub(crate) flashes: Flashes,
@@ -300,7 +300,7 @@ pub(crate) struct HighlightsTemplate {
 
 #[allow(dead_code)]
 #[derive(Template)]
-#[template(path = "percy/emoji-stats.html")]
+#[template(path = "percy/emoji_stats.html")]
 pub(crate) struct EmojiStatsTemplate {
     pub(crate) account: Option<Account>,
     pub(crate) flashes: Flashes,
@@ -313,7 +313,7 @@ pub(crate) struct EmojiStatsTemplate {
 
 #[allow(dead_code)]
 #[derive(Template)]
-#[template(path = "percy/audit-log.html")]
+#[template(path = "percy/audit_log.html")]
 pub(crate) struct AuditLogTemplate {
     pub(crate) account: Option<Account>,
     pub(crate) flashes: Flashes,
