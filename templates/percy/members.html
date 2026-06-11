@@ -87,6 +87,9 @@
         </div>
     </div>
 
+{% endblock %}
+
+{% block page_js %}
 <script>
 const GUILD_ID = '{{ guild_id }}';
 const ROLES = [{% for role in roles %}{ id: '{{ role.id }}', name: '{{ role.name }}', color: {{ role.color }} },{% endfor %}];

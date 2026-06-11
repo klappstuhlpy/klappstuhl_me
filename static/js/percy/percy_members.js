@@ -151,21 +151,6 @@
         }
     });
 
-    // Toast (reuse if loaded from percy-dashboard, otherwise define)
-    if (typeof window.showToast === 'undefined') {
-        window.showToast = function(level, message) {
-            const toast = document.createElement('div');
-            toast.className = 'toast toast-' + level;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            requestAnimationFrame(() => toast.classList.add('visible'));
-            setTimeout(() => {
-                toast.classList.remove('visible');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        };
-    }
-
     // ─── Bulk Selection ──────────────────────────────────────────────
     const bulkToolbar = document.getElementById('bulk-toolbar');
     const bulkCount = document.getElementById('bulk-selected-count');

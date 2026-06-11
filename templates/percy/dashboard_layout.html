@@ -50,22 +50,12 @@
             </div>
         </div>
     </nav>
-    <script>
-    document.querySelectorAll('.dashboard-nav .nav-group-label').forEach(function(label) {
-        label.addEventListener('click', function(e) {
-            var group = this.closest('.nav-group');
-            var wasOpen = group.classList.contains('open');
-            document.querySelectorAll('.dashboard-nav .nav-group').forEach(function(g) { g.classList.remove('open'); });
-            if (!wasOpen) group.classList.add('open');
-        });
-    });
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.nav-group')) {
-            document.querySelectorAll('.dashboard-nav .nav-group').forEach(function(g) { g.classList.remove('open'); });
-        }
-    });
-    </script>
 
     {% block content %}{% endblock %}
 </div>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/percy/percy_common.js"></script>
+{% block page_js %}{% endblock %}
 {% endblock %}

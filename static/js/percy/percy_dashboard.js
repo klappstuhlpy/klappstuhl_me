@@ -198,21 +198,7 @@
         });
     });
 
-    // -- Toast notifications ---------------------------------------------------
-
-    function showToast(level, message) {
-        const toast = document.createElement('div');
-        toast.className = 'toast toast-' + level;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        requestAnimationFrame(() => toast.classList.add('visible'));
-        setTimeout(() => {
-            toast.classList.remove('visible');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }
-
-    window.showToast = showToast;
+    // Toast notifications come from percy_common.js (window.showToast).
 
     // -- Gatekeeper starter message modal ----------------------------------------
 
