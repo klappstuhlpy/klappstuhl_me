@@ -72,6 +72,8 @@ pub struct GuildFlags {
     pub raid: bool,
     pub alerts: bool,
     pub gatekeeper: bool,
+    #[serde(default)]
+    pub mentions: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

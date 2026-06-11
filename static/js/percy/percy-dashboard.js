@@ -40,7 +40,7 @@
     function captureFormState(form) {
         const state = {};
         for (const el of form.elements) {
-            if (!el.name || el.name.startsWith('_')) continue;
+            if (!el.name || el.name.startsWith('_') || el.type === 'hidden') continue;
             if (el.type === 'checkbox') {
                 state[el.name] = el.checked;
             } else {
@@ -52,7 +52,7 @@
 
     function restoreFormState(form, state) {
         for (const el of form.elements) {
-            if (!el.name || el.name.startsWith('_')) continue;
+            if (!el.name || el.name.startsWith('_') || el.type === 'hidden') continue;
             if (el.type === 'checkbox') {
                 el.checked = !!state[el.name];
             } else {
@@ -63,7 +63,7 @@
 
     function isFormDirty(form, initial) {
         for (const el of form.elements) {
-            if (!el.name || el.name.startsWith('_')) continue;
+            if (!el.name || el.name.startsWith('_') || el.type === 'hidden') continue;
             if (el.type === 'checkbox') {
                 if (el.checked !== !!initial[el.name]) return true;
             } else {
@@ -139,10 +139,14 @@
         }
     }
 
-    // Listen for changes on all form elements
-    forms.forEach(form => {
-        form.addEventListener('input', () => checkDirty(form));
-        form.addEventListener('change', () => checkDirty(form));
+    // Listen for changes on all form elements (delegated to catch events from all inputs)
+    document.addEventListener('input', (e) => {
+        const form = e.target.closest ? e.target.closest('form') : null;
+        if (form && formStates.has(form)) checkDirty(form);
+    });
+    document.addEventListener('change', (e) => {
+        const form = e.target.closest ? e.target.closest('form') : null;
+        if (form && formStates.has(form)) checkDirty(form);
     });
 
     // -- Cancel button (inline, per-section) -----------------------------------

@@ -126,6 +126,13 @@
                         </div>
                         <input type="checkbox" name="gatekeeper" value="true" {% if guild.flags.gatekeeper %}checked{% endif %}>
                     </label>
+                    <label class="config-toggle">
+                        <div>
+                            <span class="config-label">Mention Spam Protection</span>
+                            <span class="config-description">Auto-ban members exceeding the mention threshold</span>
+                        </div>
+                        <input type="checkbox" name="mentions" value="true" {% if guild.flags.mentions %}checked{% endif %}>
+                    </label>
                     {% if guild.flags.gatekeeper %}{% match gatekeeper %}{% when Some with (gk) %}{% if gk.needs_setup %}
                     <input type="hidden" name="gatekeeper" value="true">
                     {% endif %}{% when None %}
@@ -186,13 +193,13 @@
         </div>
         {% endif %}
 
-        {% if guild.flags.raid && guild.mention_count.is_none() %}
+        {% if guild.flags.mentions && guild.mention_count.is_none() %}
         <div class="gk-setup-callout">
             <div class="gk-setup-callout-pulse"></div>
             <div class="gk-setup-callout-content">
-                <span class="gk-setup-callout-title">&#9888; Raid Protection needs setup</span>
-                <p>The Raid Protection flag is enabled but no mention threshold is set. Configure the <strong>Mention Threshold</strong> in the <a href="#moderation" class="mod-setup-link">Moderation tab</a>.</p>
-                <span class="gk-setup-callout-hint">If you don't want to use raid protection, just uncheck the flag.</span>
+                <span class="gk-setup-callout-title">&#9888; Mention Spam Protection needs setup</span>
+                <p>The Mention Spam Protection flag is enabled but no mention threshold is set. Configure the <strong>Mention Threshold</strong> in the <a href="#moderation" class="mod-setup-link">Moderation tab</a>.</p>
+                <span class="gk-setup-callout-hint">If you don't want to use mention spam protection, just uncheck the flag.</span>
             </div>
         </div>
         {% endif %}
@@ -325,7 +332,7 @@
                     <div class="config-field">
                         <label class="config-label" for="mention_count">
                             Mention Threshold
-                            {% if guild.flags.raid && guild.mention_count.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
+                            {% if guild.flags.mentions && guild.mention_count.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
                         </label>
                         <span class="config-description">Auto-mute after this many mentions in one message</span>
                         <input type="number" name="mention_count" id="mention_count" class="config-input" min="0" max="100" placeholder="Off" value="{% match guild.mention_count %}{% when Some with (n) %}{{ n }}{% when None %}{% endmatch %}">

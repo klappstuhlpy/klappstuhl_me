@@ -160,7 +160,7 @@ pub(super) async fn guild_config_update(
                 if !form.fields.contains_key("alerts") {
                     clear.insert("alert_channel_id".into(), serde_json::Value::Null);
                 }
-                if !form.fields.contains_key("raid") {
+                if !form.fields.contains_key("mentions") {
                     clear.insert("mention_count".into(), serde_json::Value::Null);
                 }
                 if !clear.is_empty() {
@@ -1058,6 +1058,7 @@ fn build_patch(section: &str, fields: &HashMap<String, String>) -> serde_json::V
                 "raid": fields.contains_key("raid"),
                 "alerts": fields.contains_key("alerts"),
                 "gatekeeper": fields.contains_key("gatekeeper"),
+                "mentions": fields.contains_key("mentions"),
             });
             serde_json::json!({ "flags": flags })
         }
