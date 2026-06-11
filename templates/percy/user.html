@@ -11,7 +11,7 @@
 <div class="dashboard-container">
     <a href="/percy/dashboard/guild/{{ guild_id }}/members" class="dashboard-back">&larr; Members</a>
 
-    {# â”€â”€â”€ Profile Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Profile Header ─────────────────────────────────────────── #}
     <div class="user-profile-header">
         <img class="user-profile-avatar" src="{{ member.avatar_url }}?size=128" alt="" width="80" height="80">
         <div class="user-profile-info">
@@ -45,7 +45,7 @@
         </div>
     </div>
 
-    {# â”€â”€â”€ Guild Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Guild Info ─────────────────────────────────────────────── #}
     {% if member.in_guild %}
     <section class="config-section">
         <h2>Guild Info</h2>
@@ -88,7 +88,7 @@
     </section>
     {% endif %}
 
-    {# â”€â”€â”€ Roles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Roles ───────────────────────────────────────────── #}
     {% if !member.roles.is_empty() %}
     <section class="config-section">
         <h2>Roles</h2>
@@ -100,7 +100,7 @@
     </section>
     {% endif %}
 
-    {# â”€â”€â”€ Leveling Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Leveling Stats ─────────────────────────────────────────── #}
     {% match member.leveling %}
     {% when Some with (lvl) %}
     <section class="config-section">
@@ -127,7 +127,7 @@
     {% when None %}
     {% endmatch %}
 
-    {# â”€â”€â”€ Command Usage â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Command Usage ──────────────────────────────────────────── #}
     {% match member.command_stats %}
     {% when Some with (stats) %}
     {% if stats.total_commands > 0 %}
@@ -165,7 +165,7 @@
     {% when None %}
     {% endmatch %}
 
-    {# â”€â”€â”€ Activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Activity ────────────────────────────────────────────────── #}
     {% match member.last_seen %}
     {% when Some with (ts) %}
     <section class="config-section">
@@ -180,7 +180,7 @@
     {% when None %}
     {% endmatch %}
 
-    {# â”€â”€â”€ Activity Heatmap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Activity Heatmap ───────────────────────────────────────────── #}
     <section class="config-section">
         <h2>Activity Graph</h2>
         <p class="config-section-description">Command usage over the past year (similar to a GitHub contribution graph).</p>
@@ -189,7 +189,7 @@
         </div>
     </section>
 
-    {# â”€â”€â”€ Name History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Name History ────────────────────────────────────────────── #}
     {% match member.names %}
     {% when Some with (names) %}
     {% if !names.usernames.is_empty() || !names.nicknames.is_empty() %}
@@ -226,7 +226,7 @@
     {% when None %}
     {% endmatch %}
 
-    {# â”€â”€â”€ Avatar History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Avatar History ────────────────────────────────────────────── #}
     {% if member.avatar_count > 0 %}
     <section class="config-section">
         <h2>Avatar History <span class="section-count">({{ member.avatar_count }})</span></h2>
@@ -236,7 +236,7 @@
     </section>
     {% endif %}
 
-    {# â”€â”€â”€ Moderation Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Moderation Summary ─────────────────────────────────────── #}
     <section class="config-section">
         <h2>Moderation</h2>
         <p class="config-section-description">

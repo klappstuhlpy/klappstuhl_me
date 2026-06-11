@@ -8,7 +8,7 @@
 
 {% block content %}
 
-    {# â”€â”€â”€ Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Summary ─────────────────────────────────────────── #}
     <div class="metric-tiles">
         <div class="metric-tile">
             <span class="tile-label">Total Commands</span>
@@ -36,7 +36,7 @@
         </div>
     </div>
 
-    {# â”€â”€â”€ Plonks (Ignored) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Plonks (Ignored) ────────────────────────────────────────────── #}
     <section class="config-section">
         <div class="config-section-head">
             <div>
@@ -70,7 +70,7 @@
         <p class="text-muted" id="plonks-empty" {% if !commands.plonks.is_empty() %}hidden{% endif %}>No plonked entities. Click "Plonk a user" to block someone.</p>
     </section>
 
-    {# â”€â”€â”€ Command List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Command List ────────────────────────────────────────────── #}
     <section class="config-section">
         <h2>All Commands</h2>
         <p class="config-section-description">Click a command to configure its availability. Three states: Enabled (works everywhere), Partial (disabled in specific channels), Disabled (blocked server-wide).</p>
@@ -102,7 +102,7 @@
         </div>
     </section>
 
-    {# â”€â”€â”€ Command Edit Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Command Edit Modal ───────────────────────────────────────────── #}
     <div class="modal-overlay" id="cmd-edit-modal" hidden>
         <div class="modal-card w-lg">
             <h3 id="cmd-edit-title">Configure Command</h3>
@@ -139,7 +139,7 @@
         </div>
     </div>
 
-    {# â”€â”€â”€ Add Plonk Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Add Plonk Modal ─────────────────────────────────────────── #}
     <div class="modal-overlay" id="plonk-modal" hidden>
         <div class="modal-card w-md">
             <h3>Plonk a user or channel</h3>

@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block content %}
-    {# â”€â”€â”€ Summary Tiles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Summary Tiles ────────────────────────────────────────────── #}
     <div class="metric-tiles">
         <div class="metric-tile">
             <span class="tile-label">Total Polls</span>
@@ -25,7 +25,7 @@
         </div>
     </div>
 
-    {# â”€â”€â”€ Poll Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Poll Settings ────────────────────────────────────────────── #}
     <section class="config-section">
         <h2>Poll Settings</h2>
         <p class="config-section-description">Configure where polls are posted and who gets notified.</p>
@@ -76,7 +76,7 @@
         </form>
     </section>
 
-    {# â”€â”€â”€ Polls Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Polls Table ─────────────────────────────────────────────── #}
     <div class="section-header polls-toolbar">
         <h2>Polls</h2>
         <button type="button" class="button primary small" onclick="openCreatePoll()">+ New Poll</button>
@@ -131,7 +131,7 @@
     </div>
     {% endif %}
 
-    {# â”€â”€â”€ Edit Poll Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Edit Poll Modal ─────────────────────────────────────────── #}
     <div class="modal-overlay" id="poll-edit-modal" hidden>
         <div class="modal-card w-xl">
             <h3>Edit Poll</h3>
@@ -184,7 +184,7 @@
         </div>
     </div>
 
-    {# â”€â”€â”€ Create Poll Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ #}
+    {# ─── Create Poll Modal ───────────────────────────────────────────── #}
     <div class="modal-overlay" id="poll-create-modal" hidden>
         <div class="modal-card w-xl">
             <h3>Create Poll</h3>
