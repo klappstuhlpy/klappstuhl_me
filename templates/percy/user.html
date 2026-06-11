@@ -4,7 +4,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
-<link rel="stylesheet" href="/css/percy/user.css" type="text/css"/>
+<link rel="stylesheet" href="/static/css/percy/user.css" type="text/css"/>
 {% endblock %}
 
 {% block body %}
@@ -273,7 +273,7 @@
         {% else %}
         <ul class="case-timeline">
             {% for c in member.cases %}
-            <li class="case-entry">
+            <li class="case-entry" data-case-index="{{ c.case_index }}">
                 <span class="case-index">#{{ c.case_index }}</span>
                 <div class="case-body">
                     <span class="case-action {{ c.action }}">{{ c.action }}</span>
@@ -281,7 +281,7 @@
                     {% when Some with (r) %}
                     <div class="case-reason">{{ r }}</div>
                     {% when None %}
-                    <div class="case-reason"><em>No reason given</em></div>
+                    <div class="case-reason is-empty"><em>No reason given</em></div>
                     {% endmatch %}
                     <div class="case-meta">
                         {% match c.moderator_name %}
@@ -295,6 +295,10 @@
                         {% when None %}
                         {% endmatch %}
                     </div>
+                </div>
+                <div class="case-actions">
+                    <button type="button" class="case-edit" title="Edit reason">Edit</button>
+                    <button type="button" class="case-delete" title="Delete case">Delete</button>
                 </div>
             </li>
             {% endfor %}
@@ -367,6 +371,87 @@
             button.disabled = false;
         }
     });
+})();
+</script>
+
+<script>
+(function() {
+    const timeline = document.querySelector('.case-timeline');
+    if (!timeline) return;
+
+    const caseUrl = (idx) => `/percy/dashboard/guild/{{ guild_id }}/cases/${idx}`;
+
+    timeline.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const entry = btn.closest('.case-entry');
+        if (!entry) return;
+        const idx = entry.dataset.caseIndex;
+
+        if (btn.classList.contains('case-delete')) {
+            if (!confirm(`Delete case #${idx}? This cannot be undone.`)) return;
+            btn.disabled = true;
+            try {
+                const resp = await fetch(caseUrl(idx), { method: 'DELETE' });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); btn.disabled = false; return; }
+                entry.remove();
+                if (!timeline.querySelector('.case-entry')) location.reload();
+            } catch {
+                alert('Failed to delete case.');
+                btn.disabled = false;
+            }
+        } else if (btn.classList.contains('case-edit')) {
+            beginEdit(entry);
+        }
+    });
+
+    function beginEdit(entry) {
+        if (entry.querySelector('.case-edit-form')) return; // already editing
+        const reasonEl = entry.querySelector('.case-reason');
+        const current = reasonEl.classList.contains('is-empty') ? '' : reasonEl.textContent.trim();
+
+        const form = document.createElement('form');
+        form.className = 'case-edit-form';
+        form.innerHTML =
+            '<input type="text" class="case-edit-input" maxlength="500" placeholder="New reason" required>'
+            + '<button type="submit" class="button small primary">Save</button>'
+            + '<button type="button" class="button small case-edit-cancel">Cancel</button>';
+        const input = form.querySelector('.case-edit-input');
+        input.value = current;
+
+        reasonEl.hidden = true;
+        reasonEl.insertAdjacentElement('afterend', form);
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+
+        const close = () => { form.remove(); reasonEl.hidden = false; };
+        form.querySelector('.case-edit-cancel').addEventListener('click', close);
+        input.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') close(); });
+
+        form.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const reason = input.value.trim();
+            if (!reason) { input.focus(); return; } // Percy requires a non-empty reason
+            const saveBtn = form.querySelector('button[type="submit"]');
+            saveBtn.disabled = true;
+            try {
+                const resp = await fetch(caseUrl(entry.dataset.caseIndex), {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason }),
+                });
+                const data = await resp.json();
+                if (data.error) { alert(data.error); saveBtn.disabled = false; return; }
+                reasonEl.textContent = reason;
+                reasonEl.classList.remove('is-empty');
+                close();
+            } catch {
+                alert('Failed to update case.');
+                saveBtn.disabled = false;
+            }
+        });
+    }
 })();
 </script>
 

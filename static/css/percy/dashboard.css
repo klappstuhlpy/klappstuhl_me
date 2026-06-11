@@ -1740,6 +1740,42 @@ th.th-sortable[aria-sort="descending"]::after {
     color: var(--text-muted);
     margin-top: 0.25rem;
 }
+.case-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+    align-items: center;
+}
+.case-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.1rem 0.2rem;
+    font: inherit;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    transition: color 0.15s ease;
+}
+.case-actions button:hover { color: var(--foreground); }
+.case-actions .case-delete:hover { color: var(--error-text); }
+.case-actions button:disabled { opacity: 0.5; cursor: default; }
+.case-edit-form {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    margin-top: 0.15rem;
+    flex-wrap: wrap;
+}
+.case-edit-input {
+    flex: 1;
+    min-width: 160px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.78rem;
+    background: var(--form-input-background);
+    border: 1px solid var(--form-input-border);
+    border-radius: 0.375rem;
+    color: var(--foreground);
+}
 
 .badge-status {
     font-size: 0.65rem;
