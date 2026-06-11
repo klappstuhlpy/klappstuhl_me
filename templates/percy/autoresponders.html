@@ -60,29 +60,29 @@
 
 <!-- Add Responder Modal -->
 <div class="modal-overlay" id="add-modal" hidden>
-    <div class="modal-card" style="max-width: 520px;">
+    <div class="modal-card w-lg">
         <h3>Add Autoresponder</h3>
-        <div style="margin-top: 1rem;">
+        <div class="modal-form">
             <label class="config-label" for="ar_trigger">Trigger</label>
-            <input type="text" id="ar_trigger" class="config-input" placeholder="hello" maxlength="200" style="margin-bottom: 0.75rem;">
+            <input type="text" id="ar_trigger" class="config-input" placeholder="hello" maxlength="200">
             <label class="config-label" for="ar_response">Response</label>
-            <textarea id="ar_response" class="config-input" rows="3" maxlength="2000" placeholder="Hi {user}! Welcome to {server}." style="resize: vertical; margin-bottom: 0.75rem;"></textarea>
+            <textarea id="ar_response" class="config-input resize-v" rows="3" maxlength="2000" placeholder="Hi {user}! Welcome to {server}."></textarea>
             <label class="config-label" for="ar_match_type">Match Type</label>
-            <select id="ar_match_type" class="config-select" style="margin-bottom: 0.75rem;">
+            <select id="ar_match_type" class="config-select">
                 <option value="contains">Contains</option>
                 <option value="exact">Exact</option>
                 <option value="starts">Starts With</option>
                 <option value="ends">Ends With</option>
                 <option value="regex">Regex</option>
             </select>
-            <label class="config-toggle" style="margin-bottom: 0;">
+            <label class="config-toggle">
                 <div>
                     <span class="config-label">Ignore Case</span>
                 </div>
                 <input type="checkbox" id="ar_ignore_case" checked>
             </label>
         </div>
-        <div class="modal-actions" style="margin-top: 1rem;">
+        <div class="modal-actions">
             <button type="button" class="button small" id="add-modal-cancel">Cancel</button>
             <button type="button" class="button primary small" id="add-modal-confirm">Create</button>
         </div>

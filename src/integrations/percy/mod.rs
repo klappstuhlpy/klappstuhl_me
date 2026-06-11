@@ -387,6 +387,26 @@ impl PercyClient {
         Ok(resp.json().await?)
     }
 
+    /// Create a new poll.
+    pub async fn create_poll(&self, guild_id: u64, body: &serde_json::Value) -> Result<serde_json::Value, PercyError> {
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/polls")))
+            .bearer_auth(&self.token)
+            .json(body)
+            .send()
+            .await?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err(PercyError::NotFound);
+        }
+        // Surface Percy's validation error text (HTTPBadRequest body) to the caller.
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(resp.json().await?)
+    }
+
     /// Edit a poll.
     pub async fn patch_poll(&self, guild_id: u64, poll_id: i64, patch: &serde_json::Value) -> Result<(), PercyError> {
         let resp = self

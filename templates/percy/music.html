@@ -3,32 +3,7 @@
 {% block page_subtitle %}<p>Player status, panel configuration, equalizer, and audio filters.</p>{% endblock %}
 
 {% block page_css %}
-<style>
-.eq-container { position: relative; width: 100%; max-width: 900px; }
-.eq-canvas { width: 100%; height: 320px; border: 1px solid var(--border, #2a2a2a); border-radius: 8px; background: var(--surface, #111); cursor: pointer; touch-action: none; }
-.eq-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
-.eq-presets { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.eq-status { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted, #888); transition: color 0.2s; }
-.eq-status.applying { color: var(--branding, #d97757); }
-.eq-status.applied { color: #4caf50; }
-.eq-status .eq-spinner { width: 12px; height: 12px; border: 2px solid transparent; border-top-color: var(--branding, #d97757); border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
-.eq-status.applying .eq-spinner { display: inline-block; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.eq-preset-label { font-size: 0.82rem; color: var(--text-muted, #888); }
-.eq-preset-label strong { color: var(--foreground, #eee); }
-.filter-toggles { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
-.filter-toggle { padding: 0.4rem 0.9rem; border-radius: 6px; border: 1px solid var(--border, #2a2a2a); background: transparent; color: var(--text-muted, #888); cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
-.filter-toggle.active { background: var(--branding, #d97757); color: #fff; border-color: var(--branding, #d97757); }
-.filter-toggle:hover { border-color: var(--branding, #d97757); }
-.now-playing { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; border-radius: 8px; background: var(--surface, #111); border: 1px solid var(--border, #2a2a2a); }
-.now-playing .np-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--branding, #d97757); animation: pulse 1.5s infinite; }
-@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
-.lowpass-input { width: 80px; margin-left: 0.5rem; }
-.listener-status { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; border-radius: 8px; background: var(--surface, #111); border: 1px solid var(--border, #2a2a2a); margin-bottom: 1.5rem; }
-.listener-status .ls-indicator { width: 10px; height: 10px; border-radius: 50%; }
-.listener-status .ls-indicator.active { background: #4caf50; }
-.listener-status .ls-indicator.inactive { background: #555; }
-</style>
+<link rel="stylesheet" href="/static/css/percy/pages/music.css" type="text/css"/>
 {% endblock %}
 
 {% block content %}
@@ -65,7 +40,7 @@
         {% match music.setup %}
         {% when Some with (setup) %}
         <p class="config-section-description">The music panel is configured. The bot will use a dedicated channel for the player panel.</p>
-        <div class="listener-status" style="margin-bottom: 1rem;">
+        <div class="listener-status">
             <span class="ls-indicator active"></span>
             <span>Panel channel: <strong id="setup-channel-name">{% for ch in channels %}{% if ch.id == setup.channel_id %}#{{ ch.name }}{% endif %}{% endfor %}</strong></span>
         </div>
@@ -78,7 +53,7 @@
                 <input type="checkbox" id="panel-toggle" {% if setup.use_panel %}checked{% endif %}>
             </label>
         </div>
-        <div class="config-actions" style="margin-top: 1rem;">
+        <div class="config-actions">
             <button type="button" class="button small danger" id="reset-setup-btn">Reset Configuration</button>
         </div>
         {% when None %}
@@ -95,7 +70,7 @@
                 </select>
             </div>
         </div>
-        <div class="config-actions" style="margin-top: 1rem;">
+        <div class="config-actions">
             <button type="button" class="button primary small" id="run-setup-btn">Setup Music Panel</button>
         </div>
         {% endmatch %}
@@ -104,7 +79,7 @@
     {# ─── Equalizer ──────────────────────────────────────────────── #}
     <section class="config-section" id="eq-section">
         <div class="eq-header">
-            <h2 style="margin:0">Equalizer</h2>
+            <h2 class="m-0">Equalizer</h2>
             <span class="eq-status" id="eq-status"><span class="eq-spinner"></span><span class="eq-status-text"></span></span>
             <span class="eq-preset-label">Preset: <strong id="eq-preset-name">{% if music.active %}Custom{% else %}—{% endif %}</strong></span>
         </div>
@@ -130,7 +105,7 @@
             <button class="filter-toggle{% if music.filters.nightcore %} active{% endif %}" data-action="nightcore">Nightcore</button>
             <button class="filter-toggle{% if music.filters.eight_d %} active{% endif %}" data-action="8d">8D Audio</button>
             <button class="filter-toggle" data-action="reset">Reset All</button>
-            <span style="display: flex; align-items: center;">
+            <span class="flex-center">
                 <button class="filter-toggle{% if music.filters.lowpass.is_some() %} active{% endif %}" data-action="lowpass" id="lowpass-btn">Lowpass</button>
                 <input type="number" class="config-input lowpass-input" id="lowpass-val" min="2.5" max="50" step="0.5" value="{{ music.filters.lowpass.unwrap_or(20.0) }}">
             </span>

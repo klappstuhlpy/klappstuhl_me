@@ -45,29 +45,29 @@
 
 <!-- Add/Edit Feed Modal -->
 <div class="modal-overlay" id="feed-modal" hidden>
-    <div class="modal-card" style="max-width: 520px;">
+    <div class="modal-card w-lg">
         <h3 id="feed-modal-title">Subscribe to Comic Feed</h3>
-        <div style="margin-top: 1rem;">
+        <div class="modal-form">
             <label class="config-label" for="feed_brand">Brand</label>
-            <select id="feed_brand" class="config-select" style="margin-bottom: 0.75rem;">
+            <select id="feed_brand" class="config-select">
                 <option value="MARVEL">Marvel</option>
                 <option value="DC">DC</option>
                 <option value="MANGA">Manga</option>
             </select>
             <label class="config-label" for="feed_channel">Channel</label>
-            <select id="feed_channel" class="config-select" style="margin-bottom: 0.75rem;">
+            <select id="feed_channel" class="config-select">
                 {% for ch in channels %}
                 <option value="{{ ch.id }}">#{{ ch.name }}</option>
                 {% endfor %}
             </select>
             <label class="config-label" for="feed_format">Format</label>
-            <select id="feed_format" class="config-select" style="margin-bottom: 0.75rem;">
+            <select id="feed_format" class="config-select">
                 <option value="Full">Full</option>
                 <option value="Compact">Compact</option>
                 <option value="Summary">Summary</option>
             </select>
             <label class="config-label" for="feed_day">Day (1-7)</label>
-            <select id="feed_day" class="config-select" style="margin-bottom: 0.75rem;">
+            <select id="feed_day" class="config-select">
                 <option value="1">1 (Monday)</option>
                 <option value="2">2 (Tuesday)</option>
                 <option value="3">3 (Wednesday)</option>
@@ -77,20 +77,20 @@
                 <option value="7">7 (Sunday)</option>
             </select>
             <label class="config-label" for="feed_ping">Ping Role (optional)</label>
-            <select id="feed_ping" class="config-select" style="margin-bottom: 0.75rem;">
+            <select id="feed_ping" class="config-select">
                 <option value="">No ping</option>
                 {% for r in roles %}
                 <option value="{{ r.id }}">@{{ r.name }}</option>
                 {% endfor %}
             </select>
-            <label class="config-toggle" style="margin-bottom: 0;">
+            <label class="config-toggle">
                 <div>
                     <span class="config-label">Pin Messages</span>
                 </div>
                 <input type="checkbox" id="feed_pin">
             </label>
         </div>
-        <div class="modal-actions" style="margin-top: 1rem;">
+        <div class="modal-actions">
             <button type="button" class="button small" id="feed-modal-cancel">Cancel</button>
             <button type="button" class="button primary small" id="feed-modal-confirm">Create</button>
         </div>

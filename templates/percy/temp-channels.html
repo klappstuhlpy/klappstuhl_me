@@ -31,9 +31,9 @@
                 <tr>
                     <td><strong>{{ entry.channel_name }}</strong> <code class="text-muted">{{ entry.channel_id }}</code></td>
                     <td><code>{{ entry.format }}</code></td>
-                    <td style="white-space: nowrap;">
-                        <button class="button small edit-hub-btn" data-channel-id="{{ entry.channel_id }}" data-format="{{ entry.format }}" style="display: inline-block;">Edit</button>
-                        <button class="button small danger delete-hub-btn" data-channel-id="{{ entry.channel_id }}" style="display: inline-block;">Delete</button>
+                    <td class="nowrap">
+                        <button class="button small edit-hub-btn inline-block" data-channel-id="{{ entry.channel_id }}" data-format="{{ entry.format }}">Edit</button>
+                        <button class="button small danger delete-hub-btn inline-block" data-channel-id="{{ entry.channel_id }}">Delete</button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -44,20 +44,20 @@
 
 <!-- Add/Edit Hub Modal -->
 <div class="modal-overlay" id="hub-modal" hidden>
-    <div class="modal-card" style="max-width: 520px;">
+    <div class="modal-card w-lg">
         <h3 id="hub-modal-title">Add Hub Channel</h3>
-        <div style="margin-top: 1rem;">
+        <div class="modal-form">
             <label class="config-label" for="hub_channel">Channel</label>
-            <select id="hub_channel" class="config-select" style="margin-bottom: 0.75rem;">
+            <select id="hub_channel" class="config-select">
                 {% for ch in channels %}
                 <option value="{{ ch.id }}">{{ ch.name }}</option>
                 {% endfor %}
             </select>
             <label class="config-label" for="hub_format">Name Format</label>
-            <input type="text" id="hub_format" class="config-input" placeholder="%display_name's Channel" style="margin-bottom: 0.5rem;">
-            <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 0;">Placeholders: <code>%name</code>, <code>%display_name</code>, <code>%guild</code>, <code>%channel</code></p>
+            <input type="text" id="hub_format" class="config-input" placeholder="%display_name's Channel">
+            <p class="text-muted fs-xs mb-0">Placeholders: <code>%name</code>, <code>%display_name</code>, <code>%guild</code>, <code>%channel</code></p>
         </div>
-        <div class="modal-actions" style="margin-top: 1rem;">
+        <div class="modal-actions">
             <button type="button" class="button small" id="hub-modal-cancel">Cancel</button>
             <button type="button" class="button primary small" id="hub-modal-confirm">Create</button>
         </div>

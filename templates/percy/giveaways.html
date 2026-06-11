@@ -46,7 +46,7 @@
                         <strong>{{ giveaway.title }}</strong>
                         {% match giveaway.description %}
                         {% when Some with (desc) %}
-                        <br><span class="text-muted" style="font-size:0.75rem;">{{ desc }}</span>
+                        <br><span class="text-muted fs-xs">{{ desc }}</span>
                         {% when None %}
                         {% endmatch %}
                     </td>

@@ -8,7 +8,7 @@
     <section class="config-section">
         <h2>Shop Items</h2>
         <p class="config-section-description">Items available for purchase in this server's shop.</p>
-        <button class="button primary small" id="add-item-btn" style="margin-bottom: 1rem;">Add Item</button>
+        <button class="button primary small mb-md" id="add-item-btn">Add Item</button>
         {% if economy.items.is_empty() %}
         <p class="text-muted">No shop items configured.</p>
         {% else %}
@@ -86,15 +86,15 @@
 <div class="modal-overlay" id="add-item-modal" hidden>
     <div class="modal-card">
         <h3>Add Shop Item</h3>
-        <div style="margin-top: 1rem;">
+        <div class="modal-form">
             <label class="config-label">Name</label>
-            <input type="text" id="item_name" class="config-input" maxlength="64" style="margin-bottom: 0.75rem;">
+            <input type="text" id="item_name" class="config-input" maxlength="64">
             <label class="config-label">Price</label>
-            <input type="number" id="item_price" class="config-input" min="1" style="margin-bottom: 0.75rem;">
+            <input type="number" id="item_price" class="config-input" min="1">
             <label class="config-label">Description</label>
-            <input type="text" id="item_desc" class="config-input" maxlength="256" style="margin-bottom: 0.75rem;">
+            <input type="text" id="item_desc" class="config-input" maxlength="256">
             <label class="config-label">Effect</label>
-            <select id="item_effect" class="config-select" style="margin-bottom: 0.75rem;">
+            <select id="item_effect" class="config-select">
                 <option value="none">None (collectible)</option>
                 <option value="cash">Cash Voucher</option>
                 <option value="lootbox">Lootbox</option>
@@ -104,11 +104,11 @@
             </select>
             <div id="effect-value-group" hidden>
                 <label class="config-label" id="effect-value-label">Value</label>
-                <input type="number" id="item_effect_value" class="config-input" min="1" style="margin-bottom: 0.75rem;">
+                <input type="number" id="item_effect_value" class="config-input" min="1">
             </div>
             <div id="effect-role-group" hidden>
                 <label class="config-label">Role to Grant</label>
-                <select id="item_effect_role" class="config-select" style="margin-bottom: 0.75rem;">
+                <select id="item_effect_role" class="config-select">
                     <option value="">Select a role…</option>
                     {% for role in roles %}
                     {% if !role.managed && role.name != "@everyone" %}
@@ -119,10 +119,10 @@
             </div>
             <div id="effect-duration-group" hidden>
                 <label class="config-label">Duration (minutes)</label>
-                <input type="number" id="item_duration" class="config-input" min="1" max="10080" style="margin-bottom: 0.75rem;">
+                <input type="number" id="item_duration" class="config-input" min="1" max="10080">
             </div>
         </div>
-        <div class="modal-actions" style="margin-top: 1rem;">
+        <div class="modal-actions">
             <button type="button" class="button small" id="item-modal-cancel">Cancel</button>
             <button type="button" class="button primary small" id="item-modal-confirm">Create</button>
         </div>
@@ -133,11 +133,11 @@
 <div class="modal-overlay" id="lottery-modal" hidden>
     <div class="modal-card">
         <h3>Start Lottery</h3>
-        <div style="margin-top: 1rem;">
+        <div class="modal-form">
             <label class="config-label">Ticket Price</label>
-            <input type="number" id="lottery_price" class="config-input" min="1" value="100" style="margin-bottom: 0.75rem;">
+            <input type="number" id="lottery_price" class="config-input" min="1" value="100">
             <label class="config-label">Duration (minutes)</label>
-            <input type="number" id="lottery_duration" class="config-input" min="5" max="43200" value="60" style="margin-bottom: 0.75rem;">
+            <input type="number" id="lottery_duration" class="config-input" min="5" max="43200" value="60">
             <label class="config-label">Announcement Channel</label>
             <select id="lottery_channel" class="config-select">
                 <option value="">Select a channel…</option>
@@ -148,7 +148,7 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="modal-actions" style="margin-top: 1rem;">
+        <div class="modal-actions">
             <button type="button" class="button small" id="lottery-modal-cancel">Cancel</button>
             <button type="button" class="button primary small" id="lottery-modal-confirm">Start</button>
         </div>

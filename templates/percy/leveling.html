@@ -86,7 +86,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="config-field" style="grid-column: 1 / -1;">
+                <div class="config-field grid-col-full">
                     <label class="config-label" for="level_up_message">Level-Up Message</label>
                     <span class="config-description">Template shown on level up. Use {user} and {level}.</span>
                     <input type="text" name="level_up_message" id="level_up_message" class="config-input" placeholder="Congrats {user}, you reached level {level}!" value="{{ config.level_up_message.as_deref().unwrap_or("") }}">
@@ -389,11 +389,11 @@
         <div class="modal-card">
             <h3>Edit Level & XP</h3>
             <p id="level-modal-desc" class="text-muted"></p>
-            <div class="config-field" style="margin: 1rem 0 0.5rem;">
+            <div class="config-field mt-md mb-xs">
                 <label class="config-label" for="edit-level">Level</label>
                 <input type="number" id="edit-level" class="config-input" min="0">
             </div>
-            <div class="config-field" style="margin: 0.5rem 0 0;">
+            <div class="config-field mt-xs">
                 <label class="config-label" for="edit-xp">XP</label>
                 <input type="number" id="edit-xp" class="config-input" min="0">
             </div>

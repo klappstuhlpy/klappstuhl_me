@@ -2,6 +2,10 @@
 
 {% block page_subtitle %}<p>View and manage running and completed polls.</p>{% endblock %}
 
+{% block page_css %}
+<link rel="stylesheet" href="/static/css/percy/pages/polls.css" type="text/css"/>
+{% endblock %}
+
 {% block content %}
     {# ─── Summary Tiles ───────────────────────────────────────────── #}
     <div class="metric-tiles">
@@ -21,7 +25,62 @@
         </div>
     </div>
 
+    {# ─── Poll Settings ───────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Poll Settings</h2>
+        <p class="config-section-description">Configure where polls are posted and who gets notified.</p>
+        <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config" id="poll-config-form">
+            <input type="hidden" name="_section" value="polls">
+            <div class="config-grid">
+                <div class="config-field">
+                    <label class="config-label" for="poll_channel">Poll Channel</label>
+                    <span class="config-description">Channel where new polls are posted</span>
+                    <select name="poll_channel_id" id="poll_channel" class="config-select">
+                        <option value="">Not set</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% match guild.poll_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            #{{ ch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="poll_reason_channel">Reason Channel</label>
+                    <span class="config-description">Channel for vote reason submissions</span>
+                    <select name="poll_reason_channel_id" id="poll_reason_channel" class="config-select">
+                        <option value="">Not set</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}" {% match guild.poll_reason_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            #{{ ch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="config-field">
+                    <label class="config-label" for="poll_ping_role">Ping Role</label>
+                    <span class="config-description">Role pinged when a new poll starts</span>
+                    <select name="poll_ping_role_id" id="poll_ping_role" class="config-select">
+                        <option value="">Not set</option>
+                        {% for role in roles %}
+                        <option value="{{ role.id }}" {% match guild.poll_ping_role %}{% when Some with (ref) %}{% if ref.id == role.id %}selected{% endif %}{% when None %}{% endmatch %}>
+                            @{{ role.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="config-actions">
+                <button type="button" class="button small" id="poll-config-cancel">Cancel</button>
+                <button type="submit" class="button primary small">Save Changes</button>
+            </div>
+        </form>
+    </section>
+
     {# ─── Polls Table ─────────────────────────────────────────────── #}
+    <div class="section-header polls-toolbar">
+        <h2>Polls</h2>
+        <button type="button" class="button primary small" onclick="openCreatePoll()">+ New Poll</button>
+    </div>
     {% if polls.polls.is_empty() %}
     <div class="empty-state">
         <h3>No polls yet</h3>
@@ -46,7 +105,7 @@
                     <td>
                         <strong>{{ poll.question }}</strong>
                         {% if !poll.description.is_empty() %}
-                        <br><span class="text-muted" style="font-size:0.75rem;">{{ poll.description }}</span>
+                        <br><span class="text-muted poll-desc">{{ poll.description }}</span>
                         {% endif %}
                     </td>
                     <td>
@@ -74,29 +133,29 @@
 
     {# ─── Edit Poll Modal ─────────────────────────────────────────── #}
     <div class="modal-overlay" id="poll-edit-modal" hidden>
-        <div class="modal-card" style="max-width:560px;">
+        <div class="modal-card w-xl">
             <h3>Edit Poll</h3>
-            <p class="text-muted" style="margin-bottom:1rem;">Edit the question, description, options, and appearance of this poll.</p>
+            <p class="text-muted modal-intro">Edit the question, description, options, and appearance of this poll.</p>
 
-            <div class="config-field" style="margin-bottom:0.75rem;">
+            <div class="config-field mb-sm">
                 <label class="config-label" for="edit-poll-question">Question</label>
                 <span class="config-description">The main poll question displayed to voters</span>
                 <input type="text" id="edit-poll-question" class="config-input" placeholder="What should we...">
             </div>
 
-            <div class="config-field" style="margin-bottom:0.75rem;">
+            <div class="config-field mb-sm">
                 <label class="config-label" for="edit-poll-description">Description</label>
                 <span class="config-description">Optional context shown below the question</span>
                 <input type="text" id="edit-poll-description" class="config-input" placeholder="Optional description...">
             </div>
 
-            <div class="config-field" style="margin-bottom:0.75rem;">
+            <div class="config-field mb-sm">
                 <label class="config-label" for="edit-poll-image">Image URL</label>
                 <span class="config-description">Image displayed alongside the poll embed</span>
                 <input type="url" id="edit-poll-image" class="config-input" placeholder="https://...">
             </div>
 
-            <div class="config-field" style="margin-bottom:0.75rem;">
+            <div class="config-field mb-sm">
                 <label class="config-label" for="edit-poll-color">Color</label>
                 <span class="config-description">
                     Hex color for the embed sidebar (e.g. #ff5733)
@@ -112,15 +171,98 @@
                 >
             </div>
 
-            <div class="config-field" style="margin-bottom:0.75rem;">
+            <div class="config-field mb-sm">
                 <label class="config-label">Options</label>
                 <span class="config-description">Poll choices (minimum 2). Leave blank to keep unchanged, clear all text to remove.</span>
-                <div id="edit-poll-options" style="display:flex;flex-direction:column;gap:0.4rem;margin-top:0.4rem;"></div>
+                <div id="edit-poll-options" class="option-list"></div>
             </div>
 
             <div class="modal-actions">
                 <button class="button small" onclick="closeEditPoll()">Cancel</button>
                 <button class="button primary small" id="poll-save-btn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    {# ─── Create Poll Modal ───────────────────────────────────────── #}
+    <div class="modal-overlay" id="poll-create-modal" hidden>
+        <div class="modal-card w-xl">
+            <h3>Create Poll</h3>
+            <p class="text-muted modal-intro">Post a new poll to your server. It will run for the chosen duration and then close automatically.</p>
+
+            <div class="config-field mb-sm">
+                <label class="config-label" for="create-poll-question">Question</label>
+                <span class="config-description">The main poll question displayed to voters</span>
+                <input type="text" id="create-poll-question" class="config-input" placeholder="What should we...">
+            </div>
+
+            <div class="config-field mb-sm">
+                <label class="config-label" for="create-poll-description">Description</label>
+                <span class="config-description">Optional context shown below the question</span>
+                <input type="text" id="create-poll-description" class="config-input" placeholder="Optional description...">
+            </div>
+
+            <div class="config-field mb-sm">
+                <label class="config-label" for="create-poll-channel">Channel</label>
+                <span class="config-description">Where to post the poll. Defaults to the configured poll channel.</span>
+                <select id="create-poll-channel" class="config-select">
+                    <option value="">Configured poll channel</option>
+                    {% for ch in channels %}
+                    <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="config-field mb-sm">
+                <label class="config-label">Duration</label>
+                <span class="config-description">How long the poll stays open before it closes automatically</span>
+                <div class="duration-row">
+                    <input type="number" id="create-poll-duration-amount" class="config-input duration-amount" value="1" min="1">
+                    <select id="create-poll-duration-unit" class="config-select duration-unit">
+                        <option value="60">Minutes</option>
+                        <option value="3600">Hours</option>
+                        <option value="86400" selected>Days</option>
+                        <option value="604800">Weeks</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="config-field mb-sm">
+                <label class="config-label" for="create-poll-thread">Discussion Thread</label>
+                <span class="config-description">Optional. If set, a thread is opened on the poll with this starter question.</span>
+                <input type="text" id="create-poll-thread" class="config-input" placeholder="What are your thoughts?">
+            </div>
+
+            <div class="config-field mb-sm">
+                <label class="config-label">Banner Image</label>
+                <span class="config-description">Optional banner shown in the poll. Use a URL or upload a file — not both.</span>
+                <div class="segmented segmented-row">
+                    <input type="radio" id="create-poll-image-url" name="create-poll-image-source" value="url" checked>
+                    <label for="create-poll-image-url">Link</label>
+                    <input type="radio" id="create-poll-image-file-src" name="create-poll-image-source" value="file">
+                    <label for="create-poll-image-file-src">Upload</label>
+                </div>
+                <input type="url" id="create-poll-image" class="config-input" placeholder="https://...">
+                <input type="file" id="create-poll-image-file" class="config-input" accept="image/*" hidden>
+            </div>
+
+            <div class="config-field mb-sm">
+                <label class="config-label" for="create-poll-color">Color</label>
+                <span class="config-description">Hex color for the embed sidebar (e.g. #ff5733)</span>
+                <input type="text" id="create-poll-color" class="config-input" placeholder="#d97757"
+                       pattern="^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
+                       title="Please enter a valid hex color (e.g. #ff5733)">
+            </div>
+
+            <div class="config-field mb-sm">
+                <label class="config-label">Options</label>
+                <span class="config-description">Poll choices (2-8 required)</span>
+                <div id="create-poll-options" class="option-list"></div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="button small" onclick="closeCreatePoll()">Cancel</button>
+                <button class="button primary small" id="poll-create-btn">Create Poll</button>
             </div>
         </div>
     </div>
@@ -272,5 +414,208 @@ async function endPoll(pollId, btn) {
 document.getElementById('poll-edit-modal').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeEditPoll();
 });
+
+// ─── Create Poll ──────────────────────────────────────────────────────
+function buildCreateOptionInputs() {
+    const container = document.getElementById('create-poll-options');
+    container.innerHTML = '';
+    for (let i = 0; i < 2; i++) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'config-input';
+        input.placeholder = 'Option ' + (i + 1);
+        container.appendChild(input);
+    }
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'button small';
+    addBtn.textContent = '+ Add option';
+    addBtn.style.alignSelf = 'flex-start';
+    addBtn.style.marginTop = '0.25rem';
+    addBtn.addEventListener('click', () => {
+        const current = container.querySelectorAll('input').length;
+        if (current >= 8) return;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'config-input';
+        input.placeholder = 'Option ' + (current + 1);
+        container.insertBefore(input, addBtn);
+        if (current + 1 >= 8) addBtn.remove();
+    });
+    container.appendChild(addBtn);
+}
+
+// Banner image source toggle (URL vs file upload — mutually exclusive)
+function selectedImageSource() {
+    const checked = document.querySelector('input[name="create-poll-image-source"]:checked');
+    return checked ? checked.value : 'url';
+}
+
+function updateImageSourceUI() {
+    const useFile = selectedImageSource() === 'file';
+    const urlInput = document.getElementById('create-poll-image');
+    const fileInput = document.getElementById('create-poll-image-file');
+    urlInput.hidden = useFile;
+    fileInput.hidden = !useFile;
+    // Clear the unused input so only one source is ever submitted.
+    if (useFile) urlInput.value = '';
+    else fileInput.value = '';
+}
+
+document.querySelectorAll('input[name="create-poll-image-source"]').forEach(radio => {
+    radio.addEventListener('change', updateImageSourceUI);
+});
+
+function openCreatePoll() {
+    document.getElementById('create-poll-question').value = '';
+    document.getElementById('create-poll-description').value = '';
+    document.getElementById('create-poll-channel').value = '';
+    document.getElementById('create-poll-thread').value = '';
+    document.getElementById('create-poll-image').value = '';
+    document.getElementById('create-poll-image-file').value = '';
+    document.getElementById('create-poll-color').value = '';
+    document.getElementById('create-poll-duration-amount').value = '1';
+    document.getElementById('create-poll-duration-unit').value = '86400';
+    const urlRadio = document.querySelector('input[name="create-poll-image-source"][value="url"]');
+    if (urlRadio) urlRadio.checked = true;
+    updateImageSourceUI();
+    buildCreateOptionInputs();
+    document.getElementById('poll-create-modal').hidden = false;
+}
+
+function closeCreatePoll() {
+    document.getElementById('poll-create-modal').hidden = true;
+}
+
+// Uploads the chosen banner file to the image host and returns its public URL.
+async function uploadPollBanner(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/polls/image`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+        body: fd,
+    });
+    const data = await resp.json();
+    if (!data.ok || !data.url) throw new Error(data.error || 'Image upload failed.');
+    return data.url;
+}
+
+document.getElementById('poll-create-btn').addEventListener('click', async () => {
+    const question = document.getElementById('create-poll-question').value.trim();
+    const description = document.getElementById('create-poll-description').value.trim();
+    const channel_id = document.getElementById('create-poll-channel').value;
+    const thread_question = document.getElementById('create-poll-thread').value.trim();
+    const color = document.getElementById('create-poll-color').value.trim();
+    const amount = parseInt(document.getElementById('create-poll-duration-amount').value, 10);
+    const unit = parseInt(document.getElementById('create-poll-duration-unit').value, 10);
+
+    const useFile = selectedImageSource() === 'file';
+    const urlValue = document.getElementById('create-poll-image').value.trim();
+    const fileInput = document.getElementById('create-poll-image-file');
+    const bannerFile = fileInput.files && fileInput.files[0];
+
+    const options = [];
+    document.getElementById('create-poll-options').querySelectorAll('input').forEach(input => {
+        const v = input.value.trim();
+        if (v) options.push(v);
+    });
+
+    if (!question) { showToast('error', 'Question is required.'); return; }
+    if (options.length < 2) { showToast('error', 'At least 2 options are required.'); return; }
+    if (!Number.isFinite(amount) || amount < 1) { showToast('error', 'Enter a valid duration.'); return; }
+    if (color && !/^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(color)) {
+        showToast('error', 'Enter a valid hex color (e.g. #ff5733).');
+        return;
+    }
+
+    const btn = document.getElementById('poll-create-btn');
+    btn.disabled = true;
+    try {
+        // Resolve the banner: either the uploaded file (turned into a hosted URL)
+        // or the pasted URL — never both.
+        let image_url = '';
+        if (useFile && bannerFile) {
+            showToast('success', 'Uploading banner…');
+            image_url = await uploadPollBanner(bannerFile);
+        } else if (!useFile) {
+            image_url = urlValue;
+        }
+
+        const body = {
+            question,
+            description,
+            options,
+            image_url,
+            color,
+            duration_seconds: amount * unit,
+        };
+        if (channel_id) body.channel_id = channel_id;
+        if (thread_question) body.thread_question = thread_question;
+
+        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/polls`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            showToast('success', 'Poll created successfully.');
+            closeCreatePoll();
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showToast('error', data.error || 'Failed to create poll.');
+        }
+    } catch (e) {
+        showToast('error', (e && e.message) || 'Network error.');
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+document.getElementById('poll-create-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeCreatePoll();
+});
+
+// ─── Poll Settings form (async submit) ────────────────────────────────
+(function () {
+    const form = document.getElementById('poll-config-form');
+    if (!form) return;
+    const snapshot = new FormData(form);
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        try {
+            const resp = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' },
+                body: new URLSearchParams(new FormData(form)),
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                showToast('success', data.message || 'Settings saved.');
+            } else {
+                showToast('error', data.error || 'Failed to save settings.');
+            }
+        } catch {
+            showToast('error', 'Network error. Please try again.');
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    });
+
+    const cancel = document.getElementById('poll-config-cancel');
+    if (cancel) {
+        cancel.addEventListener('click', () => {
+            for (const el of form.elements) {
+                if (!el.name || el.name.startsWith('_')) continue;
+                el.value = snapshot.get(el.name) || '';
+            }
+            showToast('success', 'Changes discarded.');
+        });
+    }
+})();
 </script>
 {% endblock %}

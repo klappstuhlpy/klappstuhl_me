@@ -2,6 +2,10 @@
 
 {% block page_subtitle %}<p>Most used custom emoji across this server.</p>{% endblock %}
 
+{% block page_css %}
+<link rel="stylesheet" href="/static/css/percy/pages/emoji-stats.css" type="text/css"/>
+{% endblock %}
+
 {% block content %}
 
     <div class="metric-tiles">
@@ -35,7 +39,7 @@
                     <td>
                         {% match entry.emoji_url %}
                         {% when Some with (url) %}
-                        <img src="{{ url }}" alt="{{ entry.emoji_name }}" style="width: 24px; height: 24px; vertical-align: middle;">
+                        <img src="{{ url }}" alt="{{ entry.emoji_name }}" class="emoji-icon">
                         {% when None %}
                         <code>:{{ entry.emoji_name }}:</code>
                         {% endmatch %}

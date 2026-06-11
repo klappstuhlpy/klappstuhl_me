@@ -4,88 +4,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
-<style>
-.activity-heatmap-container {
-    overflow-x: auto;
-    padding: 0.5rem 0;
-}
-.heatmap-grid {
-    display: flex;
-    gap: 2px;
-}
-.heatmap-col {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-.heatmap-cell {
-    width: 11px;
-    height: 11px;
-    border-radius: 2px;
-    background: var(--box-shade);
-    border: 1px solid var(--box-border);
-}
-.heatmap-cell.l1 { background: #0e4429; border-color: #0e4429; }
-.heatmap-cell.l2 { background: #006d32; border-color: #006d32; }
-.heatmap-cell.l3 { background: #26a641; border-color: #26a641; }
-.heatmap-cell.l4 { background: #39d353; border-color: #39d353; }
-.heatmap-legend {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    margin-top: 0.5rem;
-    font-size: 0.7rem;
-    color: var(--text-muted);
-}
-.heatmap-legend .heatmap-cell { cursor: default; }
-.heatmap-months {
-    display: flex;
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    margin-bottom: 0.25rem;
-    padding-left: 0;
-}
-.heatmap-months span {
-    flex: 1;
-    text-align: left;
-}
-.open-case-form {
-    margin-bottom: 1.25rem;
-    padding: 1rem;
-    background: var(--box-shade);
-    border: 1px solid var(--box-border);
-    border-radius: 0.5rem;
-}
-.open-case-fields {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-.open-case-fields select,
-.open-case-fields input {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.82rem;
-    background: var(--form-input-background);
-    border: 1px solid var(--form-input-border);
-    border-radius: 0.375rem;
-    color: var(--foreground);
-}
-.open-case-fields input {
-    flex: 1;
-    min-width: 180px;
-}
-.open-case-hint {
-    margin: 0.5rem 0 0;
-    font-size: 0.72rem;
-    color: var(--text-muted);
-}
-.open-case-status {
-    margin: 0.5rem 0 0;
-    font-size: 0.78rem;
-}
-.open-case-status.error { color: var(--error-text); }
-.open-case-status.success { color: var(--success-text); }
-</style>
+<link rel="stylesheet" href="/static/css/percy/pages/user.css" type="text/css"/>
 {% endblock %}
 
 {% block body %}
@@ -173,7 +92,7 @@
     {% if !member.roles.is_empty() %}
     <section class="config-section">
         <h2>Roles</h2>
-        <div class="member-roles" style="max-height: none;">
+        <div class="member-roles expanded">
             {% for role in member.roles %}
             <span class="role-chip" style="border-color: {{ role.color_hex() }}; color: {% if role.color != 0 %}{{ role.color_hex() }}{% else %}var(--foreground){% endif %};">{{ role.name }}</span>
             {% endfor %}
@@ -503,7 +422,7 @@
                     if (d <= today) {
                         html += `<div class="heatmap-cell ${level}" title="${title}"></div>`;
                     } else {
-                        html += `<div class="heatmap-cell" style="visibility:hidden;"></div>`;
+                        html += `<div class="heatmap-cell is-empty"></div>`;
                     }
                     d.setDate(d.getDate() + 1);
                 }

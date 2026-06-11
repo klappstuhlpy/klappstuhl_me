@@ -854,7 +854,7 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 
 ### Features
 
-- **Tabbed configuration** — General (feature flags, polls, music, prefixes, Discord status feed subscription), Moderation (audit/alert/mute/mention + mod/message/voice log channels, active lockdowns with unlock), and Gatekeeper (verification channel, roles, starter message modal, bypass action, rate limit, auto-enable/disable) tabs. REQUIRED tags appear when a flag is enabled but its associated config is missing. Cancel/Save Changes buttons with form-state tracking.
+- **Tabbed configuration** — General (feature flags, music, prefixes, Discord status feed subscription), Moderation (audit/alert/mute/mention + mod/message/voice log channels, active lockdowns with unlock), and Gatekeeper (verification channel, roles, starter message modal, bypass action, rate limit, auto-enable/disable) tabs. REQUIRED tags appear when a flag is enabled but its associated config is missing. Cancel/Save Changes buttons with form-state tracking.
 - **Member management** — searchable, paginated member directory with kick/ban actions and role mutations. Confirmation modals gather moderation reasons.
 - **Leveling** — Full configuration form (enable/disable, voice XP, stack roles, clear-XP-on-leave, XP curve factor, base XP, min/max gain per message, XP cooldown, level-up announcement destination — same channel / DM / off / a specific channel — and level-up message template). Collection editors with add/remove and Discord role/channel pickers for **level rewards** (roles granted at a level, shown with their color swatch, plus a one-click "Generate preset roles" button that creates 12 themed milestone roles for levels 5–100 behind an "Are you sure?" confirm), **XP multipliers** (per role and per channel), **blacklists** (roles/channels/users excluded from XP), and **special level-up messages** (custom text per level). XP leaderboard with rank medals (gold/silver/bronze) and in-place level/XP editing per member via modal.
 - **Economy** — Shop item management (create/delete) with effect display (cash voucher, lootbox, role grant, XP/loot boosts with duration), top balance leaderboard, and lottery control (start/cancel active lotteries).
@@ -864,7 +864,7 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 - **Temporary Voice Channels** — Manage hub channels that spawn temp voice channels. Table with format string editing and placeholder reference (%name, %display_name, %guild, %channel).
 - **Highlights** — Admin view of all member highlight configurations (trigger words, blocked count) with the ability to remove a user's highlights.
 - **Emoji Stats** — Read-only usage statistics: total uses, distinct emojis, and a ranked table of top custom emojis with images and counts.
-- **Polls** — Browse all guild polls with status pills (Active/Ended), total vote counts, option counts, and publish/expiry dates. Edit running polls inline. End active polls with a confirmation dialog (archives thread, updates Discord message, removes timer).
+- **Polls** — Browse all guild polls with status pills (Active/Ended), total vote counts, option counts, and publish/expiry dates. **Poll settings** (poll/reason channels and ping role — moved here from the config tab) and a **Create Poll** modal live on this page: pick a channel, run duration, 2–8 options, optional description/colour/discussion-thread question, and a banner image supplied either by URL or by file upload (mutually exclusive — uploads are stored in the image host and the resulting raw URL is handed to Percy). Edit running polls inline. End active polls with a confirmation dialog (archives thread, updates Discord message, removes timer).
 - **Giveaways** — Track active and completed giveaways with entry counts, winner counts, and end times.
 - **Tags** — View most-used tags ranked by usage, top creators leaderboard, total tag count and total usage statistics.
 - **Command management** — Three-state system: Enabled/Partial/Disabled. Click any command to configure per-channel state. Plonk management to ignore specific users or channels.
@@ -923,7 +923,9 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/highlights` | GET | Highlights admin view |
 | `/percy/dashboard/guild/:id/highlights/:uid` | DELETE | Remove a user's highlights |
 | `/percy/dashboard/guild/:id/emoji-stats` | GET | Emoji usage statistics |
-| `/percy/dashboard/guild/:id/polls` | GET | Polls overview |
+| `/percy/dashboard/guild/:id/polls` | GET | Polls overview + settings + create-poll UI |
+| `/percy/dashboard/guild/:id/polls` | POST | Create and publish a new poll |
+| `/percy/dashboard/guild/:id/polls/image` | POST | Upload a poll banner image (stored in the image host), returns its public URL |
 | `/percy/dashboard/guild/:id/polls/:poll_id` | POST | Edit a running poll |
 | `/percy/dashboard/guild/:id/polls/:poll_id/end` | POST | End a running poll |
 | `/percy/dashboard/guild/:id/giveaways` | GET | Giveaways overview |
@@ -949,7 +951,7 @@ The dashboard code is grouped under a `percy` namespace per file type:
 - `src/services/percy_stats.rs` — background poller that fetches bot stats every 60s and publishes to the `"percy"` WebSocket topic.
 - `src/services/percy_moderation.rs` — placeholder for future server-push moderation notifications via the `"moderation"` WS topic.
 - `templates/percy/*.html` — one Askama template per page (including `user.html` for the member detail/lookup view). All guild sub-pages extend `dashboard_layout.html` which provides the shared container, navigation, and mobile-friendly dropdown toggle.
-- `static/css/percy/dashboard.css`, `static/js/percy/percy-dashboard.js`, `static/js/percy/percy-members.js` — page styling and behavior.
+- `static/css/percy/dashboard.css` — the shared base: layout, components, and reusable primitives (spacing/width utilities, `.modal-card`/`.modal-form`, status-colour helpers, shared `pulse`/`spin` keyframes). Page-specific styling lives in `static/css/percy/pages/<page>.css` and is pulled in per template via the `page_css` block; templates carry no inline `<style>` blocks (only genuinely dynamic, template-computed colours remain inline). `static/js/percy/percy-dashboard.js`, `static/js/percy/percy-members.js` — page behavior.
 
 ### How it works
 

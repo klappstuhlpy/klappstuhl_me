@@ -207,7 +207,14 @@ pub fn routes() -> Router<AppState> {
             patch(guild_temp_channel_patch).delete(guild_temp_channel_delete),
         )
         // Browse pages
-        .route("/percy/dashboard/guild/:guild_id/polls", get(guild_polls))
+        .route(
+            "/percy/dashboard/guild/:guild_id/polls",
+            get(guild_polls).post(guild_poll_create),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/polls/image",
+            post(guild_poll_image_upload),
+        )
         .route("/percy/dashboard/guild/:guild_id/polls/:poll_id", post(guild_poll_edit))
         .route(
             "/percy/dashboard/guild/:guild_id/polls/:poll_id/end",

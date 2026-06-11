@@ -3,106 +3,7 @@
 {% block page_subtitle %}<p>View, enable, disable, or restrict commands.</p>{% endblock %}
 
 {% block page_css %}
-<style>
-.cmd-state {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-.cmd-state.enabled { color: var(--success-text); }
-.cmd-state.partial { color: var(--warning-text); }
-.cmd-state.disabled { color: var(--error-text); }
-.cmd-state::before {
-    content: "";
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-}
-.config-section-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
-}
-.config-section-head h2 { margin-bottom: 0.25rem; }
-.config-section-head .button { flex-shrink: 0; white-space: nowrap; }
-.command-card {
-    cursor: pointer;
-}
-.command-card:hover {
-    border-color: var(--branding);
-    background: var(--box-shade);
-}
-.cmd-edit-form {
-    margin-top: 1rem;
-}
-.cmd-channels-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    max-height: 200px;
-    overflow-y: auto;
-    margin-top: 0.5rem;
-    padding: 0.5rem;
-    background: var(--form-input-background);
-    border: 1px solid var(--form-input-border);
-    border-radius: 0.375rem;
-}
-.cmd-channel-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.82rem;
-}
-.cmd-channel-row input[type="checkbox"] {
-    width: 1rem;
-    height: 1rem;
-    accent-color: var(--branding);
-}
-.cmd-mode-select {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-}
-.cmd-mode-btn {
-    flex: 1;
-    padding: 0.5rem;
-    font-size: 0.78rem;
-    font-weight: 500;
-    text-align: center;
-    border-radius: 0.375rem;
-    border: 1px solid var(--box-border);
-    background: var(--box-shade);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.cmd-mode-btn:hover {
-    border-color: var(--foreground);
-    color: var(--foreground);
-}
-.cmd-mode-btn.active-enabled {
-    border-color: var(--success-border);
-    background: var(--success-bg);
-    color: var(--success-text);
-}
-.cmd-mode-btn.active-partial {
-    border-color: var(--warning-border);
-    background: var(--warning-bg);
-    color: var(--warning-text);
-}
-.cmd-mode-btn.active-disabled {
-    border-color: var(--error-border);
-    background: var(--error-bg);
-    color: var(--error-text);
-}
-</style>
+<link rel="stylesheet" href="/static/css/percy/pages/commands.css" type="text/css"/>
 {% endblock %}
 
 {% block content %}
@@ -115,17 +16,17 @@
         </div>
         <div class="metric-tile">
             <span class="tile-label">Enabled</span>
-            <span class="tile-value" style="color:var(--success-text);">{{ commands.commands.len() - disabled_count - partial_count }}</span>
+            <span class="tile-value text-success">{{ commands.commands.len() - disabled_count - partial_count }}</span>
             <span class="tile-sub">Fully enabled</span>
         </div>
         <div class="metric-tile">
             <span class="tile-label">Partial</span>
-            <span class="tile-value" style="color:var(--warning-text);">{{ partial_count }}</span>
+            <span class="tile-value text-warning">{{ partial_count }}</span>
             <span class="tile-sub">Disabled in some channels</span>
         </div>
         <div class="metric-tile">
             <span class="tile-label">Disabled</span>
-            <span class="tile-value" style="color:var(--error-text);">{{ disabled_count }}</span>
+            <span class="tile-value text-error">{{ disabled_count }}</span>
             <span class="tile-sub">Globally disabled</span>
         </div>
         <div class="metric-tile">
@@ -174,14 +75,14 @@
         <h2>All Commands</h2>
         <p class="config-section-description">Click a command to configure its availability. Three states: Enabled (works everywhere), Partial (disabled in specific channels), Disabled (blocked server-wide).</p>
 
-        <div class="members-toolbar" style="margin-bottom:1rem;">
-            <input type="text" id="cmd-search" class="config-input" placeholder="Search commands..." style="max-width:320px;">
+        <div class="members-toolbar mb-md">
+            <input type="text" id="cmd-search" class="config-input search-input" placeholder="Search commands...">
         </div>
 
         <div class="command-grid" id="command-grid">
             {% for cmd in commands.commands %}
             <div class="command-card" data-idx="{{ loop.index0 }}" data-name="{{ cmd.name|lower }}" data-category="{{ cmd.category|lower }}">
-                <div style="flex:1;min-width:0;">
+                <div class="cmd-card-body">
                     <span class="command-name">{{ cmd.name }}</span>
                     <br>
                     <span class="command-category">{{ cmd.category }}</span>
@@ -203,13 +104,13 @@
 
     {# ─── Command Edit Modal ──────────────────────────────────────── #}
     <div class="modal-overlay" id="cmd-edit-modal" hidden>
-        <div class="modal-card" style="max-width:500px;">
+        <div class="modal-card w-lg">
             <h3 id="cmd-edit-title">Configure Command</h3>
-            <p class="text-muted" id="cmd-edit-desc" style="margin-bottom:1rem;"></p>
+            <p class="text-muted mb-md" id="cmd-edit-desc"></p>
 
             <div class="cmd-edit-form">
-                <label class="config-label" style="margin-bottom:0.5rem;display:block;">Status</label>
-                <span class="config-description" style="margin-bottom:0.75rem;">Choose how this command is available in your server.</span>
+                <label class="config-label mb-xs d-block">Status</label>
+                <span class="config-description mb-sm">Choose how this command is available in your server.</span>
 
                 <div class="cmd-mode-select">
                     <button type="button" class="cmd-mode-btn" data-mode="enabled">Enabled</button>
@@ -240,12 +141,12 @@
 
     {# ─── Add Plonk Modal ─────────────────────────────────────────── #}
     <div class="modal-overlay" id="plonk-modal" hidden>
-        <div class="modal-card" style="max-width:440px;">
+        <div class="modal-card w-md">
             <h3>Plonk a user or channel</h3>
-            <p class="text-muted" style="margin-bottom:1rem;">Enter a Discord <strong>user ID</strong> (or channel ID) to block it from using the bot entirely. Right-click a user in Discord with Developer Mode on to copy their ID.</p>
+            <p class="text-muted mb-md">Enter a Discord <strong>user ID</strong> (or channel ID) to block it from using the bot entirely. Right-click a user in Discord with Developer Mode on to copy their ID.</p>
             <label class="config-label" for="plonk-id-input">User / Channel ID</label>
             <input type="text" id="plonk-id-input" class="config-input" placeholder="e.g. 123456789012345678" inputmode="numeric" autocomplete="off">
-            <div class="modal-actions" style="margin-top:1rem;">
+            <div class="modal-actions">
                 <button type="button" class="button small" id="plonk-cancel-btn">Cancel</button>
                 <button type="button" class="button primary small" id="plonk-add-btn">Plonk</button>
             </div>

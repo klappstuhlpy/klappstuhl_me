@@ -651,6 +651,9 @@ pub(super) async fn guild_polls(
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
+    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
+    let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
+
     let polls = percy
         .get_polls(guild_id)
         .await
@@ -662,7 +665,10 @@ pub(super) async fn guild_polls(
         account: Some(account),
         flashes,
         guild_id,
-        guild_name: guild.name,
+        guild_name: guild.name.clone(),
+        guild,
+        channels,
+        roles,
         nav_active: "polls",
         page_title: "Polls",
         polls,
@@ -712,6 +718,70 @@ pub(super) async fn guild_poll_end(
     match percy.end_poll(guild_id, poll_id).await {
         Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
         Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_poll_create(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.create_poll(guild_id, &body).await {
+        Ok(data) => Json(serde_json::json!({"ok": true, "id": data.get("id")})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+/// Stores an uploaded poll banner in the image host and returns its public URL.
+///
+/// The poll-create flow only deals in URLs (Percy renders the banner from a URL,
+/// exactly like the `/polls create` command uses an attachment's CDN URL), so a
+/// file upload is turned into a hosted URL here before the poll is created.
+pub(super) async fn guild_poll_image_upload(
+    State(state): State<AppState>,
+    account: Account,
+    crate::headers::ClientIp(client_ip): crate::headers::ClientIp,
+    Path(guild_id): Path<u64>,
+    multipart: axum::extract::Multipart,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match crate::routes::image::raw_upload_file(state, account, client_ip, multipart, true, None).await {
+        Ok(result) if !result.links.is_empty() => {
+            // `raw_upload_file` returns the gallery *page* URL (`/gallery/<id>.<ext>`),
+            // which is HTML. Discord can only embed a direct image, so hand back the
+            // raw bytes URL (`/gallery/raw/<id>.<ext>`) for the poll banner.
+            let raw_url = result.links[0].replacen("/gallery/", "/gallery/raw/", 1);
+            Json(serde_json::json!({"ok": true, "url": raw_url})).into_response()
+        }
+        Ok(result) => {
+            let msg = if result.infected > 0 {
+                "Image blocked: it failed a malware scan."
+            } else {
+                "Image upload failed."
+            };
+            Json(serde_json::json!({"error": msg})).into_response()
+        }
+        Err(e) => Json(serde_json::json!({"error": e.error})).into_response(),
     }
 }
 

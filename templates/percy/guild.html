@@ -25,7 +25,7 @@
             {% when None %}
             {% endmatch %}
         </div>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/members" class="button small" style="margin-left:auto;">Manage Members</a>
+        <a href="/percy/dashboard/guild/{{ guild.id }}/members" class="button small ml-auto">Manage Members</a>
     </div>
 
     {% if guild.is_new_config %}
@@ -204,64 +204,13 @@
         </div>
         {% endif %}
 
-        {# ─── Polls ──────────────────────────────────────────────────── #}
-        <section class="config-section">
-            <h2>Polls</h2>
-            <p class="config-section-description">Configure where polls are posted and who gets notified.</p>
-            <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
-                <input type="hidden" name="_section" value="polls">
-                <div class="config-grid">
-                    <div class="config-field">
-                        <label class="config-label" for="poll_channel">Poll Channel</label>
-                        <span class="config-description">Channel where new polls are posted</span>
-                        <select name="poll_channel_id" id="poll_channel" class="config-select">
-                            <option value="">Not set</option>
-                            {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% match guild.poll_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
-                                #{{ ch.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="config-field">
-                        <label class="config-label" for="poll_reason_channel">Reason Channel</label>
-                        <span class="config-description">Channel for vote reason submissions</span>
-                        <select name="poll_reason_channel_id" id="poll_reason_channel" class="config-select">
-                            <option value="">Not set</option>
-                            {% for ch in channels %}
-                            <option value="{{ ch.id }}" {% match guild.poll_reason_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
-                                #{{ ch.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="config-field">
-                        <label class="config-label" for="poll_ping_role">Ping Role</label>
-                        <span class="config-description">Role pinged when a new poll starts</span>
-                        <select name="poll_ping_role_id" id="poll_ping_role" class="config-select">
-                            <option value="">Not set</option>
-                            {% for role in roles %}
-                            <option value="{{ role.id }}" {% match guild.poll_ping_role %}{% when Some with (ref) %}{% if ref.id == role.id %}selected{% endif %}{% when None %}{% endmatch %}>
-                                @{{ role.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                <div class="config-actions">
-                    <button type="button" class="button small cancel-btn">Cancel</button>
-                    <button type="submit" class="button primary small">Save Changes</button>
-                </div>
-            </form>
-        </section>
-
         {# ─── Prefixes ───────────────────────────────────────────────── #}
         <section class="config-section">
             <h2>Prefixes</h2>
             <p class="config-section-description">Set custom command prefixes for this server. The bot always responds to mentions.</p>
             <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
                 <input type="hidden" name="_section" value="prefixes">
-                <div class="config-grid" style="grid-template-columns: 1fr;">
+                <div class="config-grid grid-cols-1">
                     <div class="config-field">
                         <label class="config-label" for="prefixes">Command Prefixes (comma-separated)</label>
                         <span class="config-description">e.g. "?, !" — members can use any of these before commands</span>
@@ -338,7 +287,7 @@
                         <input type="number" name="mention_count" id="mention_count" class="config-input" min="0" max="100" placeholder="Off" value="{% match guild.mention_count %}{% when Some with (n) %}{{ n }}{% when None %}{% endmatch %}">
                     </div>
                 </div>
-                <h2 style="margin-top:1.5rem;">Logging Channels</h2>
+                <h2 class="mt-lg">Logging Channels</h2>
                 <p class="config-section-description">Route different event types to dedicated channels.</p>
                 <div class="config-grid">
                     <div class="config-field">
@@ -398,7 +347,7 @@
                 </label>
                 {% endfor %}
             </div>
-            <div class="config-actions" style="margin-top: 1rem;">
+            <div class="config-actions">
                 <button type="button" class="button small" id="audit-flags-all">Enable All</button>
                 <button type="button" class="button small danger" id="audit-flags-none">Disable All</button>
             </div>
@@ -621,14 +570,14 @@
     <div class="modal-card">
         <h3>Starter Message</h3>
         <p>Configure the verification embed that will be sent to the selected channel.</p>
-        <div style="margin-top: 1rem;">
+        <div class="modal-form">
             <label class="config-label" for="gk_modal_title">Title</label>
-            <input type="text" id="gk_modal_title" class="config-input" maxlength="256" value="Verification Required" style="margin-bottom: 0.75rem;">
+            <input type="text" id="gk_modal_title" class="config-input" maxlength="256" value="Verification Required">
             <label class="config-label" for="gk_modal_content">Content</label>
-            <textarea id="gk_modal_content" class="config-input" rows="4" maxlength="2000" style="resize: vertical;">This server requires verification in order to continue participating.
+            <textarea id="gk_modal_content" class="config-input resize-v" rows="4" maxlength="2000">This server requires verification in order to continue participating.
 **Press the button below to verify your account.**</textarea>
         </div>
-        <div class="modal-actions" style="margin-top: 1rem;">
+        <div class="modal-actions">
             <button type="button" class="button small" id="gk-modal-cancel">Cancel</button>
             <button type="button" class="button primary small" id="gk-modal-confirm">Send Message</button>
         </div>
