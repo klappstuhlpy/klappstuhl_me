@@ -598,6 +598,13 @@ pub struct MusicFiltersState {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct MusicSetup {
+    pub channel_id: String,
+    pub message_id: Option<String>,
+    pub use_panel: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct MusicInfo {
     pub active: bool,
     pub equalizer: Vec<f64>,
@@ -607,6 +614,15 @@ pub struct MusicInfo {
     pub now_playing: Option<NowPlaying>,
     #[serde(default)]
     pub channel: Option<String>,
+    #[serde(default)]
+    pub setup: Option<MusicSetup>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MusicSetupResponse {
+    pub ok: bool,
+    pub channel_id: String,
+    pub channel_name: String,
 }
 
 // -- Comics types ------------------------------------------------------------

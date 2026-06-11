@@ -163,6 +163,14 @@ pub fn routes() -> Router<AppState> {
             get(guild_music_status),
         )
         .route(
+            "/percy/dashboard/guild/:guild_id/music/setup",
+            post(guild_music_setup),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/music/reset",
+            post(guild_music_reset),
+        )
+        .route(
             "/percy/dashboard/guild/:guild_id/music/equalizer",
             post(guild_music_equalizer),
         )

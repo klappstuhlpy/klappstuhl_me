@@ -1391,6 +1391,7 @@ pub(super) async fn guild_music(
         presets: vec![],
         now_playing: None,
         channel: None,
+        setup: None,
     });
     let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
     MusicTemplate {
@@ -1471,8 +1472,55 @@ pub(super) async fn guild_music_status(
             "now_playing": music.now_playing,
             "equalizer": music.equalizer,
             "filters": music.filters,
+            "setup": music.setup,
         }))
         .into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_music_setup(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false, "error": "Not authenticated"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.post_music_setup(guild_id, &body).await {
+        Ok(resp) => Json(serde_json::json!({
+            "ok": true,
+            "channel_id": resp.channel_id,
+            "channel_name": resp.channel_name,
+        }))
+        .into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_music_reset(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false, "error": "Not authenticated"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.post_music_reset(guild_id).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
     }
 }

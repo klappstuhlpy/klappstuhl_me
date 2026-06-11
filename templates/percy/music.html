@@ -59,38 +59,46 @@
         </div>
     </section>
 
-    {# ─── Panel Configuration ────────────────────────────────────── #}
-    <section class="config-section">
-        <h2>Music Panel</h2>
-        <p class="config-section-description">Control the persistent now-playing panel embed.</p>
-        <form id="panel-form">
-            <input type="hidden" name="_section" value="music">
-            <div class="config-grid">
-                <label class="config-toggle">
-                    <div>
-                        <span class="config-label">Music Panel</span>
-                        <span class="config-description">Show a persistent now-playing panel</span>
-                    </div>
-                    <input type="checkbox" name="use_music_panel" value="true" {% if guild.use_music_panel %}checked{% endif %}>
-                </label>
-                <div class="config-field">
-                    <label class="config-label" for="music_panel_channel">Panel Channel</label>
-                    <span class="config-description">Channel for the now-playing embed</span>
-                    <select name="music_panel_channel_id" id="music_panel_channel" class="config-select">
-                        <option value="">Not set</option>
-                        {% for ch in channels %}
-                        <option value="{{ ch.id }}" {% match guild.music_panel_channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
-                            #{{ ch.name }}
-                        </option>
-                        {% endfor %}
-                    </select>
+    {# ─── Music Panel Setup ──────────────────────────────────────── #}
+    <section class="config-section" id="setup-section">
+        <h2>Music Panel Setup</h2>
+        {% match music.setup %}
+        {% when Some with (setup) %}
+        <p class="config-section-description">The music panel is configured. The bot will use a dedicated channel for the player panel.</p>
+        <div class="listener-status" style="margin-bottom: 1rem;">
+            <span class="ls-indicator active"></span>
+            <span>Panel channel: <strong id="setup-channel-name">{% for ch in channels %}{% if ch.id == setup.channel_id %}#{{ ch.name }}{% endif %}{% endfor %}</strong></span>
+        </div>
+        <div class="config-grid">
+            <label class="config-toggle">
+                <div>
+                    <span class="config-label">Use Music Panel</span>
+                    <span class="config-description">When disabled, the bot won't send a player panel even though setup exists</span>
                 </div>
+                <input type="checkbox" id="panel-toggle" {% if setup.use_panel %}checked{% endif %}>
+            </label>
+        </div>
+        <div class="config-actions" style="margin-top: 1rem;">
+            <button type="button" class="button small danger" id="reset-setup-btn">Reset Configuration</button>
+        </div>
+        {% when None %}
+        <p class="config-section-description">No music panel is configured. Set one up to get a dedicated player channel with auto-cleanup and a persistent now-playing embed.</p>
+        <div class="config-grid">
+            <div class="config-field">
+                <label class="config-label" for="setup-channel">Channel (optional)</label>
+                <span class="config-description">Leave empty to create a new channel automatically</span>
+                <select id="setup-channel" class="config-select">
+                    <option value="">Create new channel</option>
+                    {% for ch in channels %}
+                    <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
-            <div class="config-actions">
-                <button type="button" class="button small cancel-btn">Cancel</button>
-                <button type="submit" class="button primary small">Save Changes</button>
-            </div>
-        </form>
+        </div>
+        <div class="config-actions" style="margin-top: 1rem;">
+            <button type="button" class="button primary small" id="run-setup-btn">Setup Music Panel</button>
+        </div>
+        {% endmatch %}
     </section>
 
     {# ─── Equalizer ──────────────────────────────────────────────── #}
@@ -155,24 +163,63 @@
         btn.textContent = capitalize(btn.textContent.trim());
     });
 
-    // ─── Panel form (stay on music page) ───────────────────────────
-    const panelForm = document.getElementById('panel-form');
-    if (panelForm) {
-        panelForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const btn = panelForm.querySelector('button[type="submit"]');
-            if (btn) btn.disabled = true;
+    // ─── Setup / Reset ──────────────────────────────────────────────
+    const setupBtn = document.getElementById('run-setup-btn');
+    if (setupBtn) {
+        setupBtn.addEventListener('click', async function() {
+            setupBtn.disabled = true;
+            setupBtn.textContent = 'Setting up…';
+            const channelSelect = document.getElementById('setup-channel');
+            const channelId = channelSelect ? channelSelect.value : '';
+            const body = channelId ? { channel_id: channelId } : {};
+            try {
+                const r = await fetch(`${base}/setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) });
+                const d = await r.json();
+                if (d.ok) {
+                    showToast('success', 'Music panel set up in #' + d.channel_name);
+                    setTimeout(function() { location.reload(); }, 1000);
+                } else {
+                    showToast('error', d.error || 'Setup failed.');
+                    setupBtn.disabled = false;
+                    setupBtn.textContent = 'Setup Music Panel';
+                }
+            } catch { showToast('error', 'Network error.'); setupBtn.disabled = false; setupBtn.textContent = 'Setup Music Panel'; }
+        });
+    }
+
+    const resetBtn2 = document.getElementById('reset-setup-btn');
+    if (resetBtn2) {
+        resetBtn2.addEventListener('click', async function() {
+            if (!confirm('This will delete the music panel channel and reset the configuration. Continue?')) return;
+            resetBtn2.disabled = true;
+            try {
+                const r = await fetch(`${base}/reset`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' });
+                const d = await r.json();
+                if (d.ok) {
+                    showToast('success', 'Music configuration reset.');
+                    setTimeout(function() { location.reload(); }, 1000);
+                } else {
+                    showToast('error', d.error || 'Reset failed.');
+                    resetBtn2.disabled = false;
+                }
+            } catch { showToast('error', 'Network error.'); resetBtn2.disabled = false; }
+        });
+    }
+
+    const panelToggle = document.getElementById('panel-toggle');
+    if (panelToggle) {
+        panelToggle.addEventListener('change', async function() {
+            const body = { use_music_panel: panelToggle.checked };
             try {
                 const r = await fetch(`/percy/dashboard/guild/${guildId}/config`, {
                     method: 'POST',
-                    headers: { 'Accept': 'application/json' },
-                    body: new URLSearchParams(new FormData(panelForm)),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+                    body: '_section=music&' + (panelToggle.checked ? 'use_music_panel=true' : ''),
                 });
                 const d = await r.json();
-                if (d.ok) showToast('success', d.message || 'Settings saved.');
-                else showToast('error', d.error || 'Failed to save.');
+                if (d.ok) showToast('success', 'Panel ' + (panelToggle.checked ? 'enabled' : 'disabled') + '.');
+                else showToast('error', d.error || 'Failed.');
             } catch { showToast('error', 'Network error.'); }
-            finally { if (btn) btn.disabled = false; }
         });
     }
 
@@ -467,9 +514,13 @@
             if (d.equalizer && d.equalizer.length === 15) {
                 gains = d.equalizer;
                 if (document.getElementById('eq-canvas')) {
-                    // Redraw only if not currently dragging
                     if (dragging < 0) draw();
                 }
+            }
+            // Update panel toggle state from polling
+            const toggle = document.getElementById('panel-toggle');
+            if (toggle && d.setup) {
+                toggle.checked = d.setup.use_panel;
             }
         } catch {}
     }

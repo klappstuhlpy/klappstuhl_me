@@ -754,6 +754,42 @@ impl PercyClient {
         Ok(())
     }
 
+    /// Set up the music panel (create channel + send panel message).
+    pub async fn post_music_setup(
+        &self,
+        guild_id: u64,
+        body: &serde_json::Value,
+    ) -> Result<MusicSetupResponse, PercyError> {
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/music/setup")))
+            .bearer_auth(&self.token)
+            .json(body)
+            .send()
+            .await?;
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(resp.json().await?)
+    }
+
+    /// Reset the music configuration (delete channel, clear config).
+    pub async fn post_music_reset(&self, guild_id: u64) -> Result<(), PercyError> {
+        let resp = self
+            .client
+            .post(self.url(&format!("/api/internal/guilds/{guild_id}/music/reset")))
+            .bearer_auth(&self.token)
+            .json(&serde_json::json!({}))
+            .send()
+            .await?;
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(())
+    }
+
     // -- Comics ---------------------------------------------------------------
 
     /// Fetch comic feeds for a guild.
