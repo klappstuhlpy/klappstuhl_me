@@ -71,6 +71,26 @@ impl PercyClient {
         Ok(())
     }
 
+    /// Update audit log event flags.
+    pub async fn patch_audit_log_flags(
+        &self,
+        guild_id: u64,
+        flags: &std::collections::HashMap<String, bool>,
+    ) -> Result<(), PercyError> {
+        let resp = self
+            .client
+            .patch(self.url(&format!("/api/internal/guilds/{guild_id}/audit-log-flags")))
+            .bearer_auth(&self.token)
+            .json(flags)
+            .send()
+            .await?;
+        if resp.status().is_client_error() || resp.status().is_server_error() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(PercyError::Api(text));
+        }
+        Ok(())
+    }
+
     /// Fetch guild roles.
     pub async fn get_guild_roles(&self, guild_id: u64) -> Result<Vec<Role>, PercyError> {
         let resp = self

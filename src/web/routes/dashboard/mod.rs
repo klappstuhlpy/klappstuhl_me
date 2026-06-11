@@ -239,6 +239,10 @@ pub fn routes() -> Router<AppState> {
             "/percy/dashboard/guild/:guild_id/moderation/ignore",
             post(guild_moderation_ignore),
         )
+        .route(
+            "/percy/dashboard/guild/:guild_id/audit-log-flags",
+            patch(guild_audit_log_flags),
+        )
         .route("/percy/dashboard/guild/:guild_id/stats", get(guild_stats))
         // Phase 5: Audit log, bulk actions, activity, export
         .route("/percy/dashboard/guild/:guild_id/audit-log", get(guild_audit_log))

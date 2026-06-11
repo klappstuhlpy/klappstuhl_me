@@ -1874,3 +1874,37 @@ th.th-sortable[aria-sort="descending"]::after {
         justify-content: center;
     }
 }
+
+/* ─── Audit Log Flags ─────────────────────────────────────── */
+.audit-flags-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.5rem;
+}
+.audit-flag-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--box-border);
+    background: var(--box-shade);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: border-color 0.15s, background 0.15s;
+}
+.audit-flag-item:hover {
+    border-color: var(--branding, #d97757);
+}
+.audit-flag-item input[type="checkbox"] {
+    accent-color: var(--branding, #d97757);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+.audit-flag-item input[type="checkbox"]:checked + span {
+    color: var(--foreground, #eee);
+}
+.audit-flag-item span {
+    color: var(--text-muted, #888);
+}

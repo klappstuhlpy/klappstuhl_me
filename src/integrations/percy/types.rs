@@ -49,6 +49,8 @@ pub struct GuildInfo {
     pub ignored_entities: Vec<IgnoredEntity>,
     pub mute_role: Option<RoleRef>,
     pub alert_channel: Option<ChannelRef>,
+    #[serde(default)]
+    pub audit_log_flags: std::collections::BTreeMap<String, bool>,
     pub music_panel_channel: Option<ChannelRef>,
     pub use_music_panel: bool,
     pub prefixes: Vec<String>,

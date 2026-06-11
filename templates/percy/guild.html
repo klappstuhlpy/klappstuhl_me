@@ -378,6 +378,26 @@
             </form>
         </section>
 
+        {# ─── Audit Log Events ──────────────────────────────────────── #}
+        {% if !guild.audit_log_flags.is_empty() %}
+        <section class="config-section">
+            <h2>Audit Log Events</h2>
+            <p class="config-section-description">Select which events are broadcast to the audit log channel. Changes are saved immediately.</p>
+            <div class="audit-flags-grid" id="audit-flags-grid">
+                {% for flag in guild.audit_log_flags %}
+                <label class="audit-flag-item">
+                    <input type="checkbox" data-flag="{{ flag.0 }}" {% if flag.1 %}checked{% endif %}>
+                    <span>{{ flag.0 }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            <div class="config-actions" style="margin-top: 1rem;">
+                <button type="button" class="button small" id="audit-flags-all">Enable All</button>
+                <button type="button" class="button small danger" id="audit-flags-none">Disable All</button>
+            </div>
+        </section>
+        {% endif %}
+
         {# ─── Ignored Entities ───────────────────────────────────────── #}
         <section class="config-section">
             <h2>Ignored Entities</h2>
@@ -685,6 +705,53 @@
                 else { toast('error', data.error || 'Failed.'); lockBtn.disabled = false; }
             } catch (e) { toast('error', 'Network error'); lockBtn.disabled = false; }
         });
+    }
+
+    // -- Audit Log Flags --
+    var auditGrid = document.getElementById('audit-flags-grid');
+    if (auditGrid) {
+        async function saveAuditFlags(flags) {
+            try {
+                var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/audit-log-flags', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(flags),
+                });
+                var data = await resp.json();
+                if (data.ok) toast('success', 'Audit log events updated.');
+                else toast('error', data.error || 'Failed to update.');
+            } catch (e) { toast('error', 'Network error'); }
+        }
+
+        auditGrid.addEventListener('change', function(e) {
+            if (e.target.tagName !== 'INPUT') return;
+            var flags = {};
+            flags[e.target.dataset.flag] = e.target.checked;
+            saveAuditFlags(flags);
+        });
+
+        var allBtn = document.getElementById('audit-flags-all');
+        var noneBtn = document.getElementById('audit-flags-none');
+        if (allBtn) {
+            allBtn.addEventListener('click', function() {
+                var flags = {};
+                auditGrid.querySelectorAll('input[data-flag]').forEach(function(cb) {
+                    cb.checked = true;
+                    flags[cb.dataset.flag] = true;
+                });
+                saveAuditFlags(flags);
+            });
+        }
+        if (noneBtn) {
+            noneBtn.addEventListener('click', function() {
+                var flags = {};
+                auditGrid.querySelectorAll('input[data-flag]').forEach(function(cb) {
+                    cb.checked = false;
+                    flags[cb.dataset.flag] = false;
+                });
+                saveAuditFlags(flags);
+            });
+        }
     }
 })();
 </script>
