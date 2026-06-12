@@ -8,6 +8,17 @@
 
 {% block content %}
 
+    <div class="dash-pageinfo">
+        <span class="dash-pageinfo-icon">&#9432;</span>
+        <div class="dash-pageinfo-body">
+            <p>Enable or disable individual <strong>commands</strong> for this server, and manage the <strong>plonk list</strong> — users or channels Percy ignores entirely. Disabled commands stop responding until re-enabled.</p>
+            <ul class="dash-pageinfo-tips">
+                <li>Disabling never affects server administrators</li>
+                <li>Plonk a channel to silence the bot there without disabling commands elsewhere</li>
+            </ul>
+        </div>
+    </div>
+
     {# ─── Summary ─────────────────────────────────────────── #}
     <div class="metric-tiles">
         <div class="metric-tile">
@@ -41,7 +52,7 @@
         <div class="config-section-head">
             <div>
                 <h2>Plonked Entities</h2>
-                <p class="config-section-description">Members and channels completely ignored by the bot â€” a plonked user cannot run any command. Users with <strong>Manage Server</strong> always bypass this.</p>
+                <p class="config-section-description">Members and channels completely ignored by the bot — a plonked user cannot run any command. Users with <strong>Manage Server</strong> always bypass this.</p>
             </div>
             <button class="button small" id="add-plonk-btn">Plonk a user</button>
         </div>

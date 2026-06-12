@@ -6,6 +6,211 @@
     padding: 0 1.5rem;
 }
 
+/* ── Wide shell layout (sidebar + content) ───────────────────────────────
+   The dashboard reclaims the horizontal padding the global layout reserves
+   on `main` so guild management can use the full width of the viewport. The
+   :has() override keeps every other page (which doesn't render a shell)
+   untouched. */
+main.grid-item:has(.dashboard-shell) {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+.dashboard-shell {
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 2rem;
+    width: 100%;
+    max-width: 1640px;
+    margin: 0 auto;
+    align-items: start;
+}
+
+.dashboard-content {
+    min-width: 0; /* let tables/charts shrink instead of overflowing the grid */
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
+
+.dash-sidebar {
+    position: sticky;
+    top: 1.25rem;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: calc(100vh - 2.5rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+}
+
+.dash-sidebar-back {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.dash-sidebar-back:hover { color: var(--branding); }
+
+.dash-sidebar-guild {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid var(--box-border);
+}
+.dash-sidebar-guild-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.75rem;
+}
+.dash-sidebar-guild-sub {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+}
+
+/* Mobile-only collapse toggle (hidden on desktop) */
+.dash-sidebar-toggle {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.55rem 0.85rem;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--foreground);
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+.dash-sidebar-toggle::after {
+    content: "\25BE";
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+.dash-sidebar-toggle[aria-expanded="true"]::after { transform: rotate(180deg); }
+
+.dash-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+.dash-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+.dash-nav-heading {
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--text-muted);
+    padding: 0 0.6rem 0.35rem;
+}
+.dash-nav-link {
+    position: relative;
+    display: block;
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.45rem;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: var(--nav-link);
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dash-nav-link:hover {
+    background: var(--box-shade);
+    color: var(--foreground);
+}
+.dash-nav-link.active {
+    background: var(--branding-dim);
+    color: var(--branding);
+    border-color: color-mix(in srgb, var(--branding) 35%, transparent);
+    font-weight: 600;
+}
+.dash-nav-link.active::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 1.1rem;
+    border-radius: 0 3px 3px 0;
+    background: var(--branding);
+}
+
+/* ── Page info / help callout (shared by feature pages) ──────────────── */
+
+.dash-pageinfo {
+    display: flex;
+    gap: 0.85rem;
+    padding: 0.95rem 1.15rem;
+    margin-bottom: 1.5rem;
+    border-radius: 0.625rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-left: 3px solid var(--branding);
+}
+.dash-pageinfo-icon {
+    flex-shrink: 0;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    color: var(--branding);
+}
+.dash-pageinfo-body {
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+.dash-pageinfo-body strong { color: var(--foreground); font-weight: 600; }
+.dash-pageinfo-body p { margin: 0 0 0.4rem; }
+.dash-pageinfo-body p:last-child { margin-bottom: 0; }
+.dash-pageinfo-body code {
+    font-size: 0.74rem;
+    padding: 0.1em 0.4em;
+    border-radius: 3px;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+}
+.dash-pageinfo-body a { color: var(--link-text); }
+.dash-pageinfo-tips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.1rem;
+    margin-top: 0.5rem;
+    list-style: none;
+    padding: 0;
+}
+.dash-pageinfo-tips li {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    padding-left: 0.9rem;
+    position: relative;
+}
+.dash-pageinfo-tips li::before {
+    content: "›";
+    position: absolute;
+    left: 0;
+    color: var(--branding);
+    font-weight: 700;
+}
+
 .dashboard-header {
     display: flex;
     align-items: center;
@@ -390,18 +595,62 @@
 .config-select,
 .config-input {
     width: 100%;
-    padding: 0.4rem 0.6rem;
+    padding: 0.5rem 0.65rem;
     font-size: 0.85rem;
     background: var(--form-input-background);
-    border: 1px solid var(--form-input-border);
+    border: 1.5px solid var(--form-input-border);
     border-radius: 0.375rem;
     color: var(--foreground);
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.config-select:hover,
+.config-input:hover {
+    border-color: color-mix(in srgb, var(--branding) 45%, var(--form-input-border));
+    background: var(--box-shade);
 }
 .config-select:focus,
 .config-input:focus {
     outline: none;
     border-color: var(--form-input-focus-border);
+    background: var(--box-shade);
+    box-shadow: 0 0 0 3px var(--branding-dim);
+}
+.config-input::placeholder { color: var(--text-muted); }
+
+/* Custom chevron + readable option list for selects (native control is hard
+   to theme; this gives them clearer affordance and contrast). */
+select.config-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+        linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position:
+        calc(100% - 1.1rem) calc(50% - 2px),
+        calc(100% - 0.75rem) calc(50% - 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 2rem;
+}
+select.config-select:hover,
+select.config-select:focus {
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--branding) 50%),
+        linear-gradient(135deg, var(--branding) 50%, transparent 50%);
+    background-position:
+        calc(100% - 1.1rem) calc(50% - 2px),
+        calc(100% - 0.75rem) calc(50% - 2px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+}
+select.config-select option {
+    background: var(--box);
+    color: var(--foreground);
+}
+/* Multi-selects keep the native arrow-less look but still gain contrast. */
+select.config-select[multiple] {
+    background-image: none;
+    padding-right: 0.65rem;
 }
 
 .config-actions {
@@ -1113,96 +1362,6 @@ th.th-sortable[aria-sort="descending"]::after {
     border: none;
 }
 
-/* -- Dashboard navigation (sub-page links) -- */
-
-.dashboard-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0;
-    border-bottom: 1px solid var(--box-border);
-    margin-bottom: 1.5rem;
-    position: relative;
-}
-.dashboard-nav a {
-    padding: 0.6rem 1rem;
-    color: var(--text-muted);
-    font-size: 0.78rem;
-    font-weight: 500;
-    text-decoration: none;
-    border-bottom: 2px solid transparent;
-    white-space: nowrap;
-    transition: color 0.15s, border-color 0.15s;
-}
-.dashboard-nav a:hover {
-    color: var(--foreground);
-    text-decoration: none;
-}
-.dashboard-nav a.active {
-    color: var(--branding);
-    border-bottom-color: var(--branding);
-}
-.dashboard-nav .nav-group {
-    position: relative;
-    display: flex;
-    align-items: stretch;
-}
-.dashboard-nav .nav-group-label {
-    display: flex;
-    align-items: center;
-    padding: 0.6rem 1rem;
-    color: var(--text-muted);
-    font-size: 0.78rem;
-    font-weight: 500;
-    cursor: pointer;
-    white-space: nowrap;
-    user-select: none;
-    border-bottom: 2px solid transparent;
-    -webkit-tap-highlight-color: transparent;
-}
-.dashboard-nav .nav-group-label:focus {
-    outline: none;
-    color: var(--foreground);
-}
-.dashboard-nav .nav-group-label::after {
-    content: " \25BE";
-    font-size: 0.6rem;
-}
-.dashboard-nav .nav-group:hover .nav-group-label,
-.dashboard-nav .nav-group:focus-within .nav-group-label,
-.dashboard-nav .nav-group.open .nav-group-label {
-    color: var(--foreground);
-}
-.dashboard-nav .nav-dropdown {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    background: var(--box);
-    border: 1px solid var(--box-border);
-    border-radius: 6px;
-    padding: 0.4rem 0;
-    min-width: 160px;
-    z-index: 1000;
-    box-shadow: 0 4px 12px rgba(0,0,0,.3);
-}
-.dashboard-nav .nav-group:hover .nav-dropdown,
-.dashboard-nav .nav-group:focus-within .nav-dropdown,
-.dashboard-nav .nav-group.open .nav-dropdown {
-    display: block;
-}
-.dashboard-nav .nav-dropdown a {
-    display: block;
-    padding: 0.45rem 1rem;
-    border-bottom: none;
-}
-.dashboard-nav .nav-dropdown a:hover {
-    background: var(--box-shade);
-}
-.dashboard-nav .nav-dropdown a.active {
-    color: var(--branding);
-    border-bottom-color: transparent;
-}
-
 /* -- Comic feed cards -- */
 
 .comic-feeds-grid {
@@ -1904,38 +2063,32 @@ th.th-sortable[aria-sort="descending"]::after {
     text-align: center;
 }
 
+/* ── Sidebar collapses to a stacked top bar on narrow viewports ──────── */
+@media (max-width: 960px) {
+    .dashboard-shell {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+    .dash-sidebar {
+        position: static;
+        max-height: none;
+        top: auto;
+    }
+    .dash-sidebar-toggle { display: flex; }
+    /* Collapsed by default on mobile; the toggle adds .open to reveal it. */
+    .dash-sidebar .dash-nav { display: none; }
+    .dash-sidebar.open .dash-nav { display: flex; }
+    .dash-nav {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 1rem 1.5rem;
+    }
+    .dash-nav-group { flex: 1 1 180px; }
+}
+
 @media (max-width: 768px) {
     .dashboard-container {
         padding: 0 1rem;
-    }
-    .dashboard-nav {
-        flex-wrap: wrap;
-        gap: 0;
-    }
-    .dashboard-nav a,
-    .dashboard-nav .nav-group-label {
-        padding: 0.75rem 0.9rem;
-        font-size: 0.82rem;
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-    }
-    .dashboard-nav .nav-group {
-        position: static;
-    }
-    .dashboard-nav .nav-dropdown {
-        position: fixed;
-        left: 1rem;
-        right: 1rem;
-        top: auto;
-        width: auto;
-        min-width: 0;
-    }
-    .dashboard-nav .nav-dropdown a {
-        padding: 0.7rem 1.2rem;
-        min-height: 44px;
-        display: flex;
-        align-items: center;
     }
     .metric-tiles {
         grid-template-columns: repeat(2, 1fr);

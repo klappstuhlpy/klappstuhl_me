@@ -19,18 +19,16 @@
         };
     }
 
-    // -- Dashboard nav dropdowns (Features / Browse) ---------------------------
-    document.querySelectorAll('.dashboard-nav .nav-group-label').forEach(function(label) {
-        label.addEventListener('click', function() {
-            const group = this.closest('.nav-group');
-            const wasOpen = group.classList.contains('open');
-            document.querySelectorAll('.dashboard-nav .nav-group').forEach(function(g) { g.classList.remove('open'); });
-            if (!wasOpen) group.classList.add('open');
+    // -- Sidebar collapse toggle (mobile) --------------------------------------
+    // The left sidebar is always visible on desktop; on narrow viewports it
+    // collapses behind a "Menu" button (.dash-sidebar-toggle) that flips the
+    // .open class on the sidebar.
+    const sidebar = document.getElementById('dash-sidebar');
+    const sidebarToggle = sidebar && sidebar.querySelector('.dash-sidebar-toggle');
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function() {
+            const open = sidebar.classList.toggle('open');
+            sidebarToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
         });
-    });
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.nav-group')) {
-            document.querySelectorAll('.dashboard-nav .nav-group').forEach(function(g) { g.classList.remove('open'); });
-        }
-    });
+    }
 })();

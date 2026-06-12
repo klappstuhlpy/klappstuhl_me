@@ -272,6 +272,41 @@ if (document.readyState === 'loading') {
 } else {
     __setupTableLabels();
 }
+
+/* ── Account menu (header dropdown) ──────────────────────────────────────
+   The account name in the main nav is an expandable button rather than a
+   link; clicking it reveals a small menu of site pages. Closes on outside
+   click or Escape. */
+function __setupAccountMenu() {
+    const menu = document.getElementById('account-menu');
+    if (!menu) return;
+    const trigger = menu.querySelector('.account-trigger');
+    if (!trigger || menu.dataset.menuReady) return;
+    menu.dataset.menuReady = '1';
+
+    const setOpen = (open) => {
+        menu.classList.toggle('open', open);
+        trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setOpen(!menu.classList.contains('open'));
+    });
+    document.addEventListener('click', (e) => {
+        if (!menu.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') setOpen(false);
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', __setupAccountMenu);
+} else {
+    __setupAccountMenu();
+}
+window.addEventListener('pageshow', __setupAccountMenu);
 // Re-run on bfcache restores (back/forward / "soft reload") since
 // DOMContentLoaded does not fire when the page is resurrected.
 window.addEventListener('pageshow', __setupTableLabels);

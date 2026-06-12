@@ -546,6 +546,125 @@ a.nav-item.branding:hover { border-bottom-color: var(--branding); }
 
 a.nav-item.active { font-weight: bold; }
 
+/* ── Account menu (expandable, replaces the old name link) ──────────────── */
+
+.account-menu {
+    position: relative;
+    display: inline-flex;
+}
+
+.account-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.2rem 0.5rem;
+    font: inherit;
+    color: var(--nav-link);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    height: auto;
+    cursor: pointer;
+    transition: color 150ms ease, background 150ms ease, border-color 150ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.account-trigger:hover,
+.account-menu.open .account-trigger {
+    color: var(--nav-link-hover);
+    background: var(--box);
+    border-color: var(--box-border);
+}
+
+.account-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid var(--box-border);
+}
+
+.account-trigger-name {
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-caret {
+    display: inline-block;
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    line-height: 1;
+    color: var(--text-muted);
+    transition: transform 150ms ease;
+}
+.account-caret::after { content: "\25BE"; }
+.account-menu.open .account-caret { transform: rotate(180deg); }
+
+.account-dropdown {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    min-width: 12rem;
+    display: none;
+    flex-direction: column;
+    padding: 0.4rem;
+    background: var(--header);
+    border: 1px solid var(--box-border);
+    border-radius: 0.6rem;
+    box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+    z-index: 1002;
+}
+.account-menu.open .account-dropdown { display: flex; }
+
+.account-dropdown-item {
+    display: block;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.4rem;
+    font-size: 0.9rem;
+    color: var(--nav-link);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 120ms ease, color 120ms ease;
+}
+.account-dropdown-item:hover {
+    background: var(--box);
+    color: var(--nav-link-hover);
+}
+.account-dropdown-logout { color: var(--link-text); }
+.account-dropdown-logout:hover { color: var(--error-text); }
+
+.account-dropdown-sep {
+    margin: 0.35rem 0.25rem;
+    border: none;
+    border-top: 1px solid var(--box-border);
+}
+
+/* In the mobile drawer the menu expands inline instead of floating, so it
+   doesn't overflow the narrow side panel. */
+@media (max-width: 480px) {
+    .account-menu { width: 100%; }
+    .account-trigger {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 0.4rem 0.5rem;
+    }
+    .account-caret { margin-left: auto; }
+    .account-dropdown {
+        position: static;
+        min-width: 0;
+        margin-top: 0.35rem;
+        padding: 0.25rem 0 0.25rem 0.75rem;
+        background: transparent;
+        border: none;
+        border-left: 1px solid var(--box-border);
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
+
 /* Hamburger */
 #hamburger-toggle {
     opacity: 0;

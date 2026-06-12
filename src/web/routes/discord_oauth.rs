@@ -49,6 +49,9 @@ struct TokenResponse {
 struct DiscordUser {
     id: String,
     username: String,
+    /// Avatar hash, or `None` if the user has no custom avatar.
+    #[serde(default)]
+    avatar: Option<String>,
 }
 
 /// Query params on the OAuth2 callback.
@@ -210,13 +213,14 @@ async fn link_discord(
 ) -> Response {
     let discord_id = user.id.clone();
     let username = user.username.clone();
+    let avatar = user.avatar.clone();
 
     let result: rusqlite::Result<()> = state
         .database()
         .call(move |conn| {
             conn.execute(
-                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username) VALUES (?, ?, ?)",
-                rusqlite::params![account_id, discord_id, username],
+                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username, discord_avatar) VALUES (?, ?, ?, ?)",
+                rusqlite::params![account_id, discord_id, username, avatar],
             )?;
             Ok(())
         })
@@ -224,6 +228,9 @@ async fn link_discord(
 
     match result {
         Ok(()) => {
+            // The account may be cached without its Discord link; refresh it so
+            // the header picks up the avatar immediately.
+            state.invalidate_account_cache(account_id);
             state
                 .audit("auth.discord.link")
                 .actor_label(format!("id:{account_id}"))
@@ -291,6 +298,7 @@ async fn login_or_create(
         let username = sanitize_username(&user.username);
         let discord_id_for_insert = user.id.clone();
         let discord_username_for_insert = user.username.clone();
+        let discord_avatar_for_insert = user.avatar.clone();
 
         // Generate a sentinel password hash that can never be matched.
         let mut random_bytes = [0u8; 64];
@@ -314,8 +322,8 @@ async fn login_or_create(
                 )?;
                 let new_id = tx.last_insert_rowid();
                 tx.execute(
-                    "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username) VALUES (?, ?, ?)",
-                    rusqlite::params![new_id, discord_id_for_insert, discord_username_for_insert],
+                    "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username, discord_avatar) VALUES (?, ?, ?, ?)",
+                    rusqlite::params![new_id, discord_id_for_insert, discord_username_for_insert, discord_avatar_for_insert],
                 )?;
                 tx.commit()?;
                 Ok(new_id)
@@ -338,6 +346,8 @@ async fn login_or_create(
                     flags: Default::default(),
                     totp_secret: None,
                     totp_enabled: false,
+                    discord_id: Some(user.id.clone()),
+                    discord_avatar: user.avatar.clone(),
                 };
                 create_session_response(state, &account, client_ip, "auth.discord.login", target).await
             }
@@ -348,6 +358,7 @@ async fn login_or_create(
                     let suffixed = append_random_suffix(&username);
                     let discord_id2 = user.id.clone();
                     let discord_username2 = user.username.clone();
+                    let discord_avatar2 = user.avatar.clone();
                     let password_hash2 = {
                         let mut rb = [0u8; 64];
                         let _ = getrandom::getrandom(&mut rb);
@@ -368,8 +379,8 @@ async fn login_or_create(
                             )?;
                             let new_id = tx.last_insert_rowid();
                             tx.execute(
-                                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username) VALUES (?, ?, ?)",
-                                rusqlite::params![new_id, discord_id2, discord_username2],
+                                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username, discord_avatar) VALUES (?, ?, ?, ?)",
+                                rusqlite::params![new_id, discord_id2, discord_username2, discord_avatar2],
                             )?;
                             tx.commit()?;
                             Ok(new_id)
@@ -391,6 +402,8 @@ async fn login_or_create(
                                 flags: Default::default(),
                                 totp_secret: None,
                                 totp_enabled: false,
+                                discord_id: Some(user.id.clone()),
+                                discord_avatar: user.avatar.clone(),
                             };
                             create_session_response(state, &account, client_ip, "auth.discord.login", target).await
                         }
@@ -429,6 +442,7 @@ async fn discord_unlink(
 
     match result {
         Ok(1..) => {
+            state.invalidate_account_cache(account_id);
             state
                 .audit("auth.discord.unlink")
                 .actor(&account)

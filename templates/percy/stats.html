@@ -4,6 +4,17 @@
 
 {% block content %}
 
+    <div class="dash-pageinfo">
+        <span class="dash-pageinfo-icon">&#9432;</span>
+        <div class="dash-pageinfo-body">
+            <p>A snapshot of this <strong>server</strong> alongside <strong>bot-wide</strong> metrics and command-usage analytics. The bot tiles refresh live over a WebSocket as Percy reports in.</p>
+            <ul class="dash-pageinfo-tips">
+                <li>Server figures come straight from Discord's gateway</li>
+                <li>Leave the page open to watch metrics update in real time</li>
+            </ul>
+        </div>
+    </div>
+
     {# ─── Server Stats ────────────────────────────────────────────── #}
     <section class="config-section">
         <h2>Server Overview</h2>

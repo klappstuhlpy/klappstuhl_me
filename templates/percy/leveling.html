@@ -8,6 +8,19 @@
 
 {% block content %}
 
+    <div class="dash-pageinfo">
+        <span class="dash-pageinfo-icon">&#9432;</span>
+        <div class="dash-pageinfo-body">
+            <p>Members earn <strong>XP for messages</strong> (and, optionally, for time spent active in voice) and level up over time. Tune the XP curve, level-up announcements, reward roles, multipliers and blacklists below — everything is applied instantly and cached by the bot.</p>
+            <ul class="dash-pageinfo-tips">
+                <li>Voice XP skips members who are alone, AFK or deafened</li>
+                <li>Reward roles can stack or replace as levels rise</li>
+                <li>Blacklist roles, channels or users to exclude them from XP</li>
+                <li>Members check their card in Discord with <code>/level</code></li>
+            </ul>
+        </div>
+    </div>
+
     {# ─── Configuration ──────────────────────────────────────────── #}
     <section class="config-section">
         <h2>Configuration</h2>
@@ -74,7 +87,7 @@
                         <option value="1">Same channel as the message</option>
                         <option value="2">Direct message</option>
                         <option value="0">Don't send</option>
-                        <option value="channel">A specific channelâ€¦</option>
+                        <option value="channel">A specific channel…</option>
                     </select>
                 </div>
                 <div class="config-field" id="lvl-channel-picker-field" hidden>
@@ -108,7 +121,7 @@
         </div>
         <div class="metric-tile">
             <span class="tile-label">XP per Message</span>
-            <span class="tile-value">{{ config.min_gain }}â€“{{ config.max_gain }}</span>
+            <span class="tile-value">{{ config.min_gain }}–{{ config.max_gain }}</span>
             <span class="tile-sub">Every {{ config.cooldown_per }}s</span>
         </div>
         <div class="metric-tile">
@@ -159,8 +172,8 @@
             <button type="button" class="button primary small" id="add-role-btn">Add Reward</button>
         </div>
         <div class="preset-row">
-            <button type="button" class="button small outline" id="preset-roles-btn">âœ¨ Generate preset roles (levels 5â€“100)</button>
-            <span class="config-description">Creates 12 milestone roles (Newcomer â†’ Immortal) with names &amp; colors, then assigns them.</span>
+            <button type="button" class="button small outline" id="preset-roles-btn">✨ Generate preset roles (levels 5–100)</button>
+            <span class="config-description">Creates 12 milestone roles (Newcomer → Immortal) with names &amp; colors, then assigns them.</span>
         </div>
     </section>
 
@@ -327,7 +340,7 @@
         <h2>XP Over Time</h2>
         <p class="config-section-description">Daily XP earned across the server, from a snapshot taken once a day. The chart fills in as more days are recorded.</p>
         <div id="xp-chart" class="xp-chart" data-points='{{ xp_history_json|safe }}'>
-            <div class="chart-message">Loading chartâ€¦</div>
+            <div class="chart-message">Loading chart…</div>
         </div>
     </section>
 

@@ -49,12 +49,31 @@
                 <a class="nav-item" href="/projects">Projects</a>
                 {% endblock %}
                 <span class="not-mobile nav-item spacer"></span>
-                <a class="nav-item" href="/percy/dashboard">Dashboard</a>
                 {% match account %}
                 {% when Some with (account) %}
-                <a class="nav-item account" href="/images">Images</a>
-                <a class="nav-item account" href="/account">{{ account.name }}</a>
+                <div class="nav-item account account-menu" id="account-menu">
+                    <button type="button" class="account-trigger" aria-haspopup="true" aria-expanded="false">
+                        {% match account.discord_avatar_url() %}
+                        {% when Some with (url) %}
+                        <img class="account-avatar" src="{{ url }}" alt="" width="24" height="24" loading="lazy">
+                        {% when None %}
+                        {% endmatch %}
+                        <span class="account-trigger-name">{{ account.name }}</span>
+                        <span class="account-caret" aria-hidden="true"></span>
+                    </button>
+                    <div class="account-dropdown" role="menu">
+                        <a class="account-dropdown-item" role="menuitem" href="/account">Account</a>
+                        <a class="account-dropdown-item" role="menuitem" href="/images">Images</a>
+                        <a class="account-dropdown-item" role="menuitem" href="/percy/dashboard">Dashboard</a>
+                        <hr class="account-dropdown-sep">
+                        <a class="account-dropdown-item" role="menuitem" href="/status">Status</a>
+                        <a class="account-dropdown-item" role="menuitem" href="/terminal">Terminal</a>
+                        <hr class="account-dropdown-sep">
+                        <a class="account-dropdown-item account-dropdown-logout" role="menuitem" href="/logout">Log out</a>
+                    </div>
+                </div>
                 {% when None %}
+                <a class="nav-item" href="/percy/dashboard">Dashboard</a>
                 <a class="nav-item account" href="/login">Login</a>
                 {% endmatch %}
                 <hr class="mobile-only">

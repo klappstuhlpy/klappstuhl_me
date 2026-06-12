@@ -394,13 +394,33 @@ impl AppState {
     pub async fn get_account(&self, id: i64) -> Option<Account> {
         match self.inner.cached_users.get_value_or_guard_async(&id).await {
             Ok(acc) => Some(acc),
-            Err(guard) => match self.database().get_by_id::<Account>(id).await.ok().flatten() {
-                Some(account) => {
-                    let _ = guard.insert(account.clone());
-                    Some(account)
+            Err(guard) => {
+                // LEFT JOIN the Discord link so the cached account carries the
+                // linked Discord id/avatar (used by the site header). Keep this
+                // in sync with the inline query in `get_session_account` so both
+                // cache writers store the same shape.
+                let query = r#"
+                    SELECT account.id AS id, account.name AS name, account.password AS password,
+                           account.flags AS flags, account.totp_secret AS totp_secret,
+                           account.totp_enabled AS totp_enabled,
+                           dl.discord_user_id AS discord_id, dl.discord_avatar AS discord_avatar
+                    FROM account
+                    LEFT JOIN user_discord_links dl ON dl.account_id = account.id
+                    WHERE account.id = ?
+                "#;
+                match self
+                    .database()
+                    .get_row(query, (id,), |row| Account::from_row(row))
+                    .await
+                    .ok()
+                {
+                    Some(account) => {
+                        let _ = guard.insert(account.clone());
+                        Some(account)
+                    }
+                    None => None,
                 }
-                None => None,
-            },
+            }
         }
     }
 
@@ -470,8 +490,10 @@ impl AppState {
                     SELECT account.id AS id, account.name AS name, account.password AS password,
                            account.flags AS flags, account.totp_secret AS totp_secret,
                            account.totp_enabled AS totp_enabled,
+                           dl.discord_user_id AS discord_id, dl.discord_avatar AS discord_avatar,
                            session.api_key AS api_key, session.created_at AS created_at
                     FROM account INNER JOIN session ON session.account_id = account.id
+                    LEFT JOIN user_discord_links dl ON dl.account_id = account.id
                     WHERE session.id = ? AND session.account_id = ? AND session.api_key = ?
                 "#;
                 match self

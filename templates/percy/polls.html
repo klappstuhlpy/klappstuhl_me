@@ -7,6 +7,18 @@
 {% endblock %}
 
 {% block content %}
+
+    <div class="dash-pageinfo">
+        <span class="dash-pageinfo-icon">&#9432;</span>
+        <div class="dash-pageinfo-body">
+            <p>Browse, create, edit and end <strong>polls</strong> for this server. Polls support up to 8 options with animated vote bars, optional vote reasons, a discussion thread, scheduling and live odds.</p>
+            <ul class="dash-pageinfo-tips">
+                <li>Ending a poll archives its thread and freezes the results</li>
+                <li>Editing is only possible while a poll is still running</li>
+            </ul>
+        </div>
+    </div>
+
     {# ─── Summary Tiles ────────────────────────────────────────────── #}
     <div class="metric-tiles">
         <div class="metric-tile">
@@ -117,7 +129,7 @@
                     </td>
                     <td class="numeric">{{ poll.total_votes }}</td>
                     <td>{{ poll.options.len() }} options</td>
-                    <td class="member-joined"><time class="js-ts">{{ poll.published.as_deref().unwrap_or("â€”") }}</time></td>
+                    <td class="member-joined"><time class="js-ts">{{ poll.published.as_deref().unwrap_or("—") }}</time></td>
                     <td class="col-actions">
                         {% if !poll.ended %}
                         <button class="button small" onclick='openEditPoll({{ poll.id }}, this)'>Edit</button>
@@ -235,7 +247,7 @@
 
             <div class="config-field mb-sm">
                 <label class="config-label">Banner Image</label>
-                <span class="config-description">Optional banner shown in the poll. Use a URL or upload a file â€” not both.</span>
+                <span class="config-description">Optional banner shown in the poll. Use a URL or upload a file — not both.</span>
                 <div class="segmented segmented-row">
                     <input type="radio" id="create-poll-image-url" name="create-poll-image-source" value="url" checked>
                     <label for="create-poll-image-url">Link</label>

@@ -7,6 +7,19 @@
 {% endblock %}
 
 {% block content %}
+
+    <div class="dash-pageinfo">
+        <span class="dash-pageinfo-icon">&#9432;</span>
+        <div class="dash-pageinfo-body">
+            <p>High-quality playback is powered by a <strong>Lavalink</strong> node. This page mirrors the live player and lets you shape the sound — pick an equalizer preset or set 15 custom bands, and toggle audio filters in real time.</p>
+            <ul class="dash-pageinfo-tips">
+                <li>Controls apply only while the bot is connected to a voice channel</li>
+                <li>EQ and filter changes take effect on the current track immediately</li>
+                <li>Pin a now-playing panel by configuring the panel channel</li>
+            </ul>
+        </div>
+    </div>
+
     {# ─── Listener Status ────────────────────────────────────────────── #}
     <section class="config-section" id="status-section">
         <h2>Player Status</h2>
@@ -81,7 +94,7 @@
         <div class="eq-header">
             <h2 class="m-0">Equalizer</h2>
             <span class="eq-status" id="eq-status"><span class="eq-spinner"></span><span class="eq-status-text"></span></span>
-            <span class="eq-preset-label">Preset: <strong id="eq-preset-name">{% if music.active %}Custom{% else %}â€”{% endif %}</strong></span>
+            <span class="eq-preset-label">Preset: <strong id="eq-preset-name">{% if music.active %}Custom{% else %}—{% endif %}</strong></span>
         </div>
         <p class="config-section-description">Drag the band nodes to adjust gain. Click a preset to apply it instantly.</p>
 

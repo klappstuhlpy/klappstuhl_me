@@ -12,6 +12,17 @@
 
 {% block content %}
 
+    <div class="dash-pageinfo">
+        <span class="dash-pageinfo-icon">&#9432;</span>
+        <div class="dash-pageinfo-body">
+            <p>A <strong>hub</strong> is a "join-to-create" voice channel: when a member joins it, Percy spins up a personal voice channel for them and deletes it automatically once it's empty.</p>
+            <ul class="dash-pageinfo-tips">
+                <li>The name format controls what spawned channels are called</li>
+                <li>Placeholders like the member's name personalise each channel</li>
+            </ul>
+        </div>
+    </div>
+
     {% if data.entries.is_empty() %}
     <section class="config-section">
         <p class="text-muted">No temp channel hubs configured. Click "Add Hub" to create one.</p>

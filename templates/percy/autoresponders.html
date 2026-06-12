@@ -12,6 +12,18 @@
 
 {% block content %}
 
+    <div class="dash-pageinfo">
+        <span class="dash-pageinfo-icon">&#9432;</span>
+        <div class="dash-pageinfo-body">
+            <p>Autoresponders send a <strong>canned reply</strong> when a message matches a trigger. Match modes are <code>contains</code>, <code>exact</code>, <code>startswith</code> and <code>regex</code>, and responses support placeholders like <code>{user}</code> and <code>{count}</code>.</p>
+            <ul class="dash-pageinfo-tips">
+                <li>Toggle a responder off without deleting it</li>
+                <li><code>regex</code> triggers are matched case-insensitively against the message</li>
+                <li>Keep triggers specific to avoid accidental replies</li>
+            </ul>
+        </div>
+    </div>
+
     <div class="metric-tiles">
         <div class="metric-tile">
             <span class="tile-label">Total</span>
