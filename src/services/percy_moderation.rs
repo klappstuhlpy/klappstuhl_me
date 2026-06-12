@@ -13,7 +13,7 @@ use crate::{percy::PercyClient, AppState};
 pub fn spawn_poller(state: AppState) {
     let percy = {
         let config = state.config();
-        PercyClient::new(state.client.clone(), &config.percy)
+        PercyClient::new(state.percy_client.clone(), &config.percy)
     };
     if percy.is_none() {
         return;

@@ -53,11 +53,9 @@
                 {% when Some with (account) %}
                 <div class="nav-item account account-menu" id="account-menu">
                     <button type="button" class="account-trigger" aria-haspopup="true" aria-expanded="false">
-                        {% match account.discord_avatar_url() %}
-                        {% when Some with (url) %}
-                        <img class="account-avatar" src="{{ url }}" alt="" width="24" height="24" loading="lazy">
-                        {% when None %}
-                        {% endmatch %}
+                        {% if account.has_discord() %}
+                        <img class="account-avatar" src="/account/discord/avatar" alt="" width="24" height="24" loading="lazy">
+                        {% endif %}
                         <span class="account-trigger-name">{{ account.name }}</span>
                         <span class="account-caret" aria-hidden="true"></span>
                     </button>

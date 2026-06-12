@@ -786,6 +786,11 @@ select.config-select[multiple] {
     font-size: 0.85rem;
     margin-bottom: 1.25rem;
 }
+.setup-banner.warning {
+    background: var(--warning-bg);
+    border-color: var(--warning-border);
+    color: var(--warning-text);
+}
 
 /* -- Tab navigation -- */
 

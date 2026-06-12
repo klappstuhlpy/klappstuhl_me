@@ -71,6 +71,12 @@
     </div>
     {% endif %}
 
+    {% if degraded %}
+    <div class="setup-banner warning">
+        <strong>Heads up —</strong> some data couldn't be loaded from the bot right now, so role and channel pickers may be empty. Avoid saving changes until this clears to prevent overwriting your configuration.
+    </div>
+    {% endif %}
+
     {# ─── Tab Navigation (config sub-tabs) ─────────────────────────── #}
     <nav class="config-tabs" role="tablist">
         <button role="tab" aria-selected="true" data-tab="general">General</button>
@@ -214,6 +220,26 @@
                     <button type="submit" class="button primary small">Save Changes</button>
                 </div>
             </form>
+        </section>
+
+        <section class="config-section">
+            <h2>Bot Status Feed</h2>
+            <p class="config-section-description">Subscribe a channel to receive Percy's status announcements (deploys, restarts, incidents). One channel per server.</p>
+            <div class="config-grid grid-cols-1">
+                <div class="config-field">
+                    <label class="config-label" for="status-feed-channel">Announcement Channel</label>
+                    <select id="status-feed-channel" class="config-select">
+                        <option value="">Select a channel…</option>
+                        {% for ch in channels %}{% if ch.channel_type == "text" || ch.channel_type == "news" %}
+                        <option value="{{ ch.id }}"{% if status_feed.channel.is_some() && status_feed.channel.as_ref().unwrap().id == ch.id %} selected{% endif %}>#{{ ch.name }}</option>
+                        {% endif %}{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="config-actions">
+                <button type="button" class="button small danger" id="status-feed-unsub"{% if !status_feed.subscribed %} hidden{% endif %}>Unsubscribe</button>
+                <button type="button" class="button primary small" id="status-feed-sub">{% if status_feed.subscribed %}Move Channel{% else %}Subscribe{% endif %}</button>
+            </div>
         </section>
     </div>
 

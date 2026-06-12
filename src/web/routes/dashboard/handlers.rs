@@ -18,7 +18,8 @@ use crate::{
 
 use super::templates::*;
 use super::{
-    build_general_invite_url, build_invite_url, check_guild_access, get_discord_id, get_percy_client, json_or_flash,
+    build_general_invite_url, build_invite_url, cached_channels, cached_roles, check_guild_access, get_discord_id,
+    get_percy_client, json_or_flash,
 };
 
 pub(super) async fn guild_list(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
@@ -40,10 +41,7 @@ pub(super) async fn guild_list(State(state): State<AppState>, account: Option<Ac
         .into_response();
     };
 
-    let guilds = match percy.get_user_guilds(&discord_id).await {
-        Ok(g) => g,
-        Err(_) => Vec::new(),
-    };
+    let guilds = percy.get_user_guilds(&discord_id).await.unwrap_or_else(|_| Vec::new());
 
     GuildsTemplate {
         account: Some(account),
@@ -72,9 +70,20 @@ pub(super) async fn guild_detail(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
+    // Fan out the independent reads concurrently; `join!` (not `try_join!`) so a
+    // single degraded sub-resource doesn't abort the others — each is handled below.
+    let (guild, channels, roles, gatekeeper, lockdowns, status_feed) = tokio::join!(
+        percy.get_guild(guild_id),
+        cached_channels(&percy, guild_id),
+        cached_roles(&percy, guild_id),
+        percy.get_gatekeeper(guild_id),
+        percy.get_lockdowns(guild_id),
+        percy.get_status_feed(guild_id),
+    );
+
+    let guild = match guild {
         Ok(g) => g,
-        Err(crate::percy::PercyError::NotFound) => {
+        Err(PercyError::NotFound) => {
             let invite_url = build_invite_url(&state, guild_id);
             return GuildNotFoundTemplate {
                 account: Some(account),
@@ -87,14 +96,15 @@ pub(super) async fn guild_detail(
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
-    let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
-    let gatekeeper = percy.get_gatekeeper(guild_id).await.ok().flatten();
-    let lockdowns = percy
-        .get_lockdowns(guild_id)
-        .await
-        .unwrap_or(LockdownsResponse { entries: Vec::new() });
-    let status_feed = percy.get_status_feed(guild_id).await.unwrap_or(StatusFeedInfo {
+    // The guild itself loaded, but if the role/channel pickers failed to fetch we
+    // render a warning rather than silently showing empty dropdowns (saving with
+    // empty pickers could clobber config).
+    let degraded = channels.is_err() || roles.is_err();
+    let channels = channels.unwrap_or_default();
+    let roles = roles.unwrap_or_default();
+    let gatekeeper = gatekeeper.ok().flatten();
+    let lockdowns = lockdowns.unwrap_or(LockdownsResponse { entries: Vec::new() });
+    let status_feed = status_feed.unwrap_or(StatusFeedInfo {
         subscribed: false,
         channel: None,
     });
@@ -108,6 +118,7 @@ pub(super) async fn guild_detail(
         gatekeeper,
         lockdowns,
         status_feed,
+        degraded,
     }
     .into_response()
 }
@@ -265,13 +276,19 @@ pub(super) async fn guild_members(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, members, roles) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_guild_members(guild_id, 100, 0),
+        cached_roles(&percy, guild_id),
+    );
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let members = percy.get_guild_members(guild_id, 100, 0).await.unwrap_or_default();
-    let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
+    let members = members.unwrap_or_default();
+    let roles = roles.unwrap_or_default();
 
     MembersTemplate {
         account: Some(account),
@@ -423,26 +440,33 @@ pub(super) async fn guild_leveling(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
+    // Fan out the six independent reads concurrently.
+    let (guild, config, leaderboard, xp_history, roles, channels) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_leveling_config(guild_id),
+        percy.get_leveling_leaderboard(guild_id, 25),
+        percy.get_leveling_xp_history(guild_id, 30),
+        cached_roles(&percy, guild_id),
+        cached_channels(&percy, guild_id),
+    );
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let config = percy.get_leveling_config(guild_id).await.unwrap_or_default();
-    let leaderboard = percy
-        .get_leveling_leaderboard(guild_id, 25)
-        .await
-        .unwrap_or(LeaderboardResponse {
-            entries: Vec::new(),
-            total: 0,
-        });
+    let config = config.unwrap_or_default();
+    let leaderboard = leaderboard.unwrap_or(LeaderboardResponse {
+        entries: Vec::new(),
+        total: 0,
+    });
 
     // Daily cumulative-XP snapshots for the chart; serialize for the inline uPlot script.
-    let xp_history = percy.get_leveling_xp_history(guild_id, 30).await.unwrap_or_default();
+    let xp_history = xp_history.unwrap_or_default();
     let xp_history_json = serde_json::to_string(&xp_history.points).unwrap_or_else(|_| "[]".to_string());
 
-    let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
-    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
+    let roles = roles.unwrap_or_default();
+    let channels = channels.unwrap_or_default();
 
     // Resolve Discord IDs to display names from the fetched role/channel lists.
     let role_name = |id: &str| -> String {
@@ -587,12 +611,14 @@ pub(super) async fn guild_user_lookup(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, member) = tokio::join!(percy.get_guild(guild_id), percy.get_member_detail(guild_id, &user_id),);
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let member = match percy.get_member_detail(guild_id, &user_id).await {
+    let member = match member {
         Ok(m) => m,
         Err(_) => {
             return Redirect::to(&format!("/percy/dashboard/guild/{guild_id}/members")).into_response();
@@ -646,18 +672,22 @@ pub(super) async fn guild_polls(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, channels, roles, polls) = tokio::join!(
+        percy.get_guild(guild_id),
+        cached_channels(&percy, guild_id),
+        cached_roles(&percy, guild_id),
+        percy.get_polls(guild_id),
+    );
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
-    let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
+    let channels = channels.unwrap_or_default();
+    let roles = roles.unwrap_or_default();
 
-    let polls = percy
-        .get_polls(guild_id)
-        .await
-        .unwrap_or(PollsResponse { polls: Vec::new() });
+    let polls = polls.unwrap_or(PollsResponse { polls: Vec::new() });
     let active_count = polls.polls.iter().filter(|p| !p.ended).count();
     let ended_count = polls.polls.iter().filter(|p| p.ended).count();
 
@@ -801,15 +831,14 @@ pub(super) async fn guild_giveaways(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, giveaways) = tokio::join!(percy.get_guild(guild_id), percy.get_giveaways(guild_id));
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let giveaways = percy
-        .get_giveaways(guild_id)
-        .await
-        .unwrap_or(GiveawaysResponse { giveaways: Vec::new() });
+    let giveaways = giveaways.unwrap_or(GiveawaysResponse { giveaways: Vec::new() });
     let active_count = giveaways.giveaways.iter().filter(|g| !g.ended).count();
     let ended_count = giveaways.giveaways.iter().filter(|g| g.ended).count();
 
@@ -843,12 +872,14 @@ pub(super) async fn guild_tags(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, tags) = tokio::join!(percy.get_guild(guild_id), percy.get_tags(guild_id));
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let tags = percy.get_tags(guild_id).await.unwrap_or(TagsResponse {
+    let tags = tags.unwrap_or(TagsResponse {
         total: 0,
         total_uses: 0,
         tags: Vec::new(),
@@ -883,16 +914,22 @@ pub(super) async fn guild_commands(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, commands, channels) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_commands(guild_id),
+        cached_channels(&percy, guild_id),
+    );
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let commands = percy.get_commands(guild_id).await.unwrap_or(CommandsResponse {
+    let commands = commands.unwrap_or(CommandsResponse {
         commands: Vec::new(),
         plonks: Vec::new(),
     });
-    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
+    let channels = channels.unwrap_or_default();
     let disabled_count = commands.commands.iter().filter(|c| c.globally_disabled).count();
     let partial_count = commands
         .commands
@@ -1062,17 +1099,23 @@ pub(super) async fn guild_stats(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, stats, bot_stats) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_guild_stats(guild_id),
+        percy.get_bot_stats(),
+    );
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
 
-    let stats = match percy.get_guild_stats(guild_id).await {
+    let stats = match stats {
         Ok(s) => s,
         Err(_) => return Redirect::to(&format!("/percy/dashboard/guild/{guild_id}")).into_response(),
     };
 
-    let bot_stats = percy.get_bot_stats().await.unwrap_or(BotStats {
+    let bot_stats = bot_stats.unwrap_or(BotStats {
         guild_count: 0,
         user_count: 0,
         channel_count: 0,
@@ -1249,17 +1292,16 @@ pub(super) async fn guild_autoresponders(
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Redirect::to("/percy/dashboard").into_response();
     }
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, data) = tokio::join!(percy.get_guild(guild_id), percy.get_autoresponders(guild_id));
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
-    let data = percy
-        .get_autoresponders(guild_id)
-        .await
-        .unwrap_or(AutorespondersResponse {
-            entries: Vec::new(),
-            total: 0,
-        });
+    let data = data.unwrap_or(AutorespondersResponse {
+        entries: Vec::new(),
+        total: 0,
+    });
     AutorespondersTemplate {
         account: Some(account),
         flashes,
@@ -1424,20 +1466,24 @@ pub(super) async fn guild_economy(
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Redirect::to("/percy/dashboard").into_response();
     }
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, economy, balances, channels, roles) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_economy(guild_id),
+        percy.get_economy_balances(guild_id, 25),
+        cached_channels(&percy, guild_id),
+        cached_roles(&percy, guild_id),
+    );
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
-    let economy = percy.get_economy(guild_id).await.unwrap_or(EconomyInfo {
+    let economy = economy.unwrap_or(EconomyInfo {
         items: Vec::new(),
         lottery: None,
     });
-    let balances = percy
-        .get_economy_balances(guild_id, 25)
-        .await
-        .unwrap_or(BalancesResponse { entries: Vec::new() });
-    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
-    let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
+    let balances = balances.unwrap_or(BalancesResponse { entries: Vec::new() });
+    let channels = channels.unwrap_or_default();
+    let roles = roles.unwrap_or_default();
     EconomyTemplate {
         account: Some(account),
         flashes,
@@ -1468,11 +1514,16 @@ pub(super) async fn guild_music(
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Redirect::to("/percy/dashboard").into_response();
     }
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, music, channels) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_music(guild_id),
+        cached_channels(&percy, guild_id),
+    );
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
-    let music = percy.get_music(guild_id).await.unwrap_or(MusicInfo {
+    let music = music.unwrap_or(MusicInfo {
         active: false,
         equalizer: vec![0.0; 15],
         filters: MusicFiltersState {
@@ -1485,7 +1536,7 @@ pub(super) async fn guild_music(
         channel: None,
         setup: None,
     });
-    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
+    let channels = channels.unwrap_or_default();
     MusicTemplate {
         account: Some(account),
         flashes,
@@ -1632,16 +1683,20 @@ pub(super) async fn guild_comics(
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Redirect::to("/percy/dashboard").into_response();
     }
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, data, channels, roles) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_comics(guild_id),
+        cached_channels(&percy, guild_id),
+        cached_roles(&percy, guild_id),
+    );
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
-    let data = percy
-        .get_comics(guild_id)
-        .await
-        .unwrap_or(ComicsResponse { feeds: Vec::new() });
-    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
-    let roles = percy.get_guild_roles(guild_id).await.unwrap_or_default();
+    let data = data.unwrap_or(ComicsResponse { feeds: Vec::new() });
+    let channels = channels.unwrap_or_default();
+    let roles = roles.unwrap_or_default();
     ComicsTemplate {
         account: Some(account),
         flashes,
@@ -1671,15 +1726,18 @@ pub(super) async fn guild_temp_channels(
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Redirect::to("/percy/dashboard").into_response();
     }
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, data, channels) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_temp_channels(guild_id),
+        cached_channels(&percy, guild_id),
+    );
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
-    let data = percy
-        .get_temp_channels(guild_id)
-        .await
-        .unwrap_or(TempChannelsResponse { entries: Vec::new() });
-    let channels = percy.get_guild_channels(guild_id).await.unwrap_or_default();
+    let data = data.unwrap_or(TempChannelsResponse { entries: Vec::new() });
+    let channels = channels.unwrap_or_default();
     TempChannelsTemplate {
         account: Some(account),
         flashes,
@@ -1708,14 +1766,13 @@ pub(super) async fn guild_highlights(
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Redirect::to("/percy/dashboard").into_response();
     }
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, data) = tokio::join!(percy.get_guild(guild_id), percy.get_highlights(guild_id));
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
-    let data = percy
-        .get_highlights(guild_id)
-        .await
-        .unwrap_or(HighlightsResponse { entries: Vec::new() });
+    let data = data.unwrap_or(HighlightsResponse { entries: Vec::new() });
     HighlightsTemplate {
         account: Some(account),
         flashes,
@@ -1743,11 +1800,13 @@ pub(super) async fn guild_emoji_stats(
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Redirect::to("/percy/dashboard").into_response();
     }
-    let guild = match percy.get_guild(guild_id).await {
+    let (guild, data) = tokio::join!(percy.get_guild(guild_id), percy.get_emoji_stats(guild_id, 50));
+
+    let guild = match guild {
         Ok(g) => g,
         Err(_) => return Redirect::to("/percy/dashboard").into_response(),
     };
-    let data = percy.get_emoji_stats(guild_id, 50).await.unwrap_or(EmojiStatsResponse {
+    let data = data.unwrap_or(EmojiStatsResponse {
         total_uses: 0,
         distinct_emojis: 0,
         entries: Vec::new(),
@@ -1910,6 +1969,72 @@ pub(super) async fn guild_economy_lottery_delete(
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
     }
     match percy.delete_lottery(guild_id).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+/// Adjust a single member's economy balance (`{ "cash": <i64>, "bank": <i64> }`,
+/// either field optional — forwarded as-is to Percy).
+pub(super) async fn guild_economy_balance_update(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, user_id)): Path<(u64, String)>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.patch_economy_balance(guild_id, &user_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+/// Subscribe the guild to (or move) the bot status feed (`{ "channel_id": "<id>" }`).
+pub(super) async fn guild_status_feed_subscribe(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.post_status_feed(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+/// Unsubscribe the guild from the bot status feed.
+pub(super) async fn guild_status_feed_unsubscribe(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.delete_status_feed(guild_id).await {
         Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
     }
@@ -2098,11 +2223,6 @@ pub(super) async fn guild_audit_log(
         return Redirect::to("/percy/dashboard").into_response();
     }
 
-    let guild = match percy.get_guild(guild_id).await {
-        Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
-    };
-
     let action = if q.action.is_empty() {
         None
     } else {
@@ -2124,13 +2244,20 @@ pub(super) async fn guild_audit_log(
         Some(q.before.as_str())
     };
 
-    let cases = percy
-        .get_cases(guild_id, q.limit, q.offset, action, moderator_id, None, after, before)
-        .await
-        .unwrap_or(CasesResponse {
-            cases: Vec::new(),
-            total: 0,
-        });
+    let (guild, cases) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_cases(guild_id, q.limit, q.offset, action, moderator_id, None, after, before),
+    );
+
+    let guild = match guild {
+        Ok(g) => g,
+        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+    };
+
+    let cases = cases.unwrap_or(CasesResponse {
+        cases: Vec::new(),
+        total: 0,
+    });
 
     AuditLogTemplate {
         account: Some(account),

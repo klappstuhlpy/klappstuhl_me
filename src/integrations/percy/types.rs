@@ -12,6 +12,15 @@ pub struct UserGuild {
     pub owner: bool,
 }
 
+/// A user's *current* avatar, resolved live from the bot (never persisted, so it
+/// can't go stale).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserAvatar {
+    pub avatar_url: String,
+    #[serde(default)]
+    pub username: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ChannelRef {
     pub id: String,
@@ -76,7 +85,7 @@ pub struct GuildFlags {
     pub mentions: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Role {
     pub id: String,
     pub name: String,

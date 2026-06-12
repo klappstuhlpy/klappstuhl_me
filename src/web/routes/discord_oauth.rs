@@ -1,19 +1,29 @@
+use std::{
+    sync::OnceLock,
+    time::{Duration, Instant},
+};
+
 use crate::{
     auth::hash_password,
     flash::Flasher,
     headers::ClientIp,
     models::{is_valid_username, Account},
+    percy::PercyClient,
     ratelimit::RateLimit,
     token::Token,
     AppState,
 };
 use axum::{
     extract::{Query, State},
-    http::{header::SET_COOKIE, HeaderValue},
+    http::{
+        header::{CACHE_CONTROL, SET_COOKIE},
+        HeaderValue, StatusCode,
+    },
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
     Router,
 };
+use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
@@ -45,13 +55,14 @@ struct TokenResponse {
 }
 
 /// Discord's /users/@me response (only the fields we need).
+///
+/// The avatar hash is intentionally *not* captured: the site resolves the
+/// avatar live from the bot (`GET /account/discord/avatar`) so it never goes
+/// stale, and nothing about the avatar is persisted.
 #[derive(Deserialize)]
 struct DiscordUser {
     id: String,
     username: String,
-    /// Avatar hash, or `None` if the user has no custom avatar.
-    #[serde(default)]
-    avatar: Option<String>,
 }
 
 /// Query params on the OAuth2 callback.
@@ -213,14 +224,13 @@ async fn link_discord(
 ) -> Response {
     let discord_id = user.id.clone();
     let username = user.username.clone();
-    let avatar = user.avatar.clone();
 
     let result: rusqlite::Result<()> = state
         .database()
         .call(move |conn| {
             conn.execute(
-                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username, discord_avatar) VALUES (?, ?, ?, ?)",
-                rusqlite::params![account_id, discord_id, username, avatar],
+                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username) VALUES (?, ?, ?)",
+                rusqlite::params![account_id, discord_id, username],
             )?;
             Ok(())
         })
@@ -298,7 +308,6 @@ async fn login_or_create(
         let username = sanitize_username(&user.username);
         let discord_id_for_insert = user.id.clone();
         let discord_username_for_insert = user.username.clone();
-        let discord_avatar_for_insert = user.avatar.clone();
 
         // Generate a sentinel password hash that can never be matched.
         let mut random_bytes = [0u8; 64];
@@ -322,8 +331,8 @@ async fn login_or_create(
                 )?;
                 let new_id = tx.last_insert_rowid();
                 tx.execute(
-                    "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username, discord_avatar) VALUES (?, ?, ?, ?)",
-                    rusqlite::params![new_id, discord_id_for_insert, discord_username_for_insert, discord_avatar_for_insert],
+                    "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username) VALUES (?, ?, ?)",
+                    rusqlite::params![new_id, discord_id_for_insert, discord_username_for_insert],
                 )?;
                 tx.commit()?;
                 Ok(new_id)
@@ -347,7 +356,6 @@ async fn login_or_create(
                     totp_secret: None,
                     totp_enabled: false,
                     discord_id: Some(user.id.clone()),
-                    discord_avatar: user.avatar.clone(),
                 };
                 create_session_response(state, &account, client_ip, "auth.discord.login", target).await
             }
@@ -358,7 +366,6 @@ async fn login_or_create(
                     let suffixed = append_random_suffix(&username);
                     let discord_id2 = user.id.clone();
                     let discord_username2 = user.username.clone();
-                    let discord_avatar2 = user.avatar.clone();
                     let password_hash2 = {
                         let mut rb = [0u8; 64];
                         let _ = getrandom::getrandom(&mut rb);
@@ -379,8 +386,8 @@ async fn login_or_create(
                             )?;
                             let new_id = tx.last_insert_rowid();
                             tx.execute(
-                                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username, discord_avatar) VALUES (?, ?, ?, ?)",
-                                rusqlite::params![new_id, discord_id2, discord_username2, discord_avatar2],
+                                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username) VALUES (?, ?, ?)",
+                                rusqlite::params![new_id, discord_id2, discord_username2],
                             )?;
                             tx.commit()?;
                             Ok(new_id)
@@ -403,7 +410,6 @@ async fn login_or_create(
                                 totp_secret: None,
                                 totp_enabled: false,
                                 discord_id: Some(user.id.clone()),
-                                discord_avatar: user.avatar.clone(),
                             };
                             create_session_response(state, &account, client_ip, "auth.discord.login", target).await
                         }
@@ -512,6 +518,60 @@ fn append_random_suffix(base: &str) -> String {
     candidate[..candidate.len().min(32)].to_string()
 }
 
+// -- Live Discord avatar -----------------------------------------------------
+
+/// How long a resolved avatar URL is reused before re-checking the bot. Short
+/// enough that a profile-picture change shows up quickly; long enough that the
+/// header doesn't hit Percy on every page load.
+const AVATAR_TTL: Duration = Duration::from_secs(600);
+
+/// `discord_user_id -> (resolved_at, avatar_url)`.
+fn avatar_cache() -> &'static Cache<String, (Instant, String)> {
+    static CACHE: OnceLock<Cache<String, (Instant, String)>> = OnceLock::new();
+    CACHE.get_or_init(|| Cache::new(2000))
+}
+
+/// Discord's default embed avatar for a user id, used when the bot can't be
+/// reached or the user is unknown so the header always renders something.
+fn default_discord_avatar(discord_id: &str) -> String {
+    let idx = discord_id.parse::<u64>().map(|n| (n >> 22) % 6).unwrap_or(0);
+    format!("https://cdn.discordapp.com/embed/avatars/{idx}.png")
+}
+
+fn avatar_redirect(url: &str) -> Response {
+    let mut resp = Redirect::temporary(url).into_response();
+    // Let the browser cache the image briefly too, matching the server-side TTL.
+    resp.headers_mut()
+        .insert(CACHE_CONTROL, HeaderValue::from_static("private, max-age=600"));
+    resp
+}
+
+/// `GET /account/discord/avatar` — 302-redirects to the linked user's *current*
+/// Discord avatar, resolved live from the bot and never persisted (so it can't go
+/// stale). The site header points its `<img>` here.
+async fn discord_avatar(State(state): State<AppState>, account: Account) -> Response {
+    let Some(discord_id) = account.discord_id.clone() else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+
+    if let Some((ts, url)) = avatar_cache().get(&discord_id) {
+        if ts.elapsed() < AVATAR_TTL {
+            return avatar_redirect(&url);
+        }
+    }
+
+    if let Some(percy) = PercyClient::new(state.percy_client.clone(), &state.config().percy) {
+        if let Ok(avatar) = percy.get_user_avatar(&discord_id).await {
+            avatar_cache().insert(discord_id, (Instant::now(), avatar.avatar_url.clone()));
+            return avatar_redirect(&avatar.avatar_url);
+        }
+    }
+
+    // Bot unreachable or unconfigured — fall back to the default avatar. Not
+    // cached, so the next request retries the bot.
+    avatar_redirect(&default_discord_avatar(&discord_id))
+}
+
 // -- Router ------------------------------------------------------------------
 
 use rusqlite::OptionalExtension;
@@ -524,4 +584,5 @@ pub fn routes() -> Router<AppState> {
             get(discord_callback).layer(RateLimit::default().quota(10, 60.0).build()),
         )
         .route("/account/discord/unlink", post(discord_unlink))
+        .route("/account/discord/avatar", get(discord_avatar))
 }

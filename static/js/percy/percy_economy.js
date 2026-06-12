@@ -118,4 +118,47 @@
             } catch { showToast('error', 'Network error.'); }
         });
     }
+
+    // Edit member balance
+    const balanceModal = document.getElementById('edit-balance-modal');
+    if (balanceModal) {
+        let editingUserId = null;
+        const usernameSpan = document.getElementById('balance-username');
+        const cashInput = document.getElementById('balance_cash');
+        const bankInput = document.getElementById('balance_bank');
+
+        document.querySelectorAll('.edit-balance-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                editingUserId = btn.dataset.userId;
+                usernameSpan.textContent = btn.dataset.username;
+                cashInput.value = btn.dataset.cash;
+                bankInput.value = btn.dataset.bank;
+                balanceModal.hidden = false;
+            });
+        });
+
+        const closeModal = () => { balanceModal.hidden = true; editingUserId = null; };
+        document.getElementById('balance-modal-cancel').addEventListener('click', closeModal);
+        balanceModal.addEventListener('click', (e) => { if (e.target === balanceModal) closeModal(); });
+
+        document.getElementById('balance-modal-confirm').addEventListener('click', async () => {
+            if (!editingUserId) return;
+            const cash = parseInt(cashInput.value, 10);
+            const bank = parseInt(bankInput.value, 10);
+            if (Number.isNaN(cash) && Number.isNaN(bank)) { showToast('error', 'Enter a cash or bank value.'); return; }
+            const body = {};
+            if (!Number.isNaN(cash)) body.cash = cash;
+            if (!Number.isNaN(bank)) body.bank = bank;
+            try {
+                const r = await fetch(`${base}/balances/${encodeURIComponent(editingUserId)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const d = await r.json();
+                if (d.ok) { showToast('success', 'Balance updated.'); setTimeout(() => location.reload(), 400); }
+                else { showToast('error', d.error || 'Failed.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    }
 })();

@@ -124,4 +124,32 @@
             });
         }
     }
+
+    // ── Bot status feed (General tab) ──────────────────────────────────────
+    var statusSubBtn = document.getElementById('status-feed-sub');
+    var statusUnsubBtn = document.getElementById('status-feed-unsub');
+    var statusSelect = document.getElementById('status-feed-channel');
+    var statusFeedUrl = '/percy/dashboard/guild/' + GUILD_ID + '/status-feed';
+    if (statusSubBtn && statusSelect) {
+        statusSubBtn.addEventListener('click', async function() {
+            var channelId = statusSelect.value;
+            if (!channelId) { toast('error', 'Select a channel first.'); return; }
+            try {
+                var data = await postJSON(statusFeedUrl, { channel_id: channelId });
+                if (data.ok) { toast('success', 'Subscribed to status feed.'); setTimeout(function(){ location.reload(); }, 400); }
+                else { toast('error', data.error || 'Failed.'); }
+            } catch (e) { toast('error', 'Network error.'); }
+        });
+    }
+    if (statusUnsubBtn) {
+        statusUnsubBtn.addEventListener('click', async function() {
+            if (!confirm('Unsubscribe this server from the status feed?')) return;
+            try {
+                var resp = await fetch(statusFeedUrl, { method: 'DELETE', headers: { 'Accept': 'application/json' } });
+                var data = await resp.json();
+                if (data.ok) { toast('success', 'Unsubscribed.'); setTimeout(function(){ location.reload(); }, 400); }
+                else { toast('error', data.error || 'Failed.'); }
+            } catch (e) { toast('error', 'Network error.'); }
+        });
+    }
 })();

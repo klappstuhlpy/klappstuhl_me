@@ -13,7 +13,7 @@ const POLL_INTERVAL: Duration = Duration::from_secs(60);
 pub fn spawn_poller(state: AppState) {
     let percy = {
         let config = state.config();
-        PercyClient::new(state.client.clone(), &config.percy)
+        PercyClient::new(state.percy_client.clone(), &config.percy)
     };
     let Some(percy) = percy else {
         return;

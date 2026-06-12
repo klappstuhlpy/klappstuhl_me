@@ -113,6 +113,10 @@ struct InnerState {
 pub struct AppState {
     inner: Arc<InnerState>,
     pub client: reqwest::Client,
+    /// Dedicated HTTP client for Percy's internal API. Carries a short timeout
+    /// (the shared `client` uses a 600 s timeout for streaming/uploads, which
+    /// would let a hung Percy stall an Axum worker for 10 minutes).
+    pub percy_client: reqwest::Client,
     pub requests: RequestLogger,
     pub incorrect_default_password_hash: String,
 }
@@ -125,6 +129,15 @@ impl AppState {
             .timeout(Duration::from_secs(600))
             .build()
             .expect("could not build HTTP client");
+
+        // Percy's internal API is local and fast; cap its calls aggressively so a
+        // hung or slow bot can never tie up a request worker on the shared client's
+        // 600 s timeout. Connection pooling is preserved (one client, cloned cheaply).
+        let percy_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(8))
+            .connect_timeout(Duration::from_secs(3))
+            .build()
+            .expect("could not build Percy HTTP client");
 
         let requests = RequestLogger::new().expect("could not build request logger");
 
@@ -233,6 +246,7 @@ impl AppState {
                 image_updates: std::sync::Mutex::new(std::collections::HashMap::new()),
             }),
             client,
+            percy_client,
             requests,
             incorrect_default_password_hash,
         }
@@ -396,14 +410,15 @@ impl AppState {
             Ok(acc) => Some(acc),
             Err(guard) => {
                 // LEFT JOIN the Discord link so the cached account carries the
-                // linked Discord id/avatar (used by the site header). Keep this
+                // linked Discord id (used by the site header, which resolves the
+                // avatar live from the bot — the avatar is never stored). Keep this
                 // in sync with the inline query in `get_session_account` so both
                 // cache writers store the same shape.
                 let query = r#"
                     SELECT account.id AS id, account.name AS name, account.password AS password,
                            account.flags AS flags, account.totp_secret AS totp_secret,
                            account.totp_enabled AS totp_enabled,
-                           dl.discord_user_id AS discord_id, dl.discord_avatar AS discord_avatar
+                           dl.discord_user_id AS discord_id
                     FROM account
                     LEFT JOIN user_discord_links dl ON dl.account_id = account.id
                     WHERE account.id = ?
@@ -490,7 +505,7 @@ impl AppState {
                     SELECT account.id AS id, account.name AS name, account.password AS password,
                            account.flags AS flags, account.totp_secret AS totp_secret,
                            account.totp_enabled AS totp_enabled,
-                           dl.discord_user_id AS discord_id, dl.discord_avatar AS discord_avatar,
+                           dl.discord_user_id AS discord_id,
                            session.api_key AS api_key, session.created_at AS created_at
                     FROM account INNER JOIN session ON session.account_id = account.id
                     LEFT JOIN user_discord_links dl ON dl.account_id = account.id

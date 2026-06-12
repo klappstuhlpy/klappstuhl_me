@@ -79,7 +79,7 @@
         <p class="text-muted">No balance data available.</p>
         {% else %}
         <table class="data-table">
-            <thead><tr><th>Member</th><th>Cash</th><th>Bank</th><th>Total</th></tr></thead>
+            <thead><tr><th>Member</th><th>Cash</th><th>Bank</th><th>Total</th><th></th></tr></thead>
             <tbody>
                 {% for b in balances.entries %}
                 <tr>
@@ -87,12 +87,36 @@
                     <td>{{ b.cash }}</td>
                     <td>{{ b.bank }}</td>
                     <td><strong>{{ b.total }}</strong></td>
+                    <td>
+                        <button class="button small edit-balance-btn"
+                                data-user-id="{{ b.user_id }}"
+                                data-username="{{ b.username }}"
+                                data-cash="{{ b.cash }}"
+                                data-bank="{{ b.bank }}">Edit</button>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
         {% endif %}
     </section>
+
+<!-- Edit Balance Modal -->
+<div class="modal-overlay" id="edit-balance-modal" hidden>
+    <div class="modal-card">
+        <h3>Edit Balance — <span id="balance-username"></span></h3>
+        <div class="modal-form">
+            <label class="config-label">Cash</label>
+            <input type="number" id="balance_cash" class="config-input">
+            <label class="config-label">Bank</label>
+            <input type="number" id="balance_bank" class="config-input">
+            <div class="modal-actions">
+                <button type="button" class="button small" id="balance-modal-cancel">Cancel</button>
+                <button type="button" class="button primary small" id="balance-modal-confirm">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Add Item Modal -->
 <div class="modal-overlay" id="add-item-modal" hidden>

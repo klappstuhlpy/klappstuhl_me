@@ -290,9 +290,6 @@ pub struct Account {
     /// `user_discord_links` in the session/account loaders, and defaults to
     /// `None` for the many queries that select only the base account columns.
     pub discord_id: Option<String>,
-    /// The linked Discord avatar hash (see [`Account::discord_avatar_url`]).
-    /// Populated through the same JOIN as [`Account::discord_id`].
-    pub discord_avatar: Option<String>,
 }
 
 impl Account {
@@ -302,26 +299,12 @@ impl Account {
     }
 
     /// Whether a Discord account is currently linked to this account.
+    ///
+    /// The linked user's avatar is **not** stored here — the site header resolves
+    /// it live from the bot via `GET /account/discord/avatar`, so it can't go
+    /// stale. Only the link's existence (and id) is persisted.
     pub fn has_discord(&self) -> bool {
         self.discord_id.is_some()
-    }
-
-    /// The CDN URL of the linked Discord profile picture, or `None` when no
-    /// Discord account is connected. When the avatar hash is missing (links
-    /// created before it was stored) this falls back to Discord's default
-    /// avatar derived from the user ID, so the header still shows a picture.
-    pub fn discord_avatar_url(&self) -> Option<String> {
-        let id = self.discord_id.as_deref()?;
-        match self.discord_avatar.as_deref() {
-            Some(hash) if !hash.is_empty() => {
-                let ext = if hash.starts_with("a_") { "gif" } else { "png" };
-                Some(format!("https://cdn.discordapp.com/avatars/{id}/{hash}.{ext}?size=64"))
-            }
-            _ => {
-                let idx = id.parse::<u64>().map(|n| (n >> 22) % 6).unwrap_or(0);
-                Some(format!("https://cdn.discordapp.com/embed/avatars/{idx}.png"))
-            }
-        }
     }
 }
 
@@ -344,9 +327,8 @@ impl Table for Account {
             totp_secret: row.get::<_, Option<String>>("totp_secret").unwrap_or(None),
             totp_enabled: row.get::<_, bool>("totp_enabled").unwrap_or(false),
             // Populated only when the loader JOINs `user_discord_links`;
-            // tolerant of result sets that don't select these columns.
+            // tolerant of result sets that don't select this column.
             discord_id: row.get::<_, Option<String>>("discord_id").unwrap_or(None),
-            discord_avatar: row.get::<_, Option<String>>("discord_avatar").unwrap_or(None),
         })
     }
 }

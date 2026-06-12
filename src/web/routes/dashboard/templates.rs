@@ -27,6 +27,10 @@ pub(crate) struct GuildTemplate {
     pub(crate) gatekeeper: Option<GatekeeperInfo>,
     pub(crate) lockdowns: LockdownsResponse,
     pub(crate) status_feed: StatusFeedInfo,
+    /// True when the guild loaded but a sub-resource (roles/channels) failed to
+    /// fetch — the page renders, but with empty pickers, so saving could clobber
+    /// config. Drives a warning banner instead of a silently hollow page.
+    pub(crate) degraded: bool,
 }
 
 #[allow(dead_code)]
