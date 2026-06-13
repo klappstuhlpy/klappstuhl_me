@@ -6,27 +6,30 @@
 # ─────────────────────────────────────────────────────────────────────────────
 FROM rust:1.88-slim-bookworm AS builder
 
+# mold is a fast drop-in linker; .cargo/config.toml points the linux target at
+# it via rustflags, which cuts a big chunk off the final link step.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
     git \
+    mold \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
-# ── Dependency layer cache ────────────────────────────────────────────────────
-# Copy only the manifests first and compile a stub binary so that all
-# dependency crates are compiled and cached in a separate layer.  The real
-# source is copied afterwards; only our own crate needs to be recompiled on
-# source changes, not the entire dependency tree.
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir -p src && echo 'fn main() {}' > src/main.rs \
- && cargo build --release \
- && rm -rf src target/release/deps/klappstuhl_me* target/release/klappstuhl_me*
-
-# ── Real build ────────────────────────────────────────────────────────────────
+# ── Build with persistent cargo + target cache ────────────────────────────────
+# BuildKit cache mounts persist the cargo registry/git checkouts and the
+# `target/` dir *across* builds. This restores Cargo's incremental compilation:
+# a `git pull` that touches a few files recompiles only those, instead of the
+# whole crate from scratch every deploy. Because `target/` is a cache mount
+# (not part of the image layer), the finished binary must be copied out before
+# the RUN ends, otherwise it won't exist in the next stage.
 COPY . .
-RUN cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo build --release \
+ && cp target/release/klappstuhl_me /build/klappstuhl_me
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -61,8 +64,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Binary (SQLite is bundled in, no separate .so needed)
-COPY --from=builder /build/target/release/klappstuhl_me ./klappstuhl_me
+# Binary (SQLite is bundled in, no separate .so needed). Copied out of the
+# build stage's cache-mounted target/ to /build/klappstuhl_me in the builder.
+COPY --from=builder /build/klappstuhl_me ./klappstuhl_me
 
 # Static assets served at runtime by tower_http from ./static/
 COPY static/ ./static/

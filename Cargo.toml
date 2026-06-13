@@ -64,3 +64,11 @@ x509-parser = "0.15"
 rustls = "0.22"
 rustls-pki-types = "1"
 webpki-roots = "0.26"
+
+[profile.release]
+# This is an I/O-bound web app (SQLite, HTTP, subprocess shelling), so it has no
+# hot compute kernel that benefits from maximal cross-function inlining. Raising
+# codegen-units lets rustc parallelise codegen into more units, speeding up
+# compilation for a negligible runtime cost here. opt-level stays at the default
+# 3 and LTO stays off (enabling it would make build times much worse).
+codegen-units = 256
