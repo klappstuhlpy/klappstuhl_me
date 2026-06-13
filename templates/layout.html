@@ -40,6 +40,9 @@
     <header class="grid-item">
         <nav class="main-navigation">
             <a class="nav-item branding" href="/"><span class="branding-glyph spark" aria-hidden="true">✻</span> Klappstuhl.me</a>
+            {# Section indicator: child templates fill this to show which area
+               of the site you're in (e.g. the Percy badge). Visual only. #}
+            {% block nav_section %}{% endblock %}
             <div class="nav-item mobile-only">
                 <input id="hamburger-toggle" type="checkbox" aria-label="Open menu"/>
                 <label class="hamburger-menu" aria-hidden="true" for="hamburger-toggle"><span></span></label>

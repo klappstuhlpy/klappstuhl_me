@@ -515,6 +515,9 @@ nav.main-navigation {
     display: flex;
     flex-direction: row;
     justify-content: flex-start;
+    /* Center items vertically so links sit on the same line as taller items
+       (the account button, the Percy section badge) instead of top-aligning. */
+    align-items: center;
 }
 
 nav.main-navigation .nav-item {
@@ -532,6 +535,45 @@ nav.main-navigation .branding {
     text-align: left;
     font-weight: bold;
 }
+
+/* Section indicator in the top nav (e.g. the Percy badge). Rendered only on
+   pages that fill layout.html's `nav_section` block — purely visual. The
+   wrapper is a `.nav-item`, so it picks up the nav's vertical margins and the
+   1rem right-margin between items; here we only need to align its contents. */
+.nav-section {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.nav-section-sep {
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.nav-section-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.1rem 0.55rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.5;
+    color: var(--branding-bright);
+    background: var(--branding-dim);
+    border: 1px solid color-mix(in srgb, var(--branding) 35%, transparent);
+    border-radius: 999px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.nav-section-badge:hover {
+    color: var(--foreground);
+    border-color: var(--branding);
+}
+
+.nav-section-glyph { font-size: 0.7em; }
 
 .nav-item.spacer { margin-right: auto !important; }
 
