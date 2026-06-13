@@ -245,10 +245,21 @@ pub fn spawn_remote_upload(state: AppState, path: PathBuf) {
     });
 }
 
+/// Minimum delay before the scheduler takes an overdue (or first-ever) backup
+/// after start-up. Spaces out catch-up backups so a burst of restarts doesn't
+/// each fire one immediately, and paces retries when `create` keeps failing.
+const STARTUP_GRACE_SECS: u64 = 300;
+
 /// Background scheduler: takes a backup every `backup_interval_hours` and
-/// prunes to `backup_keep`. A value of 0 hours disables the scheduler. The
-/// first backup runs one interval after start-up (so frequent restarts don't
-/// spam backups).
+/// prunes to `backup_keep`. A value of 0 hours disables the scheduler.
+///
+/// The schedule is derived from the **newest backup on disk**, not from process
+/// start-up, so the cadence survives restarts: a process that restarts more
+/// often than the interval would otherwise reset its timer every time and never
+/// reach a scheduled backup. If the newest backup is already older than the
+/// interval (or none exists), a catch-up backup runs after [`STARTUP_GRACE_SECS`];
+/// otherwise the scheduler sleeps until `newest_backup + interval`. This matches
+/// the "next run" estimate shown in the admin UI.
 pub fn spawn_scheduler(state: AppState) {
     let interval_hours = state.config().backup.interval_hours.unwrap_or(DEFAULT_INTERVAL_HOURS);
     if interval_hours == 0 {
@@ -256,11 +267,20 @@ pub fn spawn_scheduler(state: AppState) {
         return;
     }
     let keep = keep_count(&state);
+    let interval_secs = interval_hours * 3600;
     tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(Duration::from_secs(interval_hours * 3600));
-        ticker.tick().await; // consume the immediate first tick
         loop {
-            ticker.tick().await;
+            // Re-read the newest backup each iteration so the next run is always
+            // anchored to the last successful backup (restart-durable).
+            let now = OffsetDateTime::now_utc().unix_timestamp();
+            let due_at = match list().first() {
+                Some(b) => b.modified_unix + interval_secs as i64,
+                None => now, // never backed up — take one shortly after start-up
+            };
+            let wait = (due_at - now).max(STARTUP_GRACE_SECS as i64) as u64;
+            tracing::info!(wait_secs = wait, "next scheduled backup in ~{wait}s");
+            tokio::time::sleep(Duration::from_secs(wait)).await;
+
             match create(&state).await {
                 Ok(path) => {
                     tracing::info!(path = %path.display(), "scheduled backup created");

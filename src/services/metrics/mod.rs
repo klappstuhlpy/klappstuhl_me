@@ -32,7 +32,7 @@ pub use storage::{fetch_current, fetch_docker_history, fetch_history, CurrentVie
 
 use crate::AppState;
 use std::time::Duration;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 /// How often the collector scrapes /proc, /sys and `docker stats`.
 pub const SCRAPE_INTERVAL: Duration = Duration::from_secs(30);
@@ -76,8 +76,9 @@ pub fn spawn_pruner(state: AppState) {
 
 async fn scrape_once(state: &AppState, alert_state: &AlertState) -> anyhow::Result<()> {
     // Heartbeat so every scrape attempt is visible in the log file,
-    // even when something downstream hangs or no errors fire.
-    info!(target: "metrics", "scrape: starting");
+    // even when something downstream hangs or no errors fire. At debug level
+    // since it fires every SCRAPE_INTERVAL and would otherwise spam the log.
+    debug!(target: "metrics", "scrape: starting");
 
     let sample = host::collect().await.map_err(|e| {
         tracing::error!(target: "metrics", error = %e, "host::collect failed");
@@ -129,7 +130,7 @@ async fn scrape_once(state: &AppState, alert_state: &AlertState) -> anyhow::Resu
         }),
     );
 
-    info!(target: "metrics", "scrape ok: cpu={:.1}% mem={:.1}% containers={}",
+    debug!(target: "metrics", "scrape ok: cpu={:.1}% mem={:.1}% containers={}",
           sample.cpu_total_pct(),
           sample.mem_used_pct(),
           containers.len());
