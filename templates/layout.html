@@ -62,17 +62,20 @@
                     <span class="account-caret" aria-hidden="true"></span>
                 </button>
                 <div class="account-dropdown" role="menu">
-                    {# Site links — surfaced inside the dropdown on mobile only. #}
-                    <a class="account-dropdown-item nav-extra" role="menuitem" href="/projects">Projects</a>
-                    <a class="account-dropdown-item nav-extra" role="menuitem" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">GitHub ↗</a>
-                    <hr class="account-dropdown-sep nav-extra">
+                    {# Account-management links first. #}
                     <a class="account-dropdown-item" role="menuitem" href="/account">Account</a>
                     <a class="account-dropdown-item" role="menuitem" href="/images">Images</a>
                     <a class="account-dropdown-item" role="menuitem" href="/links">Short Links</a>
                     <a class="account-dropdown-item" role="menuitem" href="/percy/dashboard">Dashboard</a>
                     <hr class="account-dropdown-sep">
+                    {# Status / Terminal group. The site links (Projects, GitHub) are
+                       surfaced inside the dropdown on mobile only (`.nav-extra`).
+                       GitHub is index-only: index.html fills the block below, every
+                       other page leaves it empty. #}
                     <a class="account-dropdown-item" role="menuitem" href="/status">Status</a>
                     <a class="account-dropdown-item" role="menuitem" href="/terminal">Terminal</a>
+                    <a class="account-dropdown-item nav-extra" role="menuitem" href="/projects">Projects</a>
+                    {% block nav_account_github %}{% endblock %}
                     <hr class="account-dropdown-sep">
                     <a class="account-dropdown-item account-dropdown-logout" role="menuitem" href="/logout">Log out</a>
                 </div>
@@ -88,7 +91,8 @@
                 </button>
                 <div class="account-dropdown" role="menu">
                     <a class="account-dropdown-item" role="menuitem" href="/projects">Projects</a>
-                    <a class="account-dropdown-item" role="menuitem" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">GitHub ↗</a>
+                    {# GitHub is index-only: index.html fills this block. #}
+                    {% block nav_menu_github %}{% endblock %}
                     <a class="account-dropdown-item" role="menuitem" href="/percy/dashboard">Dashboard</a>
                     <hr class="account-dropdown-sep">
                     <a class="account-dropdown-item" role="menuitem" href="/login">Login</a>
