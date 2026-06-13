@@ -273,40 +273,81 @@ if (document.readyState === 'loading') {
     __setupTableLabels();
 }
 
-/* ── Account menu (header dropdown) ──────────────────────────────────────
-   The account name in the main nav is an expandable button rather than a
-   link; clicking it reveals a small menu of site pages. Closes on outside
-   click or Escape. */
+/* ── Nav dropdowns (header) ───────────────────────────────────────────────
+   The account button (and, for logged-out visitors, the "Menu" button) in the
+   main nav are expandable triggers rather than links; clicking one reveals a
+   small menu of site pages. Closes on outside click or Escape. */
 function __setupAccountMenu() {
-    const menu = document.getElementById('account-menu');
-    if (!menu) return;
-    const trigger = menu.querySelector('.account-trigger');
-    if (!trigger || menu.dataset.menuReady) return;
-    menu.dataset.menuReady = '1';
+    const menus = document.querySelectorAll('.account-menu');
+    if (!menus.length) return;
 
-    const setOpen = (open) => {
-        menu.classList.toggle('open', open);
-        trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menus.forEach((menu) => {
+        const trigger = menu.querySelector('.account-trigger');
+        if (!trigger || menu.dataset.menuReady) return;
+        menu.dataset.menuReady = '1';
+
+        const setOpen = (open) => {
+            menu.classList.toggle('open', open);
+            trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        };
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setOpen(!menu.classList.contains('open'));
+        });
+        document.addEventListener('click', (e) => {
+            if (!menu.contains(e.target)) setOpen(false);
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') setOpen(false);
+        });
+    });
+}
+
+/* ── Compact nav ──────────────────────────────────────────────────────────
+   When the nav's items can't fit on one line (e.g. branding + Percy section
+   badge crowd out the account name), collapse the account button to just its
+   avatar. We measure by clearing the flag, then re-checking overflow. */
+function __setupNavCompact() {
+    const nav = document.querySelector('nav.main-navigation');
+    if (!nav) return;
+
+    const apply = () => {
+        nav.classList.remove('nav-compact');
+        if (nav.scrollWidth > nav.clientWidth + 1) {
+            nav.classList.add('nav-compact');
+        }
     };
 
-    trigger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        setOpen(!menu.classList.contains('open'));
-    });
-    document.addEventListener('click', (e) => {
-        if (!menu.contains(e.target)) setOpen(false);
-    });
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') setOpen(false);
-    });
+    apply();
+
+    // Wire the resize/observer listeners only once — `__setupNav` re-runs on
+    // bfcache `pageshow`, but the measurement above already re-checks.
+    if (nav.dataset.compactReady) return;
+    nav.dataset.compactReady = '1';
+
+    let raf = 0;
+    const schedule = () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(apply);
+    };
+    window.addEventListener('resize', schedule);
+    window.addEventListener('load', schedule);
+    if (window.ResizeObserver) {
+        new ResizeObserver(schedule).observe(nav);
+    }
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', __setupAccountMenu);
-} else {
+function __setupNav() {
     __setupAccountMenu();
+    __setupNavCompact();
 }
-window.addEventListener('pageshow', __setupAccountMenu);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', __setupNav);
+} else {
+    __setupNav();
+}
+window.addEventListener('pageshow', __setupNav);
 // Re-run on bfcache restores (back/forward / "soft reload") since
 // DOMContentLoaded does not fire when the page is resurrected.
 window.addEventListener('pageshow', __setupTableLabels);

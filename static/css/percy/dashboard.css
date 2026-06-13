@@ -411,12 +411,17 @@ main.grid-item:has(.dashboard-shell) {
 
 .guild-grid {
     display: grid;
+    /* minmax(0, 1fr) caps the track at the container width — without the 0
+       minimum the implicit `auto` track expands to the (nowrap) guild name's
+       full width, overflowing the viewport on mobile instead of truncating. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.75rem;
 }
 
 .guild-card {
     display: flex;
     align-items: center;
+    min-width: 0;
     gap: 1rem;
     padding: 1rem 1.25rem;
     border-radius: 0.625rem;

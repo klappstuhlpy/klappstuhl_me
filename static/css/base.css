@@ -684,111 +684,32 @@ a.nav-item.active { font-weight: bold; }
     border-top: 1px solid var(--box-border);
 }
 
-/* In the mobile drawer the menu expands inline instead of floating, so it
-   doesn't overflow the narrow side panel. */
-@media (max-width: 480px) {
-    .account-menu { width: 100%; }
-    .account-trigger {
-        width: 100%;
-        justify-content: flex-start;
-        padding: 0.4rem 0.5rem;
-    }
-    .account-caret { margin-left: auto; }
-    .account-dropdown {
-        position: static;
-        min-width: 0;
-        margin-top: 0.35rem;
-        padding: 0.25rem 0 0.25rem 0.75rem;
-        background: transparent;
-        border: none;
-        border-left: 1px solid var(--box-border);
-        border-radius: 0;
-        box-shadow: none;
-    }
-}
+/* ── Mobile nav (no hamburger) ───────────────────────────────────────────
+   On mobile the inline site links (`.not-mobile`) are hidden; the account
+   dropdown carries them instead via `.nav-extra` items, and logged-out users
+   get a small `#nav-menu` dropdown beside the Login button. The dropdown
+   itself keeps the same floating style as desktop. */
 
-/* Hamburger */
-#hamburger-toggle {
-    opacity: 0;
-    width: 2rem;
-    height: 1rem;
-}
+/* Site links that only appear inside the dropdown on mobile. Higher
+   specificity than `.account-dropdown-item` so it wins regardless of order. */
+.account-dropdown-item.nav-extra,
+.account-dropdown-sep.nav-extra { display: none; }
 
-#hamburger-toggle:checked + .hamburger-menu > span { transform: rotate(45deg); }
-
-#hamburger-toggle:checked + .hamburger-menu > span::before {
-    top: 0;
-    transform: rotate(0deg);
-}
-
-#hamburger-toggle:checked + .hamburger-menu > span::after {
-    top: 0;
-    transform: rotate(90deg);
-}
-
-.nav-item:has(#hamburger-toggle:checked) ~ .hamburger-menu-container {
-    right: 0 !important;
-}
-
-.hamburger-menu {
-    position: absolute;
-    /* Offset by the status-bar inset so the icon clears the notch / clock
-       when launched as a home-screen PWA (black-translucent status bar). */
-    top: calc(29px + env(safe-area-inset-top));
-    right: 1rem;
-    width: 26px;
-    height: 26px;
-    cursor: pointer;
-    /* Sit above page content (homepage hero z-index:1, gallery select
-       pill z-index:2) so the toggle stays tappable over either. */
-    z-index: 1001;
-}
-
-#hamburger-toggle:checked + .hamburger-menu { position: fixed; }
-
-.hamburger-menu > span,
-.hamburger-menu > span::before,
-.hamburger-menu > span::after {
-    display: block;
-    position: absolute;
-    width: 100%;
-    height: 2px;
-    background-color: var(--nav-link);
-    transition-duration: .25s;
-}
-
-.hamburger-menu > span::before { content: ''; top: -8px; }
-.hamburger-menu > span::after  { content: ''; top: 8px; }
-
-.hamburger-menu-container { display: contents; }
+/* Logged-out menu dropdown: mobile-only (ID specificity beats `.account-menu`). */
+#nav-menu { display: none; }
 
 @media (max-width: 480px) {
-    .hamburger-menu-container {
-        display: flex;
-        position: fixed;
-        top: 0;
-        right: -100%;
-        width: 50%;
-        height: 100%;
-        margin: 0;
-        /* Pad the top by the status-bar inset so the first link clears the
-           clock / battery when running as a standalone PWA. */
-        padding: calc(60px + env(safe-area-inset-top)) 0 60px;
-        background-color: var(--background);
-        box-shadow: 2px 2px 6px rgba(0, 0, 0, .4);
-        transition-duration: .25s;
-        /* Above all in-page content so the drawer is fully opaque — the
-           homepage hero and gallery select pills must not bleed through. */
-        z-index: 1000;
-        flex-direction: column;
-    }
-
-    .hamburger-menu-container > .nav-item { margin-left: 0.5rem; }
-
-    .hamburger-menu-container > .nav-item.account + hr { order: -1; margin: 0.25rem; }
-
-    .hamburger-menu-container > .nav-item.account { order: -1; }
+    .account-dropdown-item.nav-extra { display: block; }
+    .account-dropdown-sep.nav-extra { display: block; }
+    #nav-menu { display: inline-flex; }
 }
+
+/* Compact trigger: when the nav can't fit the account name (e.g. branding +
+   Percy badge crowd it out), JS adds `.nav-compact` and we collapse the
+   account button to just the avatar. The logged-out "Menu" label stays. */
+.nav-compact .account-trigger-name,
+.nav-compact #account-menu .account-caret { display: none; }
+.nav-compact #account-menu .account-trigger { gap: 0; padding: 0.2rem; }
 
 @media (min-width: 480px) {
     .nav-item.branding { margin-left: 1rem; }

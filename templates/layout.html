@@ -43,43 +43,59 @@
             {# Section indicator: child templates fill this to show which area
                of the site you're in (e.g. the Percy badge). Visual only. #}
             {% block nav_section %}{% endblock %}
-            <div class="nav-item mobile-only">
-                <input id="hamburger-toggle" type="checkbox" aria-label="Open menu"/>
-                <label class="hamburger-menu" aria-hidden="true" for="hamburger-toggle"><span></span></label>
-            </div>
-            <div class="hamburger-menu-container">
-                {% block index_nav %}
-                <a class="nav-item" href="/projects">Projects</a>
-                {% endblock %}
-                <span class="not-mobile nav-item spacer"></span>
-                {% match account %}
-                {% when Some with (account) %}
-                <div class="nav-item account account-menu" id="account-menu">
-                    <button type="button" class="account-trigger" aria-haspopup="true" aria-expanded="false">
-                        {% if account.has_discord() %}
-                        <img class="account-avatar" src="/account/discord/avatar" alt="" width="24" height="24" loading="lazy">
-                        {% endif %}
-                        <span class="account-trigger-name">{{ account.name }}</span>
-                        <span class="account-caret" aria-hidden="true"></span>
-                    </button>
-                    <div class="account-dropdown" role="menu">
-                        <a class="account-dropdown-item" role="menuitem" href="/account">Account</a>
-                        <a class="account-dropdown-item" role="menuitem" href="/images">Images</a>
-                        <a class="account-dropdown-item" role="menuitem" href="/links">Short Links</a>
-                        <a class="account-dropdown-item" role="menuitem" href="/percy/dashboard">Dashboard</a>
-                        <hr class="account-dropdown-sep">
-                        <a class="account-dropdown-item" role="menuitem" href="/status">Status</a>
-                        <a class="account-dropdown-item" role="menuitem" href="/terminal">Terminal</a>
-                        <hr class="account-dropdown-sep">
-                        <a class="account-dropdown-item account-dropdown-logout" role="menuitem" href="/logout">Log out</a>
-                    </div>
+            {# Inline site links — desktop only. On mobile they move into the
+               account / menu dropdown (see the `.nav-extra` items below). #}
+            {% block index_nav %}
+            <a class="nav-item not-mobile" href="/projects">Projects</a>
+            {% endblock %}
+            <span class="nav-item spacer"></span>
+            {% match account %}
+            {% when Some with (account) %}
+            <div class="nav-item account account-menu" id="account-menu">
+                <button type="button" class="account-trigger" aria-haspopup="true" aria-expanded="false">
+                    {% if account.has_discord() %}
+                    <img class="account-avatar" src="/account/discord/avatar" alt="" width="24" height="24" loading="lazy">
+                    {% else %}
+                    <img class="account-avatar" src="/static/img/avatar_placeholder.svg" alt="" width="24" height="24">
+                    {% endif %}
+                    <span class="account-trigger-name">{{ account.name }}</span>
+                    <span class="account-caret" aria-hidden="true"></span>
+                </button>
+                <div class="account-dropdown" role="menu">
+                    {# Site links — surfaced inside the dropdown on mobile only. #}
+                    <a class="account-dropdown-item nav-extra" role="menuitem" href="/projects">Projects</a>
+                    <a class="account-dropdown-item nav-extra" role="menuitem" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">GitHub ↗</a>
+                    <hr class="account-dropdown-sep nav-extra">
+                    <a class="account-dropdown-item" role="menuitem" href="/account">Account</a>
+                    <a class="account-dropdown-item" role="menuitem" href="/images">Images</a>
+                    <a class="account-dropdown-item" role="menuitem" href="/links">Short Links</a>
+                    <a class="account-dropdown-item" role="menuitem" href="/percy/dashboard">Dashboard</a>
+                    <hr class="account-dropdown-sep">
+                    <a class="account-dropdown-item" role="menuitem" href="/status">Status</a>
+                    <a class="account-dropdown-item" role="menuitem" href="/terminal">Terminal</a>
+                    <hr class="account-dropdown-sep">
+                    <a class="account-dropdown-item account-dropdown-logout" role="menuitem" href="/logout">Log out</a>
                 </div>
-                {% when None %}
-                <a class="nav-item" href="/percy/dashboard">Dashboard</a>
-                <a class="nav-item account" href="/login">Login</a>
-                {% endmatch %}
-                <hr class="mobile-only">
             </div>
+            {% when None %}
+            <a class="nav-item not-mobile" href="/percy/dashboard">Dashboard</a>
+            {# Logged-out: a compact menu dropdown carrying the site links on
+               mobile (where the inline links are hidden), including the Login button #}
+            <div class="nav-item account-menu" id="nav-menu">
+                <button type="button" class="account-trigger nav-menu-trigger" aria-haspopup="true" aria-expanded="false" aria-label="Menu">
+                    <span class="nav-menu-label">Menu</span>
+                    <span class="account-caret" aria-hidden="true"></span>
+                </button>
+                <div class="account-dropdown" role="menu">
+                    <a class="account-dropdown-item" role="menuitem" href="/projects">Projects</a>
+                    <a class="account-dropdown-item" role="menuitem" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">GitHub ↗</a>
+                    <a class="account-dropdown-item" role="menuitem" href="/percy/dashboard">Dashboard</a>
+                    <hr class="account-dropdown-sep">
+                    <a class="account-dropdown-item" role="menuitem" href="/login">Login</a>
+                </div>
+            </div>
+            <a class="nav-item account not-mobile" href="/login">Login</a>
+            {% endmatch %}
         </nav>
     </header>
     {% block sidebar %}{% endblock %}
