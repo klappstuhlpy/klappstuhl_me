@@ -67,8 +67,23 @@ webpki-roots = "0.26"
 
 [profile.release]
 # This is an I/O-bound web app (SQLite, HTTP, subprocess shelling), so it has no
-# hot compute kernel that benefits from maximal cross-function inlining. Raising
-# codegen-units lets rustc parallelise codegen into more units, speeding up
-# compilation for a negligible runtime cost here. opt-level stays at the default
-# 3 and LTO stays off (enabling it would make build times much worse).
+# hot compute kernel that needs aggressive optimisation. The whole app is a
+# single binary crate, so any source/template change recompiles all of it — and
+# `opt-level = 3` on that much code is what dominates the build (~110s). So:
+#   • opt-level = 1 on our own crate: basic opts, far faster codegen, negligible
+#     runtime cost for glue code. Dependencies stay at 3 (see the override below).
+#   • incremental = true: release builds skip incremental compilation by default;
+#     with target/ persisted via the Docker cache mount, turning it on means a
+#     small change recompiles only the affected codegen units, not the whole crate.
+#   • codegen-units = 256: parallelise codegen across more units.
+# LTO stays off (enabling it would make build times much worse).
+opt-level = 1
+incremental = true
 codegen-units = 256
+
+# Dependencies rarely change and are cached, so optimise them fully. This keeps
+# their fingerprint identical to the previous default-release build, so applying
+# this profile does NOT trigger a one-off recompile of the whole dependency tree
+# — only our own crate rebuilds.
+[profile.release.package."*"]
+opt-level = 3
