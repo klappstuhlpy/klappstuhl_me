@@ -16,6 +16,7 @@ mod docker;
 mod firewall;
 mod health;
 mod image;
+mod links;
 mod logs;
 mod metrics;
 mod proxy;
@@ -71,6 +72,7 @@ pub fn all() -> Router<AppState> {
         .merge(discord_oauth::routes())
         .merge(dashboard::routes())
         .merge(image::routes())
+        .merge(links::routes())
         .merge(admin::routes())
         .merge(audit::routes())
         .merge(metrics::routes())
@@ -90,6 +92,8 @@ pub fn all() -> Router<AppState> {
         .merge(terminal::routes())
         .merge(ws::routes())
         .nest("/api", api::routes())
+        // Resolves bare `r.<domain>/<code>` short links; 404s everything else.
+        .fallback(links::short_link_fallback)
 }
 
 #[cfg(test)]

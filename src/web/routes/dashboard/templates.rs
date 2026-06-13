@@ -52,6 +52,18 @@ pub(crate) struct PercyLandingTemplate {
     pub(crate) flashes: Flashes,
 }
 
+/// A public Percy legal document (Privacy Policy / Terms of Service). `content`
+/// is pre-rendered, trusted HTML produced from the canonical GitHub markdown.
+#[allow(dead_code)]
+#[derive(Template)]
+#[template(path = "percy/legal.html")]
+pub(crate) struct PercyLegalTemplate {
+    pub(crate) account: Option<Account>,
+    pub(crate) flashes: Flashes,
+    pub(crate) title: &'static str,
+    pub(crate) content: String,
+}
+
 #[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "percy/guild_not_found.html")]

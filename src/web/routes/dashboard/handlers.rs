@@ -2,7 +2,7 @@
 
 use axum::{
     extract::{Path, Query, State},
-    http::HeaderMap,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
     Form, Json,
 };
@@ -18,9 +18,56 @@ use crate::{
 
 use super::templates::*;
 use super::{
-    build_general_invite_url, build_invite_url, cached_channels, cached_roles, check_guild_access, get_discord_id,
-    get_percy_client, json_or_flash,
+    build_general_invite_url, build_invite_url, cached_channels, cached_legal_doc, cached_roles, check_guild_access,
+    get_discord_id, get_percy_client, json_or_flash,
 };
+
+/// Canonical sources for Percy's public legal docs, fetched live and rendered.
+const PRIVACY_POLICY_URL: &str = "https://raw.githubusercontent.com/klappstuhlpy/Percy/master/PRIVACY_POLICY.md";
+const TERMS_OF_SERVICE_URL: &str = "https://raw.githubusercontent.com/klappstuhlpy/Percy/master/TERMS_OF_SERVICE.md";
+
+/// `GET /percy/privacy-policy` — Percy's Privacy Policy.
+pub(super) async fn percy_privacy(
+    State(state): State<AppState>,
+    account: Option<Account>,
+    flashes: Flashes,
+) -> Response {
+    render_legal_doc(&state, account, flashes, "Privacy Policy", PRIVACY_POLICY_URL).await
+}
+
+/// `GET /percy/terms-of-service` — Percy's Terms of Service.
+pub(super) async fn percy_terms(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
+    render_legal_doc(&state, account, flashes, "Terms of Service", TERMS_OF_SERVICE_URL).await
+}
+
+/// Shared rendering for the public legal pages: fetch (cached) the canonical
+/// markdown, render to HTML, and wrap it in the site layout. A fetch failure
+/// surfaces as 502 — by design there is no embedded fallback copy.
+async fn render_legal_doc(
+    state: &AppState,
+    account: Option<Account>,
+    flashes: Flashes,
+    title: &'static str,
+    url: &'static str,
+) -> Response {
+    match cached_legal_doc(state, url).await {
+        Ok(content) => PercyLegalTemplate {
+            account,
+            flashes,
+            title,
+            content: (*content).clone(),
+        }
+        .into_response(),
+        Err(e) => {
+            tracing::warn!(error = %e, url, "failed to fetch Percy legal doc");
+            (
+                StatusCode::BAD_GATEWAY,
+                "Could not load this document right now. Please try again shortly.",
+            )
+                .into_response()
+        }
+    }
+}
 
 pub(super) async fn guild_list(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
     // Logged-out visitors get a welcome/landing page that introduces the bot

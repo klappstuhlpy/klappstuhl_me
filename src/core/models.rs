@@ -178,6 +178,49 @@ impl Table for ImageEntry {
     }
 }
 
+/// A user-created short link, served from the `r.` subdomain
+/// (`r.<domain>/<code>` → `target_url`).
+#[derive(Debug, Clone, Serialize)]
+pub struct ShortLink {
+    /// Auto-increment primary key.
+    pub id: i64,
+    /// The short code / custom alias that appears in the URL (unique).
+    pub code: String,
+    /// The destination the short link redirects to.
+    pub target_url: String,
+    /// Owner account id.
+    pub account_id: i64,
+    /// Number of times the link has been resolved.
+    pub clicks: i64,
+    /// When the link was created.
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+    /// When the link was last edited.
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: OffsetDateTime,
+}
+
+impl Table for ShortLink {
+    const NAME: &'static str = "short_link";
+
+    const COLUMNS: &'static [&'static str] =
+        &["id", "code", "target_url", "account_id", "clicks", "created_at", "updated_at"];
+
+    type Id = i64;
+
+    fn from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            id: row.get("id")?,
+            code: row.get("code")?,
+            target_url: row.get("target_url")?,
+            account_id: row.get("account_id")?,
+            clicks: row.get("clicks")?,
+            created_at: row.get("created_at")?,
+            updated_at: row.get("updated_at")?,
+        })
+    }
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, ToSchema)]
 pub struct ResolvedImageData {
     /// encoded image bytes

@@ -1,0 +1,99 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/links.css" type="text/css">
+<meta property="og:url" content="{{ crate::CONFIG.get().unwrap().canonical_url() }}/links">
+{% endblock %}
+
+{% block title %}Your Short Links | Klappstuhl.me{% endblock %}
+
+{% block body %}
+
+{%- for flash in flashes -%}
+{{ flash.html()|safe }}
+{%- endfor -%}
+
+<div class="links-head">
+    <h1>Your Short Links</h1>
+    {% if is_admin %}
+    <span class="links-quota">Unlimited (admin)</span>
+    {% else %}
+    <span class="links-quota">{{ links.len() }} / {{ limit }} used</span>
+    {% endif %}
+</div>
+
+<form class="link-create" method="POST" action="/links" autocomplete="off">
+    <div class="link-create-field link-create-target">
+        <label for="create-target">Destination URL</label>
+        <input type="text" id="create-target" name="target_url" inputmode="url"
+               placeholder="https://example.com/some/long/path" required>
+    </div>
+    <div class="link-create-field link-create-alias">
+        <label for="create-alias">Custom alias <span class="muted">(optional)</span></label>
+        <div class="alias-input">
+            <span class="alias-prefix">{{ short_host }}/</span>
+            <input type="text" id="create-alias" name="code" placeholder="auto"
+                   pattern="[A-Za-z0-9_-]+" maxlength="64" spellcheck="false">
+        </div>
+    </div>
+    <button type="submit" class="button primary">Create</button>
+</form>
+
+{% if links.is_empty() %}
+<p class="links-empty">No short links yet. Create one above — it'll be reachable at
+    <code>{{ short_host }}/&lt;code&gt;</code>.</p>
+{% else %}
+<div class="links-table">
+    <div class="links-row links-row-head">
+        <span>Short link</span>
+        <span>Destination</span>
+        <span class="links-clicks">Clicks</span>
+        <span>Created</span>
+        <span class="links-actions-head">Actions</span>
+    </div>
+    {% for link in links %}
+    <div class="links-row" data-id="{{ link.id }}" data-code="{{ link.code|e }}" data-target="{{ link.target_url|e }}">
+        <span class="links-short">
+            <a href="{{ link.short_url }}" target="_blank" rel="noopener" class="links-short-url">{{ short_host }}/{{ link.code|e }}</a>
+            <button type="button" class="link-copy" data-url="{{ link.short_url }}" title="Copy short link" aria-label="Copy short link">⧉</button>
+        </span>
+        <a href="{{ link.target_url|e }}" target="_blank" rel="noopener" class="links-target" title="{{ link.target_url|e }}">{{ link.target_url|e }}</a>
+        <span class="links-clicks">{{ link.clicks }}</span>
+        <span class="links-created"><time class="js-ts" datetime="{{ link.created_at|isoformat }}">{{ link.created_at|isoformat }}</time></span>
+        <span class="links-actions">
+            <button type="button" class="button small link-edit">Edit</button>
+            <form method="POST" action="/links/{{ link.id }}/delete" class="link-delete-form">
+                <button type="submit" class="button small danger link-delete">Delete</button>
+            </form>
+        </span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<dialog id="edit-link-modal">
+    <form method="POST" id="edit-link-form" autocomplete="off">
+        <h1>Edit short link</h1>
+        <div class="link-create-field">
+            <label for="edit-target">Destination URL</label>
+            <input type="text" id="edit-target" name="target_url" inputmode="url" required>
+        </div>
+        <div class="link-create-field">
+            <label for="edit-alias">Alias</label>
+            <div class="alias-input">
+                <span class="alias-prefix">{{ short_host }}/</span>
+                <input type="text" id="edit-alias" name="code" pattern="[A-Za-z0-9_-]+" maxlength="64" spellcheck="false" required>
+            </div>
+        </div>
+        <footer>
+            <button type="submit" class="button primary">Save</button>
+            <button type="button" class="button" id="edit-cancel" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/links.js"></script>
+{% endblock %}

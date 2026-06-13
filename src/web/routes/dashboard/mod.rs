@@ -118,6 +118,58 @@ pub(super) async fn cached_channels(percy: &PercyClient, guild_id: u64) -> Resul
     Ok(channels)
 }
 
+/// How long a fetched-and-rendered legal doc stays cached. The docs change only
+/// when the canonical GitHub repo does, so a long TTL spares a network round-trip
+/// per view while still picking up edits without a redeploy.
+const LEGAL_DOC_TTL: Duration = Duration::from_secs(3600);
+
+/// `raw GitHub url -> (fetched_at, rendered HTML)`.
+fn legal_doc_cache() -> &'static Cache<&'static str, Timed<Arc<String>>> {
+    static CACHE: OnceLock<Cache<&'static str, Timed<Arc<String>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Cache::new(8))
+}
+
+/// Fetches a markdown document from `url`, renders it to HTML, and caches the
+/// result for [`LEGAL_DOC_TTL`]. There is intentionally no local fallback — the
+/// page reflects the live source of truth, so a fetch failure surfaces as an
+/// error to the caller rather than serving a stale embedded copy.
+pub(super) async fn cached_legal_doc(state: &AppState, url: &'static str) -> Result<Arc<String>, reqwest::Error> {
+    if let Some((ts, html)) = legal_doc_cache().get(&url) {
+        if ts.elapsed() < LEGAL_DOC_TTL {
+            return Ok(html);
+        }
+    }
+    let markdown = state
+        .client
+        .get(url)
+        .timeout(Duration::from_secs(8))
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await?;
+
+    let html = Arc::new(render_markdown(&markdown));
+    legal_doc_cache().insert(url, (Instant::now(), html.clone()));
+    Ok(html)
+}
+
+/// Renders CommonMark (plus tables, strikethrough, task-lists, footnotes) to
+/// HTML. The input is a trusted document from our own repo, so embedded raw
+/// HTML is passed through.
+fn render_markdown(markdown: &str) -> String {
+    use pulldown_cmark::{html, Options, Parser};
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
+    options.insert(Options::ENABLE_FOOTNOTES);
+    let parser = Parser::new_ext(markdown, options);
+    let mut out = String::new();
+    html::push_html(&mut out, parser);
+    out
+}
+
 async fn check_guild_access(percy: &PercyClient, discord_id: &str, guild_id: u64) -> bool {
     let guild_id_str = guild_id.to_string();
 
@@ -193,6 +245,9 @@ pub fn routes() -> Router<AppState> {
             "/percy",
             get(|| async { axum::response::Redirect::to("/percy/dashboard") }),
         )
+        // Public legal docs, rendered live from the canonical GitHub repo.
+        .route("/percy/privacy-policy", get(percy_privacy))
+        .route("/percy/terms-of-service", get(percy_terms))
         .route("/percy/dashboard", get(guild_list))
         .route("/percy/dashboard/guild/:guild_id", get(guild_detail))
         .route("/percy/dashboard/guild/:guild_id/config", post(guild_config_update))

@@ -1,0 +1,247 @@
+/* URL-shortener management page (/links). */
+
+.links-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.links-quota {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+/* --- Create form --------------------------------------------------------- */
+.link-create {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin: 1.25rem 0 2rem;
+    padding: 1rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 8px;
+}
+
+.link-create-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.link-create-field label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.link-create-field .muted {
+    opacity: 0.7;
+}
+
+.link-create-target {
+    flex: 1 1 320px;
+}
+
+.link-create-target input {
+    width: 100%;
+}
+
+.link-create input[type="text"] {
+    background: var(--form-input-background);
+    border: 1px solid var(--form-input-border);
+    border-radius: 6px;
+    color: var(--foreground);
+    padding: 0.5rem 0.6rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.link-create input[type="text"]:focus {
+    outline: none;
+    border-color: var(--form-input-focus-border);
+}
+
+/* Alias input with a host prefix. */
+.alias-input {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--form-input-border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--form-input-background);
+}
+
+.alias-input:focus-within {
+    border-color: var(--form-input-focus-border);
+}
+
+.alias-prefix {
+    display: flex;
+    align-items: center;
+    padding: 0 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    background: var(--box-shade);
+    border-right: 1px solid var(--form-input-border);
+    white-space: nowrap;
+}
+
+.alias-input input {
+    border: none !important;
+    background: transparent !important;
+    flex: 1 1 8rem;
+    min-width: 6rem;
+}
+
+/* --- Table --------------------------------------------------------------- */
+.links-empty {
+    color: var(--text-muted);
+}
+
+.links-table {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--box-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.links-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.4fr) minmax(180px, 2fr) 70px 130px 150px;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--box-border);
+}
+
+.links-row:last-child {
+    border-bottom: none;
+}
+
+.links-row-head {
+    background: var(--box-shade);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.links-short {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.links-short-url {
+    color: var(--link-text);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.links-short-url:hover {
+    color: var(--link-hover-text);
+    text-decoration: underline;
+}
+
+.link-copy {
+    background: none;
+    border: 1px solid var(--box-border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.85rem;
+    line-height: 1;
+    flex: 0 0 auto;
+}
+
+.link-copy:hover {
+    color: var(--foreground);
+    border-color: var(--box-border-light);
+}
+
+.link-copy.copied {
+    color: var(--success-text);
+    border-color: var(--success-border);
+}
+
+.links-target {
+    color: var(--text-muted);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.links-target:hover {
+    color: var(--foreground);
+    text-decoration: underline;
+}
+
+.links-clicks {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.links-created {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.links-actions,
+.links-actions-head {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.links-actions .link-delete-form {
+    margin: 0;
+}
+
+.button.small {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+/* --- Edit modal ---------------------------------------------------------- */
+#edit-link-modal .link-create-field {
+    margin-bottom: 1rem;
+}
+
+#edit-link-modal input[type="text"] {
+    width: 100%;
+    background: var(--form-input-background);
+    border: 1px solid var(--form-input-border);
+    border-radius: 6px;
+    color: var(--foreground);
+    padding: 0.5rem 0.6rem;
+    font-family: inherit;
+}
+
+#edit-link-modal .alias-input input {
+    width: auto;
+}
+
+@media (max-width: 720px) {
+    .links-row {
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: auto;
+    }
+
+    .links-row-head {
+        display: none;
+    }
+
+    .links-created {
+        display: none;
+    }
+}

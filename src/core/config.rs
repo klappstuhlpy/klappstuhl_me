@@ -592,6 +592,31 @@ impl Config {
         base.push_str(&url.into());
         base
     }
+
+    /// The host short links are served from. In production this is the `r.`
+    /// subdomain of the primary domain (e.g. `r.klappstuhl.me`); in dev there is
+    /// no resolvable subdomain, so it falls back to the local `localhost:<port>`.
+    /// Used to recognise inbound short-link requests by their `Host` header.
+    pub fn short_domain(&self) -> String {
+        let domain = self.domains.first().map(|x| x.as_str()).unwrap_or("localhost");
+        if !self.production || domain == "localhost" {
+            format!("localhost:{}", self.server.port)
+        } else {
+            format!("r.{domain}")
+        }
+    }
+
+    /// The public URL for the short link `code`. Pretty `https://r.<domain>/<code>`
+    /// in production; the path-based `http://localhost:<port>/r/<code>` in dev,
+    /// where a real `r.` subdomain can't resolve locally.
+    pub fn short_link_url(&self, code: &str) -> String {
+        let domain = self.domains.first().map(|x| x.as_str()).unwrap_or("localhost");
+        if !self.production || domain == "localhost" {
+            format!("http://localhost:{}/r/{code}", self.server.port)
+        } else {
+            format!("https://r.{domain}/{code}")
+        }
+    }
 }
 
 /// One-time, in-memory migration from the old flat config keys to the grouped
