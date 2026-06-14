@@ -197,7 +197,7 @@ impl PercyClient {
         .await
     }
 
-    /// Fetch an aggregated member profile (identity, leveling, moderation history, notes).
+    /// Fetch an aggregated member profile (identity, leveling, moderation history).
     pub async fn get_member_detail(&self, guild_id: u64, user_id: &str) -> Result<MemberDetail, PercyError> {
         self.send_into(
             self.client

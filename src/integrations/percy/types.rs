@@ -339,8 +339,6 @@ pub struct MemberDetail {
     pub case_count: u32,
     #[serde(default)]
     pub warning_count: u32,
-    #[serde(default)]
-    pub note_count: u32,
     // Extended user info
     pub top_role: Option<String>,
     #[serde(default)]
