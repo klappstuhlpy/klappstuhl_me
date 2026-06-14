@@ -70,6 +70,94 @@
     --link-hover-text: #eec3b1;
 }
 
+/* ── Light theme ─────────────────────────────────────────────────
+   Dark is the default (the `:root` tokens above). The light theme only
+   re-maps the colour tokens; every component reads them, so the whole UI
+   flips. The coral brand accent is kept; the dark neutrals are inverted to
+   warm off-whites and the semantic / form / button colours get light-mode
+   variants so text stays legible on a pale background. Set on <html> by the
+   inline theme-init script in layout.html and toggled in base.js. */
+[data-theme="light"] {
+    /* Core */
+    --foreground: #1f1e1d;
+    --background: #f7f6f3;
+    --header: #fffefb;
+    --text-muted: #6b6a66;
+
+    /* Brand — coral stays; the "bright" emphasis tone darkens for contrast. */
+    --branding: #d97757;
+    --branding-bright: #b8542f;
+    --branding-dim: color-mix(in srgb, var(--branding) 16%, transparent);
+
+    /* Terminal / TUI chrome */
+    --tui-border: #d8d4cc;
+    --tui-bg: #f0eee9;
+    --cursor: #d97757;
+    --prompt: #15803d;
+
+    /* Semantic colours */
+    --success-text: #166534;
+    --success-bg:   #dcfce7;
+    --success-border: #86efac;
+    --info-text:    #075985;
+    --info-bg:      #e0f2fe;
+    --info-border:  #7dd3fc;
+    --error-text:   #b91c1c;
+    --error-bg:     #fee2e2;
+    --error-border: #fca5a5;
+    --warning-text: #92400e;
+    --warning-bg:   #fef3c7;
+    --warning-border: #fde68a;
+
+    /* Surfaces */
+    --box:        #efede8;
+    --box-shade:  #e6e3dc;
+    --box-border: #ddd9d1;
+    --box-border-light: #57534e;
+
+    /* Forms */
+    --form-input-background:    #ffffff;
+    --form-input-border:        #d6d2ca;
+    --form-input-focus-border:  #d97757;
+    --form-input-error-border:  #ef4444;
+
+    /* Navigation */
+    --nav-link:       #57534e;
+    --nav-link-hover: #1f1e1d;
+
+    /* Buttons — primary/danger keep white text; the neutral default button
+       darkens to a warm grey so its white label stays readable on light. */
+    --button-text:          #fafafa;
+    --default-button-rgb:   87,83,78;
+    --primary-button-rgb:   217,119,87;
+    --danger-button-rgb:    185,28,28;
+
+    /* Close button */
+    --close-button-bg:       rgba(0,0,0,.06);
+    --close-button-text:     #1f1e1d;
+    --close-button-bg-hover: rgba(0,0,0,.12);
+
+    /* Links */
+    --link-text:       #bf5e3c;
+    --link-hover-text: #a04a2c;
+}
+
+/* While a theme switch is in flight, base.js adds `.theme-transition` to
+   <html> so colour-bearing properties cross-fade instead of snapping. It's
+   removed once the fade completes, so it never interferes with normal hover
+   transitions. The `.theme-icon` rule below opts the toggle's sun/moon back
+   into their own transform animation (the blanket rule would clobber it). */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+    transition: background-color 400ms ease, color 400ms ease, border-color 400ms ease,
+                fill 400ms ease, stroke 400ms ease, box-shadow 400ms ease !important;
+}
+html.theme-transition .theme-icon {
+    transition: opacity 400ms ease, transform 500ms cubic-bezier(.4, 0, .2, 1) !important;
+}
+
 /* ── Reset / base ────────────────────────────────────────────── */
 
 html { height: 100%; }
@@ -359,6 +447,25 @@ input[type="checkbox"]:checked::after {
     font-size: 0.75rem;
 }
 
+/* Outline buttons in light mode. The base `.button` colour is `--button-text`
+   (white), which is meant for filled buttons; on a transparent outline button
+   over a pale page that's white-on-white. Give them readable dark / intent
+   text at rest, and white again on hover when the button fills with colour.
+   Primary outline buttons keep their coral text (set elsewhere), so they're
+   excluded here; danger outline gets its own red text below. */
+[data-theme="light"] .button.outline:not(.primary):not(.danger) {
+    color: var(--foreground);
+}
+[data-theme="light"] .button.outline:not(.primary):not(.danger):hover:not(:disabled) {
+    color: var(--button-text);
+}
+[data-theme="light"] .button.danger.outline {
+    color: rgb(var(--danger-button-rgb));
+}
+[data-theme="light"] .button.danger.outline:hover:not(:disabled) {
+    color: var(--button-text);
+}
+
 /* ── Tables ──────────────────────────────────────────────────── */
 
 table {
@@ -574,6 +681,62 @@ nav.main-navigation .branding {
 }
 
 .nav-section-glyph { font-size: 0.7em; }
+
+/* ── Theme toggle (sun / moon) ───────────────────────────────────────────
+   A single icon button in the nav. The sun and moon are stacked in a fixed
+   box; only one is visible per theme and they cross-fade with a rotate+scale
+   so clicking smoothly morphs one into the other. */
+/* Selectors are scoped under `nav.main-navigation` to match the specificity of
+   the base `.nav-item` rule (the button also carries `.nav-item` for layout),
+   so these colour/border/hover styles win. */
+nav.main-navigation .theme-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    padding: 0;
+    color: var(--nav-link);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+nav.main-navigation .theme-toggle:hover {
+    color: var(--nav-link-hover);
+    background: var(--box);
+    border-color: var(--box-border);
+}
+
+.theme-toggle-track {
+    position: relative;
+    width: 1.15rem;
+    height: 1.15rem;
+}
+
+.theme-icon {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: opacity 400ms ease, transform 500ms cubic-bezier(.4, 0, .2, 1);
+}
+
+/* Default (dark): the moon is shown, the sun is tucked away. */
+.theme-icon-sun  { opacity: 0; transform: rotate(-90deg) scale(.4); }
+.theme-icon-moon { opacity: 1; transform: rotate(0)      scale(1); }
+
+/* Light: swap them. */
+[data-theme="light"] .theme-icon-sun  { opacity: 1; transform: rotate(0)     scale(1); }
+[data-theme="light"] .theme-icon-moon { opacity: 0; transform: rotate(90deg) scale(.4); }
 
 .nav-item.spacer { margin-right: auto !important; }
 

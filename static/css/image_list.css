@@ -270,6 +270,23 @@ h1 {
     box-shadow: none;
 }
 
+/* Light mode: the pill is hardcoded near-black, which leaves the dark
+   `--foreground` label invisible. Flip it to a translucent light pill with a
+   dark border so the (now-dark) label and checkbox read clearly. The checked
+   state already uses the coral fill + white text, so it needs no override. */
+[data-theme="light"] .file-bulk {
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(0, 0, 0, 0.12);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+[data-theme="light"] .file-bulk:hover {
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(0, 0, 0, 0.2);
+}
+[data-theme="light"] .file-bulk input[type="checkbox"]:hover {
+    background-color: rgba(0, 0, 0, 0.06);
+}
+
 .file-bulk input[type="checkbox"]:checked::after {
     top: 1px;
     left: 1px;
@@ -364,9 +381,12 @@ h1 {
     color: var(--text-muted);
 }
 .upload-expiry-select {
-    background: var(--box-bg, #18181b);
-    color: var(--text, #e4e4e7);
-    border: 1px solid var(--box-border, #27272a);
+    /* `--box-bg` / `--text` are not defined tokens, so this used to fall back
+       to the hardcoded dark literals and stayed dark in light mode. Use the
+       real tokens so it follows the theme. */
+    background: var(--box);
+    color: var(--foreground);
+    border: 1px solid var(--box-border);
     border-radius: 6px;
     padding: 0.35rem 0.5rem;
     font-size: 0.85rem;

@@ -338,9 +338,50 @@ function __setupNavCompact() {
     }
 }
 
+/* ── Colour theme toggle ──────────────────────────────────────────────────
+   The initial theme is applied pre-paint by the inline script in layout.html.
+   Here we wire the nav toggle: flip the theme, persist it, update the browser
+   chrome meta tags, and briefly add `.theme-transition` so the page cross-fades
+   between palettes instead of snapping. */
+let __themeTransitionTimer = 0;
+
+function __applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    const tc = document.querySelector('meta[name="theme-color"]');
+    if (tc) tc.setAttribute('content', theme === 'light' ? '#f7f6f3' : '#09090b');
+    const cs = document.querySelector('meta[name="color-scheme"]');
+    if (cs) cs.setAttribute('content', theme === 'light' ? 'light' : 'dark');
+}
+
+function __setupThemeToggle() {
+    const toggle = document.getElementById('theme-toggle');
+    if (!toggle) return;
+
+    const reflect = () => {
+        const isLight = document.documentElement.dataset.theme === 'light';
+        toggle.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+    };
+    reflect();
+
+    if (toggle.dataset.themeReady) return;
+    toggle.dataset.themeReady = '1';
+
+    toggle.addEventListener('click', () => {
+        const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+        const root = document.documentElement;
+        root.classList.add('theme-transition');
+        __applyTheme(next);
+        try { localStorage.setItem('theme', next); } catch (e) { /* private mode */ }
+        reflect();
+        clearTimeout(__themeTransitionTimer);
+        __themeTransitionTimer = setTimeout(() => root.classList.remove('theme-transition'), 450);
+    });
+}
+
 function __setupNav() {
     __setupAccountMenu();
     __setupNavCompact();
+    __setupThemeToggle();
 }
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', __setupNav);

@@ -13,7 +13,7 @@
     padding: 0 1.25rem;
 }
 .legal-doc-head {
-    border-bottom: 1px solid var(--border, #2a2a2a);
+    border-bottom: 1px solid var(--box-border);
     padding-bottom: 1rem;
     margin-bottom: 2rem;
 }
@@ -30,7 +30,9 @@
 }
 .legal-body {
     line-height: 1.75;
-    color: var(--text, #e6e6e6);
+    /* `--text` is not a defined token, so this fell back to the hardcoded
+       light-grey literal and was unreadable on the light background. */
+    color: var(--foreground);
 }
 .legal-body h1,
 .legal-body h2,
@@ -43,7 +45,7 @@
 .legal-body h2 {
     font-size: 1.3rem;
     padding-bottom: 0.3rem;
-    border-bottom: 1px solid var(--border, #2a2a2a);
+    border-bottom: 1px solid var(--box-border);
 }
 .legal-body h3 { font-size: 1.1rem; }
 .legal-body p,
@@ -59,15 +61,15 @@
 }
 .legal-body a:hover { opacity: 0.85; }
 .legal-body code {
-    background: var(--surface, #1a1a1a);
-    border: 1px solid var(--border, #2a2a2a);
+    background: var(--box);
+    border: 1px solid var(--box-border);
     border-radius: 4px;
     padding: 0.1rem 0.35rem;
     font-size: 0.9em;
 }
 .legal-body pre {
-    background: var(--surface, #1a1a1a);
-    border: 1px solid var(--border, #2a2a2a);
+    background: var(--box);
+    border: 1px solid var(--box-border);
     border-radius: 6px;
     padding: 1rem;
     overflow-x: auto;
@@ -86,13 +88,13 @@
 }
 .legal-body th,
 .legal-body td {
-    border: 1px solid var(--border, #2a2a2a);
+    border: 1px solid var(--box-border);
     padding: 0.5rem 0.75rem;
     text-align: left;
 }
 .legal-body hr {
     border: none;
-    border-top: 3px solid var(--border, #2a2a2a);
+    border-top: 3px solid var(--box-border);
     margin: 2rem 0;
 }
 </style>

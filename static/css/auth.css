@@ -159,7 +159,12 @@
     width: 0.875rem;
     height: 0.875rem;
     border-radius: 50%;
-    background: var(--foreground);
+    /* Always a light thumb (the dark track / coral fill provides contrast).
+       Using a fixed white + shadow keeps it visible in light mode, where
+       `--foreground` would make the dot dark. The shadow is imperceptible on
+       the dark track, so dark mode is unchanged. */
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
     transition: left 0.2s;
 }
 
@@ -215,7 +220,10 @@
 
 /* ── Discord login / signup button ───────────────────────────── */
 
-.login-discord {
+/* `a.` qualifier (and explicit hover colour) so the white text beats the
+   global `a:not(.button)` link colour, which would otherwise tint it (and is
+   barely readable on the Discord blue in light mode). */
+a.login-discord {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -232,7 +240,8 @@
     transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.login-discord:hover {
+a.login-discord:hover {
+    color: #fff;
     background: #4752c4;
     transform: translateY(-1px);
     box-shadow: 0 8px 22px -8px rgba(88, 101, 242, 0.8);

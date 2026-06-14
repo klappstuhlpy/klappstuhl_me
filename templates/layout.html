@@ -11,6 +11,26 @@
     <meta name="theme-color" content="#09090b">
     <meta name="color-scheme" content="dark">
 
+    {# Apply the saved colour theme before first paint to avoid a flash of the
+       wrong theme. Falls back to the OS preference, then dark. base.js handles
+       the toggle button; this only needs to set the initial state. #}
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem("theme");
+                var theme = stored
+                    || (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+                document.documentElement.dataset.theme = theme;
+                var tc = document.querySelector('meta[name="theme-color"]');
+                if (tc) tc.setAttribute("content", theme === "light" ? "#f7f6f3" : "#09090b");
+                var cs = document.querySelector('meta[name="color-scheme"]');
+                if (cs) cs.setAttribute("content", theme === "light" ? "light" : "dark");
+            } catch (e) {
+                document.documentElement.dataset.theme = "dark";
+            }
+        })();
+    </script>
+
     {# iOS standalone-mode hints — without these Safari opens links from
        the home-screen icon in regular Safari instead of the PWA shell. #}
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -49,6 +69,25 @@
             <a class="nav-item not-mobile" href="/projects">Projects</a>
             {% endblock %}
             <span class="nav-item spacer"></span>
+            {# Colour-theme toggle: the sun and moon cross-fade when clicked. #}
+            <button type="button" class="theme-toggle nav-item" id="theme-toggle" aria-label="Toggle colour theme" title="Toggle light / dark theme">
+                <span class="theme-toggle-track" aria-hidden="true">
+                    <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" focusable="false">
+                        <circle cx="12" cy="12" r="4.5"></circle>
+                        <line x1="12" y1="1.5" x2="12" y2="4"></line>
+                        <line x1="12" y1="20" x2="12" y2="22.5"></line>
+                        <line x1="1.5" y1="12" x2="4" y2="12"></line>
+                        <line x1="20" y1="12" x2="22.5" y2="12"></line>
+                        <line x1="4.2" y1="4.2" x2="6" y2="6"></line>
+                        <line x1="18" y1="18" x2="19.8" y2="19.8"></line>
+                        <line x1="4.2" y1="19.8" x2="6" y2="18"></line>
+                        <line x1="18" y1="6" x2="19.8" y2="4.2"></line>
+                    </svg>
+                    <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" focusable="false">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </span>
+            </button>
             {% match account %}
             {% when Some with (account) %}
             <div class="nav-item account account-menu" id="account-menu">
