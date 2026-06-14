@@ -449,30 +449,24 @@
     <div class="config-tab-panel" id="tab-gatekeeper" role="tabpanel" hidden>
 
         <section class="config-section">
-            <h2>Gatekeeper Settings</h2>
-            <p class="config-section-description">Captcha-based verification system for new members joining the server.</p>
+            <h2>Entrance Protection</h2>
+            <p class="config-section-description">Captcha-gated verification that holds new members until they prove they're human.</p>
 
             <div class="gk-info">
-                <p>Gatekeeper automatically assigns a role to a member when they join, for the sole purpose of
-                    blocking them from accessing the server. The user must press a button to verify themselves and
-                    have that role removed.</p>
-                <p class="gk-info-heading">To set up gatekeeper, a few things are required:</p>
-                <ul>
-                    <li>A <strong>channel</strong> that locked users will see but regular users will not.</li>
-                    <li>A <strong>role</strong> that is assigned when users join.</li>
-                    <li>A <strong>message</strong> that the bot sends in the channel with the verify button.</li>
-                </ul>
-                <p class="gk-info-heading">Optional settings:</p>
-                <ul>
-                    <li>A role that is assigned when users finish verification (<strong>Starter Role</strong>).</li>
-                </ul>
-                <p class="gk-info-heading">There are also settings to help configure some aspects of it:</p>
-                <ul>
-                    <li><strong>Auto (Rate Limit)</strong> automatically triggers the gatekeeper if N members join within a span of M seconds.</li>
-                    <li><strong>Bypass Action</strong> configures what action is taken when a user talks or joins voice before verifying.</li>
-                </ul>
-                <p class="gk-info-note">Note that once gatekeeper is enabled — even automatically — it must be manually disabled.</p>
-                <p class="gk-info-discord"><span class="gk-info-icon">&#9432;</span> Users verify by solving an image captcha consisting of 6 random letters they need to type into the chat.</p>
+                <p class="gk-info-heading">How it works</p>
+                <p>When a member joins, they're immediately assigned a <strong>lockdown role</strong> that hides every channel except a designated <strong>verification channel</strong>. Inside that channel a captcha button awaits — solving it removes the role and grants full access.</p>
+
+                <p class="gk-info-heading">Prerequisites</p>
+                <ol>
+                    <li><strong>Verification Channel</strong> — visible only to held members.</li>
+                    <li><strong>Lockdown Role</strong> — strips channel access on assignment.</li>
+                    <li><strong>Captcha Message</strong> — the embed with the solve button, deployed to the channel.</li>
+                </ol>
+
+                <p class="gk-info-heading">Enforcement</p>
+                <p>If a held member attempts to speak or join voice before verifying, the configured <strong>bypass action</strong> (kick or ban) fires immediately. The <strong>auto-trigger</strong> threshold activates gatekeeper automatically when join velocity spikes — once engaged, only a moderator can stand it down.</p>
+
+                <p class="gk-info-discord"><span class="gk-info-icon">&#9432;</span> Captchas are 6-character alphanumeric images. Members type their answer directly in chat within 90 seconds.</p>
             </div>
 
             {% match gatekeeper %}
@@ -480,12 +474,12 @@
             {% match gk.started_at %}
             {% when Some with (ts) %}
             <div class="gatekeeper-status active">
-                <span>Active since <time class="js-ts" datetime="{{ ts }}">{{ ts }}</time></span>
-                <span class="badge">{{ gk.member_count }} pending</span>
+                <span>Engaged since <time class="js-ts" datetime="{{ ts }}">{{ ts }}</time></span>
+                <span class="badge">{{ gk.member_count }} held</span>
             </div>
             {% when None %}
             <div class="gatekeeper-status inactive">
-                <span>Inactive</span>
+                <span>Standing by</span>
             </div>
             {% endmatch %}
             <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/gatekeeper">
@@ -497,9 +491,9 @@
                             Verification Channel
                             {% if guild.flags.gatekeeper && gk.needs_setup && gk.channel.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
                         </label>
-                        <span class="config-description">Where captcha challenges are posted (Changing this resends the Verification Message!)</span>
+                        <span class="config-description">The isolated channel held members are funneled into. Changing this re-deploys the captcha message.</span>
                         <select name="channel_id" id="gk_channel" class="config-select" data-initial="{% match gk.channel %}{% when Some with (ref) %}{{ ref.id }}{% when None %}{% endmatch %}">
-                            <option value="">Not set</option>
+                            <option value="">Select channel...</option>
                             {% for ch in channels %}
                             <option value="{{ ch.id }}" {% match gk.channel %}{% when Some with (ref) %}{% if ref.id == ch.id %}selected{% endif %}{% when None %}{% endmatch %}>
                                 #{{ ch.name }}
@@ -509,12 +503,12 @@
                     </div>
                     <div class="config-field">
                         <label class="config-label" for="gk_role">
-                            Gatekeeper Role
+                            Lockdown Role
                             {% if guild.flags.gatekeeper && gk.needs_setup && gk.role.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
                         </label>
-                        <span class="config-description">Assigned to unverified members on join</span>
+                        <span class="config-description">Auto-assigned on join to strip channel visibility until captcha is solved.</span>
                         <select name="role_id" id="gk_role" class="config-select">
-                            <option value="">Not set</option>
+                            <option value="">Select role...</option>
                             {% for role in roles %}
                             <option value="{{ role.id }}" {% match gk.role %}{% when Some with (ref) %}{% if ref.id == role.id %}selected{% endif %}{% when None %}{% endmatch %}>
                                 @{{ role.name }}
@@ -524,22 +518,22 @@
                     </div>
                     <div class="config-field">
                         <label class="config-label" for="gk_message_status">
-                            Verification Message
+                            Captcha Message
                             {% if guild.flags.gatekeeper && gk.needs_setup && gk.message.is_none() %}<span class="gk-required-tag">REQUIRED</span>{% endif %}
                         </label>
-                        <span class="config-description">Embed sent to the channel with the verify button (set by selecting a channel)</span>
+                        <span class="config-description">The verification embed posted in the channel with the solve button.</span>
                         {% match gk.message %}
                         {% when Some with (_msg_id) %}
-                        <span class="gk-message-status sent">Sent</span>
+                        <span class="gk-message-status sent">Deployed</span>
                         {% when None %}
-                        <span class="gk-message-status not-sent">Not sent — select a channel above to configure</span>
+                        <span class="gk-message-status not-sent">Awaiting deployment — select a channel first</span>
                         {% endmatch %}
                     </div>
                     <div class="config-field">
-                        <label class="config-label" for="gk_starter_role">Starter Role (post-verify)</label>
-                        <span class="config-description">Role granted after successful verification</span>
+                        <label class="config-label" for="gk_starter_role">Post-Verification Role</label>
+                        <span class="config-description">Optional role granted once a member successfully verifies.</span>
                         <select name="starter_role_id" id="gk_starter_role" class="config-select">
-                            <option value="">Not set</option>
+                            <option value="">None</option>
                             {% for role in roles %}
                             <option value="{{ role.id }}" {% match gk.starter_role %}{% when Some with (ref) %}{% if ref.id == role.id %}selected{% endif %}{% when None %}{% endmatch %}>
                                 @{{ role.name }}
@@ -549,16 +543,16 @@
                     </div>
                     <div class="config-field">
                         <label class="config-label" for="gk_bypass">Bypass Action</label>
-                        <span class="config-description">Action taken if verification is bypassed</span>
+                        <span class="config-description">What happens when an unverified member speaks or joins voice.</span>
                         <select name="bypass_action" id="gk_bypass" class="config-select">
-                            <option value="ban" {% if gk.bypass_action == "ban" %}selected{% endif %}>Ban</option>
-                            <option value="kick" {% if gk.bypass_action == "kick" %}selected{% endif %}>Kick</option>
+                            <option value="ban" {% if gk.bypass_action == "ban" %}selected{% endif %}>Ban immediately</option>
+                            <option value="kick" {% if gk.bypass_action == "kick" %}selected{% endif %}>Kick immediately</option>
                         </select>
                     </div>
                     <div class="config-field">
-                        <label class="config-label" for="gk_rate">Rate Limit</label>
+                        <label class="config-label" for="gk_rate">Auto-Trigger Threshold</label>
                         <span class="config-description">
-                            Auto-trigger threshold (joins/seconds, e.g. 5/10)
+                            Activate gatekeeper when join velocity exceeds this rate (format: joins/seconds).
                         </span>
                         <input
                                 type="text"
@@ -568,39 +562,39 @@
                                 placeholder="5/10"
                                 value="{{ gk.rate.as_deref().unwrap_or("") }}"
                         pattern="^\d+\/\d+$"
-                        title="Please enter a value in the format number/number, e.g. 5/10"
+                        title="Format: number/number (e.g. 5/10 means 5 joins within 10 seconds)"
                         required
                         >
                     </div>
                 </div>
                 <div class="config-actions">
-                    <button type="button" class="button small cancel-btn">Cancel</button>
-                    <button type="submit" class="button primary small">Save Changes</button>
+                    <button type="button" class="button small cancel-btn">Discard</button>
+                    <button type="submit" class="button primary small">Apply Changes</button>
                 </div>
             </form>
             {% when None %}
-            <p class="text-muted">Gatekeeper has not been configured for this server. Enable the Gatekeeper flag and use the bot's <code>/moderation gatekeeper setup</code> command to initialize it.</p>
+            <p class="text-muted">Gatekeeper is not initialized for this server. Enable the flag in General Settings and run <code>/moderation gatekeeper</code> in Discord to begin setup.</p>
             {% endmatch %}
         </section>
     </div>
     </div>
 </div>
 
-<!-- Gatekeeper Starter Message Modal -->
+<!-- Gatekeeper Captcha Message Modal -->
 <div class="modal-overlay" id="gk-message-modal" hidden>
     <div class="modal-card">
-        <h3>Starter Message</h3>
-        <p>Configure the verification embed that will be sent to the selected channel.</p>
+        <h3>Deploy Captcha Message</h3>
+        <p>Customize the verification embed that will be posted in the verification channel. Members see this embed with a "Begin Verification" button.</p>
         <div class="modal-form">
-            <label class="config-label" for="gk_modal_title">Title</label>
-            <input type="text" id="gk_modal_title" class="config-input" maxlength="256" value="Verification Required">
-            <label class="config-label" for="gk_modal_content">Content</label>
-            <textarea id="gk_modal_content" class="config-input resize-v" rows="4" maxlength="2000">This server requires verification in order to continue participating.
-**Press the button below to verify your account.**</textarea>
+            <label class="config-label" for="gk_modal_title">Embed Title</label>
+            <input type="text" id="gk_modal_title" class="config-input" maxlength="256" value="Identity Verification">
+            <label class="config-label" for="gk_modal_content">Embed Body</label>
+            <textarea id="gk_modal_content" class="config-input resize-v" rows="4" maxlength="2000">To access this server you must complete a quick verification.
+**Tap the button below to begin.**</textarea>
         </div>
         <div class="modal-actions">
             <button type="button" class="button small" id="gk-modal-cancel">Cancel</button>
-            <button type="button" class="button primary small" id="gk-modal-confirm">Send Message</button>
+            <button type="button" class="button primary small" id="gk-modal-confirm">Deploy</button>
         </div>
     </div>
 </div>
