@@ -11,7 +11,7 @@ use crate::{database::is_unique_constraint_violation, filters, AppState};
 use askama::Template;
 use axum::extract::multipart::Field;
 use axum::extract::Multipart;
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::routing::{delete, get, post};
 use axum::{
     extract::{Path, State},
@@ -643,6 +643,7 @@ struct ImageTemplate {
 async fn get_image_page(
     State(state): State<AppState>,
     Path(image_id): Path<String>,
+    headers: HeaderMap,
     account: Option<Account>,
     flashes: Flashes,
 ) -> Result<Response, InternalError> {
@@ -666,6 +667,18 @@ async fn get_image_page(
     let provided_ext = image_id.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
     if provided_ext.as_deref() != Some(canonical_ext.as_str()) {
         return Ok(Redirect::permanent(&format!("/gallery/{}.{}", id, canonical_ext)).into_response());
+    }
+
+    // Content negotiation: programs, `<img>` tags, and `curl` that don't ask
+    // for `text/html` get the raw image bytes straight from this canonical URL,
+    // so the same link doubles as a direct image source — no `/raw/` prefix
+    // needed. Browsers (which send `Accept: text/html,…` on navigation) fall
+    // through to the landing page below. The explicit `/gallery/raw/:id` route
+    // remains as an always-raw escape hatch. View counts stay page-only so
+    // hotlinks don't inflate them.
+    let accept = headers.get(header::ACCEPT).and_then(|v| v.to_str().ok());
+    if !wants_html_page(accept) {
+        return Ok(raw_image_response(entry));
     }
 
     let page_url = canonical_url(format!("/gallery/{}.{}", id, canonical_ext)).unwrap_or_default();
@@ -730,15 +743,44 @@ async fn get_image_raw(State(state): State<AppState>, Path(image_id): Path<Strin
         return Ok(Redirect::permanent(&format!("/gallery/raw/{}.{}", id, canonical_ext)).into_response());
     }
 
-    let mime = entry.mimetype.clone();
-    Ok((
+    Ok(raw_image_response(entry))
+}
+
+/// Builds the raw-bytes response for an image: the correct `Content-Type` plus
+/// an inline `Content-Disposition` that names the download after the uploader's
+/// original filename. Shared by the explicit `/gallery/raw/:id` route and the
+/// content-negotiated `/gallery/:id` route.
+fn raw_image_response(entry: ImageEntry) -> Response {
+    (
         [
-            (header::CONTENT_TYPE, mime),
+            (header::CONTENT_TYPE, entry.mimetype.clone()),
             (header::CONTENT_DISPOSITION, inline_disposition(&entry.download_name())),
         ],
         entry.image_data,
     )
-        .into_response())
+        .into_response()
+}
+
+/// Decides whether a request for `/gallery/:id` wants the HTML landing page or
+/// the raw image bytes, based on the `Accept` header. Browsers navigating to
+/// the URL send `Accept: text/html,…`; `<img>` tags, `curl`, and other programs
+/// send `image/*`, `*/*`, or no `Accept` at all. We serve the page only when
+/// the client explicitly accepts `text/html` with non-zero `q`, so the same
+/// canonical URL doubles as a direct hotlink for everything else.
+fn wants_html_page(accept: Option<&str>) -> bool {
+    let Some(accept) = accept else { return false };
+    accept.split(',').any(|part| {
+        let mut segments = part.split(';').map(str::trim);
+        if segments.next().map(str::to_ascii_lowercase).as_deref() != Some("text/html") {
+            return false;
+        }
+        // Respect an explicit `q=0` (RFC 7231: "not acceptable").
+        !segments.any(|p| {
+            p.strip_prefix("q=")
+                .and_then(|q| q.trim().parse::<f32>().ok())
+                .is_some_and(|q| q <= 0.0)
+        })
+    })
 }
 
 /// Builds a `Content-Disposition: inline` value that names the download after
@@ -919,5 +961,21 @@ mod tests {
         assert!(value.contains("filename=\"na_ve_caf_.png\""));
         // Extended field keeps the bytes via percent-encoding.
         assert!(value.contains("filename*=UTF-8''na%C3%AFve%E2%80%94caf%C3%A9.png"));
+    }
+
+    #[test]
+    fn wants_html_page_distinguishes_browsers_from_programs() {
+        // Browser top-level navigation → serve the landing page.
+        assert!(wants_html_page(Some(
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+        )));
+        // `<img>` tags, fetch(), curl, and headerless clients → raw bytes.
+        assert!(!wants_html_page(Some("image/avif,image/webp,image/apng,*/*;q=0.8")));
+        assert!(!wants_html_page(Some("*/*")));
+        assert!(!wants_html_page(None));
+        // An explicit `q=0` on text/html means "not acceptable" → raw bytes.
+        assert!(!wants_html_page(Some("text/html;q=0, */*")));
+        // Case/whitespace insensitivity around the media type and params.
+        assert!(wants_html_page(Some("  TEXT/HTML ;q=0.9 ")));
     }
 }

@@ -741,10 +741,15 @@ mod tests {
         let result = conn
             .transaction(|_tx| -> rusqlite::Result<()> { panic!("boom inside transaction") })
             .await;
-        assert!(result.is_err(), "panicking transaction should yield Err, got {result:?}");
+        assert!(
+            result.is_err(),
+            "panicking transaction should yield Err, got {result:?}"
+        );
 
         // And the pool is still usable afterwards.
-        conn.execute_batch("CREATE TABLE t(x);").await.expect("pool still works");
+        conn.execute_batch("CREATE TABLE t(x);")
+            .await
+            .expect("pool still works");
     }
 
     #[test]

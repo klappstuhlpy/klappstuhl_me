@@ -308,8 +308,7 @@ impl RequestLogger {
                             }
                             last_insert = Instant::now();
                         }
-                        if let Err(e) = connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;")
-                        {
+                        if let Err(e) = connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;") {
                             tracing::warn!(error = %e, "requests.db maintenance failed");
                         }
                     }
