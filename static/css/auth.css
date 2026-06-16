@@ -385,6 +385,7 @@ a.login-discord:hover {
 
 /* Wraps the input + reveal button as a single rounded control */
 .api-key-field {
+    position: relative;
     display: flex;
     align-items: stretch;
     border: 1px solid var(--box-border);
@@ -411,6 +412,38 @@ a.login-discord:hover {
        dots without using -webkit-text-security (which is non-standard). */
     letter-spacing: 0.05em;
     min-width: 0;
+    /* The field copies on click rather than being editable. */
+    cursor: pointer;
+    transition: filter 0.25s ease, opacity 0.25s ease;
+}
+
+/* While the "Copied" badge is showing, blur the token underneath it. */
+.api-key-field.copied .api-key-input {
+    filter: blur(4px);
+    opacity: 0.5;
+}
+
+/* "Copied" overlay — fades + un-blurs in, then back out. */
+.api-key-copied {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--branding);
+    pointer-events: none;
+    opacity: 0;
+    filter: blur(6px);
+    transition: opacity 0.25s ease, filter 0.25s ease;
+}
+
+.api-key-field.copied .api-key-copied {
+    opacity: 1;
+    filter: blur(0);
 }
 
 .api-key-input[type="password"] {

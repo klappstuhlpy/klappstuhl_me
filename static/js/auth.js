@@ -78,18 +78,26 @@ document.getElementById('api-key-reveal')?.addEventListener('click', (e) => {
   }
 });
 
-document.getElementById('copy-api-key')?.addEventListener('click', async (e) => {
+/* Copy the token and flash the blur/fade "Copied" overlay on the field. */
+let apiKeyCopiedTimer = null;
+async function copyApiKey() {
   const input = document.getElementById('api-key');
   // .value because the API key now lives in an <input>, not a <code> node.
   const key = input ? input.value : '';
   if (!key) return;
   await navigator.clipboard.writeText(key);
-  e.target.textContent = 'Done';
-  e.target.disabled = true;
-  await sleep(500);
-  e.target.textContent = 'Copy';
-  e.target.disabled = false;
-});
+  const field = input.closest('.api-key-field');
+  if (field) {
+    field.classList.add('copied');
+    clearTimeout(apiKeyCopiedTimer);
+    apiKeyCopiedTimer = setTimeout(() => field.classList.remove('copied'), 1200);
+  }
+}
+
+// The input itself acts as a copy button (readonly, cursor: pointer).
+document.getElementById('api-key')?.addEventListener('click', copyApiKey);
+
+document.getElementById('copy-api-key')?.addEventListener('click', copyApiKey);
 
 document.querySelector('#api-section button[type=submit][name="new"]')?.addEventListener('click', async (e) => {
   e.preventDefault();

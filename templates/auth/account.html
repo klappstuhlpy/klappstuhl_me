@@ -70,10 +70,12 @@
         {% when Some with (api) %}
         <div class="api-key-row">
             <div class="api-key-field">
-                <input type="password" id="api-key" class="api-key-input" readonly value="{{ api }}" autocomplete="off" spellcheck="false">
+                <input type="password" id="api-key" class="api-key-input" readonly value="{{ api }}" autocomplete="off" spellcheck="false" title="Click to copy"
+                    name="api-key-readonly" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other">
                 <button type="button" class="api-key-toggle" id="api-key-reveal" aria-label="Show or hide API key" title="Show / hide">
                     <img src="/static/img/visibility.svg" alt="" width="20" height="20">
                 </button>
+                <span class="api-key-copied" id="api-key-copied" aria-hidden="true">Copied</span>
             </div>
         </div>
         <p class="api-key-hint">Treat this token like a password. Anyone with it can act as you via the API.</p>
