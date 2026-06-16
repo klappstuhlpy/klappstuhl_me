@@ -10,6 +10,7 @@ use std::{
 
 use axum::{extract::Request, http::HeaderMap, response::Response};
 use crossbeam_channel::Sender;
+use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 use tracing::{event, Level};
@@ -85,43 +86,83 @@ fn is_ipv6_ula(addr: Ipv6Addr) -> bool {
     (addr.segments()[0] & 0xfe00) == 0xfc00
 }
 
-const REQUEST_LOGGING_QUERY: &str = r#"
-CREATE TABLE IF NOT EXISTS request (
-    id INTEGER PRIMARY KEY,
-    ts INTEGER NOT NULL,
-    status_code INTEGER NOT NULL,
-    path TEXT NOT NULL,
-    route TEXT,
-    user_id INTEGER,
-    user_agent TEXT,
-    referrer TEXT,
-    latency REAL,
-    ip TEXT,
-    bad_reason TEXT
-);
+/// Schema migrations for `requests.db`, run through the shared migration runner in
+/// `crate::migrations` (same tracking table, checksums and integrity checking as
+/// `main.db`). Versions must stay contiguous from 0.
+///
+/// * `0` — the base request log (the schema before the security dashboard).
+/// * `1` — the `ip` / `bad_reason` columns and their indexes.
+const REQUESTS_MIGRATIONS: [crate::migrations::EmbeddedMigration; 2] = [
+    crate::migrations::EmbeddedMigration {
+        version: 0,
+        sql: "CREATE TABLE IF NOT EXISTS request (
+                  id INTEGER PRIMARY KEY,
+                  ts INTEGER NOT NULL,
+                  status_code INTEGER NOT NULL,
+                  path TEXT NOT NULL,
+                  route TEXT,
+                  user_id INTEGER,
+                  user_agent TEXT,
+                  referrer TEXT,
+                  latency REAL
+              );
+              CREATE INDEX IF NOT EXISTS request_status_code_idx ON request(status_code);
+              CREATE INDEX IF NOT EXISTS request_ts_idx ON request(ts);
+              CREATE INDEX IF NOT EXISTS request_user_id_idx ON request(user_id);
+              CREATE INDEX IF NOT EXISTS request_referrer_idx ON request(referrer);
+              CREATE INDEX IF NOT EXISTS request_path_idx ON request(path);
+              CREATE INDEX IF NOT EXISTS request_route_idx ON request(route);",
+    },
+    crate::migrations::EmbeddedMigration {
+        version: 1,
+        sql: "ALTER TABLE request ADD COLUMN ip TEXT;
+              ALTER TABLE request ADD COLUMN bad_reason TEXT;
+              CREATE INDEX IF NOT EXISTS request_ip_idx ON request(ip);
+              CREATE INDEX IF NOT EXISTS request_bad_reason_idx ON request(bad_reason);",
+    },
+];
 
-CREATE INDEX IF NOT EXISTS request_status_code_idx ON request(status_code);
-CREATE INDEX IF NOT EXISTS request_ts_idx ON request(ts);
-CREATE INDEX IF NOT EXISTS request_user_id_idx ON request(user_id);
-CREATE INDEX IF NOT EXISTS request_referrer_idx ON request(referrer);
-CREATE INDEX IF NOT EXISTS request_path_idx ON request(path);
-CREATE INDEX IF NOT EXISTS request_route_idx ON request(route);
-CREATE INDEX IF NOT EXISTS request_ip_idx ON request(ip);
-CREATE INDEX IF NOT EXISTS request_bad_reason_idx ON request(bad_reason);
-"#;
+/// Brings a pre-migration-runner `requests.db` under version control without
+/// re-running schema it already has.
+///
+/// These databases predate any version tracking, so they sit at `user_version = 0`
+/// while their `request` table may already be at migration 0 (base) or 1 (with the
+/// `ip` / `bad_reason` columns). Recreating or `ALTER`-ing that schema would fail or
+/// no-op incorrectly, so we instead detect how far the table progressed and set
+/// `user_version` to the matching baseline. The migration runner then *adopts* those
+/// versions (recording their checksums) and applies only what's genuinely missing.
+fn bootstrap_legacy_requests_db(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+    let current: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    if current != 0 {
+        return Ok(()); // already tracked by the migration runner
+    }
 
-/// Adds the `ip` and `bad_reason` columns to existing databases that pre-date
-/// the security dashboard.  SQLite doesn't support `ADD COLUMN IF NOT EXISTS`,
-/// so we try-and-ignore: the error returned for "duplicate column name" is
-/// what we want to silently swallow, anything else propagates.
-fn migrate_request_log_schema(conn: &rusqlite::Connection) {
-    let _ = conn.execute("ALTER TABLE request ADD COLUMN ip TEXT", []);
-    let _ = conn.execute("ALTER TABLE request ADD COLUMN bad_reason TEXT", []);
-    let _ = conn.execute("CREATE INDEX IF NOT EXISTS request_ip_idx ON request(ip)", []);
-    let _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS request_bad_reason_idx ON request(bad_reason)",
-        [],
-    );
+    let table_exists = conn
+        .query_row(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'request'",
+            [],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if !table_exists {
+        return Ok(()); // fresh database — let the runner build it from scratch
+    }
+
+    // Legacy table present but untracked: figure out which columns it already has.
+    let (mut has_ip, mut has_bad_reason) = (false, false);
+    let mut stmt = conn.prepare("PRAGMA table_info(request)")?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        match row.get::<_, String>(1)?.as_str() {
+            "ip" => has_ip = true,
+            "bad_reason" => has_bad_reason = true,
+            _ => {}
+        }
+    }
+
+    let baseline = if has_ip && has_bad_reason { 2 } else { 1 };
+    conn.execute_batch(&format!("PRAGMA user_version = {baseline};"))
 }
 
 ///A request log entry
@@ -153,10 +194,8 @@ pub struct RequestLogEntry {
 
 impl RequestLogEntry {
     fn from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
-        // Use `column_index` lookups instead of `row.get("col")?` so existing
-        // databases without the new ip / bad_reason columns still deserialise.
-        let ip: Option<String> = row.get::<_, Option<String>>("ip").unwrap_or(None);
-        let bad_reason: Option<String> = row.get::<_, Option<String>>("bad_reason").unwrap_or(None);
+        // The `ip` / `bad_reason` columns are guaranteed by migration 1, and every
+        // caller selects `*`, so plain name lookups are safe.
         Ok(Self {
             id: row.get("id")?,
             ts: row.get("ts")?,
@@ -167,8 +206,8 @@ impl RequestLogEntry {
             user_agent: row.get("user_agent")?,
             referrer: row.get("referrer")?,
             latency: row.get("latency")?,
-            ip,
-            bad_reason,
+            ip: row.get("ip")?,
+            bad_reason: row.get("bad_reason")?,
         })
     }
 }
@@ -176,6 +215,7 @@ impl RequestLogEntry {
 enum RequestMessage {
     Log(RequestLogEntry),
     Query(Box<dyn FnOnce(&mut rusqlite::Connection) + Send + 'static>),
+    Maintain,
     Clean,
     Quit,
 }
@@ -241,10 +281,12 @@ impl RequestLogger {
         path.set_file_name("requests.db");
 
         let mut connection = rusqlite::Connection::open(path)?;
+        connection.busy_timeout(Duration::from_secs(5))?;
         connection.execute_batch("PRAGMA journal_mode=WAL;")?;
-        connection.execute_batch(REQUEST_LOGGING_QUERY)?;
-        // Bring databases created before the security dashboard up to date.
-        migrate_request_log_schema(&connection);
+        // Adopt any pre-versioning database, then run the schema through the shared
+        // migration runner (checksummed, integrity-checked — same as main.db).
+        bootstrap_legacy_requests_db(&connection)?;
+        crate::migrations::run(&mut connection, &REQUESTS_MIGRATIONS, "schema_migrations")?;
 
         std::thread::spawn(move || {
             // This set up is so it can be bulk-inserted somewhat efficiently
@@ -256,6 +298,19 @@ impl RequestLogger {
                     RequestMessage::Clean => {
                         if let Err(e) = clean_request_logs(&mut connection) {
                             tracing::error!(error = %e, "error when cleaning request logs");
+                        }
+                    }
+                    RequestMessage::Maintain => {
+                        // Flush buffered inserts first so the checkpoint reclaims their WAL pages.
+                        if !buffer.is_empty() {
+                            if let Err(e) = bulk_insert_request_logs(&mut connection, buffer.drain(..)) {
+                                tracing::error!(error = %e, "error flushing request logs before maintenance");
+                            }
+                            last_insert = Instant::now();
+                        }
+                        if let Err(e) = connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;")
+                        {
+                            tracing::warn!(error = %e, "requests.db maintenance failed");
                         }
                     }
                     RequestMessage::Quit => break,
@@ -297,6 +352,13 @@ impl RequestLogger {
     /// Returns `true` if the cleanup request went through.
     pub fn cleanup(&self) -> bool {
         self.sender.send(RequestMessage::Clean).is_ok()
+    }
+
+    /// Request WAL checkpoint + planner optimisation on the request log connection.
+    ///
+    /// Returns `true` if the request went through.
+    pub fn maintenance(&self) -> bool {
+        self.sender.send(RequestMessage::Maintain).is_ok()
     }
 
     async fn call<F, R>(&self, func: F) -> R
@@ -500,5 +562,62 @@ where
 
         this.logger.log(std::mem::take(this.log));
         res.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn upgrade(conn: &mut rusqlite::Connection) {
+        bootstrap_legacy_requests_db(conn).expect("bootstrap");
+        crate::migrations::run(conn, &REQUESTS_MIGRATIONS, "schema_migrations").expect("run migrations");
+    }
+
+    fn columns(conn: &rusqlite::Connection) -> Vec<String> {
+        let mut stmt = conn.prepare("PRAGMA table_info(request)").unwrap();
+        let cols = stmt.query_map([], |r| r.get::<_, String>(1)).unwrap();
+        cols.collect::<Result<Vec<_>, _>>().unwrap()
+    }
+
+    fn user_version(conn: &rusqlite::Connection) -> i64 {
+        conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap()
+    }
+
+    #[test]
+    fn fresh_requests_db_gets_full_schema() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        upgrade(&mut conn);
+        let cols = columns(&conn);
+        assert!(cols.contains(&"ip".to_string()) && cols.contains(&"bad_reason".to_string()));
+        assert_eq!(user_version(&conn), 2);
+    }
+
+    #[test]
+    fn legacy_base_requests_db_is_upgraded() {
+        // Pre-security-dashboard database: base table, no version tracking, no ip/bad_reason.
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(REQUESTS_MIGRATIONS[0].sql).unwrap();
+        assert!(!columns(&conn).contains(&"ip".to_string()));
+
+        upgrade(&mut conn);
+        let cols = columns(&conn);
+        assert!(cols.contains(&"ip".to_string()) && cols.contains(&"bad_reason".to_string()));
+        assert_eq!(user_version(&conn), 2);
+    }
+
+    #[test]
+    fn legacy_full_requests_db_is_adopted_without_realter() {
+        // Database that already has ip/bad_reason but no version tracking: the runner
+        // must adopt it, not try to ALTER columns that already exist.
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(REQUESTS_MIGRATIONS[0].sql).unwrap();
+        conn.execute_batch(REQUESTS_MIGRATIONS[1].sql).unwrap();
+
+        upgrade(&mut conn);
+        assert_eq!(user_version(&conn), 2);
+        // Idempotent on subsequent boots.
+        upgrade(&mut conn);
+        assert_eq!(user_version(&conn), 2);
     }
 }

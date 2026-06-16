@@ -1007,8 +1007,13 @@ The `static/` directory must be alongside the binary at runtime — it serves th
 ### Database migrations
 
 The schema is versioned via `PRAGMA user_version` and migrations are applied automatically on startup from `sql/0.sql`
-through `sql/N.sql` (currently up to `sql/13.sql`). To add a migration, drop a new `sql/<N+1>.sql` ending with
-`PRAGMA user_version = <N+1>;` and bump the array length in `src/main.rs`.
+through `sql/N.sql`. The migration list is discovered automatically: `build.rs` scans `sql/*.sql` at build time
+(enforcing a gapless `0..N` sequence) and embeds them into the binary, and the runner in `src/core/migrations.rs`
+applies any that are pending. **To add a migration, just drop in a new `sql/<N+1>.sql`** — no `PRAGMA user_version`
+line and no source edits are needed; the runner owns the version and bumps it after each migration. Each applied
+migration is recorded in a `schema_migrations` table with a SHA-256 checksum, and the runner verifies on every startup
+that previously-applied migrations still match their recorded checksum, refusing to start on schema drift — so never
+edit an already-applied migration, add a new one instead.
 
 The `request` table (in `requests.db`, separate from `main.db`) uses idempotent `ALTER TABLE` for compatibility with
 existing production databases.
@@ -1054,7 +1059,7 @@ src/
 
 templates/                — Askama HTML templates (grouped into subfolders)
 static/                   — CSS, JS, images served verbatim (grouped into subfolders)
-sql/                      — Numbered migration files (0.sql … 13.sql)
+sql/                      — Numbered migration files (0.sql … N.sql), auto-discovered by build.rs
 ```
 
 ## License

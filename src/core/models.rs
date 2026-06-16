@@ -203,8 +203,15 @@ pub struct ShortLink {
 impl Table for ShortLink {
     const NAME: &'static str = "short_link";
 
-    const COLUMNS: &'static [&'static str] =
-        &["id", "code", "target_url", "account_id", "clicks", "created_at", "updated_at"];
+    const COLUMNS: &'static [&'static str] = &[
+        "id",
+        "code",
+        "target_url",
+        "account_id",
+        "clicks",
+        "created_at",
+        "updated_at",
+    ];
 
     type Id = i64;
 

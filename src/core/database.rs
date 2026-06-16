@@ -1,8 +1,21 @@
+//! A small async wrapper around SQLite.
+//!
+//! There is no async SQLite driver, so [`Database`] runs a fixed pool of OS
+//! threads, each owning one blocking [`rusqlite::Connection`]. Queries are closures
+//! shipped to an idle worker over a `crossbeam-channel`, with the result returned
+//! over a `oneshot`. The public API ([`Database::get`], [`Database::all`],
+//! [`Database::execute`], …) is `async` and mirrors rusqlite.
+//!
+//! Connections are tuned for a WAL, concurrent-reader workload and each worker
+//! survives a panicking query, so one bad closure can't tear down the pool.
+
 use std::{
     borrow::Cow,
+    panic::AssertUnwindSafe,
     path::{Path, PathBuf},
     sync::Arc,
     thread,
+    time::Duration,
 };
 
 use crossbeam_channel::{Receiver, Sender};
@@ -48,9 +61,45 @@ pub trait Table: Sized {
 }
 
 type SqliteCall = Box<dyn FnOnce(&mut rusqlite::Connection) + Send + 'static>;
-type InitFn = Arc<dyn Fn(&mut rusqlite::Connection) -> rusqlite::Result<()> + Send + Sync + 'static>;
+/// The connection-initialisation hook (e.g. the migration runner), run once per
+/// worker after the standard pragmas are applied.
+type InitDyn = dyn Fn(&mut rusqlite::Connection) -> anyhow::Result<()> + Send + Sync + 'static;
+type InitFn = Arc<InitDyn>;
 
 const UNREACHABLE: &str = "connection communication channels unexpectedly terminated";
+
+/// Connection-level pragmas applied to every worker connection before it is handed
+/// out. These tune SQLite for the app's WAL, many-readers/few-writers workload.
+fn configure_connection(connection: &rusqlite::Connection) -> rusqlite::Result<()> {
+    // Wait rather than fail when another worker (or the migration race at startup)
+    // holds the write lock. Five seconds is ample for any statement here.
+    connection.busy_timeout(Duration::from_secs(5))?;
+    // execute_batch happily steps through pragmas that return a row (journal_mode).
+    connection.execute_batch(
+        "PRAGMA journal_mode = WAL;       -- concurrent readers alongside one writer
+         PRAGMA foreign_keys = ON;        -- enforce referential integrity
+         PRAGMA synchronous = NORMAL;     -- safe with WAL, far fewer fsyncs than FULL
+         PRAGMA temp_store = MEMORY;      -- keep temp b-trees off disk
+         PRAGMA cache_size = -16384;      -- 16 MiB page cache per connection
+         PRAGMA mmap_size = 268435456;    -- 256 MiB memory-mapped I/O
+         PRAGMA wal_autocheckpoint = 1000;-- checkpoint roughly every 4 MiB of WAL",
+    )?;
+    // The default prepared-statement cache holds only 16 statements; the app has
+    // well over that many distinct cached queries per connection, so a small cache
+    // thrashes (re-preparing on eviction). Raise it generously — statements are cheap.
+    connection.set_prepared_statement_cache_capacity(128);
+    Ok(())
+}
+
+/// The error reported when a worker thread drops a query's response channel — it
+/// caught a panic inside the query closure. Surfacing this as a normal error keeps
+/// a panicking query from taking down the calling request task.
+fn worker_unavailable() -> rusqlite::Error {
+    rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_ABORT),
+        Some("database worker did not return a result (a query closure panicked)".to_owned()),
+    )
+}
 
 enum Message {
     Call(SqliteCall),
@@ -79,28 +128,30 @@ impl DatabaseBuilder {
     ///
     /// These connections are each a separate thread.
     pub fn connections(mut self, max_connections: usize) -> Self {
-        self.max_connections = max_connections;
+        self.max_connections = max_connections.max(1);
         self
     }
 
     /// Configure the function to call when the connection is successfully opened.
     ///
-    /// Useful for setting certain attributes such as PRAGMAs.
+    /// Connection-level pragmas (WAL, foreign keys, busy timeout, …) are always
+    /// applied *before* this runs, so the init function is free to assume them.
+    /// This is the right place to run migrations.
     ///
     /// # Example
-    ///
-    /// Make a `Database` that sets the `foreign_keys` pragma to
-    /// true for every connection.
     ///
     /// ```rust,no_run
     /// use klappstuhl_me::Database;
     /// let db = Database::file("app.db")
-    ///     .with_init(|c| c.execute_batch("PRAGMA foreign_keys=1;"))
+    ///     .with_init(|c| {
+    ///         c.execute_batch("CREATE TABLE IF NOT EXISTS foo(id INTEGER PRIMARY KEY);")?;
+    ///         Ok(())
+    ///     })
     ///     .open();
     /// ```
     pub fn with_init<F>(mut self, init: F) -> Self
     where
-        F: Fn(&mut rusqlite::Connection) -> rusqlite::Result<()> + Send + Sync + 'static,
+        F: Fn(&mut rusqlite::Connection) -> anyhow::Result<()> + Send + Sync + 'static,
     {
         self.init = Some(Arc::new(init));
         self
@@ -108,8 +159,9 @@ impl DatabaseBuilder {
 
     /// Opens the database and the background threads needed for the connection pooling mechanism.
     ///
-    /// If any of the connections fail to open then the failure is returned.
-    pub async fn open(self) -> rusqlite::Result<Database> {
+    /// If any of the connections fail to open (or fail their init) then the failure is returned and
+    /// all already-spawned workers are torn down.
+    pub async fn open(self) -> anyhow::Result<Database> {
         let (result_sender, mut result_receiver) = mpsc::channel(self.max_connections);
         let (sender, receiver) = crossbeam_channel::unbounded();
 
@@ -129,17 +181,17 @@ impl DatabaseBuilder {
             ));
         }
 
-        // Wait for all the results to come through
+        // Drop our handle so the channel closes once every worker has reported in.
         drop(result_sender);
 
         let db = Database { sender, workers };
 
-        // If None is returned then all other senders have been closed
-        // Senders close when they have reported either a success or an error
-        // when opening a SQLite connection
+        // Each worker sends exactly one result (Ok once ready, or Err on failure)
+        // and then drops its sender. The loop ends when all senders are gone.
         while let Some(result) = result_receiver.recv().await {
             if let Err(e) = result {
-                error!("received error while waiting for connection pool to initialise");
+                error!(error = %e, "a database connection failed to initialise; tearing down the pool");
+                // `db` drops here, terminating and joining the other workers.
                 return Err(e);
             }
         }
@@ -166,6 +218,17 @@ impl Database {
     }
 
     /// Call a function in a background thread with a connection and get the result asynchronously.
+    ///
+    /// This is the raw escape hatch. If `func` panics, the worker catches it (the
+    /// pool stays alive) but this method's caller cannot be handed a value, so the
+    /// caller's task panics in turn. Prefer the fallible typed helpers ([`get`],
+    /// [`all`], [`execute`], [`transaction`], …) which turn such a panic into an
+    /// `Err` instead.
+    ///
+    /// [`get`]: Database::get
+    /// [`all`]: Database::all
+    /// [`execute`]: Database::execute
+    /// [`transaction`]: Database::transaction
     pub async fn call<F, R>(&self, func: F) -> R
     where
         F: FnOnce(&mut rusqlite::Connection) -> R + Send + 'static,
@@ -182,6 +245,41 @@ impl Database {
         receiver.await.expect(UNREACHABLE)
     }
 
+    /// Dispatch a fallible query closure to a worker, mapping a worker-side panic
+    /// (signalled by a dropped response channel) into a [`worker_unavailable`] error
+    /// rather than panicking the caller. All the typed helpers below build on this.
+    async fn dispatch<F, T>(&self, func: F) -> rusqlite::Result<T>
+    where
+        F: FnOnce(&mut rusqlite::Connection) -> rusqlite::Result<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let (sender, receiver) = oneshot::channel();
+
+        self.sender
+            .send(Message::Call(Box::new(move |conn| {
+                let _ = sender.send(func(conn));
+            })))
+            .expect(UNREACHABLE);
+
+        match receiver.await {
+            Ok(result) => result,
+            Err(_) => Err(worker_unavailable()),
+        }
+    }
+
+    /// Number of queries currently queued waiting for a free worker.
+    ///
+    /// Persistently non-zero means the pool is saturated — every connection is busy
+    /// and work is backing up. The maintenance task samples this to warn.
+    pub fn queued(&self) -> usize {
+        self.sender.len()
+    }
+
+    /// Number of worker connections in the pool.
+    pub fn pool_size(&self) -> usize {
+        self.workers.len()
+    }
+
     /// Execute the given query with the given parameters with a connection from the pool.
     pub async fn execute<Q, P>(&self, query: Q, params: P) -> rusqlite::Result<usize>
     where
@@ -189,7 +287,7 @@ impl Database {
         P: rusqlite::Params + Send + 'static,
     {
         let query = query.into();
-        self.call(move |conn| conn.execute(query.as_ref(), params)).await
+        self.dispatch(move |conn| conn.execute(query.as_ref(), params)).await
     }
 
     /// Execute the given query with a connection from the pool.
@@ -198,7 +296,7 @@ impl Database {
         Q: Into<Cow<'static, str>> + Send,
     {
         let query = query.into();
-        self.call(move |conn| conn.execute_batch(query.as_ref())).await
+        self.dispatch(move |conn| conn.execute_batch(query.as_ref())).await
     }
 
     /// Execute the query with the given parameters and get the first result, if any.
@@ -211,7 +309,7 @@ impl Database {
         Q: Into<Cow<'static, str>> + Send,
     {
         let query = query.into();
-        self.call(move |conn| -> rusqlite::Result<Option<T>> {
+        self.dispatch(move |conn| -> rusqlite::Result<Option<T>> {
             let mut stmt = conn.prepare_cached(query.as_ref())?;
             match stmt.query_row(params, T::from_row) {
                 Ok(value) => Ok(Some(value)),
@@ -233,7 +331,7 @@ impl Database {
         Q: Into<Cow<'static, str>> + Send,
     {
         let query = query.into();
-        self.call(move |conn| -> rusqlite::Result<R> {
+        self.dispatch(move |conn| -> rusqlite::Result<R> {
             let mut stmt = conn.prepare_cached(query.as_ref())?;
             stmt.query_row(params, func)
         })
@@ -246,7 +344,7 @@ impl Database {
         T: Table + Send + 'static,
         T::Id: rusqlite::ToSql + Send + 'static,
     {
-        self.call(move |conn| -> rusqlite::Result<Option<T>> {
+        self.dispatch(move |conn| -> rusqlite::Result<Option<T>> {
             let query = format!("SELECT * FROM {} WHERE id=?", T::NAME);
             let mut stmt = conn.prepare_cached(&query)?;
             match stmt.query_row(rusqlite::params![id], T::from_row) {
@@ -268,7 +366,7 @@ impl Database {
         Q: Into<Cow<'static, str>> + Send,
     {
         let query = query.into();
-        self.call(move |conn| -> rusqlite::Result<Vec<T>> {
+        self.dispatch(move |conn| -> rusqlite::Result<Vec<T>> {
             let mut stmt = conn.prepare_cached(query.as_ref())?;
             let result = match stmt.query_map(params, T::from_row) {
                 Ok(value) => value.collect(),
@@ -286,7 +384,7 @@ impl Database {
         F: FnOnce(Transaction) -> rusqlite::Result<R> + Send + Sync + 'static,
         R: Send + 'static,
     {
-        self.call(move |conn| -> rusqlite::Result<R> {
+        self.dispatch(move |conn| -> rusqlite::Result<R> {
             let tx = Transaction {
                 inner: conn.transaction()?,
             };
@@ -302,7 +400,7 @@ impl Database {
     where
         T: rusqlite::types::FromSql + Send + 'static,
     {
-        self.call(move |conn| -> rusqlite::Result<Option<T>> {
+        self.dispatch(move |conn| -> rusqlite::Result<Option<T>> {
             let query = "SELECT value FROM storage WHERE name = ?";
             let mut stmt = conn.prepare_cached(query)?;
             let result = stmt.query_row([key], |row| row.get(0));
@@ -317,15 +415,18 @@ impl Database {
         .flatten()
     }
 
-    /// Updates the value in the key-value store.
+    /// Sets the value in the key-value store, inserting the key if it does not yet
+    /// exist. A plain `UPDATE` would silently no-op for a missing key, so this
+    /// upserts.
     pub async fn update_storage<T>(&self, key: &'static str, value: T) -> rusqlite::Result<()>
     where
         T: rusqlite::types::ToSql + Send + 'static,
     {
-        self.call(move |conn| {
-            let query = "UPDATE storage SET value = ? WHERE name = ?";
+        self.dispatch(move |conn| {
+            let query = "INSERT INTO storage(name, value) VALUES (?, ?) \
+                         ON CONFLICT(name) DO UPDATE SET value = excluded.value";
             let mut stmt = conn.prepare_cached(query)?;
-            stmt.execute((value, key))?;
+            stmt.execute((key, value))?;
             Ok(())
         })
         .await
@@ -366,58 +467,49 @@ impl Worker {
     fn new(
         id: usize,
         path: PathBuf,
-        result_sender: mpsc::Sender<rusqlite::Result<()>>,
+        result_sender: mpsc::Sender<anyhow::Result<()>>,
         init: Option<InitFn>,
         receiver: Receiver<Message>,
     ) -> Self {
-        let thread = thread::spawn(move || {
-            let mut connection = match rusqlite::Connection::open(path) {
-                Ok(c) => c,
-                Err(e) => {
-                    error!("database connection worker {} received an error ({})", id, &e);
-                    let _ = result_sender.blocking_send(Err(e));
-                    return;
-                }
-            };
-
-            trace!("database connection worker {} created connection", id);
-
-            if let Some(f) = init {
-                if let Err(e) = f(&mut connection) {
-                    error!(
-                        "database connection worker {} received an error ({}) during init",
-                        id, &e
-                    );
-                    let _ = result_sender.blocking_send(Err(e));
-                    return;
-                }
-
-                trace!("database connection worker {} initialised connection", id);
-            }
-
-            trace!(
-                "database connection worker {} is signaling to main thread completion",
-                id
-            );
-            if result_sender.blocking_send(Ok(())).is_err() {
-                trace!("database connection worker {} received an error during sending", id);
-                return;
-            }
-
-            drop(result_sender);
-
-            trace!("database connection worker {} has signaled completion", id);
-
-            while let Ok(msg) = receiver.recv() {
-                match msg {
-                    Message::Call(func) => {
-                        trace!("database connection worker {} received request to process call", id);
-                        func(&mut connection)
+        let thread = thread::Builder::new()
+            .name(format!("sqlite-worker-{id}"))
+            .spawn(move || {
+                let mut connection = match open_and_init(id, &path, init.as_deref()) {
+                    Ok(connection) => connection,
+                    Err(e) => {
+                        let _ = result_sender.blocking_send(Err(e));
+                        return;
                     }
-                    Message::Terminate => break,
+                };
+
+                trace!("database connection worker {} signaling readiness", id);
+                if result_sender.blocking_send(Ok(())).is_err() {
+                    trace!("database connection worker {} could not signal readiness", id);
+                    return;
                 }
-            }
-        });
+                // Drop early so the readiness aggregation in `open` completes as soon
+                // as every worker has reported, rather than at thread exit.
+                drop(result_sender);
+
+                while let Ok(msg) = receiver.recv() {
+                    match msg {
+                        Message::Call(func) => {
+                            // A panic inside a query closure must not kill the worker
+                            // (which would silently shrink the pool). Catch it; the
+                            // caller observes a dropped oneshot and surfaces the error.
+                            if std::panic::catch_unwind(AssertUnwindSafe(|| func(&mut connection))).is_err() {
+                                error!(
+                                    "database connection worker {} caught a panic while executing a query; \
+                                     the connection is preserved",
+                                    id
+                                );
+                            }
+                        }
+                        Message::Terminate => break,
+                    }
+                }
+            })
+            .expect("failed to spawn database worker thread");
 
         Worker {
             id,
@@ -442,6 +534,23 @@ impl Worker {
             None => true,
         }
     }
+}
+
+/// Opens a connection, applies the standard pragmas, then runs the optional init.
+fn open_and_init(id: usize, path: &Path, init: Option<&InitDyn>) -> anyhow::Result<rusqlite::Connection> {
+    let mut connection = rusqlite::Connection::open(path)
+        .map_err(|e| anyhow::Error::from(e).context(format!("worker {id} could not open database connection")))?;
+    trace!("database connection worker {} created connection", id);
+
+    configure_connection(&connection)
+        .map_err(|e| anyhow::Error::from(e).context(format!("worker {id} could not configure connection pragmas")))?;
+
+    if let Some(init) = init {
+        init(&mut connection).map_err(|e| e.context(format!("worker {id} failed during database init")))?;
+        trace!("database connection worker {} initialised connection", id);
+    }
+
+    Ok(connection)
 }
 
 impl std::fmt::Debug for Worker {
@@ -540,11 +649,9 @@ pub fn directory() -> anyhow::Result<PathBuf> {
 
     let mut path = dirs::data_dir().context("could not find a data directory for the current user")?;
     path.push(crate::PROGRAM_NAME);
-    if let Err(e) = std::fs::create_dir(&path) {
-        if e.kind() != std::io::ErrorKind::AlreadyExists {
-            return Err(e).context("could not create application local data directory");
-        }
-    }
+    // create_dir_all is idempotent (no error if it already exists) and tolerates a
+    // missing intermediate data dir on first run.
+    std::fs::create_dir_all(&path).context("could not create application local data directory")?;
     path.push("main.db");
     Ok(path)
 }
@@ -581,7 +688,8 @@ mod tests {
                 con.execute_batch(
                     "CREATE TABLE IF NOT EXISTS foo(id INTEGER PRIMARY KEY, name TEXT, age INTEGER);
             INSERT INTO foo(name, age) VALUES ('bob', 20), ('tanya', 25), ('phil', 25);",
-                )
+                )?;
+                Ok(())
             })
             .open()
             .await
@@ -604,6 +712,39 @@ mod tests {
                 age: 20
             })
         );
+    }
+
+    #[tokio::test]
+    async fn worker_survives_panicking_query() {
+        let conn = Arc::new(Database::file(":memory:").connections(1).open().await.expect("open db"));
+
+        // A panicking query closure drops its oneshot sender, so the awaiting
+        // caller's task panics. Run it on a spawned task so we can absorb that
+        // panic without failing the test.
+        let task_conn = conn.clone();
+        let handle = tokio::spawn(async move {
+            task_conn.call(|_c| panic!("boom")).await;
+        });
+        assert!(handle.await.is_err(), "the panicking call's task should fail");
+
+        // The single worker must still be alive and serving queries.
+        let n: i64 = conn.call(|c| c.query_row("SELECT 1", [], |r| r.get(0)).unwrap()).await;
+        assert_eq!(n, 1);
+    }
+
+    #[tokio::test]
+    async fn typed_query_returns_error_on_panic() {
+        let conn = Database::file(":memory:").connections(1).open().await.expect("open db");
+
+        // A panicking closure routed through the typed API must surface as an Err,
+        // never a panic in the caller's task.
+        let result = conn
+            .transaction(|_tx| -> rusqlite::Result<()> { panic!("boom inside transaction") })
+            .await;
+        assert!(result.is_err(), "panicking transaction should yield Err, got {result:?}");
+
+        // And the pool is still usable afterwards.
+        conn.execute_batch("CREATE TABLE t(x);").await.expect("pool still works");
     }
 
     #[test]

@@ -7,6 +7,7 @@ pub mod database;
 pub mod error;
 pub mod filters;
 pub mod logging;
+pub mod migrations;
 pub mod models;
 pub mod state;
 pub mod utils;

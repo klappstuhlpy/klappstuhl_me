@@ -215,10 +215,14 @@ async fn create_link(
     match insert_link(&state, code, &target, account.id, custom_alias).await {
         Ok(()) => flasher.add(FlashMessage::success("Short link created.")).bail("/links"),
         Err(InsertError::Taken) => flasher
-            .add(FlashMessage::error("That alias is already taken — please pick another."))
+            .add(FlashMessage::error(
+                "That alias is already taken — please pick another.",
+            ))
             .bail("/links"),
         Err(InsertError::Db) => flasher
-            .add(FlashMessage::error("Could not create the short link. Please try again."))
+            .add(FlashMessage::error(
+                "Could not create the short link. Please try again.",
+            ))
             .bail("/links"),
     }
 }
@@ -318,7 +322,9 @@ async fn edit_link(
     match result {
         Ok(_) => flasher.add(FlashMessage::success("Short link updated.")).bail("/links"),
         Err(e) if is_unique_constraint_violation(&e) => flasher
-            .add(FlashMessage::error("That alias is already taken — please pick another."))
+            .add(FlashMessage::error(
+                "That alias is already taken — please pick another.",
+            ))
             .bail("/links"),
         Err(e) => {
             tracing::error!(error = %e, "failed to update short link");

@@ -116,6 +116,40 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         }
     });
 
+    // Periodic SQLite maintenance for both databases: checkpoint the WAL back into
+    // the main file (so it can't grow unbounded behind a long-lived reader), refresh
+    // the query planner's statistics, and surface connection-pool saturation. ANALYZE
+    // (heavier) runs roughly daily. None of this blocks request handling.
+    let maintenance_state = state.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(600));
+        interval.tick().await; // consume the immediate first tick
+        let mut ticks: u64 = 0;
+        loop {
+            interval.tick().await;
+            ticks += 1;
+            let db = maintenance_state.database();
+            let sql = if ticks.is_multiple_of(144) {
+                "PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize; ANALYZE;"
+            } else {
+                "PRAGMA wal_checkpoint(TRUNCATE); PRAGMA optimize;"
+            };
+            if let Err(e) = db.execute_batch(sql).await {
+                error!(error = %e, "main.db maintenance failed");
+            }
+            maintenance_state.requests.maintenance();
+
+            let queued = db.queued();
+            if queued > db.pool_size() * 8 {
+                error!(
+                    queued,
+                    pool = db.pool_size(),
+                    "database query queue is backing up — the connection pool is saturated"
+                );
+            }
+        }
+    });
+
     // Live metrics: scrape host + docker every 30s, prune old samples hourly.
     klappstuhl_me::metrics::spawn_collector(state.clone());
     klappstuhl_me::metrics::spawn_pruner(state.clone());
@@ -310,60 +344,20 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
-const MIGRATIONS: [&str; 15] = [
-    include_str!("../sql/0.sql"),
-    include_str!("../sql/1.sql"),
-    include_str!("../sql/2.sql"),
-    include_str!("../sql/3.sql"),
-    include_str!("../sql/4.sql"),
-    include_str!("../sql/5.sql"),
-    include_str!("../sql/6.sql"),
-    include_str!("../sql/7.sql"),
-    include_str!("../sql/8.sql"),
-    include_str!("../sql/9.sql"),
-    include_str!("../sql/10.sql"),
-    include_str!("../sql/11.sql"),
-    include_str!("../sql/12.sql"),
-    include_str!("../sql/13.sql"),
-    include_str!("../sql/14.sql"),
-];
-
-fn init_db(connection: &mut rusqlite::Connection) -> rusqlite::Result<()> {
-    // The connection pool spawns 10 workers in parallel that all run this
-    // init function on the same database file. Without a busy timeout, the
-    // workers that lose the race for the write lock during journal_mode=wal
-    // and the migration transaction below fail immediately with SQLITE_BUSY.
-    // Five seconds is plenty for any DDL to finish.
-    connection.busy_timeout(Duration::from_secs(5))?;
-
-    connection.execute_batch("PRAGMA foreign_keys=1;")?;
-    connection.execute_batch("PRAGMA journal_mode=wal;")?;
-
-    // Use IMMEDIATE so writers serialize from the very start of the
-    // transaction instead of upgrading mid-flight and triggering
-    // SQLITE_BUSY_SNAPSHOT.
-    let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
-
-    let version: usize = {
-        let mut stmt = tx.prepare_cached("PRAGMA user_version;")?;
-        stmt.query_row([], |r| r.get(0))?
-    };
-
-    for migration in MIGRATIONS.iter().skip(version) {
-        tx.execute_batch(migration)?;
-    }
-
-    tx.commit()?;
-
-    Ok(())
-}
-
 async fn run(command: klappstuhl_me::Command) -> anyhow::Result<()> {
     let config = klappstuhl_me::Config::load()?;
+    // The connection pool applies the connection-level pragmas (WAL, foreign keys,
+    // busy timeout, …) itself; the init hook just runs the migration runner. Every
+    // pooled connection runs this, but the runner serialises on the write lock and
+    // no-ops once the schema is up to date.
     let database = klappstuhl_me::Database::file(&klappstuhl_me::database::directory()?)
-        .with_init(init_db)
+        .with_init(klappstuhl_me::migrations::migrate)
         .open()
         .await?;
+
+    // Refresh query-planner statistics once at startup (cheap, recommended by SQLite
+    // after schema changes such as the migrations that just ran).
+    let _ = database.execute_batch("PRAGMA optimize;").await;
 
     let state = klappstuhl_me::AppState::new(config, database).await;
     match command {
