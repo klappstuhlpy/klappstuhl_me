@@ -641,6 +641,7 @@ nav.main-navigation .branding {
     width: max-content;
     text-align: left;
     font-weight: bold;
+    white-space: nowrap;
 }
 
 /* Section indicator in the top nav (e.g. the Percy badge). Rendered only on
@@ -865,6 +866,7 @@ a.nav-item.active { font-weight: bold; }
     .account-dropdown-item.nav-extra { display: block; }
     .account-dropdown-sep.nav-extra { display: block; }
     #nav-menu { display: inline-flex; }
+    nav.main-navigation .nav-item:not(:last-child) { margin-right: 0.5rem; }
 }
 
 /* Compact trigger: when the nav can't fit the account name (e.g. branding +

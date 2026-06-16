@@ -321,6 +321,7 @@
 
 .event-info {
     flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -626,10 +627,25 @@
 
 @media (max-width: 640px) {
     #log-modal {
-        width: 100vw;
+        width: 100%;
+        max-width: 100%;
         height: 92dvh;
         border-radius: 0.625rem 0.625rem 0 0;
-        margin: auto 0 0;
+        margin: auto 0 0 0;
+        inset: auto 0 0 0;
+    }
+    .log-modal-footer {
+        padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0.5rem));
+    }
+    .event-row {
+        gap: 0.35rem;
+        padding: 0.2rem 0.5rem;
+    }
+    .event-badge {
+        min-width: 2.8rem;
+        max-width: 5.5rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 }
 

@@ -438,12 +438,13 @@
 
     function appendEvent(msg) {
         if (logEmpty) logEmpty.remove();
-        const action  = msg.Action || msg.action || '?';
-        const evType  = msg.Type   || msg.type   || '';
-        const actor   = msg.Actor  || msg.actor  || {};
-        const attrs   = actor.Attributes || actor.attributes || {};
-        const name    = attrs.name || actor.ID || actor.id || '';
-        const ts      = msg.time;
+        const rawAction = msg.Action || msg.action || '?';
+        const action    = rawAction.split(':')[0];
+        const evType    = msg.Type   || msg.type   || '';
+        const actor     = msg.Actor  || msg.actor  || {};
+        const attrs     = actor.Attributes || actor.attributes || {};
+        const name      = attrs.name || actor.ID || actor.id || '';
+        const ts        = msg.time;
 
         const row = document.createElement('div');
         row.className = 'event-row';
@@ -496,7 +497,7 @@
             const msg = envelope.data;
             if (!msg) return;
             appendEvent(msg);
-            const action = msg.Action || msg.action || '';
+            const action = (msg.Action || msg.action || '').split(':')[0];
             if (STATE_CHANGING.has(action)) softRefresh();
         });
 
