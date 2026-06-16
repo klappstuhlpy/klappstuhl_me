@@ -119,11 +119,11 @@ pub(super) async fn guild_detail(
 
     // Fan out the independent reads concurrently; `join!` (not `try_join!`) so a
     // single degraded sub-resource doesn't abort the others — each is handled below.
-    let (guild, channels, roles, gatekeeper, lockdowns, status_feed) = tokio::join!(
+    let (guild, channels, roles, sentinel, lockdowns, status_feed) = tokio::join!(
         percy.get_guild(guild_id),
         cached_channels(&percy, guild_id),
         cached_roles(&percy, guild_id),
-        percy.get_gatekeeper(guild_id),
+        percy.get_sentinel(guild_id),
         percy.get_lockdowns(guild_id),
         percy.get_status_feed(guild_id),
     );
@@ -149,7 +149,7 @@ pub(super) async fn guild_detail(
     let degraded = channels.is_err() || roles.is_err();
     let channels = channels.unwrap_or_default();
     let roles = roles.unwrap_or_default();
-    let gatekeeper = gatekeeper.ok().flatten();
+    let sentinel = sentinel.ok().flatten();
     let lockdowns = lockdowns.unwrap_or(LockdownsResponse { entries: Vec::new() });
     let status_feed = status_feed.unwrap_or(StatusFeedInfo {
         subscribed: false,
@@ -162,7 +162,7 @@ pub(super) async fn guild_detail(
         guild,
         channels,
         roles,
-        gatekeeper,
+        sentinel,
         lockdowns,
         status_feed,
         degraded,
@@ -204,10 +204,10 @@ pub(super) async fn guild_config_update(
     match percy.patch_guild_config(guild_id, &patch).await {
         Ok(()) => {
             if form.section == "flags" {
-                // Auto-enable/disable gatekeeper when its flag is toggled
-                let gk_enabled = form.fields.contains_key("gatekeeper");
-                if let Err(e) = percy.toggle_gatekeeper(guild_id, gk_enabled).await {
-                    tracing::warn!(error = %e, "Gatekeeper toggle after flag change");
+                // Auto-enable/disable sentinel when its flag is toggled
+                let gk_enabled = form.fields.contains_key("sentinel");
+                if let Err(e) = percy.toggle_sentinel(guild_id, gk_enabled).await {
+                    tracing::warn!(error = %e, "Sentinel toggle after flag change");
                 }
 
                 // Clear associated config fields when flags are turned off
@@ -239,7 +239,7 @@ pub(super) async fn guild_config_update(
     }
 }
 
-pub(super) async fn guild_gatekeeper_update(
+pub(super) async fn guild_sentinel_update(
     State(state): State<AppState>,
     account: Account,
     flasher: Flasher,
@@ -267,42 +267,42 @@ pub(super) async fn guild_gatekeeper_update(
     let sent_starter = starter_title.is_some() && starter_content.is_some() && channel_id.is_some();
 
     if let (Some(title), Some(content), Some(ch_id)) = (starter_title, starter_content, channel_id) {
-        match percy.send_gatekeeper_message(guild_id, ch_id, title, content).await {
+        match percy.send_sentinel_message(guild_id, ch_id, title, content).await {
             Ok(_message_id) => {}
             Err(e) => {
-                tracing::error!(error = %e, "Failed to send gatekeeper starter message");
+                tracing::error!(error = %e, "Failed to send sentinel starter message");
                 let msg = format!("Failed to send verification message: {e}");
                 return json_or_flash(&headers, &flasher, false, &msg, &redirect_url);
             }
         }
     }
 
-    let mut patch = build_gatekeeper_patch(&form);
-    // channel_id was already set by send_gatekeeper_message
+    let mut patch = build_sentinel_patch(&form);
+    // channel_id was already set by send_sentinel_message
     if sent_starter {
         if let Some(obj) = patch.as_object_mut() {
             obj.remove("channel_id");
         }
     }
     if !patch.as_object().map_or(true, |m| m.is_empty()) {
-        if let Err(e) = percy.patch_gatekeeper(guild_id, &patch).await {
-            tracing::error!(error = %e, "Failed to update gatekeeper config");
+        if let Err(e) = percy.patch_sentinel(guild_id, &patch).await {
+            tracing::error!(error = %e, "Failed to update sentinel config");
             return json_or_flash(
                 &headers,
                 &flasher,
                 false,
-                "Failed to save gatekeeper settings.",
+                "Failed to save sentinel settings.",
                 &redirect_url,
             );
         }
     }
 
     // Try to auto-enable if all required fields are now set
-    if let Err(e) = percy.toggle_gatekeeper(guild_id, true).await {
-        tracing::debug!(error = %e, "Gatekeeper not ready to enable (expected if setup incomplete)");
+    if let Err(e) = percy.toggle_sentinel(guild_id, true).await {
+        tracing::debug!(error = %e, "Sentinel not ready to enable (expected if setup incomplete)");
     }
 
-    json_or_flash(&headers, &flasher, true, "Gatekeeper settings saved.", &redirect_url)
+    json_or_flash(&headers, &flasher, true, "Sentinel settings saved.", &redirect_url)
 }
 
 pub(super) async fn guild_members(
@@ -1217,7 +1217,7 @@ fn build_patch(section: &str, fields: &HashMap<String, String>) -> serde_json::V
                 "audit_log": fields.contains_key("audit_log"),
                 "raid": fields.contains_key("raid"),
                 "alerts": fields.contains_key("alerts"),
-                "gatekeeper": fields.contains_key("gatekeeper"),
+                "sentinel": fields.contains_key("sentinel"),
                 "mentions": fields.contains_key("mentions"),
             });
             serde_json::json!({ "flags": flags })
@@ -1286,7 +1286,7 @@ fn build_patch(section: &str, fields: &HashMap<String, String>) -> serde_json::V
     }
 }
 
-fn build_gatekeeper_patch(fields: &HashMap<String, String>) -> serde_json::Value {
+fn build_sentinel_patch(fields: &HashMap<String, String>) -> serde_json::Value {
     let mut patch = serde_json::Map::new();
     if let Some(v) = fields.get("channel_id") {
         patch.insert("channel_id".into(), parse_id_or_null(v));

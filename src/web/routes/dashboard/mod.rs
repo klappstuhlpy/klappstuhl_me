@@ -252,8 +252,8 @@ pub fn routes() -> Router<AppState> {
         .route("/percy/dashboard/guild/:guild_id", get(guild_detail))
         .route("/percy/dashboard/guild/:guild_id/config", post(guild_config_update))
         .route(
-            "/percy/dashboard/guild/:guild_id/gatekeeper",
-            post(guild_gatekeeper_update),
+            "/percy/dashboard/guild/:guild_id/sentinel",
+            post(guild_sentinel_update),
         )
         .route("/percy/dashboard/guild/:guild_id/members", get(guild_members))
         .route("/percy/dashboard/guild/:guild_id/members.json", get(guild_members_json))

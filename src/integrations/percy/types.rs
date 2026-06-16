@@ -80,7 +80,7 @@ pub struct GuildFlags {
     pub audit_log: bool,
     pub raid: bool,
     pub alerts: bool,
-    pub gatekeeper: bool,
+    pub sentinel: bool,
     #[serde(default)]
     pub mentions: bool,
 }
@@ -120,7 +120,7 @@ pub struct Member {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct GatekeeperInfo {
+pub struct SentinelInfo {
     pub channel: Option<ChannelRef>,
     pub role: Option<RoleRef>,
     pub message: Option<u64>,

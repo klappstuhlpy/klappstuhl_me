@@ -221,29 +221,29 @@ impl PercyClient {
         .await
     }
 
-    // -- Gatekeeper ----------------------------------------------------------
+    // -- Sentinel ----------------------------------------------------------
 
-    /// Fetch gatekeeper configuration for a guild.
-    pub async fn get_gatekeeper(&self, guild_id: u64) -> Result<Option<GatekeeperInfo>, PercyError> {
+    /// Fetch sentinel configuration for a guild.
+    pub async fn get_sentinel(&self, guild_id: u64) -> Result<Option<SentinelInfo>, PercyError> {
         self.send_into(
             self.client
-                .get(self.url(&format!("/api/internal/guilds/{guild_id}/gatekeeper"))),
+                .get(self.url(&format!("/api/internal/guilds/{guild_id}/sentinel"))),
         )
         .await
     }
 
-    /// Patch gatekeeper configuration.
-    pub async fn patch_gatekeeper(&self, guild_id: u64, patch: &serde_json::Value) -> Result<(), PercyError> {
+    /// Patch sentinel configuration.
+    pub async fn patch_sentinel(&self, guild_id: u64, patch: &serde_json::Value) -> Result<(), PercyError> {
         self.send_unit(
             self.client
-                .patch(self.url(&format!("/api/internal/guilds/{guild_id}/gatekeeper")))
+                .patch(self.url(&format!("/api/internal/guilds/{guild_id}/sentinel")))
                 .json(patch),
         )
         .await
     }
 
-    /// Send the gatekeeper verification message to a channel and return the message_id.
-    pub async fn send_gatekeeper_message(
+    /// Send the sentinel verification message to a channel and return the message_id.
+    pub async fn send_sentinel_message(
         &self,
         guild_id: u64,
         channel_id: u64,
@@ -259,18 +259,18 @@ impl PercyClient {
         let data: serde_json::Value = self
             .send_into(
                 self.client
-                    .post(self.url(&format!("/api/internal/guilds/{guild_id}/gatekeeper/message")))
+                    .post(self.url(&format!("/api/internal/guilds/{guild_id}/sentinel/message")))
                     .json(&body),
             )
             .await?;
         Ok(data["message_id"].as_u64().unwrap_or(0))
     }
 
-    /// Enable or disable the gatekeeper.
-    pub async fn toggle_gatekeeper(&self, guild_id: u64, enabled: bool) -> Result<(), PercyError> {
+    /// Enable or disable the sentinel.
+    pub async fn toggle_sentinel(&self, guild_id: u64, enabled: bool) -> Result<(), PercyError> {
         self.send_unit(
             self.client
-                .post(self.url(&format!("/api/internal/guilds/{guild_id}/gatekeeper/toggle")))
+                .post(self.url(&format!("/api/internal/guilds/{guild_id}/sentinel/toggle")))
                 .json(&serde_json::json!({"enabled": enabled})),
         )
         .await

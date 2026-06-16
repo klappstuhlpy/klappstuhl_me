@@ -24,7 +24,7 @@ pub(crate) struct GuildTemplate {
     pub(crate) guild: GuildInfo,
     pub(crate) channels: Vec<Channel>,
     pub(crate) roles: Vec<Role>,
-    pub(crate) gatekeeper: Option<GatekeeperInfo>,
+    pub(crate) sentinel: Option<SentinelInfo>,
     pub(crate) lockdowns: LockdownsResponse,
     pub(crate) status_feed: StatusFeedInfo,
     /// True when the guild loaded but a sub-resource (roles/channels) failed to

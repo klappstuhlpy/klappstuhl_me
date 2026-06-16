@@ -854,7 +854,7 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 
 ### Features
 
-- **Tabbed configuration** — General (feature flags, music, prefixes, Discord status feed subscription), Moderation (audit/alert/mute/mention + mod/message/voice log channels, active lockdowns with unlock), and Gatekeeper (verification channel, roles, starter message modal, bypass action, rate limit, auto-enable/disable) tabs. REQUIRED tags appear when a flag is enabled but its associated config is missing. Cancel/Save Changes buttons with form-state tracking.
+- **Tabbed configuration** — General (feature flags, music, prefixes, Discord status feed subscription), Moderation (audit/alert/mute/mention + mod/message/voice log channels, active lockdowns with unlock), and Sentinel (verification channel, roles, starter message modal, bypass action, rate limit, auto-enable/disable) tabs. REQUIRED tags appear when a flag is enabled but its associated config is missing. Cancel/Save Changes buttons with form-state tracking.
 - **Member management** — searchable, paginated member directory with kick/ban actions and role mutations. Confirmation modals gather moderation reasons.
 - **Leveling** — Full configuration form (enable/disable, voice XP, stack roles, clear-XP-on-leave, XP curve factor, base XP, min/max gain per message, XP cooldown, level-up announcement destination — same channel / DM / off / a specific channel — and level-up message template). Collection editors with add/remove and Discord role/channel pickers for **level rewards** (roles granted at a level, shown with their color swatch, plus a one-click "Generate preset roles" button that creates 12 themed milestone roles for levels 5–100 behind an "Are you sure?" confirm), **XP multipliers** (per role and per channel), **blacklists** (roles/channels/users excluded from XP), and **special level-up messages** (custom text per level). XP leaderboard with rank medals (gold/silver/bronze) and in-place level/XP editing per member via modal.
 - **Economy** — Shop item management (create/delete) with effect display (cash voucher, lootbox, role grant, XP/loot boosts with duration), top balance leaderboard, and lottery control (start/cancel active lotteries).
@@ -888,9 +888,9 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/auth/discord/callback` | GET | OAuth2 callback |
 | `/account/discord/unlink` | POST | Remove Discord link |
 | `/percy/dashboard` | GET | Server selection (guilds you can manage) |
-| `/percy/dashboard/guild/:id` | GET | Per-guild config editor (tabbed: General, Moderation, Gatekeeper) |
+| `/percy/dashboard/guild/:id` | GET | Per-guild config editor (tabbed: General, Moderation, Sentinel) |
 | `/percy/dashboard/guild/:id/config` | POST | Save config changes (flags/moderation/polls/music/prefixes) |
-| `/percy/dashboard/guild/:id/gatekeeper` | POST | Save gatekeeper settings |
+| `/percy/dashboard/guild/:id/sentinel` | POST | Save sentinel settings |
 | `/percy/dashboard/guild/:id/members` | GET | Member management page |
 | `/percy/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API) |
 | `/percy/dashboard/guild/:id/members/:uid` | GET | User lookup page (profile, leveling, moderation cases incl. opening new ones, activity heatmap) |
@@ -962,7 +962,7 @@ The dashboard code is grouped under a `percy` namespace per file type:
 5. Form submissions are proxied through the Rust BFF to Percy's internal API, which writes to PostgreSQL and invalidates the cache
 6. Member actions (kick/ban/role changes) call Discord's API through Percy — the BFF never touches Discord directly
 7. Stats, leaderboards, and browsing pages (polls/tags/giveaways) read data from Percy's repositories and format them for display
-8. Feature flags auto-enable/disable associated systems (gatekeeper toggle, clearing channels on flag disable) and show REQUIRED warnings when setup is incomplete
+8. Feature flags auto-enable/disable associated systems (sentinel toggle, clearing channels on flag disable) and show REQUIRED warnings when setup is incomplete
 
 ---
 

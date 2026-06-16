@@ -24,7 +24,7 @@
     document.querySelectorAll('.gk-setup-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            switchTab('gatekeeper');
+            switchTab('sentinel');
         });
     });
 
@@ -183,8 +183,8 @@
                     formStates.set(form, captureFormState(form));
                     hideBanner();
                     const section = form.querySelector('input[name="_section"]');
-                    const isGatekeeper = form.action && form.action.includes('/gatekeeper');
-                    if ((section && (section.value === 'flags' || section.value === 'moderation')) || isGatekeeper) {
+                    const isSentinel = form.action && form.action.includes('/sentinel');
+                    if ((section && (section.value === 'flags' || section.value === 'moderation')) || isSentinel) {
                         setTimeout(() => location.reload(), 400);
                     }
                 } else {
@@ -200,7 +200,7 @@
 
     // Toast notifications come from percy_common.js (window.showToast).
 
-    // -- Gatekeeper starter message modal ----------------------------------------
+    // -- Sentinel starter message modal ----------------------------------------
 
     const gkChannel = document.getElementById('gk_channel');
     const gkModal = document.getElementById('gk-message-modal');

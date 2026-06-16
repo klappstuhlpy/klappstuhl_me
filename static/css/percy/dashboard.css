@@ -892,9 +892,9 @@ select.config-select[multiple] {
     border-left: 3px solid var(--error-text);
 }
 
-/* -- Gatekeeper status -- */
+/* -- Sentinel status -- */
 
-.gatekeeper-status {
+.sentinel-status {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -903,18 +903,18 @@ select.config-select[multiple] {
     font-size: 0.82rem;
     margin-bottom: 1rem;
 }
-.gatekeeper-status.active {
+.sentinel-status.active {
     background: var(--success-bg);
     border: 1px solid var(--success-border);
     color: var(--success-text);
 }
-.gatekeeper-status.inactive {
+.sentinel-status.inactive {
     background: var(--box-shade);
     border: 1px solid var(--box-border);
     color: var(--text-muted);
 }
 
-/* -- Gatekeeper setup callout (floating) -- */
+/* -- Sentinel setup callout (floating) -- */
 
 .gk-setup-callout {
     position: relative;
@@ -986,14 +986,14 @@ select.config-select[multiple] {
     font-style: italic;
 }
 
-/* -- Gatekeeper disabled toggle state -- */
+/* -- Sentinel disabled toggle state -- */
 
 .config-toggle.gk-disabled {
     opacity: 0.5;
     pointer-events: none;
 }
 
-/* -- Gatekeeper required tag -- */
+/* -- Sentinel required tag -- */
 
 .gk-required-tag {
     display: inline-block;
@@ -1010,7 +1010,7 @@ select.config-select[multiple] {
     vertical-align: middle;
 }
 
-/* -- Gatekeeper info box -- */
+/* -- Sentinel info box -- */
 
 .gk-info {
     background: var(--box);
@@ -1143,7 +1143,7 @@ th.th-sortable[aria-sort="descending"]::after {
     color: var(--branding);
 }
 
-/* -- Gatekeeper message status -- */
+/* -- Sentinel message status -- */
 
 .gk-message-status {
     display: inline-block;

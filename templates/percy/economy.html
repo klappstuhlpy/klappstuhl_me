@@ -61,7 +61,7 @@
         <h2>Lottery</h2>
         {% match economy.lottery %}
         {% when Some with (lot) %}
-        <div class="gatekeeper-status active">
+        <div class="sentinel-status active">
             <span>Active — Jackpot: {{ lot.jackpot }} | Ticket: {{ lot.ticket_price }}</span>
             {% match lot.ends_at %}{% when Some with (t) %}<span class="badge">Ends: <time class="js-ts" datetime="{{ t }}">{{ t }}</time></span>{% when None %}{% endmatch %}
         </div>
