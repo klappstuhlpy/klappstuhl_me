@@ -55,5 +55,3 @@ CREATE TABLE IF NOT EXISTS docker_stat
 ) WITHOUT ROWID;
 
 CREATE INDEX IF NOT EXISTS docker_stat_name_ts ON docker_stat (container_name, ts);
-
-PRAGMA user_version = 3;

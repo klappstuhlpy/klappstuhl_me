@@ -32,5 +32,3 @@ CREATE TABLE IF NOT EXISTS audit_log
 CREATE INDEX IF NOT EXISTS audit_log_ts_idx     ON audit_log (ts);
 CREATE INDEX IF NOT EXISTS audit_log_action_idx ON audit_log (action);
 CREATE INDEX IF NOT EXISTS audit_log_actor_idx  ON audit_log (actor_id);
-
-PRAGMA user_version = 5;

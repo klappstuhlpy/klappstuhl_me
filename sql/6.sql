@@ -63,5 +63,3 @@ CREATE INDEX IF NOT EXISTS ssh_token_account_idx ON ssh_token (account_id);
 CREATE INDEX IF NOT EXISTS ssh_session_audit_account_idx ON ssh_session_audit (account_id);
 CREATE INDEX IF NOT EXISTS ssh_session_audit_key_idx ON ssh_session_audit (key_id);
 CREATE INDEX IF NOT EXISTS ssh_session_audit_created_idx ON ssh_session_audit (created_at);
-
-PRAGMA user_version = 6;

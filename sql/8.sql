@@ -13,5 +13,3 @@ CREATE TABLE IF NOT EXISTS file_scan (
     vt_url        TEXT,
     scanned_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-PRAGMA user_version = 8;

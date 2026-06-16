@@ -38,5 +38,3 @@ CREATE TABLE IF NOT EXISTS scan_run
 );
 
 CREATE INDEX IF NOT EXISTS scan_run_started_idx ON scan_run (started_at);
-
-PRAGMA user_version = 4;

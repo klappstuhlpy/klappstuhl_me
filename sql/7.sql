@@ -7,5 +7,3 @@ CREATE TABLE IF NOT EXISTS docker_snapshot (
     description    TEXT,
     created_at     TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
-PRAGMA user_version = 7;

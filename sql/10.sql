@@ -54,5 +54,3 @@ CREATE INDEX IF NOT EXISTS firewall_lockout_status_idx ON firewall_lockout (stat
 
 CREATE UNIQUE INDEX IF NOT EXISTS firewall_lockout_active_ip_idx
     ON firewall_lockout (ip) WHERE status = 'active';
-
-PRAGMA user_version = 10;

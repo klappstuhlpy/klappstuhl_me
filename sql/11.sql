@@ -43,5 +43,3 @@ CREATE TABLE IF NOT EXISTS proxy_route
 );
 
 CREATE INDEX IF NOT EXISTS proxy_route_enabled_idx ON proxy_route (enabled);
-
-PRAGMA user_version = 11;

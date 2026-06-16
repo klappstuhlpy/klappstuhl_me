@@ -68,5 +68,3 @@ CREATE TABLE IF NOT EXISTS health_incident
 CREATE INDEX IF NOT EXISTS health_incident_target_idx   ON health_incident (target_id);
 CREATE INDEX IF NOT EXISTS health_incident_started_idx  ON health_incident (started_at DESC);
 CREATE INDEX IF NOT EXISTS health_incident_open_idx     ON health_incident (target_id, ended_at);
-
-PRAGMA user_version = 9;

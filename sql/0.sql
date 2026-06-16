@@ -59,5 +59,3 @@ CREATE TABLE IF NOT EXISTS session
 
 CREATE INDEX IF NOT EXISTS session_account_id_idx ON session (account_id);
 CREATE INDEX IF NOT EXISTS session_api_key_idx ON session (api_key);
-
-PRAGMA user_version = 1;

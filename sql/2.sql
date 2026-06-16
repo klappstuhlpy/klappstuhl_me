@@ -17,5 +17,3 @@
 --
 -- CREATE INDEX IF NOT EXISTS invite_created_by_idx ON invite (created_by);
 -- CREATE INDEX IF NOT EXISTS invite_used_idx       ON invite (used_at);
-
-PRAGMA user_version = 2;

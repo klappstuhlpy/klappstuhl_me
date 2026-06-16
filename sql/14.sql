@@ -11,5 +11,3 @@ CREATE TABLE IF NOT EXISTS short_link (
 );
 
 CREATE INDEX IF NOT EXISTS short_link_account_idx ON short_link (account_id);
-
-PRAGMA user_version = 14;

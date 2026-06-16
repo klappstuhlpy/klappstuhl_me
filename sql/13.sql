@@ -7,5 +7,3 @@ CREATE TABLE IF NOT EXISTS user_discord_links (
     linked_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     discord_avatar   TEXT
 );
-
-PRAGMA user_version = 13;
