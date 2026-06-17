@@ -28,24 +28,34 @@
     min-width: 12rem;
 }
 
-/* ── Layout: two columns side-by-side, stacking under 1100 px ── */
+/* ── Layout ───────────────────────────────────────────────────
+   Stacked, full width: the query runner on top, the table/role
+   catalog below it. `min-width: 0` lets a wide table scroll inside
+   its panel instead of pushing the page out of bounds. */
 
 .pg-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
 }
 
-@media (max-width: 1100px) {
-    .pg-grid { grid-template-columns: 1fr; }
-}
+.pg-panel--runner  { order: 0; }
+.pg-panel--catalog { order: 1; }
 
 .pg-panel {
+    min-width: 0;
     background: var(--box);
     border: 1px solid var(--box-border);
     border-radius: 0.625rem;
     padding: 1rem 1.25rem;
+}
+
+/* Wide tables (catalog + results) scroll horizontally within their panel
+   rather than clipping or forcing the whole page wider. Overrides the
+   shared `.container-table-wrap { overflow: hidden }`. */
+.pg-panel .container-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .pg-h2 {
@@ -97,21 +107,26 @@
 
 .pg-sql-input {
     width: 100%;
-    min-height: 8rem;
+    min-height: 9rem;
     box-sizing: border-box;
-    padding: 0.6rem 0.75rem;
+    padding: 0.7rem 0.85rem;
     font-family: inherit;
-    font-size: 0.82rem;
-    line-height: 1.5;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    tab-size: 4;
     background: var(--box-shade);
     color: var(--foreground);
     border: 1px solid var(--box-border);
-    border-radius: 0.375rem;
+    border-radius: 0.5rem;
     resize: vertical;
     outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.pg-sql-input:focus { border-color: var(--form-input-focus-border); }
+.pg-sql-input:focus {
+    border-color: var(--branding);
+    box-shadow: 0 0 0 2px var(--branding-dim);
+}
 
 .pg-runner-actions {
     display: flex;
@@ -128,6 +143,41 @@
 .pg-status.error  { color: var(--error-text); }
 .pg-status.ok     { color: var(--success-text); }
 
+/* ── Error box ─────────────────────────────────────────────── */
+
+.pg-error {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: 0.5rem;
+    padding: 0.7rem 0.85rem;
+    margin: 0 0 1rem;
+}
+
+.pg-error[hidden] { display: none; }
+
+.pg-error-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--error-text);
+}
+
+.pg-error-body {
+    margin: 0;
+    font-family: inherit;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--error-text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 16rem;
+    overflow: auto;
+}
+
 /* ── Results ──────────────────────────────────────────────── */
 
 .pg-result-meta {
@@ -136,8 +186,22 @@
     margin-bottom: 0.5rem;
 }
 
+/* Tall result sets scroll inside the panel (both axes) instead of
+   stretching the page; the header row stays pinned while scrolling. */
+.pg-result-scroll {
+    max-height: 28rem;
+    overflow: auto;
+}
+
 .pg-result-table {
     font-size: 0.78rem;
+}
+
+.pg-result-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--box);
 }
 
 .pg-result-table td {

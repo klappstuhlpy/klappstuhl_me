@@ -19,6 +19,8 @@ const safeToggle   = document.getElementById("safe-mode");
 const statusEl     = document.getElementById("pg-status");
 const resultMeta   = document.getElementById("pg-result-meta");
 const resultTable  = document.getElementById("pg-result-table");
+const errorBox     = document.getElementById("pg-error");
+const errorBody    = document.getElementById("pg-error-body");
 
 // Maps a source id ("sqlite:main", "pg:foo") to its backend kind.
 const dbKinds = new Map();
@@ -35,14 +37,40 @@ function showStatus(text, cls) {
     statusEl.textContent = text || "";
 }
 
+/* Pulls a usable message out of a failed Response. The backend sends
+   `{ "error": "…" }`, but we degrade gracefully: a non-JSON body is shown
+   verbatim, and as a last resort we fall back to the status code — note
+   `res.statusText` is always empty over HTTP/2, so never rely on it alone. */
+async function errorMessage(res) {
+    const text = await res.text().catch(() => "");
+    if (text) {
+        try {
+            const j = JSON.parse(text);
+            if (j && j.error) return String(j.error);
+        } catch { /* not JSON — fall through and show the raw body */ }
+        return text;
+    }
+    return `Request failed (HTTP ${res.status}${res.statusText ? " " + res.statusText : ""})`;
+}
+
+/* Renders a query error prominently in its own box (full, multi-line). */
+function showError(msg) {
+    errorBody.textContent = msg || "Unknown error";
+    errorBox.hidden = false;
+}
+
+function clearError() {
+    errorBox.hidden = true;
+    errorBody.textContent = "";
+}
+
 /* ── Databases ─────────────────────────────────────────────── */
 
 async function loadDatabases() {
     showStatus("Loading databases…");
     const res = await fetch("/admin/database/databases");
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        showStatus("Failed to list databases: " + (err.error || res.status), "error");
+        showStatus("Failed to list databases: " + (await errorMessage(res)), "error");
         return;
     }
     const dbs = await res.json();
@@ -80,8 +108,7 @@ async function loadTables(db) {
     tablesTbody.innerHTML = '<tr><td colspan="6" class="muted">Loading…</td></tr>';
     const res = await fetch(`/admin/database/tables?db=${encodeURIComponent(db)}`);
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        tablesTbody.innerHTML = `<tr><td colspan="6" class="muted">Error: ${escapeHtml(err.error || res.statusText)}</td></tr>`;
+        tablesTbody.innerHTML = `<tr><td colspan="6" class="muted">Error: ${escapeHtml(await errorMessage(res))}</td></tr>`;
         return;
     }
     const rows = await res.json();
@@ -121,8 +148,7 @@ async function loadRoles() {
     rolesTbody.innerHTML = '<tr><td colspan="5" class="muted">Loading…</td></tr>';
     const res = await fetch("/admin/database/roles");
     if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        rolesTbody.innerHTML = `<tr><td colspan="5" class="muted">Error: ${escapeHtml(err.error || res.statusText)}</td></tr>`;
+        rolesTbody.innerHTML = `<tr><td colspan="5" class="muted">Error: ${escapeHtml(await errorMessage(res))}</td></tr>`;
         return;
     }
     const rows = await res.json();
@@ -184,6 +210,7 @@ runBtn.addEventListener("click", async () => {
         return;
     }
     runBtn.disabled = true;
+    clearError();
     showStatus("Running…");
 
     // serde_urlencoded can't parse `danger_mode=` (empty) into a bool, so
@@ -201,15 +228,17 @@ runBtn.addEventListener("click", async () => {
             body,
         });
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            showStatus("Error: " + (err.error || res.statusText), "error");
+            const msg = await errorMessage(res);
+            showError(msg);
+            showStatus("Query failed", "error");
             return;
         }
         const data = await res.json();
         renderResult(data);
         showStatus(`OK · ${data.row_count} rows in ${data.elapsed_ms} ms`, "ok");
     } catch (e) {
-        showStatus("Network error: " + (e.message || e), "error");
+        showError("Network error: " + (e.message || e));
+        showStatus("Query failed", "error");
     } finally {
         runBtn.disabled = false;
     }

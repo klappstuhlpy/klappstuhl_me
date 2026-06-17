@@ -62,6 +62,13 @@ fn api_error(e: impl ToString) -> (StatusCode, Json<ApiError>) {
     (StatusCode::BAD_GATEWAY, Json(ApiError { error: e.to_string() }))
 }
 
+/// A failed query (bad SQL, missing table, type error, …) is the caller's
+/// fault, not an upstream outage — surface it as a 400 with the engine's
+/// message so the UI can show exactly what went wrong.
+fn query_error(e: impl ToString) -> (StatusCode, Json<ApiError>) {
+    (StatusCode::BAD_REQUEST, Json(ApiError { error: e.to_string() }))
+}
+
 // ─── Catalog endpoints ───────────────────────────────────────────────
 
 async fn list_databases(
@@ -174,7 +181,7 @@ async fn run_query(
         .meta(meta)
         .fire();
 
-    outcome.map(Json).map_err(api_error)
+    outcome.map(Json).map_err(query_error)
 }
 
 /// Truncates `sql` so the audit row stays small. Newlines collapsed to spaces.
