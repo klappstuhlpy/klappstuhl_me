@@ -1,7 +1,7 @@
 use crate::AppState;
 use crate::{flash::Flashes, models::Account};
 use askama::Template;
-use axum::{extract::State, response::IntoResponse, routing::get, Router};
+use axum::{extract::State, response::IntoResponse, response::Redirect, routing::get, Router};
 
 mod admin;
 mod api;
@@ -47,20 +47,11 @@ async fn index(State(state): State<AppState>, account: Option<Account>, flashes:
     }
 }
 
-#[derive(Template)]
-#[template(path = "projects.html")]
-struct ProjectsTemplate {
-    account: Option<Account>,
-    flashes: Flashes,
-    url: String,
-}
-
-async fn projects(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> impl IntoResponse {
-    ProjectsTemplate {
-        account,
-        flashes,
-        url: state.config().url_to("/projects"),
-    }
+/// The standalone projects page was folded into the homepage (`/#projects`).
+/// Kept as a redirect so old bookmarks, the spotlight palette, and the AI
+/// `navigate` tool's whitelisted `/projects` route still resolve.
+async fn projects() -> impl IntoResponse {
+    Redirect::to("/#projects")
 }
 
 pub fn all() -> Router<AppState> {

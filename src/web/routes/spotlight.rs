@@ -106,7 +106,7 @@ fn static_nav() -> Vec<SpotlightItem> {
 fn static_pages() -> Vec<SpotlightItem> {
     vec![
         SpotlightItem::page("Home", "Landing page", "/"),
-        SpotlightItem::page("Projects", "Project portfolio", "/projects"),
+        SpotlightItem::page("Projects", "Project portfolio", "/#projects"),
         SpotlightItem::page("Images", "Uploaded image gallery", "/images"),
         SpotlightItem::page("Account", "Profile, API tokens, settings", "/account"),
         SpotlightItem::page("API Docs", "OpenAPI 3.0 reference (Scalar)", "/api/docs"),

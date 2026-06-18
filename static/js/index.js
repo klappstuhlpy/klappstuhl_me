@@ -1,11 +1,18 @@
-/* Homepage animation: a text-scramble "decrypt" reveal for the name and
-   tagline, layered over a field of faint monospace code tokens drifting
-   upward. No dependencies. Honours prefers-reduced-motion (the markup
-   already contains the final text, so doing nothing is a valid state). */
+/* Homepage choreography:
+     1. a text-scramble "decrypt" reveal for the name + tagline,
+     2. a boot morph — a beat after load the terminal glides up and types in
+        more lines, opening the page to its scroll-revealed content,
+     3. scroll-reveal of the about / projects / stack sections,
+     4. ambient drifting code + a cursor-following spotlight + a subtle
+        terminal tilt.
+   No dependencies. Honours prefers-reduced-motion (the markup already holds the
+   final text and the CSS fallback is the expanded layout, so the quiet path is
+   "do almost nothing"). */
 (function () {
     "use strict";
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const finePointer = window.matchMedia("(pointer: fine)").matches;
 
     /* ── Scramble decrypt-reveal ──────────────────────────────────────
        Each character flickers through random glyphs, then locks into its
@@ -56,6 +63,48 @@
         scramble(el, parseInt(el.dataset.delay || "0", 10));
     });
 
+    /* ── Boot morph ───────────────────────────────────────────────────
+       A beat after the scramble settles, lift the terminal and reveal the
+       extra lines + the page below. CSS does the actual animation; we just
+       flip the `booted` class. Reduced-motion / no fine timing still ends in
+       the same expanded state, just instantly. */
+    function boot() { document.body.classList.add("booted"); }
+    if (reduce) {
+        boot();
+    } else {
+        // Long enough for "builds things for the web" (delay 850ms) to finish.
+        window.setTimeout(boot, 2600);
+    }
+
+    /* ── Scroll-reveal ────────────────────────────────────────────────
+       Reveal sections (and their staggered children) as they enter view. */
+    const reveals = document.querySelectorAll(".reveal");
+    if (reduce || !("IntersectionObserver" in window)) {
+        reveals.forEach((el) => el.classList.add("in"));
+    } else {
+        const io = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add("in");
+                    io.unobserve(entry.target);
+                }
+            }
+        }, { threshold: 0.15, rootMargin: "0px 0px -8% 0px" });
+        reveals.forEach((el) => io.observe(el));
+    }
+
+    /* Hide the scroll cue once the visitor has scrolled at all. */
+    let scrolled = false;
+    window.addEventListener("scroll", () => {
+        if (!scrolled && window.scrollY > 24) {
+            scrolled = true;
+            document.body.classList.add("scrolled");
+        } else if (scrolled && window.scrollY <= 24) {
+            scrolled = false;
+            document.body.classList.remove("scrolled");
+        }
+    }, { passive: true });
+
     /* ── Ambient drifting-code field ──────────────────────────────────
        A handful of code-ish tokens float up the page at low opacity. */
     const ambient = document.querySelector(".ambient");
@@ -64,7 +113,7 @@
             "fn main()", "{ }", "=>", "</>", "async", "impl", "0x1F", "use std::*",
             "match", "#[derive]", "let mut", "::", "pub fn", ".await", "Ok(())",
             "&str", "<T>", "||", "...", "return", "200 OK", "SELECT *", "git push",
-            "None", "?", "==", "->", "loop {}", "0b1010", "#7c3aed",
+            "None", "?", "==", "->", "loop {}", "0b1010", "#d97757",
         ];
         const count = window.innerWidth < 600 ? 14 : 28;
         const frag = document.createDocumentFragment();
@@ -85,15 +134,63 @@
             frag.appendChild(span);
         }
         ambient.appendChild(frag);
+    }
 
-        // Subtle parallax: nudge the whole field toward the cursor. Pointer
-        // devices only — no-op on touch where there's no hover position.
-        if (window.matchMedia("(pointer: fine)").matches) {
-            window.addEventListener("mousemove", (e) => {
-                const x = (e.clientX / window.innerWidth - 0.5) * 14;
-                const y = (e.clientY / window.innerHeight - 0.5) * 14;
+    /* ── Pointer effects (fine pointers only) ─────────────────────────
+       • parallax nudge on the ambient field,
+       • a soft spotlight that trails the cursor,
+       • a subtle 3D tilt on the hero terminal. */
+    if (finePointer && !reduce) {
+        const glow = document.querySelector(".cursor-glow");
+        const tilt = document.querySelector("[data-tilt]");
+        let raf = 0;
+        let mx = 0, my = 0;
+
+        function apply() {
+            raf = 0;
+            if (ambient) {
+                const x = (mx / window.innerWidth - 0.5) * 14;
+                const y = (my / window.innerHeight - 0.5) * 14;
                 ambient.style.transform = "translate(" + x.toFixed(1) + "px," + y.toFixed(1) + "px)";
-            }, { passive: true });
+            }
+            if (glow) {
+                glow.style.left = mx + "px";
+                glow.style.top = my + "px";
+            }
+            if (tilt) {
+                const r = tilt.getBoundingClientRect();
+                const dx = (mx - (r.left + r.width / 2)) / r.width;   // -0.5..0.5
+                const dy = (my - (r.top + r.height / 2)) / r.height;
+                // Only tilt when the cursor is reasonably near the window.
+                if (Math.abs(dx) < 1.4 && Math.abs(dy) < 1.4) {
+                    tilt.style.setProperty("--ry", (dx * 6).toFixed(2) + "deg");
+                    tilt.style.setProperty("--rx", (-dy * 6).toFixed(2) + "deg");
+                } else {
+                    tilt.style.setProperty("--ry", "0deg");
+                    tilt.style.setProperty("--rx", "0deg");
+                }
+            }
         }
+
+        window.addEventListener("mousemove", (e) => {
+            mx = e.clientX; my = e.clientY;
+            if (glow) glow.classList.add("on");
+            if (!raf) raf = requestAnimationFrame(apply);
+        }, { passive: true });
+
+        window.addEventListener("mouseleave", () => {
+            if (glow) glow.classList.remove("on");
+            if (tilt) { tilt.style.setProperty("--ry", "0deg"); tilt.style.setProperty("--rx", "0deg"); }
+        }, { passive: true });
+
+        // Per-card sheen: feed the local cursor position into the card's
+        // radial-gradient hotspot (--mx/--my used by .project-card::after).
+        document.querySelectorAll(".project-card").forEach((card) => {
+            card.addEventListener("mousemove", (e) => {
+                const r = card.getBoundingClientRect();
+                card.style.setProperty("--mx", (e.clientX - r.left) + "px");
+                card.style.setProperty("--my", (e.clientY - r.top) + "px");
+            }, { passive: true });
+        });
     }
 })();

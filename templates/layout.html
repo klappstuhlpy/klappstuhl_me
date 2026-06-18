@@ -66,7 +66,7 @@
             {# Inline site links — desktop only. On mobile they move into the
                account / menu dropdown (see the `.nav-extra` items below). #}
             {% block index_nav %}
-            <a class="nav-item not-mobile" href="/projects">Projects</a>
+            <a class="nav-item not-mobile" href="/#projects">Projects</a>
             {% endblock %}
             <span class="nav-item spacer"></span>
             {# Colour-theme toggle: the sun and moon cross-fade when clicked. #}
@@ -113,7 +113,7 @@
                        other page leaves it empty. #}
                     <a class="account-dropdown-item" role="menuitem" href="/status">Status</a>
                     <a class="account-dropdown-item" role="menuitem" href="/terminal">Terminal</a>
-                    <a class="account-dropdown-item nav-extra" role="menuitem" href="/projects">Projects</a>
+                    <a class="account-dropdown-item nav-extra" role="menuitem" href="/#projects">Projects</a>
                     {% block nav_account_github %}{% endblock %}
                     <hr class="account-dropdown-sep">
                     <a class="account-dropdown-item account-dropdown-logout" role="menuitem" href="/logout">Log out</a>
@@ -129,7 +129,7 @@
                     <span class="account-caret" aria-hidden="true"></span>
                 </button>
                 <div class="account-dropdown" role="menu">
-                    <a class="account-dropdown-item" role="menuitem" href="/projects">Projects</a>
+                    <a class="account-dropdown-item" role="menuitem" href="/#projects">Projects</a>
                     {# GitHub is index-only: index.html fills this block. #}
                     {% block nav_menu_github %}{% endblock %}
                     <a class="account-dropdown-item" role="menuitem" href="/percy/dashboard">Dashboard</a>
@@ -148,8 +148,6 @@
     <footer class="grid-item">
         <div class="copyright">
             <span>© 2026 Klappstuhl65</span>
-            <a class="footer-link" href="/status">Status</a>
-            <a class="footer-link" href="/terminal"><span class="spark" aria-hidden="true">✻</span> Terminal</a>
         </div>
         {% block footer %}{% endblock %}
     </footer>

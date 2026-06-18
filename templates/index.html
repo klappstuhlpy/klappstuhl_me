@@ -5,10 +5,15 @@
 
 <meta property="og:url" content="{{ url }}">
 <meta property="og:title" content="Home | Klappstuhl.me">
+
+{# Flag the JS-capable path before first paint so the hero can start in its
+   collapsed "pre-boot" state. Without JS (or this script), the CSS leaves the
+   page in its fully-expanded fallback layout. #}
+<script>document.documentElement.classList.add("js-index");</script>
 {% endblock %}
 
 {% block index_nav %}
-<a class="nav-item not-mobile" href="/projects">Projects</a>
+<a class="nav-item not-mobile" href="/#projects">Projects</a>
 <a class="nav-item not-mobile" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">GitHub ↗</a>
 {% endblock %}
 
@@ -27,11 +32,17 @@
 {{ flash.html()|safe }}
 {% endfor %}
 
-{# Ambient drifting-code field — populated by index.js, purely decorative. #}
+{# Ambient drifting-code field + cursor spotlight — populated/moved by index.js,
+   purely decorative. #}
 <div class="ambient" aria-hidden="true"></div>
+<div class="cursor-glow" aria-hidden="true"></div>
 
+{# ── Hero: boot-sequence terminal that rises and expands after a beat ──
+   Phase 1 (centered): whoami / tagline scramble in.
+   Phase 2 (.booted on <body>): the window glides up and more lines type in,
+   and the page below becomes reachable. #}
 <section class="hero" aria-label="klappstuhl.me">
-    <div class="term-window tui-box">
+    <div class="term-window tui-box" data-tilt>
         <div class="tui-bar">
             <span class="tui-lights"><span></span><span></span><span></span></span>
             <span class="tui-title"><span class="glyph spark">✻</span> klappstuhl@me — ~/</span>
@@ -42,10 +53,97 @@
             <h1 class="hero-name"><span class="scramble" data-final="klappstuhl.me">klappstuhl.me</span></h1>
             <p class="tui-prompt" data-prompt="$">cat tagline.txt</p>
             <p class="hero-tag"><span class="scramble" data-final="builds things for the web" data-delay="850">builds things for the web</span></p>
-            <p class="tui-prompt" data-prompt="$"><span class="blink" aria-hidden="true">▋</span></p>
+
+            {# Extra lines that type in only after the window has risen (phase 2).
+               Hidden in the JS path until then; shown by default without JS. #}
+            <div class="boot-extra">
+                <p class="tui-prompt" data-prompt="$">uname -a</p>
+                <p class="hero-out">klappstuhl · rust · python · self-hosted · 24/7</p>
+                <p class="tui-prompt" data-prompt="$">ls ~/projects</p>
+                <p class="hero-out hero-projects-line">Percy&nbsp;&nbsp;RoboHashira&nbsp;&nbsp;klappstuhl_me</p>
+                <p class="tui-prompt" data-prompt="$"><span class="blink" aria-hidden="true">▋</span></p>
+            </div>
         </div>
     </div>
+
+    {# Scroll affordance — fades in once booted, hides again on scroll. #}
+    <a class="scroll-cue" href="#about" aria-label="Scroll down">
+        <span class="scroll-cue-label">scroll</span>
+        <span class="scroll-cue-arrow" aria-hidden="true">▾</span>
+    </a>
 </section>
+
+{# ── Folded-in content: about + projects + stack, revealed on scroll ── #}
+<div class="page-content">
+
+    <section id="about" class="content-section reveal">
+        <p class="section-kicker">// about</p>
+        <h2 class="section-title">A homelab that grew a homepage.</h2>
+        <p class="section-lead">
+            <span class="prompt-inline">$</span> klappstuhl.me started as a personal image host and
+            turned into a self-hosted control room — live server metrics, Docker control, firewall and
+            reverse-proxy management, uptime monitoring and an admin shell — all driven from a single
+            Rust binary. Below: the things I build and keep running.
+        </p>
+    </section>
+
+    <section id="projects" class="content-section reveal">
+        <p class="section-kicker">// projects</p>
+        <h2 class="section-title">Things I build</h2>
+
+        <div class="project-grid">
+            <a class="project-card reveal" href="https://github.com/klappstuhlpy/Percy" target="_blank" rel="noopener" style="--i:0">
+                <div class="project-header">
+                    <span class="project-name"><span class="spark" aria-hidden="true">✻</span> Percy</span>
+                    <span class="project-tag">Python</span>
+                </div>
+                <p class="project-desc">A multipurpose Discord bot featuring moderation, music playback, leveling, economy and a full web dashboard.</p>
+                <span class="project-link">github.com/klappstuhlpy/Percy ↗</span>
+            </a>
+
+            <a class="project-card reveal" href="https://github.com/klappstuhlpy/RoboHashira" target="_blank" rel="noopener" style="--i:1">
+                <div class="project-header">
+                    <span class="project-name"><span class="spark" aria-hidden="true">✻</span> RoboHashira</span>
+                    <span class="project-tag">Python</span>
+                </div>
+                <p class="project-desc">A Discord bot with anime tracking, manga reader integration, and community tools.</p>
+                <span class="project-link">github.com/klappstuhlpy/RoboHashira ↗</span>
+            </a>
+
+            <a class="project-card reveal" href="https://github.com/klappstuhlpy/klappstuhl_me" target="_blank" rel="noopener" style="--i:2">
+                <div class="project-header">
+                    <span class="project-name"><span class="spark" aria-hidden="true">✻</span> klappstuhl.me</span>
+                    <span class="project-tag">Rust</span>
+                </div>
+                <p class="project-desc">This website — a personal image host and homelab admin platform built with Axum and SQLite.</p>
+                <span class="project-link">github.com/klappstuhlpy/klappstuhl_me ↗</span>
+            </a>
+        </div>
+    </section>
+
+    <section id="stack" class="content-section reveal">
+        <p class="section-kicker">// stack</p>
+        <h2 class="section-title">The toolbox</h2>
+        <ul class="stack-grid">
+            <li class="stack-chip reveal" style="--i:0">Rust</li>
+            <li class="stack-chip reveal" style="--i:1">Python</li>
+            <li class="stack-chip reveal" style="--i:2">Axum</li>
+            <li class="stack-chip reveal" style="--i:3">Tokio</li>
+            <li class="stack-chip reveal" style="--i:4">SQLite</li>
+            <li class="stack-chip reveal" style="--i:5">PostgreSQL</li>
+            <li class="stack-chip reveal" style="--i:6">discord.py</li>
+            <li class="stack-chip reveal" style="--i:7">Docker</li>
+            <li class="stack-chip reveal" style="--i:8">Linux</li>
+        </ul>
+
+        <div class="cta reveal">
+            <a class="button primary cta-button" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">
+                <span class="spark" aria-hidden="true">✻</span> See it all on GitHub ↗
+            </a>
+        </div>
+    </section>
+
+</div>
 {% endblock %}
 
 {% block body_end %}
