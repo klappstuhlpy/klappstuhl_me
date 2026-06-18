@@ -15,8 +15,11 @@
         <div class="dash-sidebar-top">
             <a href="/percy/dashboard" class="dash-sidebar-back">&larr; All servers</a>
             <div class="dash-sidebar-guild">
-                <span class="dash-sidebar-guild-name" title="{{ guild.name }}">{{ guild.name }}</span>
-                <span class="dash-sidebar-guild-sub">Server dashboard</span>
+                <span class="dash-sidebar-guild-mark" aria-hidden="true"><span class="spark">✻</span></span>
+                <div class="dash-sidebar-guild-text">
+                    <span class="dash-sidebar-guild-name" title="{{ guild.name }}">{{ guild.name }}</span>
+                    <span class="dash-sidebar-guild-sub">Server dashboard</span>
+                </div>
             </div>
         </div>
         <button type="button" class="dash-sidebar-toggle" aria-expanded="false" aria-controls="dash-sidebar"><span>Menu</span></button>
@@ -49,7 +52,7 @@
     </aside>
 
     <div class="dashboard-content">
-    <div class="guild-header">
+    <div class="guild-header dash-rise">
         {% match guild.icon_url %}
         {% when Some with (url) %}
         <img class="guild-header-icon" src="{{ url }}?size=128" alt="" width="64" height="64">

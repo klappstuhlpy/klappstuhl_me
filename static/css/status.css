@@ -6,15 +6,30 @@
     padding: 1rem 0 3rem;
 }
 
+.status-kicker {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+    animation: page-rise 0.5s both;
+}
+.status-kicker-prompt { color: var(--prompt); font-weight: 700; }
+
 .status-banner {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.9rem;
     padding: 1.25rem 1.5rem;
     border: 1px solid var(--box-border);
     border-radius: 14px;
-    background: var(--box-shade);
+    background:
+        radial-gradient(130% 180% at 0% 0%, color-mix(in srgb, var(--accent, var(--text-muted)) 16%, transparent), transparent 60%),
+        var(--box-shade);
     margin-bottom: 1.5rem;
+    overflow: hidden;
+    animation: page-rise 0.5s both;
+    animation-delay: 0.05s;
 }
 
 .status-banner h1 {
@@ -28,10 +43,10 @@
     font-size: 0.9rem;
 }
 
-/* Status banner accent by overall state */
-.status-banner.up       { border-color: var(--success-border); }
-.status-banner.degraded { border-color: var(--warning-border); }
-.status-banner.down     { border-color: var(--error-border); }
+/* Status banner accent by overall state (drives border + the corner glow) */
+.status-banner.up       { border-color: var(--success-border); --accent: var(--success-text); }
+.status-banner.degraded { border-color: var(--warning-border); --accent: var(--warning-text); }
+.status-banner.down     { border-color: var(--error-border);   --accent: var(--error-text); }
 
 /* Coloured dot */
 .status-dot {
@@ -56,6 +71,8 @@
     border: 1px solid var(--box-border);
     border-radius: 14px;
     overflow: hidden;
+    animation: page-rise 0.5s both;
+    animation-delay: 0.1s;
 }
 
 .status-row {
@@ -64,7 +81,9 @@
     gap: 0.75rem;
     padding: 0.85rem 1.1rem;
     border-bottom: 1px solid var(--box-border);
+    transition: background 140ms ease;
 }
+.status-row:hover { background: var(--box-shade); }
 .status-row:last-child { border-bottom: none; }
 
 .status-name {
@@ -99,4 +118,10 @@
     font-size: 0.9rem;
     text-align: center;
     margin-top: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status-kicker,
+    .status-banner,
+    .status-list { animation: none; }
 }

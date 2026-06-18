@@ -13,8 +13,10 @@
 {{ flash.html()|safe }}
 {%- endfor -%}
 
-<h1>Your Images</h1>
-
+<div class="page-head">
+    <h1>Your Images</h1>
+    <p class="page-head-sub"><span class="page-head-prompt">$</span> ls ~/gallery</p>
+</div>
 
 <div class="toolbar">
     <div class="text-input-container">

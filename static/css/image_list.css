@@ -1,8 +1,6 @@
-/* Toolbar */
+/* Page header — primitives now live in base.css (.page-head/.page-head-sub). */
 
-h1 {
-    margin-bottom: 1.5rem;
-}
+/* Toolbar */
 
 .toolbar {
     display: flex;
@@ -133,17 +131,35 @@ h1 {
     border-radius: 8px;
     overflow: hidden;
     transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+    animation: card-rise 0.4s both;
 }
 
 .entry:hover {
     border-color: var(--branding);
-    box-shadow: 0 4px 18px -8px rgba(124, 58, 237, 0.45);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--branding) 70%, transparent);
 }
 
 .entry:has(.file-bulk input[type="checkbox"]:checked) {
     border-color: var(--branding);
-    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.55), 0 4px 18px -8px rgba(124, 58, 237, 0.55);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--branding) 60%, transparent),
+                0 4px 18px -8px color-mix(in srgb, var(--branding) 60%, transparent);
 }
+
+/* Subtle staggered entrance for the first rows; later cards just fade in. */
+@keyframes card-rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+}
+.entry:nth-child(2)  { animation-delay: 0.02s; }
+.entry:nth-child(3)  { animation-delay: 0.05s; }
+.entry:nth-child(4)  { animation-delay: 0.08s; }
+.entry:nth-child(5)  { animation-delay: 0.11s; }
+.entry:nth-child(6)  { animation-delay: 0.14s; }
+.entry:nth-child(7)  { animation-delay: 0.17s; }
+.entry:nth-child(8)  { animation-delay: 0.20s; }
+.entry:nth-child(9)  { animation-delay: 0.23s; }
+.entry:nth-child(n+10) { animation-delay: 0.26s; }
 
 .entry:has(.file-bulk input[type="checkbox"]:checked) .card-thumb {
     opacity: 0.72;
@@ -298,7 +314,7 @@ h1 {
     background: rgb(var(--primary-button-rgb));
     border-color: rgb(var(--primary-button-rgb));
     color: var(--button-text);
-    box-shadow: 0 2px 10px rgba(124, 58, 237, 0.45);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--branding) 50%, transparent);
 }
 
 .file-bulk:has(input[type="checkbox"]:checked)::after {
@@ -391,4 +407,10 @@ h1 {
     padding: 0.35rem 0.5rem;
     font-size: 0.85rem;
     cursor: pointer;
+}
+
+/* Respect reduced-motion: keep the cards, drop the entrance + hover lift. */
+@media (prefers-reduced-motion: reduce) {
+    .entry { animation: none; }
+    .entry:hover { transform: none; }
 }

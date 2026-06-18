@@ -12,21 +12,6 @@
 <script>document.documentElement.classList.add("js-index");</script>
 {% endblock %}
 
-{% block index_nav %}
-<a class="nav-item not-mobile" href="/#projects">Projects</a>
-<a class="nav-item not-mobile" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">GitHub ↗</a>
-{% endblock %}
-
-{# GitHub in the mobile dropdown is index-only — these blocks are empty on
-   every other page. Mirrors the desktop inline GitHub link above. #}
-{% block nav_account_github %}
-<a class="account-dropdown-item nav-extra" role="menuitem" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">GitHub ↗</a>
-{% endblock %}
-
-{% block nav_menu_github %}
-<a class="account-dropdown-item" role="menuitem" href="https://github.com/klappstuhlpy" target="_blank" rel="noopener">GitHub ↗</a>
-{% endblock %}
-
 {% block body %}
 {% for flash in flashes %}
 {{ flash.html()|safe }}

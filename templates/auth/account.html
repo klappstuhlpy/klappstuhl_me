@@ -16,7 +16,11 @@
 {# ─── Header ──────────────────────────────────────────────────── #}
 <div class="account-header">
     <div class="account-identity">
-        <h1 class="account-name">{{ user.name }}</h1>
+        <span class="account-avatar-mark" aria-hidden="true"><span class="spark">✻</span></span>
+        <div class="account-id-text">
+            <h1 class="account-name">{{ user.name }}</h1>
+            <p class="account-handle"><span class="account-handle-prompt">$</span> ~/account{% if user.flags.is_admin() %} · <span class="account-handle-root">root</span>{% endif %}</p>
+        </div>
         {% if user.flags.is_admin() %}
         <span class="badge branding">Admin</span>
         {% endif %}

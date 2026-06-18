@@ -2,29 +2,55 @@
 
 .links-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 1rem;
     flex-wrap: wrap;
 }
 
+.links-head-text { min-width: 0; }
+
 .links-quota {
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    color: var(--branding-bright);
+    font-size: 0.8rem;
     white-space: nowrap;
+    padding: 0.3rem 0.7rem;
+    border-radius: 9999px;
+    border: 1px solid color-mix(in srgb, var(--branding) 35%, transparent);
+    background: var(--branding-dim);
 }
 
 /* --- Create form --------------------------------------------------------- */
 .link-create {
+    position: relative;
     display: flex;
     gap: 0.75rem;
     align-items: flex-end;
     flex-wrap: wrap;
     margin: 1.25rem 0 2rem;
-    padding: 1rem;
-    background: var(--box);
+    padding: 1.1rem 1.2rem;
+    background:
+        radial-gradient(120% 160% at 0% 0%, var(--branding-dim), transparent 55%),
+        var(--box);
     border: 1px solid var(--box-border);
-    border-radius: 8px;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 180ms ease;
+    animation: page-rise 0.5s both;
+    animation-delay: 0.04s;
+}
+
+/* Coral hairline accent down the left edge, echoing the account header. */
+.link-create::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(var(--branding), transparent);
+}
+
+.link-create:focus-within {
+    border-color: color-mix(in srgb, var(--branding) 45%, var(--box-border));
 }
 
 .link-create-field {
@@ -106,8 +132,10 @@
     display: flex;
     flex-direction: column;
     border: 1px solid var(--box-border);
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
+    animation: page-rise 0.5s both;
+    animation-delay: 0.09s;
 }
 
 .links-row {
@@ -117,6 +145,11 @@
     align-items: center;
     padding: 0.7rem 0.9rem;
     border-bottom: 1px solid var(--box-border);
+    transition: background 140ms ease;
+}
+
+.links-row:not(.links-row-head):hover {
+    background: var(--box-shade);
 }
 
 .links-row:last-child {
@@ -212,9 +245,21 @@
     font-size: 0.8rem;
 }
 
-/* --- Edit modal ---------------------------------------------------------- */
+/* --- Edit modal ----------------------------------------------------------
+   The fields sit directly in the dialog <form> (no .form-container wrapper),
+   so they need the same 1.5rem horizontal inset the base dialog gives the
+   <h1> and <footer>, plus breathing room under the heading. */
 #edit-link-modal .link-create-field {
-    margin-bottom: 1rem;
+    padding: 0 1.5rem;
+    margin-bottom: 0.875rem;
+}
+
+#edit-link-modal .link-create-field:first-of-type {
+    margin-top: 0.75rem;
+}
+
+#edit-link-modal .link-create-field:last-of-type {
+    margin-bottom: 0.25rem;
 }
 
 #edit-link-modal input[type="text"] {
@@ -229,6 +274,11 @@
 
 #edit-link-modal .alias-input input {
     width: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .link-create,
+    .links-table { animation: none; }
 }
 
 @media (max-width: 720px) {

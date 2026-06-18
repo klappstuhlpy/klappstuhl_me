@@ -6,6 +6,23 @@
     padding: 0 1.5rem;
 }
 
+/* ── Shared staggered entrance ───────────────────────────────────────────
+   Add `dash-rise` to any block for a gentle rise-and-fade on load; set
+   `--i` on grid children for a cascade. Guarded for reduced-motion below. */
+@keyframes dash-rise {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: none; }
+}
+.dash-rise {
+    animation: dash-rise 0.5s both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+}
+@media (prefers-reduced-motion: reduce) {
+    .dash-rise { animation: none; }
+}
+
+.dash-h1-glyph { color: var(--branding); font-size: 0.8em; margin-right: 0.15rem; }
+
 /* ── Wide shell layout (sidebar + content) ───────────────────────────────
    The dashboard reclaims the horizontal padding the global layout reserves
    on `main` so guild management can use the full width of the viewport. The
@@ -58,10 +75,30 @@ main.grid-item:has(.dashboard-shell) {
 
 .dash-sidebar-guild {
     display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
     padding-bottom: 0.85rem;
     border-bottom: 1px solid var(--box-border);
+}
+.dash-sidebar-guild-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    flex-shrink: 0;
+    border-radius: 0.55rem;
+    background: var(--tui-bg);
+    border: 1px solid color-mix(in srgb, var(--branding) 40%, var(--box-border));
+    box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--branding) 80%, transparent);
+}
+.dash-sidebar-guild-mark .spark { color: var(--branding); font-size: 1rem; }
+.dash-sidebar-guild-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
 }
 .dash-sidebar-guild-name {
     font-size: 0.95rem;
@@ -70,7 +107,6 @@ main.grid-item:has(.dashboard-shell) {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-top: 0.75rem;
 }
 .dash-sidebar-guild-sub {
     font-size: 0.68rem;
@@ -131,11 +167,12 @@ main.grid-item:has(.dashboard-shell) {
     color: var(--nav-link);
     text-decoration: none;
     border: 1px solid transparent;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
 }
 .dash-nav-link:hover {
     background: var(--box-shade);
     color: var(--foreground);
+    transform: translateX(2px);
 }
 .dash-nav-link.active {
     background: var(--branding-dim);
@@ -241,12 +278,31 @@ main.grid-item:has(.dashboard-shell) {
 }
 .dashboard-back:hover { color: var(--branding); }
 
+.guilds-count {
+    align-self: center;
+    font-size: 0.78rem;
+    color: var(--branding-bright);
+    white-space: nowrap;
+    padding: 0.3rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid color-mix(in srgb, var(--branding) 35%, transparent);
+    background: var(--branding-dim);
+}
+
 .dashboard-empty {
     text-align: center;
     padding: 4rem 1rem;
-    background: var(--box);
+    background:
+        radial-gradient(90% 120% at 50% 0%, var(--branding-dim), transparent 60%),
+        var(--box);
     border: 1px solid var(--box-border);
-    border-radius: 0.625rem;
+    border-radius: 0.9rem;
+}
+.dashboard-empty-glyph {
+    font-size: 2.25rem;
+    color: var(--branding);
+    display: block;
+    margin-bottom: 0.75rem;
 }
 .dashboard-empty h1 {
     font-size: 1.25rem;
@@ -389,15 +445,28 @@ a.invite-percy-btn:hover {
 }
 
 .percy-feature {
-    padding: 1.25rem 1.35rem;
+    padding: 1.35rem 1.4rem;
     background: var(--box);
     border: 1px solid var(--box-border);
-    border-radius: 0.625rem;
-    transition: border-color 0.15s, transform 0.15s;
+    border-radius: 0.8rem;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 .percy-feature:hover {
-    border-color: var(--branding);
-    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--branding) 55%, var(--box-border));
+    transform: translateY(-3px);
+    box-shadow: 0 14px 30px -16px color-mix(in srgb, var(--branding) 65%, transparent);
+}
+.percy-feature-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0.6rem;
+    font-size: 1.15rem;
+    background: var(--branding-dim);
+    border: 1px solid color-mix(in srgb, var(--branding) 30%, transparent);
 }
 .percy-feature h3 {
     margin: 0 0 0.4rem;
@@ -415,37 +484,69 @@ a.invite-percy-btn:hover {
 
 .guild-grid {
     display: grid;
-    /* minmax(0, 1fr) caps the track at the container width — without the 0
-       minimum the implicit `auto` track expands to the (nowrap) guild name's
-       full width, overflowing the viewport on mobile instead of truncating. */
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.75rem;
+    /* A responsive card grid; minmax(0, …) keeps long guild names truncating
+       instead of stretching the track and overflowing on mobile. */
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 0.9rem;
 }
 
 .guild-card {
+    position: relative;
     display: flex;
     align-items: center;
     min-width: 0;
     gap: 1rem;
-    padding: 1rem 1.25rem;
-    border-radius: 0.625rem;
+    padding: 1.1rem 1.25rem;
+    border-radius: 0.8rem;
     background: var(--box);
     border: 1px solid var(--box-border);
     text-decoration: none;
     color: var(--foreground);
-    transition: border-color 0.15s, background 0.15s;
-}
-.guild-card:hover {
-    border-color: var(--branding);
-    background: var(--box-shade);
+    overflow: hidden;
+    transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
+/* A coral corner glow that blooms on hover. */
+.guild-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(120% 140% at 0% 0%, var(--branding-dim), transparent 55%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+.guild-card:hover {
+    border-color: color-mix(in srgb, var(--branding) 55%, var(--box-border));
+    background: var(--box-shade);
+    transform: translateY(-3px);
+    box-shadow: 0 14px 30px -16px color-mix(in srgb, var(--branding) 70%, transparent);
+}
+.guild-card:hover::before { opacity: 1; }
+
+.guild-card-arrow {
+    flex-shrink: 0;
+    color: var(--branding);
+    font-size: 1.1rem;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.guild-card:hover .guild-card-arrow { opacity: 1; transform: translateX(0); }
+
+.guild-owner-badge { flex-shrink: 0; }
+
 .guild-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
+    width: 56px;
+    height: 56px;
+    border-radius: 0.7rem;
     object-fit: cover;
     flex-shrink: 0;
+    border: 1px solid var(--box-border);
+    transition: border-color 0.18s ease;
+}
+.guild-card:hover .guild-icon {
+    border-color: color-mix(in srgb, var(--branding) 50%, var(--box-border));
 }
 .guild-icon-placeholder {
     display: flex;
@@ -482,15 +583,21 @@ a.invite-percy-btn:hover {
     display: flex;
     align-items: center;
     gap: 1.25rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--box-border);
+    padding: 1.4rem 1.5rem;
+    border: 1px solid var(--box-border);
+    border-radius: 0.9rem;
+    background:
+        radial-gradient(110% 160% at 0% 0%, var(--branding-dim), transparent 55%),
+        var(--box);
     margin-bottom: 1.5rem;
 }
 .guild-header-icon {
     width: 64px;
     height: 64px;
-    border-radius: 50%;
+    border-radius: 0.8rem;
     object-fit: cover;
+    border: 1px solid color-mix(in srgb, var(--branding) 40%, var(--box-border));
+    box-shadow: 0 8px 22px -12px color-mix(in srgb, var(--branding) 70%, transparent);
 }
 .guild-header-name {
     font-size: 1.5rem;
@@ -502,18 +609,32 @@ a.invite-percy-btn:hover {
 
 .config-section {
     margin-bottom: 1.5rem;
-    padding: 1.25rem;
-    border-radius: 0.625rem;
+    padding: 1.25rem 1.4rem;
+    border-radius: 0.8rem;
     background: var(--box);
     border: 1px solid var(--box-border);
+    transition: border-color 0.18s ease;
+}
+.config-section:hover {
+    border-color: color-mix(in srgb, var(--branding) 30%, var(--box-border));
 }
 .config-section h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
     font-size: 0.8rem;
     margin-bottom: 1rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-weight: 600;
+}
+/* Coral terminal glyph before each config section title. */
+.config-section h2::before {
+    content: "✻";
+    color: var(--branding);
+    font-size: 0.9em;
+    text-transform: none;
 }
 
 .config-grid {
@@ -1525,14 +1646,33 @@ th.th-sortable[aria-sort="descending"]::after {
 }
 
 .metric-tile {
+    position: relative;
     background: var(--box);
     border: 1px solid var(--box-border);
-    border-radius: 0.625rem;
+    border-radius: 0.7rem;
     padding: 1rem 1.25rem;
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
+    overflow: hidden;
+    transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
+/* A coral accent line along the top edge, revealed on hover. */
+.metric-tile::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--branding), transparent);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+.metric-tile:hover {
+    border-color: color-mix(in srgb, var(--branding) 45%, var(--box-border));
+    transform: translateY(-2px);
+    box-shadow: 0 12px 26px -16px color-mix(in srgb, var(--branding) 65%, transparent);
+}
+.metric-tile:hover::before { opacity: 1; }
 
 .tile-label {
     font-size: 0.68rem;

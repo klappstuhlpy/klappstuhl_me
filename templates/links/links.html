@@ -13,8 +13,11 @@
 {{ flash.html()|safe }}
 {%- endfor -%}
 
-<div class="links-head">
-    <h1>Your Short Links</h1>
+<div class="links-head page-head">
+    <div class="links-head-text">
+        <h1>Your Short Links</h1>
+        <p class="page-head-sub"><span class="page-head-prompt">$</span> ln -s &lt;url&gt; ~/links</p>
+    </div>
     {% if is_admin %}
     <span class="links-quota">Unlimited (admin)</span>
     {% else %}

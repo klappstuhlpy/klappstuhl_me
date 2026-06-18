@@ -32,6 +32,7 @@
     border-bottom: 1px solid var(--box-border);
     margin-bottom: 0.5rem;
 }
+.admin-sidebar-title .spark { color: var(--branding); text-transform: none; }
 
 .admin-nav {
     display: flex;
@@ -40,6 +41,7 @@
 }
 
 .admin-nav-item {
+    position: relative;
     display: flex;
     align-items: center;
     padding: 0.5rem 0.75rem;
@@ -47,18 +49,31 @@
     color: var(--nav-link);
     text-decoration: none;
     font-size: 0.875rem;
-    transition: background 0.12s, color 0.12s;
+    transition: background 0.12s, color 0.12s, transform 0.12s;
 }
 
 .admin-nav-item:hover {
     background: var(--box-shade);
     color: var(--foreground);
+    transform: translateX(2px);
 }
 
 .admin-nav-item.active {
-    background: rgb(237 153 58 / 0.12);
-    color: var(--foreground);
+    background: var(--branding-dim);
+    color: var(--branding);
     font-weight: 600;
+}
+/* Coral accent bar on the active item, matching the bot dashboard. */
+.admin-nav-item.active::before {
+    content: "";
+    position: absolute;
+    left: -0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 1.1rem;
+    border-radius: 0 3px 3px 0;
+    background: var(--branding);
 }
 
 .admin-nav-item.disabled {
@@ -232,6 +247,12 @@
   padding: 1rem 1.25rem;
   border-radius: 0.5rem;
   min-width: 150px;
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+
+.statistic-box:hover {
+  border-color: color-mix(in srgb, var(--branding) 45%, var(--box-border));
+  transform: translateY(-2px);
 }
 
 .statistic-box > .title {

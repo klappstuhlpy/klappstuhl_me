@@ -1181,6 +1181,39 @@ button:hover .spark,
     .thinking::before, .blink, .spark { animation: none !important; }
 }
 
+/* ── Page header (reusable) ───────────────────────────────────────
+   A title + a dim shell-prompt subtitle over a hairline divider. Used on
+   the gallery, short-links, and other inner pages to give them the same
+   terminal-flavoured heading. Pair `.page-head-sub` with a leading
+   `.page-head-prompt` span ("$"). */
+
+.page-head {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--box-border);
+}
+
+.page-head > h1 { margin: 0; }
+
+.page-head-sub {
+    margin: 0.3rem 0 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+}
+
+.page-head-prompt { color: var(--prompt); font-weight: 700; }
+
+/* A gentle rise-and-fade used for staggered entrances on inner pages. */
+@keyframes page-rise {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .page-rise { animation: none !important; }
+}
+
 /* ── CLI error page ──────────────────────────────────────────────── */
 
 .error-cli {

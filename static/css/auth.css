@@ -9,15 +9,31 @@
 }
 
 .login-card {
-    background: var(--box);
+    position: relative;
+    background:
+        radial-gradient(120% 90% at 50% 0%, var(--branding-dim), transparent 55%),
+        var(--box);
     border: 1px solid var(--box-border);
-    border-radius: 0.75rem;
+    border-radius: 0.9rem;
     padding: 2.25rem 2rem 2.5rem;
     width: 100%;
     max-width: 22rem;
     display: flex;
     flex-direction: column;
     align-items: center;
+    overflow: hidden;
+    box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.8);
+    animation: page-rise 0.5s both;
+}
+
+/* A coral hairline glowing across the top edge of the card. */
+.login-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--branding), transparent);
+    opacity: 0.8;
 }
 
 /* ── Brand mark ──────────────────────────────────────────────── */
@@ -28,14 +44,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 0.5rem;
-    background: var(--branding);
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.7rem;
+    background: linear-gradient(160deg, var(--branding-bright), var(--branding));
     color: #fff;
-    font-weight: 700;
-    font-size: 1.1rem;
+    font-size: 1.4rem;
+    box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--branding) 85%, transparent);
 }
+.login-brand-mark .spark { display: inline-block; }
 
 .login-title {
     font-size: 1.35rem;
@@ -260,27 +277,76 @@ a.login-discord:hover {
 /* ── Account page header ─────────────────────────────────────── */
 
 .account-header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 1rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--box-border);
-    margin-bottom: 2rem;
+    padding: 1.5rem 1.6rem;
+    margin-bottom: 1.75rem;
+    border: 1px solid var(--box-border);
+    border-radius: 0.85rem;
+    background:
+        radial-gradient(120% 140% at 0% 0%, var(--branding-dim), transparent 55%),
+        var(--box);
+    overflow: hidden;
+    animation: account-rise 0.5s both;
+}
+
+/* A coral hairline accent running down the left edge. */
+.account-header::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(var(--branding), transparent);
 }
 
 .account-identity {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.9rem;
+}
+
+.account-avatar-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex-shrink: 0;
+    border-radius: 0.7rem;
+    background: var(--tui-bg);
+    border: 1px solid color-mix(in srgb, var(--branding) 40%, var(--box-border));
+    box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--branding) 80%, transparent);
+}
+.account-avatar-mark .spark {
+    color: var(--branding);
+    font-size: 1.3rem;
+}
+
+.account-id-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
 }
 
 .account-name {
     margin: 0;
     font-size: 1.5rem;
     font-weight: 700;
+    line-height: 1.1;
 }
+
+.account-handle {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+}
+.account-handle-prompt { color: var(--prompt); font-weight: 700; }
+.account-handle-root { color: var(--branding); }
 
 .account-header-actions {
     display: flex;
@@ -289,18 +355,55 @@ a.login-discord:hover {
     flex-wrap: wrap;
 }
 
-/* ── Account sections ────────────────────────────────────────── */
+/* ── Account sections (card surfaces) ────────────────────────── */
 
-.account-section { margin-bottom: 2rem; }
+.account-section {
+    position: relative;
+    margin-bottom: 1.25rem;
+    padding: 1.25rem 1.5rem 1.4rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.85rem;
+    transition: border-color 180ms ease, transform 180ms ease;
+    animation: account-rise 0.5s both;
+}
+
+.account-section:hover {
+    border-color: color-mix(in srgb, var(--branding) 45%, var(--box-border));
+}
+
+/* Gentle staggered entrance for the stack of section cards. */
+.account-section:nth-of-type(1) { animation-delay: 0.04s; }
+.account-section:nth-of-type(2) { animation-delay: 0.09s; }
+.account-section:nth-of-type(3) { animation-delay: 0.14s; }
+.account-section:nth-of-type(4) { animation-delay: 0.19s; }
+.account-section:nth-of-type(5) { animation-delay: 0.24s; }
+.account-section:nth-of-type(6) { animation-delay: 0.29s; }
+
+@keyframes account-rise {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: none; }
+}
 
 .account-section > h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
     margin-top: 0;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.65rem;
     font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-muted);
+}
+
+/* Coral terminal glyph before each section title. */
+.account-section > h2::before {
+    content: "✻";
+    color: var(--branding);
+    font-size: 0.85em;
+    text-transform: none;
 }
 
 .account-section > h3 {
@@ -325,7 +428,9 @@ a.login-discord:hover {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1.25rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.25rem;
+    animation: account-rise 0.5s both;
+    animation-delay: 0.02s;
 }
 
 @media (max-width: 768px) {
@@ -371,6 +476,7 @@ a.login-discord:hover {
 .quick-link:hover {
     background: var(--box);
     border-color: var(--branding);
+    transform: translateY(-2px);
 }
 
 .quick-link.external::after {
@@ -548,12 +654,13 @@ a.login-discord:hover {
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1rem;
-    background: var(--box);
+    background: var(--box-shade);
     gap: 1rem;
+    transition: background 0.12s ease;
 }
 
 .session + .session { border-top: 1px solid var(--box-border); }
-.session:hover { background: var(--box-shade); }
+.session:hover { background: var(--tui-bg); }
 
 .session-info {
     display: flex;
@@ -580,4 +687,13 @@ a.login-discord:hover {
 #change-password-modal,
 #disable-2fa-modal {
     width: min(440px, 92vw);
+}
+
+/* Respect reduced-motion: keep the layout, drop the entrance + lift. */
+@media (prefers-reduced-motion: reduce) {
+    .account-header,
+    .account-section,
+    .quick-links-section,
+    .login-card { animation: none; }
+    .quick-link:hover { transform: none; }
 }

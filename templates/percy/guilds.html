@@ -10,15 +10,19 @@
 
 {% block body %}
 <div class="dashboard-container">
-    <div class="dashboard-header">
+    <div class="dashboard-header dash-rise">
         <div>
-            <h1>Bot Dashboard</h1>
-            <p>Select a server to manage Percy's configuration.</p>
+            <h1><span class="spark dash-h1-glyph" aria-hidden="true">✻</span> Your Servers</h1>
+            <p>Pick a server to manage Percy's configuration.</p>
         </div>
+        {% if !guilds.is_empty() %}
+        <span class="guilds-count">{{ guilds.len() }} server{% if guilds.len() != 1 %}s{% endif %}</span>
+        {% endif %}
     </div>
 
     {% if guilds.is_empty() %}
-    <div class="dashboard-empty">
+    <div class="dashboard-empty dash-rise">
+        <div class="dashboard-empty-glyph spark" aria-hidden="true">✻</div>
         <h1>No servers found</h1>
         <p>Make sure Percy is in your server and you have <strong>Manage Server</strong> or <strong>Administrator</strong> permissions.</p>
         <a href="{{ invite_url }}" target="_blank" rel="noopener" class="invite-percy-btn">
@@ -29,10 +33,10 @@
     {% else %}
     <div class="guild-grid">
         {% for guild in guilds %}
-        <a href="/percy/dashboard/guild/{{ guild.id }}" class="guild-card button-card">
+        <a href="/percy/dashboard/guild/{{ guild.id }}" class="guild-card button-card dash-rise" style="--i:{{ loop.index0 }}">
             {% match guild.icon_url %}
             {% when Some with (url) %}
-            <img class="guild-icon" src="{{ url }}?size=128" alt="" width="48" height="48">
+            <img class="guild-icon" src="{{ url }}?size=128" alt="" width="56" height="56">
             {% when None %}
             <div class="guild-icon guild-icon-placeholder">{{ guild.name.chars().next().unwrap_or('?') }}</div>
             {% endmatch %}
@@ -42,11 +46,13 @@
                 {% when Some with (count) %}
                 <span class="guild-members">{{ count }} members</span>
                 {% when None %}
+                <span class="guild-members">Tap to manage</span>
                 {% endmatch %}
             </div>
             {% if guild.owner %}
-            <span class="badge branding">Owner</span>
+            <span class="badge branding guild-owner-badge">Owner</span>
             {% endif %}
+            <span class="guild-card-arrow" aria-hidden="true">→</span>
         </a>
         {% endfor %}
     </div>
