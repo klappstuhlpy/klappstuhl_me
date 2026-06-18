@@ -186,29 +186,50 @@
                 return d.toISOString().split('T')[0];
             }
 
-            // Build weeks (columns of 7 days)
-            let html = '<div class="heatmap-grid">';
+            const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            // Build weeks (columns of 7 days), recording the month each column
+            // starts in so we can render aligned month labels above the grid.
+            const colMonths = [];
+            let gridHtml = '<div class="heatmap-grid">';
             const d = new Date(startDate);
             while (d <= today) {
-                html += '<div class="heatmap-col">';
+                colMonths.push(d.getMonth());
+                gridHtml += '<div class="heatmap-col">';
                 for (let row = 0; row < 7; row++) {
                     const key = fmt(d);
                     const count = activityMap[key] || 0;
                     const level = getLevel(count);
                     const title = `${key}: ${count} command${count !== 1 ? 's' : ''}`;
                     if (d <= today) {
-                        html += `<div class="heatmap-cell ${level}" title="${title}"></div>`;
+                        gridHtml += `<div class="heatmap-cell ${level}" title="${title}"></div>`;
                     } else {
-                        html += `<div class="heatmap-cell is-empty"></div>`;
+                        gridHtml += `<div class="heatmap-cell is-empty"></div>`;
                     }
                     d.setDate(d.getDate() + 1);
                 }
-                html += '</div>';
+                gridHtml += '</div>';
             }
-            html += '</div>';
+            gridHtml += '</div>';
+
+            // Shortened month labels — one cell per week column, labelled when
+            // the month changes (skipping a label that would land in the last
+            // couple of columns, where it'd be clipped at the edge).
+            let monthsHtml = '<div class="heatmap-months">';
+            let prevMonth = -1;
+            colMonths.forEach((month, i) => {
+                let label = '';
+                if (month !== prevMonth) {
+                    if (i === 0 || i < colMonths.length - 2) label = MONTHS[month];
+                    prevMonth = month;
+                }
+                monthsHtml += `<span class="heatmap-month">${label}</span>`;
+            });
+            monthsHtml += '</div>';
 
             // Legend
-            html += `<div class="heatmap-legend">
+            const legendHtml = `<div class="heatmap-legend">
                 <span>Less</span>
                 <div class="heatmap-cell"></div>
                 <div class="heatmap-cell l1"></div>
@@ -218,7 +239,7 @@
                 <span>More</span>
             </div>`;
 
-            container.innerHTML = html;
+            container.innerHTML = monthsHtml + gridHtml + legendHtml;
         })
         .catch(() => {
             container.innerHTML = '<div class="empty-state"><p>Failed to load activity data.</p></div>';

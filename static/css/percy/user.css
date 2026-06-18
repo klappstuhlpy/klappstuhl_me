@@ -37,16 +37,21 @@
     color: var(--text-muted);
 }
 .heatmap-legend .heatmap-cell { cursor: default; }
+/* Month labels: one cell per week column (11px + the grid's 2px gap), so each
+   label lines up above the column where its month begins. Labels overflow to
+   the right over the following empty cells (GitHub-style) instead of wrapping. */
 .heatmap-months {
     display: flex;
+    gap: 2px;
     font-size: 0.65rem;
     color: var(--text-muted);
-    margin-bottom: 0.25rem;
-    padding-left: 0;
+    margin-bottom: 0.35rem;
 }
-.heatmap-months span {
-    flex: 1;
-    text-align: left;
+.heatmap-months .heatmap-month {
+    flex: 0 0 11px;
+    width: 11px;
+    white-space: nowrap;
+    overflow: visible;
 }
 .open-case-form {
     margin-bottom: 1.25rem;
