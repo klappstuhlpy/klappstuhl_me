@@ -613,6 +613,18 @@ pub struct MusicSetup {
     pub channel_id: String,
     pub message_id: Option<String>,
     pub use_panel: bool,
+    #[serde(default)]
+    pub dj_mode: u8,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct AlwaysOnState {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub mode: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -627,6 +639,8 @@ pub struct MusicInfo {
     pub channel: Option<String>,
     #[serde(default)]
     pub setup: Option<MusicSetup>,
+    #[serde(default)]
+    pub always_on: AlwaysOnState,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

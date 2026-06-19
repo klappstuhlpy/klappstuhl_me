@@ -653,6 +653,26 @@ impl PercyClient {
         .await
     }
 
+    /// Enable or disable the 24/7 always-on player for a guild.
+    pub async fn post_music_247(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .post(self.url(&format!("/api/internal/guilds/{guild_id}/music/247")))
+                .json(body),
+        )
+        .await
+    }
+
+    /// Update the DJ mode setting for a guild's music player.
+    pub async fn patch_music_dj_mode(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .patch(self.url(&format!("/api/internal/guilds/{guild_id}/music/dj-mode")))
+                .json(body),
+        )
+        .await
+    }
+
     // -- Comics --------------------------------------------------------------
 
     /// Fetch comic feeds for a guild.

@@ -106,7 +106,7 @@
     if (canvas) {
     const ctx = canvas.getContext('2d');
     let canvasW = 0, canvasH = 0;
-    const PAD_TOP = 40, PAD_BOTTOM = 30, PAD_LEFT = 55, PAD_RIGHT = 20;
+    const PAD_TOP = 40, PAD_BOTTOM = 30, PAD_LEFT = 55, PAD_RIGHT = 20, BAND_INSET = 12;
 
     function resize() {
         const rect = canvas.getBoundingClientRect();
@@ -128,7 +128,7 @@
     }
 
     function bandX(i) {
-        return PAD_LEFT + i / (BANDS.length - 1) * (canvasW - PAD_LEFT - PAD_RIGHT);
+        return PAD_LEFT + BAND_INSET + i / (BANDS.length - 1) * (canvasW - PAD_LEFT - BAND_INSET - PAD_RIGHT);
     }
 
     draw = function() {
@@ -152,13 +152,13 @@
         ctx.fillStyle = '#888'; ctx.font = '11px JetBrains Mono, monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
         for (const g of gridGains) {
             const label = g >= 0 ? '+' + g.toFixed(2) : g.toFixed(2);
-            ctx.fillText(label, PAD_LEFT - 8, gainToY(g));
+            ctx.fillText(label, PAD_LEFT - 12, gainToY(g));
         }
 
         // X-axis labels (band frequencies)
         ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         for (let i = 0; i < BANDS.length; i++) {
-            ctx.fillText(BANDS[i], bandX(i), canvasH - PAD_BOTTOM + 8);
+            ctx.fillText(BANDS[i], bandX(i), canvasH - PAD_BOTTOM + 12);
         }
 
         // Axis labels

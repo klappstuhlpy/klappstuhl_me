@@ -329,6 +329,8 @@ pub fn routes() -> Router<AppState> {
             "/percy/dashboard/guild/:guild_id/music/filters",
             post(guild_music_filters),
         )
+        .route("/percy/dashboard/guild/:guild_id/music/247", post(guild_music_247))
+        .route("/percy/dashboard/guild/:guild_id/music/dj-mode", patch(guild_music_dj_mode))
         .route(
             "/percy/dashboard/guild/:guild_id/autoresponders",
             get(guild_autoresponders).post(guild_autoresponders_action),

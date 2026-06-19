@@ -910,6 +910,7 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/music/status` | GET | Live music status (JSON, polled every 10s) |
 | `/percy/dashboard/guild/:id/music/equalizer` | POST | Apply equalizer bands or preset |
 | `/percy/dashboard/guild/:id/music/filters` | POST | Toggle audio filters (nightcore, 8D, lowpass) |
+| `/percy/dashboard/guild/:id/music/247` | POST | Enable/disable the 24/7 always-on player (radio/playlist/autoplay) |
 | `/percy/dashboard/guild/:id/economy/items` | POST | Create a shop item |
 | `/percy/dashboard/guild/:id/economy/items/:name` | DELETE | Delete a shop item |
 | `/percy/dashboard/guild/:id/economy/lottery` | POST/DELETE | Start / cancel the lottery |
