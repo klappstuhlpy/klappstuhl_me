@@ -536,6 +536,74 @@ a.invite-percy-btn:hover {
 
 .guild-owner-badge { flex-shrink: 0; }
 
+/* ── Server list sections (Managed / In / Add Percy) ─────────────── */
+.guild-section { margin-top: 1.6rem; }
+.guild-section:first-of-type { margin-top: 0.5rem; }
+.guild-section-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.2rem;
+}
+.guild-section-head h2 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+.guild-section-sub {
+    margin: 0 0 0.9rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+.guild-overview-badge {
+    flex-shrink: 0;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    color: var(--text-muted);
+}
+
+/* "Add Percy" cards are visually muted until hovered, signalling they're a
+   call-to-action rather than a live server you can open. */
+.guild-card-add {
+    border-style: dashed;
+    opacity: 0.72;
+}
+.guild-card-add .guild-icon,
+.guild-card-add .guild-icon-placeholder {
+    filter: grayscale(0.7);
+}
+.guild-card-add:hover {
+    opacity: 1;
+}
+.guild-card-add:hover .guild-icon,
+.guild-card-add:hover .guild-icon-placeholder {
+    filter: none;
+}
+.guild-add-cta {
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--branding);
+    border: 1px solid color-mix(in srgb, var(--branding) 35%, transparent);
+    background: var(--branding-dim);
+    border-radius: 0.5rem;
+    padding: 0.25rem 0.6rem;
+}
+
+/* A smaller header-aligned variant of the invite button. */
+.invite-percy-btn-sm {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.85rem;
+    align-self: center;
+    flex-shrink: 0;
+}
+
+.guild-addhint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+.guild-addhint a { color: var(--branding); }
+
 .guild-icon {
     width: 56px;
     height: 56px;

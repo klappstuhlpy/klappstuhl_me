@@ -10,8 +10,24 @@ use crate::{flash::Flashes, models::Account, percy::*};
 pub(crate) struct GuildsTemplate {
     pub(crate) account: Option<Account>,
     pub(crate) flashes: Flashes,
-    pub(crate) guilds: Vec<UserGuild>,
+    /// Servers the user can manage and Percy is in — full admin dashboard cards.
+    pub(crate) managed: Vec<UserGuild>,
+    /// Servers the user is in (but can't manage) where Percy is present —
+    /// read-only public overview cards.
+    pub(crate) public: Vec<UserGuild>,
+    /// Servers the user can manage but Percy is *not* in yet — greyed "Add Percy"
+    /// cards that link to the bot invite (captured from Discord OAuth).
+    pub(crate) add_percy: Vec<AddPercyGuild>,
     /// Invite URL (no guild pre-selected) for the "Invite Percy" empty-state button.
+    pub(crate) invite_url: String,
+}
+
+/// A greyed "Add Percy" card: a server the user administrates but Percy isn't in.
+pub(crate) struct AddPercyGuild {
+    pub(crate) name: String,
+    pub(crate) icon_url: Option<String>,
+    pub(crate) owner: bool,
+    /// Bot invite URL with this guild pre-selected.
     pub(crate) invite_url: String,
 }
 
@@ -123,6 +139,32 @@ pub(crate) struct UserLookupTemplate {
     pub(crate) guild_id: u64,
     pub(crate) guild_name: String,
     pub(crate) member: MemberDetail,
+}
+
+/// Read-only public server overview shown to members who can't manage the guild.
+/// Surfaces the same information a member could already see in Discord: server
+/// stats, top leveling ranks, active polls/giveaways, the shop, the live music
+/// player, and a short "powered by Percy" blurb.
+#[allow(dead_code)]
+#[derive(Template)]
+#[template(path = "percy/overview.html")]
+pub(crate) struct OverviewTemplate {
+    pub(crate) account: Option<Account>,
+    pub(crate) flashes: Flashes,
+    pub(crate) guild_id: u64,
+    pub(crate) guild_name: String,
+    pub(crate) guild_icon: Option<String>,
+    pub(crate) member_count: Option<u32>,
+    pub(crate) stats: GuildStats,
+    pub(crate) bot_stats: BotStats,
+    pub(crate) music: MusicInfo,
+    /// Whether the viewer currently shares the bot's voice channel (initial
+    /// state; the live poll refreshes it). Gates the playback controls.
+    pub(crate) can_control_music: bool,
+    pub(crate) leaderboard: LeaderboardResponse,
+    pub(crate) active_polls: Vec<PollInfo>,
+    pub(crate) active_giveaways: Vec<GiveawayInfo>,
+    pub(crate) economy: EconomyInfo,
 }
 
 /// A resolved level-reward row (role granted at a level threshold).

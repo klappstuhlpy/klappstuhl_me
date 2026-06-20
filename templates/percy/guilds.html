@@ -13,49 +13,126 @@
     <div class="dashboard-header dash-rise">
         <div>
             <h1><span class="spark dash-h1-glyph" aria-hidden="true">✻</span> Your Servers</h1>
-            <p>Pick a server to manage Percy's configuration.</p>
+            <p>Manage Percy's configuration, peek at a server you're in, or add Percy somewhere new.</p>
         </div>
-        {% if !guilds.is_empty() %}
-        <span class="guilds-count">{{ guilds.len() }} server{% if guilds.len() != 1 %}s{% endif %}</span>
-        {% endif %}
+        <a href="{{ invite_url }}" target="_blank" rel="noopener" class="invite-percy-btn invite-percy-btn-sm">
+            <img src="/static/img/discord.svg" alt="" width="18" height="18">
+            Add to a server
+        </a>
     </div>
 
-    {% if guilds.is_empty() %}
+    {% if managed.is_empty() && public.is_empty() && add_percy.is_empty() %}
     <div class="dashboard-empty dash-rise">
         <div class="dashboard-empty-glyph spark" aria-hidden="true">✻</div>
         <h1>No servers found</h1>
-        <p>Make sure Percy is in your server and you have <strong>Manage Server</strong> or <strong>Administrator</strong> permissions.</p>
+        <p>Add Percy to a server you manage, or join a server that already has Percy.</p>
         <a href="{{ invite_url }}" target="_blank" rel="noopener" class="invite-percy-btn">
             <img src="/static/img/discord.svg" alt="" width="20" height="20">
             Invite Percy
         </a>
     </div>
     {% else %}
-    <div class="guild-grid">
-        {% for guild in guilds %}
-        <a href="/percy/dashboard/guild/{{ guild.id }}" class="guild-card button-card dash-rise" style="--i:{{ loop.index0 }}">
-            {% match guild.icon_url %}
-            {% when Some with (url) %}
-            <img class="guild-icon" src="{{ url }}?size=128" alt="" width="56" height="56">
-            {% when None %}
-            <div class="guild-icon guild-icon-placeholder">{{ guild.name.chars().next().unwrap_or('?') }}</div>
-            {% endmatch %}
-            <div class="guild-info">
-                <span class="guild-name">{{ guild.name }}</span>
-                {% match guild.member_count %}
-                {% when Some with (count) %}
-                <span class="guild-members">{{ count }} members</span>
+
+    {% if !managed.is_empty() %}
+    <section class="guild-section dash-rise">
+        <div class="guild-section-head">
+            <h2>Managed Servers</h2>
+            <span class="guilds-count">{{ managed.len() }}</span>
+        </div>
+        <p class="guild-section-sub">You have Manage Server or Administrator here — full dashboard access.</p>
+        <div class="guild-grid">
+            {% for guild in managed %}
+            <a href="/percy/dashboard/guild/{{ guild.id }}" class="guild-card button-card" style="--i:{{ loop.index0 }}">
+                {% match guild.icon_url %}
+                {% when Some with (url) %}
+                <img class="guild-icon" src="{{ url }}?size=128" alt="" width="56" height="56">
                 {% when None %}
-                <span class="guild-members">Tap to manage</span>
+                <div class="guild-icon guild-icon-placeholder">{{ guild.name.chars().next().unwrap_or('?') }}</div>
                 {% endmatch %}
-            </div>
-            {% if guild.owner %}
-            <span class="badge branding guild-owner-badge">Owner</span>
-            {% endif %}
-            <span class="guild-card-arrow" aria-hidden="true">→</span>
-        </a>
-        {% endfor %}
-    </div>
+                <div class="guild-info">
+                    <span class="guild-name">{{ guild.name }}</span>
+                    {% match guild.member_count %}
+                    {% when Some with (count) %}
+                    <span class="guild-members">{{ count }} members</span>
+                    {% when None %}
+                    <span class="guild-members">Tap to manage</span>
+                    {% endmatch %}
+                </div>
+                {% if guild.owner %}
+                <span class="badge branding guild-owner-badge">Owner</span>
+                {% endif %}
+                <span class="guild-card-arrow" aria-hidden="true">→</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if !public.is_empty() %}
+    <section class="guild-section dash-rise">
+        <div class="guild-section-head">
+            <h2>Servers You're In</h2>
+            <span class="guilds-count">{{ public.len() }}</span>
+        </div>
+        <p class="guild-section-sub">Percy is here, but you don't manage it — open a read-only overview.</p>
+        <div class="guild-grid">
+            {% for guild in public %}
+            <a href="/percy/dashboard/guild/{{ guild.id }}/overview" class="guild-card button-card" style="--i:{{ loop.index0 }}">
+                {% match guild.icon_url %}
+                {% when Some with (url) %}
+                <img class="guild-icon" src="{{ url }}?size=128" alt="" width="56" height="56">
+                {% when None %}
+                <div class="guild-icon guild-icon-placeholder">{{ guild.name.chars().next().unwrap_or('?') }}</div>
+                {% endmatch %}
+                <div class="guild-info">
+                    <span class="guild-name">{{ guild.name }}</span>
+                    {% match guild.member_count %}
+                    {% when Some with (count) %}
+                    <span class="guild-members">{{ count }} members</span>
+                    {% when None %}
+                    <span class="guild-members">View overview</span>
+                    {% endmatch %}
+                </div>
+                <span class="badge guild-overview-badge">Overview</span>
+                <span class="guild-card-arrow" aria-hidden="true">→</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="guild-section dash-rise">
+        <div class="guild-section-head">
+            <h2>Add Percy</h2>
+            {% if !add_percy.is_empty() %}<span class="guilds-count">{{ add_percy.len() }}</span>{% endif %}
+        </div>
+        <p class="guild-section-sub">Servers you manage where Percy isn't a member yet. Click to invite{% if add_percy.is_empty() %}, or use <strong>Add to a server</strong> above to pick any server{% endif %}.</p>
+        {% if add_percy.is_empty() %}
+        <p class="guild-addhint">Don't see a server you manage here? This list is built from Discord when you sign in — <a href="/auth/discord">re-link Discord</a> to refresh it.</p>
+        {% else %}
+        <div class="guild-grid">
+            {% for guild in add_percy %}
+            <a href="{{ guild.invite_url }}" target="_blank" rel="noopener" class="guild-card button-card guild-card-add" style="--i:{{ loop.index0 }}">
+                {% match guild.icon_url %}
+                {% when Some with (url) %}
+                <img class="guild-icon" src="{{ url }}?size=128" alt="" width="56" height="56">
+                {% when None %}
+                <div class="guild-icon guild-icon-placeholder">{{ guild.name.chars().next().unwrap_or('?') }}</div>
+                {% endmatch %}
+                <div class="guild-info">
+                    <span class="guild-name">{{ guild.name }}</span>
+                    <span class="guild-members">Percy not added</span>
+                </div>
+                {% if guild.owner %}
+                <span class="badge branding guild-owner-badge">Owner</span>
+                {% endif %}
+                <span class="guild-add-cta" aria-hidden="true">+ Add</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
     {% endif %}
 </div>
 {% endblock %}

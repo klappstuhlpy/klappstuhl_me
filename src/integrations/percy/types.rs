@@ -10,6 +10,12 @@ pub struct UserGuild {
     pub icon_url: Option<String>,
     pub member_count: Option<u32>,
     pub owner: bool,
+    /// True when the user has Administrator or Manage Server in this guild. The
+    /// dashboard shows manageable guilds as full admin cards and the rest as
+    /// read-only public overviews. Defaults to `false` for backward compat with
+    /// an older Percy that only returned manageable guilds.
+    #[serde(default)]
+    pub manageable: bool,
 }
 
 /// A user's *current* avatar, resolved live from the bot (never persisted, so it
@@ -641,6 +647,11 @@ pub struct MusicInfo {
     pub setup: Option<MusicSetup>,
     #[serde(default)]
     pub always_on: AlwaysOnState,
+    /// Discord IDs of the (non-bot) members currently sharing the bot's voice
+    /// channel. The public overview uses this to decide whether a viewer may
+    /// control playback; Percy re-verifies on every control request.
+    #[serde(default)]
+    pub listeners: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

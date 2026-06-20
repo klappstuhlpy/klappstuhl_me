@@ -593,6 +593,21 @@ impl Config {
         base
     }
 
+    /// The OAuth2 callback URL to hand Discord, for both the authorize redirect
+    /// and the token exchange (the two must match byte-for-byte). In production
+    /// this is the `redirect_uri` registered in the developer portal. In local/dev
+    /// it's derived from the live host instead — `http://localhost:<port>/auth/
+    /// discord/callback` — so testing on a non-public host (e.g. Windows on
+    /// `localhost:9510`) works without swapping config. Register that localhost
+    /// URL in the Discord portal as an additional redirect for it to succeed.
+    pub fn discord_redirect_uri(&self) -> Option<String> {
+        if self.production {
+            self.discord.redirect_uri.clone()
+        } else {
+            Some(self.url_to("/auth/discord/callback"))
+        }
+    }
+
     /// The host short links are served from. In production this is the `r.`
     /// subdomain of the primary domain (e.g. `r.klappstuhl.me`); in dev there is
     /// no resolvable subdomain, so it falls back to the local `localhost:<port>`.

@@ -1,0 +1,186 @@
+{% extends "../layout.html" %}
+
+{% block nav_section %}{% include "percy/_brand_badge.html" %}{% endblock %}
+
+{% block title %}{{ guild_name }} — Overview | Klappstuhl.me{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+<link rel="stylesheet" href="/static/css/percy/overview.css" type="text/css"/>
+{% endblock %}
+
+{% block body %}
+<div class="dashboard-container overview-container">
+    <a href="/percy/dashboard" class="overview-back">&larr; All servers</a>
+
+    <div class="overview-hero dash-rise">
+        {% match guild_icon %}
+        {% when Some with (url) %}
+        <img class="overview-hero-icon" src="{{ url }}?size=160" alt="" width="80" height="80">
+        {% when None %}
+        <div class="overview-hero-icon overview-hero-icon-ph">{{ guild_name.chars().next().unwrap_or('?') }}</div>
+        {% endmatch %}
+        <div class="overview-hero-text">
+            <span class="overview-hero-tag">Public overview</span>
+            <h1>{{ guild_name }}</h1>
+            {% match member_count %}
+            {% when Some with (count) %}
+            <p>{{ count }} members</p>
+            {% when None %}
+            <p></p>
+            {% endmatch %}
+        </div>
+    </div>
+
+    {# ─── Now Playing ─────────────────────────────────────────────── #}
+    <section class="config-section overview-music dash-rise" id="music-section"
+             data-can-control="{% if can_control_music %}1{% else %}0{% endif %}">
+        <h2>Now Playing</h2>
+        <div id="music-body">
+            {% if music.active %}
+            <div class="listener-status">
+                <span class="ls-indicator active"></span>
+                <span>Playing in <strong id="music-channel">{% match music.channel %}{% when Some with (ch) %}voice channel{% when None %}voice{% endmatch %}</strong></span>
+            </div>
+            {% match music.now_playing %}
+            {% when Some with (np) %}
+            <div class="now-playing">
+                <span class="np-dot"></span>
+                <span><strong id="music-title">{{ np.title }}</strong> <span class="text-muted">&mdash; <span id="music-author">{{ np.author }}</span></span></span>
+            </div>
+            {% when None %}
+            <p class="text-muted" id="music-idle">Connected but nothing playing.</p>
+            {% endmatch %}
+            {% else %}
+            <div class="listener-status">
+                <span class="ls-indicator inactive"></span>
+                <span class="text-muted" id="music-idle">No active music session in this server.</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="overview-music-controls" id="music-controls" {% if !can_control_music %}hidden{% endif %}>
+            <button type="button" class="button small" data-action="resume" title="Resume">▶ Resume</button>
+            <button type="button" class="button small" data-action="pause" title="Pause">⏸ Pause</button>
+            <button type="button" class="button small" data-action="skip" title="Skip">⏭ Skip</button>
+            <button type="button" class="button small danger" data-action="stop" title="Stop">⏹ Stop</button>
+        </div>
+        <p class="overview-music-hint" id="music-hint" {% if can_control_music %}hidden{% endif %}>
+            Join the bot's voice channel to control playback.
+        </p>
+    </section>
+
+    {# ─── Server Stats ────────────────────────────────────────────── #}
+    <section class="config-section dash-rise">
+        <h2>Server Stats</h2>
+        <div class="overview-stat-grid">
+            {% match stats.member_count %}{% when Some with (c) %}<div class="overview-stat"><span class="overview-stat-val">{{ c }}</span><span class="overview-stat-label">Members</span></div>{% when None %}{% endmatch %}
+            <div class="overview-stat"><span class="overview-stat-val">{{ stats.online_count }}</span><span class="overview-stat-label">Online</span></div>
+            <div class="overview-stat"><span class="overview-stat-val">{{ stats.human_count }}</span><span class="overview-stat-label">Humans</span></div>
+            <div class="overview-stat"><span class="overview-stat-val">{{ stats.bot_count }}</span><span class="overview-stat-label">Bots</span></div>
+            <div class="overview-stat"><span class="overview-stat-val">{{ stats.channel_count }}</span><span class="overview-stat-label">Channels</span></div>
+            <div class="overview-stat"><span class="overview-stat-val">{{ stats.role_count }}</span><span class="overview-stat-label">Roles</span></div>
+            <div class="overview-stat"><span class="overview-stat-val">{{ stats.emoji_count }}</span><span class="overview-stat-label">Emojis</span></div>
+            <div class="overview-stat"><span class="overview-stat-val">{{ stats.boost_count }}</span><span class="overview-stat-label">Boosts · T{{ stats.boost_tier }}</span></div>
+        </div>
+        <div class="overview-meta">
+            <span>Created <strong>{{ stats.created_at }}</strong></span>
+            {% match stats.owner_name %}{% when Some with (name) %}<span>Owner <strong>{{ name }}</strong></span>{% when None %}{% endmatch %}
+        </div>
+    </section>
+
+    {# ─── Leaderboard ─────────────────────────────────────────────── #}
+    {% if !leaderboard.entries.is_empty() %}
+    <section class="config-section dash-rise">
+        <h2>Top Members</h2>
+        <ol class="overview-lb">
+            {% for entry in leaderboard.entries %}
+            <li class="overview-lb-row">
+                <span class="overview-lb-rank">#{{ loop.index }}</span>
+                {% match entry.avatar_url %}
+                {% when Some with (url) %}<img class="overview-lb-avatar" src="{{ url }}" alt="" width="32" height="32">
+                {% when None %}<span class="overview-lb-avatar overview-lb-avatar-ph"></span>{% endmatch %}
+                <span class="overview-lb-name">{{ entry.username }}</span>
+                <span class="overview-lb-level">Level {{ entry.level }}</span>
+                <span class="overview-lb-xp">{{ entry.total_xp }} XP</span>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
+    {% endif %}
+
+    {# ─── Active Polls ────────────────────────────────────────────── #}
+    {% if !active_polls.is_empty() %}
+    <section class="config-section dash-rise">
+        <h2>Active Polls</h2>
+        <ul class="overview-list">
+            {% for poll in active_polls %}
+            <li class="overview-list-row">
+                <span class="overview-list-title">{{ poll.question }}</span>
+                <span class="overview-list-meta">{{ poll.total_votes }} votes{% match poll.expires %}{% when Some with (e) %} · ends {{ e }}{% when None %}{% endmatch %}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    {# ─── Active Giveaways ────────────────────────────────────────── #}
+    {% if !active_giveaways.is_empty() %}
+    <section class="config-section dash-rise">
+        <h2>Active Giveaways</h2>
+        <ul class="overview-list">
+            {% for g in active_giveaways %}
+            <li class="overview-list-row">
+                <span class="overview-list-title">{{ g.title }}</span>
+                <span class="overview-list-meta">{{ g.entries }} entries · {{ g.winners_count }} winner{% if g.winners_count != 1 %}s{% endif %}{% match g.ends_at %}{% when Some with (e) %} · ends {{ e }}{% when None %}{% endmatch %}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    {# ─── Shop ────────────────────────────────────────────────────── #}
+    {% if !economy.items.is_empty() %}
+    <section class="config-section dash-rise">
+        <h2>Shop</h2>
+        <div class="overview-shop">
+            {% for item in economy.items %}
+            <div class="overview-shop-item">
+                <span class="overview-shop-name">{{ item.name }}</span>
+                {% match item.description %}{% when Some with (d) %}<span class="overview-shop-desc">{{ d }}</span>{% when None %}{% endmatch %}
+                <span class="overview-shop-price">{{ item.price }} coins</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% match economy.lottery %}
+        {% when Some with (lottery) %}
+        <div class="overview-lottery">🎟️ Lottery jackpot: <strong>{{ lottery.jackpot }}</strong> coins · ticket {{ lottery.ticket_price }} coins</div>
+        {% when None %}{% endmatch %}
+    </section>
+    {% endif %}
+
+    {# ─── Powered by Percy ────────────────────────────────────────── #}
+    <section class="config-section overview-bot dash-rise">
+        <h2>Powered by Percy</h2>
+        <p class="config-section-description">This server runs <strong>Percy</strong>, an all-in-one Discord bot for moderation, leveling, music, economy and more.</p>
+        <div class="overview-stat-grid">
+            <div class="overview-stat"><span class="overview-stat-val">{{ bot_stats.guild_count }}</span><span class="overview-stat-label">Servers</span></div>
+            <div class="overview-stat"><span class="overview-stat-val">{{ bot_stats.user_count }}</span><span class="overview-stat-label">Users</span></div>
+            <div class="overview-stat"><span class="overview-stat-val">{{ bot_stats.command_count }}</span><span class="overview-stat-label">Commands</span></div>
+            <div class="overview-stat"><span class="overview-stat-val">{{ bot_stats.latency_ms }}ms</span><span class="overview-stat-label">Latency</span></div>
+        </div>
+        <div class="overview-bot-links">
+            <a href="/percy/privacy-policy">Privacy Policy</a>
+            <a href="/percy/terms-of-service">Terms of Service</a>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block body_end %}
+<script>
+const GUILD_ID = '{{ guild_id }}';
+</script>
+<script src="/static/js/percy/percy_common.js"></script>
+<script src="/static/js/percy/percy_overview.js"></script>
+{% endblock %}

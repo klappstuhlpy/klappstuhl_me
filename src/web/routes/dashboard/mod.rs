@@ -7,7 +7,7 @@ mod handlers;
 mod templates;
 
 use std::{
-    collections::HashSet,
+    collections::HashMap,
     sync::{Arc, OnceLock},
     time::{Duration, Instant},
 };
@@ -49,10 +49,12 @@ fn discord_link_cache() -> &'static Cache<i64, Timed<String>> {
     CACHE.get_or_init(|| Cache::new(2000))
 }
 
-/// `discord_user_id -> (fetched_at, manageable guild ids)`. Removes one Percy
+/// `discord_user_id -> (fetched_at, {guild id -> manageable})`. Removes one Percy
 /// round-trip (`get_user_guilds`) from every dashboard page load and mutation.
-fn guild_access_cache() -> &'static Cache<String, Timed<Arc<HashSet<String>>>> {
-    static CACHE: OnceLock<Cache<String, Timed<Arc<HashSet<String>>>>> = OnceLock::new();
+/// The bool distinguishes a managed server (admin/Manage Server) from one the
+/// user is merely a member of (read-only public overview).
+fn guild_access_cache() -> &'static Cache<String, Timed<Arc<HashMap<String, bool>>>> {
+    static CACHE: OnceLock<Cache<String, Timed<Arc<HashMap<String, bool>>>>> = OnceLock::new();
     CACHE.get_or_init(|| Cache::new(2000))
 }
 
@@ -170,26 +172,70 @@ fn render_markdown(markdown: &str) -> String {
     out
 }
 
-async fn check_guild_access(percy: &PercyClient, discord_id: &str, guild_id: u64) -> bool {
-    let guild_id_str = guild_id.to_string();
-
-    // Fast path: an unexpired manageable-guild set for this user.
-    if let Some((ts, guilds)) = guild_access_cache().get(discord_id) {
+/// Fetches (cached) the user's mutual-guild map (`guild_id -> manageable`).
+/// `None` on a Percy failure, which is deliberately *not* cached so a blip can't
+/// lock a user out for the whole TTL.
+async fn user_guild_map(percy: &PercyClient, discord_id: &str) -> Option<Arc<HashMap<String, bool>>> {
+    if let Some((ts, map)) = guild_access_cache().get(discord_id) {
         if ts.elapsed() < ACCESS_TTL {
-            return guilds.contains(&guild_id_str);
+            return Some(map);
         }
     }
+    let guilds = percy.get_user_guilds(discord_id).await.ok()?;
+    let map: Arc<HashMap<String, bool>> = Arc::new(guilds.into_iter().map(|g| (g.id, g.manageable)).collect());
+    guild_access_cache().insert(discord_id.to_string(), (Instant::now(), map.clone()));
+    Some(map)
+}
 
-    // Miss/expired: refetch from Percy. A transient failure is *not* cached, so a
-    // Percy blip can't lock an admin out for the whole TTL.
-    let guilds = match percy.get_user_guilds(discord_id).await {
-        Ok(g) => g,
-        Err(_) => return false,
-    };
-    let set: HashSet<String> = guilds.into_iter().map(|g| g.id).collect();
-    let allowed = set.contains(&guild_id_str);
-    guild_access_cache().insert(discord_id.to_string(), (Instant::now(), Arc::new(set)));
-    allowed
+/// Whether the user can *manage* the guild (admin / Manage Server). Gates every
+/// admin dashboard page and mutation.
+async fn check_guild_access(percy: &PercyClient, discord_id: &str, guild_id: u64) -> bool {
+    user_guild_map(percy, discord_id)
+        .await
+        .map(|m| m.get(&guild_id.to_string()).copied().unwrap_or(false))
+        .unwrap_or(false)
+}
+
+/// Whether the user is merely a *member* of the guild (manageable or not). Gates
+/// the read-only public overview and its live music panel.
+async fn check_guild_membership(percy: &PercyClient, discord_id: &str, guild_id: u64) -> bool {
+    user_guild_map(percy, discord_id)
+        .await
+        .map(|m| m.contains_key(&guild_id.to_string()))
+        .unwrap_or(false)
+}
+
+/// A guild the user can manage, captured from Discord OAuth at login. Used to
+/// build the dashboard's "Add Percy" cards for servers Percy isn't in yet.
+pub(super) struct StoredAdminGuild {
+    pub(super) id: String,
+    pub(super) name: String,
+    pub(super) icon: Option<String>,
+    pub(super) owner: bool,
+}
+
+/// Loads the user's stored manageable guilds (from the last Discord OAuth login).
+async fn get_admin_guilds(state: &AppState, discord_id: &str) -> Vec<StoredAdminGuild> {
+    let discord_id = discord_id.to_string();
+    state
+        .database()
+        .call(move |conn| -> rusqlite::Result<Vec<StoredAdminGuild>> {
+            let mut stmt = conn.prepare_cached(
+                "SELECT guild_id, name, icon, owner FROM user_discord_admin_guilds \
+                 WHERE discord_user_id = ? ORDER BY name COLLATE NOCASE",
+            )?;
+            let rows = stmt.query_map([discord_id], |row| {
+                Ok(StoredAdminGuild {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    icon: row.get(2)?,
+                    owner: row.get::<_, i64>(3)? != 0,
+                })
+            })?;
+            rows.collect()
+        })
+        .await
+        .unwrap_or_default()
 }
 
 fn invite_client_id(state: &AppState) -> String {
@@ -249,6 +295,16 @@ pub fn routes() -> Router<AppState> {
         .route("/percy/privacy-policy", get(percy_privacy))
         .route("/percy/terms-of-service", get(percy_terms))
         .route("/percy/dashboard", get(guild_list))
+        // Public read-only server overview for members without manage access.
+        .route("/percy/dashboard/guild/:guild_id/overview", get(guild_overview))
+        .route(
+            "/percy/dashboard/guild/:guild_id/overview/music",
+            get(guild_overview_music_status),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/overview/music/control",
+            post(guild_overview_music_control),
+        )
         .route("/percy/dashboard/guild/:guild_id", get(guild_detail))
         .route("/percy/dashboard/guild/:guild_id/config", post(guild_config_update))
         .route("/percy/dashboard/guild/:guild_id/sentinel", post(guild_sentinel_update))
@@ -330,7 +386,10 @@ pub fn routes() -> Router<AppState> {
             post(guild_music_filters),
         )
         .route("/percy/dashboard/guild/:guild_id/music/247", post(guild_music_247))
-        .route("/percy/dashboard/guild/:guild_id/music/dj-mode", patch(guild_music_dj_mode))
+        .route(
+            "/percy/dashboard/guild/:guild_id/music/dj-mode",
+            patch(guild_music_dj_mode),
+        )
         .route(
             "/percy/dashboard/guild/:guild_id/autoresponders",
             get(guild_autoresponders).post(guild_autoresponders_action),

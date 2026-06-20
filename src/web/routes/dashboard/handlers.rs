@@ -19,7 +19,7 @@ use crate::{
 use super::templates::*;
 use super::{
     build_general_invite_url, build_invite_url, cached_channels, cached_legal_doc, cached_roles, check_guild_access,
-    get_discord_id, get_percy_client, json_or_flash,
+    check_guild_membership, get_admin_guilds, get_discord_id, get_percy_client, json_or_flash,
 };
 
 /// Canonical sources for Percy's public legal docs, fetched live and rendered.
@@ -88,12 +88,41 @@ pub(super) async fn guild_list(State(state): State<AppState>, account: Option<Ac
         .into_response();
     };
 
-    let guilds = percy.get_user_guilds(&discord_id).await.unwrap_or_else(|_| Vec::new());
+    // Percy knows the guilds it *shares* with the user (each tagged manageable);
+    // the stored OAuth guild list adds servers the user manages that Percy isn't
+    // in yet. Fetch both concurrently.
+    let (mutual, admin_guilds) = tokio::join!(
+        percy.get_user_guilds(&discord_id),
+        get_admin_guilds(&state, &discord_id),
+    );
+    let mutual = mutual.unwrap_or_default();
+
+    // Guilds Percy is already in (any membership) — used to exclude them from the
+    // "Add Percy" bucket.
+    let present: std::collections::HashSet<&str> = mutual.iter().map(|g| g.id.as_str()).collect();
+
+    let add_percy: Vec<AddPercyGuild> = admin_guilds
+        .into_iter()
+        .filter(|g| !present.contains(g.id.as_str()))
+        .map(|g| AddPercyGuild {
+            invite_url: build_invite_url(&state, g.id.parse().unwrap_or(0)),
+            icon_url: g
+                .icon
+                .as_deref()
+                .map(|hash| format!("https://cdn.discordapp.com/icons/{}/{}.png", g.id, hash)),
+            name: g.name,
+            owner: g.owner,
+        })
+        .collect();
+
+    let (managed, public): (Vec<UserGuild>, Vec<UserGuild>) = mutual.into_iter().partition(|g| g.manageable);
 
     GuildsTemplate {
         account: Some(account),
         flashes,
-        guilds,
+        managed,
+        public,
+        add_percy,
         invite_url: build_general_invite_url(&state),
     }
     .into_response()
@@ -168,6 +197,168 @@ pub(super) async fn guild_detail(
         degraded,
     }
     .into_response()
+}
+
+/// `GET /percy/dashboard/guild/:guild_id/overview` — read-only public overview
+/// for members who can't manage the guild. Access requires only that the viewer
+/// shares the guild with Percy; everything shown is already visible to members
+/// in Discord.
+pub(super) async fn guild_overview(
+    State(state): State<AppState>,
+    account: Account,
+    flashes: Flashes,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    if !check_guild_membership(&percy, &discord_id, guild_id).await {
+        return Redirect::to("/percy/dashboard").into_response();
+    }
+
+    let (guild, stats, bot_stats, music, leaderboard, polls, giveaways, economy) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_guild_stats(guild_id),
+        percy.get_bot_stats(),
+        percy.get_music(guild_id),
+        percy.get_leveling_leaderboard(guild_id, 10),
+        percy.get_polls(guild_id),
+        percy.get_giveaways(guild_id),
+        percy.get_economy(guild_id),
+    );
+
+    let guild = match guild {
+        Ok(g) => g,
+        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+    };
+    let stats = match stats {
+        Ok(s) => s,
+        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+    };
+
+    let bot_stats = bot_stats.unwrap_or(BotStats {
+        guild_count: 0,
+        user_count: 0,
+        channel_count: 0,
+        total_commands_used: 0,
+        cog_count: 0,
+        command_count: 0,
+        latency_ms: 0.0,
+        uptime_seconds: 0.0,
+    });
+    let music = music.unwrap_or(MusicInfo {
+        active: false,
+        equalizer: vec![0.0; 15],
+        filters: MusicFiltersState {
+            nightcore: false,
+            eight_d: false,
+            lowpass: None,
+        },
+        presets: vec![],
+        now_playing: None,
+        channel: None,
+        setup: None,
+        always_on: Default::default(),
+        listeners: Vec::new(),
+    });
+    let can_control_music = music.active && music.listeners.contains(&discord_id);
+    let leaderboard = leaderboard.unwrap_or(LeaderboardResponse {
+        entries: Vec::new(),
+        total: 0,
+    });
+    let active_polls = polls
+        .map(|p| p.polls.into_iter().filter(|p| !p.ended).collect())
+        .unwrap_or_default();
+    let active_giveaways = giveaways
+        .map(|g| g.giveaways.into_iter().filter(|g| !g.ended).collect())
+        .unwrap_or_default();
+    let economy = economy.unwrap_or(EconomyInfo {
+        items: Vec::new(),
+        lottery: None,
+    });
+
+    OverviewTemplate {
+        account: Some(account),
+        flashes,
+        guild_id,
+        guild_name: guild.name,
+        guild_icon: guild.icon_url,
+        member_count: guild.member_count,
+        stats,
+        bot_stats,
+        music,
+        can_control_music,
+        leaderboard,
+        active_polls,
+        active_giveaways,
+        economy,
+    }
+    .into_response()
+}
+
+/// `GET /percy/dashboard/guild/:guild_id/overview/music` — live now-playing
+/// state for the public overview's auto-refreshing music panel. Membership-gated.
+pub(super) async fn guild_overview_music_status(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false})).into_response();
+    };
+    if !check_guild_membership(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.get_music(guild_id).await {
+        Ok(music) => {
+            let can_control = music.active && music.listeners.contains(&discord_id);
+            Json(serde_json::json!({
+                "ok": true,
+                "active": music.active,
+                "channel": music.channel,
+                "now_playing": music.now_playing,
+                "can_control": can_control,
+            }))
+            .into_response()
+        }
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub(super) struct MusicControlForm {
+    action: String,
+}
+
+/// `POST /percy/dashboard/guild/:guild_id/overview/music/control` — pause/resume/
+/// skip/stop from the public overview. The viewer's Discord id is taken from the
+/// session (never the request body); Percy enforces voice-presence and DJ-mode.
+pub(super) async fn guild_overview_music_control(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(form): Json<MusicControlForm>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false, "error": "Not authenticated"})).into_response();
+    };
+    if !check_guild_membership(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    let payload = serde_json::json!({"action": form.action, "user_id": discord_id});
+    match percy.music_control(guild_id, &payload).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -1583,6 +1774,7 @@ pub(super) async fn guild_music(
         channel: None,
         setup: None,
         always_on: Default::default(),
+        listeners: Vec::new(),
     });
     let channels = channels.unwrap_or_default();
     MusicTemplate {

@@ -829,7 +829,7 @@ the toggle.
 
 ## Percy Bot Dashboard
 
-The Percy bot dashboard at `/percy/dashboard` is a full-featured web management interface for the Percy Discord bot. Server administrators can configure the bot, moderate members, manage economy/leveling/autoresponders/comics/temp-channels, browse polls/giveaways/tags/highlights/emoji-stats, control command availability, and view server/bot statistics — all through a terminal-aesthetic UI that connects to Percy's internal API.
+The Percy bot dashboard at `/percy/dashboard` is a full-featured web management interface for the Percy Discord bot. Server administrators can configure the bot, moderate members, manage economy/leveling/autoresponders/comics/temp-channels, browse polls/giveaways/tags/highlights/emoji-stats, control command availability, and view server/bot statistics — all through a terminal-aesthetic UI that connects to Percy's internal API. The server picker also lists servers you're in but don't manage (each opens a **read-only public overview** — stats, leaderboard, active polls/giveaways, shop, and a live music panel that's only controllable when you share the bot's voice channel) and "Add Percy" cards for servers you administrate that Percy isn't in yet (sourced from your Discord OAuth guild list, since Percy's API can only see guilds it's already in).
 
 ### Requirements
 
@@ -887,7 +887,10 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/auth/discord` | GET | Initiate Discord OAuth2 link |
 | `/auth/discord/callback` | GET | OAuth2 callback |
 | `/account/discord/unlink` | POST | Remove Discord link |
-| `/percy/dashboard` | GET | Server selection (guilds you can manage) |
+| `/percy/dashboard` | GET | Server selection: managed servers, read-only servers you're in, and "Add Percy" cards for servers you manage Percy isn't in yet |
+| `/percy/dashboard/guild/:id/overview` | GET | Read-only public overview for members without manage access (stats, leaderboard, polls/giveaways, shop, live music) |
+| `/percy/dashboard/guild/:id/overview/music` | GET | Live now-playing state for the overview (JSON, polled) |
+| `/percy/dashboard/guild/:id/overview/music/control` | POST | Pause/resume/skip/stop — only if the viewer shares the bot's voice channel |
 | `/percy/dashboard/guild/:id` | GET | Per-guild config editor (tabbed: General, Moderation, Sentinel) |
 | `/percy/dashboard/guild/:id/config` | POST | Save config changes (flags/moderation/polls/music/prefixes) |
 | `/percy/dashboard/guild/:id/sentinel` | POST | Save sentinel settings |
@@ -911,6 +914,7 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/music/equalizer` | POST | Apply equalizer bands or preset |
 | `/percy/dashboard/guild/:id/music/filters` | POST | Toggle audio filters (nightcore, 8D, lowpass) |
 | `/percy/dashboard/guild/:id/music/247` | POST | Enable/disable the 24/7 always-on player (radio/playlist/autoplay) |
+| `/percy/dashboard/guild/:id/music/control` | POST | Pause/resume/skip/stop the live player (voice-presence + DJ-mode gated) |
 | `/percy/dashboard/guild/:id/economy/items` | POST | Create a shop item |
 | `/percy/dashboard/guild/:id/economy/items/:name` | DELETE | Delete a shop item |
 | `/percy/dashboard/guild/:id/economy/lottery` | POST/DELETE | Start / cancel the lottery |
