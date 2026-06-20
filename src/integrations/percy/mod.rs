@@ -1005,6 +1005,37 @@ impl PercyClient {
         )
         .await
     }
+
+    // -- Custom Bot Profile ---------------------------------------------------
+
+    /// Fetch the bot's per-guild profile customization.
+    pub async fn get_custom_bot(&self, guild_id: u64) -> Result<CustomBotProfile, PercyError> {
+        self.send_into(
+            self.client
+                .get(self.url(&format!("/api/internal/guilds/{guild_id}/custom-bot"))),
+        )
+        .await
+    }
+
+    /// Update the bot's per-guild profile customization.
+    pub async fn patch_custom_bot(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .patch(self.url(&format!("/api/internal/guilds/{guild_id}/custom-bot")))
+                .json(body),
+        )
+        .await
+    }
+
+    /// Reset the bot's per-guild profile to defaults.
+    pub async fn reset_custom_bot(&self, guild_id: u64) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .post(self.url(&format!("/api/internal/guilds/{guild_id}/custom-bot/reset")))
+                .json(&serde_json::json!({})),
+        )
+        .await
+    }
 }
 
 // -- Error type --------------------------------------------------------------

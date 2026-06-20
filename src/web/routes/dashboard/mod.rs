@@ -294,6 +294,12 @@ pub fn routes() -> Router<AppState> {
         // Public legal docs, rendered live from the canonical GitHub repo.
         .route("/percy/privacy-policy", get(percy_privacy))
         .route("/percy/terms-of-service", get(percy_terms))
+        // Public leaderboard (no auth required to view).
+        .route("/percy/lb/:target", get(public_leaderboard))
+        .route(
+            "/percy/lb/:guild_id/vanity",
+            post(public_leaderboard_vanity_claim).delete(public_leaderboard_vanity_delete),
+        )
         .route("/percy/dashboard", get(guild_list))
         // Public read-only server overview for members without manage access.
         .route("/percy/dashboard/guild/:guild_id/overview", get(guild_overview))
@@ -389,6 +395,14 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/percy/dashboard/guild/:guild_id/music/dj-mode",
             patch(guild_music_dj_mode),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/custom-bot",
+            patch(guild_custom_bot_update),
+        )
+        .route(
+            "/percy/dashboard/guild/:guild_id/custom-bot/reset",
+            post(guild_custom_bot_reset),
         )
         .route(
             "/percy/dashboard/guild/:guild_id/autoresponders",

@@ -148,13 +148,14 @@ pub(super) async fn guild_detail(
 
     // Fan out the independent reads concurrently; `join!` (not `try_join!`) so a
     // single degraded sub-resource doesn't abort the others — each is handled below.
-    let (guild, channels, roles, sentinel, lockdowns, status_feed) = tokio::join!(
+    let (guild, channels, roles, sentinel, lockdowns, status_feed, bot_profile) = tokio::join!(
         percy.get_guild(guild_id),
         cached_channels(&percy, guild_id),
         cached_roles(&percy, guild_id),
         percy.get_sentinel(guild_id),
         percy.get_lockdowns(guild_id),
         percy.get_status_feed(guild_id),
+        percy.get_custom_bot(guild_id),
     );
 
     let guild = match guild {
@@ -184,6 +185,7 @@ pub(super) async fn guild_detail(
         subscribed: false,
         channel: None,
     });
+    let bot_profile = bot_profile.unwrap_or_default();
 
     GuildTemplate {
         account: Some(account),
@@ -194,6 +196,7 @@ pub(super) async fn guild_detail(
         sentinel,
         lockdowns,
         status_feed,
+        bot_profile,
         degraded,
     }
     .into_response()
@@ -2855,5 +2858,310 @@ pub(super) async fn guild_cases_recent(
     match percy.get_recent_cases(guild_id, since).await {
         Ok(data) => Json(serde_json::json!(data)).into_response(),
         Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+// -- Public Leaderboard -------------------------------------------------------
+
+/// Resolve a vanity slug or guild ID to a guild_id for the public leaderboard.
+async fn resolve_leaderboard_target(state: &AppState, target: &str) -> Option<u64> {
+    if let Ok(id) = target.parse::<u64>() {
+        return Some(id);
+    }
+    let slug = target.to_lowercase();
+    state
+        .database()
+        .call(move |conn| -> rusqlite::Result<Option<u64>> {
+            conn.prepare_cached("SELECT guild_id FROM percy_leaderboard_vanity WHERE slug = ?")
+                .and_then(|mut stmt| {
+                    stmt.query_row([&slug], |row| row.get::<_, String>(0))
+                        .map(|id| id.parse::<u64>().ok())
+                })
+        })
+        .await
+        .ok()
+        .flatten()
+}
+
+/// Get the vanity slug for a guild, if one exists.
+async fn get_vanity_for_guild(state: &AppState, guild_id: u64) -> Option<String> {
+    let gid = guild_id.to_string();
+    state
+        .database()
+        .call(move |conn| -> rusqlite::Result<String> {
+            conn.prepare_cached("SELECT slug FROM percy_leaderboard_vanity WHERE guild_id = ?")
+                .and_then(|mut stmt| stmt.query_row([&gid], |row| row.get(0)))
+        })
+        .await
+        .ok()
+}
+
+/// `GET /percy/lb/:target` — public leaderboard page (no login required).
+pub(super) async fn public_leaderboard(
+    State(state): State<AppState>,
+    account: Option<Account>,
+    flashes: Flashes,
+    Path(target): Path<String>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/percy/dashboard").into_response();
+    };
+    let Some(guild_id) = resolve_leaderboard_target(&state, &target).await else {
+        return (StatusCode::NOT_FOUND, "Leaderboard not found").into_response();
+    };
+
+    let (guild, leaderboard, balances) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_leveling_leaderboard(guild_id, 100),
+        percy.get_economy_balances(guild_id, 100),
+    );
+
+    let guild = match guild {
+        Ok(g) => g,
+        Err(_) => return (StatusCode::NOT_FOUND, "Guild not found").into_response(),
+    };
+
+    let leaderboard = leaderboard.unwrap_or(LeaderboardResponse {
+        entries: Vec::new(),
+        total: 0,
+    });
+    let balances = balances.unwrap_or(BalancesResponse { entries: Vec::new() });
+    let vanity = get_vanity_for_guild(&state, guild_id).await;
+
+    let can_manage = if let Some(ref acc) = account {
+        if let Some(discord_id) = get_discord_id(&state, acc.id).await {
+            check_guild_access(&percy, &discord_id, guild_id).await
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    LeaderboardTemplate {
+        account,
+        flashes,
+        guild_id,
+        guild_name: guild.name,
+        guild_icon: guild.icon_url,
+        leaderboard,
+        balances,
+        vanity,
+        can_manage,
+    }
+    .into_response()
+}
+
+#[derive(Deserialize)]
+pub(super) struct VanityClaimBody {
+    slug: String,
+}
+
+/// `POST /percy/lb/:guild_id/vanity` — claim or update a vanity slug.
+pub(super) async fn public_leaderboard_vanity_claim(
+    State(state): State<AppState>,
+    account: Account,
+    headers: HeaderMap,
+    flasher: Flasher,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<VanityClaimBody>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "Not configured",
+            &format!("/percy/lb/{guild_id}"),
+        );
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "No Discord account linked",
+            &format!("/percy/lb/{guild_id}"),
+        );
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "You don't have permission to manage this server",
+            &format!("/percy/lb/{guild_id}"),
+        );
+    }
+
+    let slug = body.slug.trim().to_lowercase();
+    if slug.is_empty() || slug.len() > 32 {
+        return json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "Vanity URL must be 1-32 characters",
+            &format!("/percy/lb/{guild_id}"),
+        );
+    }
+    if !slug.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        return json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "Vanity URL can only contain letters, numbers, hyphens, and underscores",
+            &format!("/percy/lb/{guild_id}"),
+        );
+    }
+    if slug.parse::<u64>().is_ok() {
+        return json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "Vanity URL cannot be a number",
+            &format!("/percy/lb/{guild_id}"),
+        );
+    }
+
+    let gid = guild_id.to_string();
+    let discord_id_clone = discord_id.clone();
+    let slug_clone = slug.clone();
+    let result = state
+        .database()
+        .call(move |conn| -> rusqlite::Result<Result<(), &'static str>> {
+            let existing: Option<String> = conn
+                .prepare_cached("SELECT guild_id FROM percy_leaderboard_vanity WHERE slug = ?")
+                .and_then(|mut stmt| stmt.query_row([&slug_clone], |row| row.get(0)))
+                .ok();
+
+            if let Some(ref owner_guild) = existing {
+                if owner_guild != &gid {
+                    return Ok(Err("This vanity URL is already taken"));
+                }
+            }
+
+            conn.execute(
+                "INSERT INTO percy_leaderboard_vanity (slug, guild_id, claimed_by) VALUES (?, ?, ?) \
+                 ON CONFLICT(guild_id) DO UPDATE SET slug = excluded.slug",
+                rusqlite::params![slug_clone, gid, discord_id_clone],
+            )?;
+            Ok(Ok(()))
+        })
+        .await;
+
+    match result {
+        Ok(Ok(())) => json_or_flash(
+            &headers,
+            &flasher,
+            true,
+            &format!("Vanity URL set to /percy/lb/{slug}"),
+            &format!("/percy/lb/{guild_id}"),
+        ),
+        Ok(Err(msg)) => json_or_flash(&headers, &flasher, false, msg, &format!("/percy/lb/{guild_id}")),
+        Err(_) => json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "Database error",
+            &format!("/percy/lb/{guild_id}"),
+        ),
+    }
+}
+
+/// `DELETE /percy/lb/:guild_id/vanity` — remove a vanity slug.
+pub(super) async fn public_leaderboard_vanity_delete(
+    State(state): State<AppState>,
+    account: Account,
+    headers: HeaderMap,
+    flasher: Flasher,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "Not configured",
+            &format!("/percy/lb/{guild_id}"),
+        );
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "No Discord account linked",
+            &format!("/percy/lb/{guild_id}"),
+        );
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return json_or_flash(
+            &headers,
+            &flasher,
+            false,
+            "You don't have permission to manage this server",
+            &format!("/percy/lb/{guild_id}"),
+        );
+    }
+
+    let gid = guild_id.to_string();
+    let _ = state
+        .database()
+        .call(move |conn| conn.execute("DELETE FROM percy_leaderboard_vanity WHERE guild_id = ?", [&gid]))
+        .await;
+
+    json_or_flash(
+        &headers,
+        &flasher,
+        true,
+        "Vanity URL removed",
+        &format!("/percy/lb/{guild_id}"),
+    )
+}
+
+// -- Custom Bot Profile -------------------------------------------------------
+
+/// `PATCH /percy/dashboard/guild/:guild_id/custom-bot` — update bot profile.
+pub(super) async fn guild_custom_bot_update(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false, "error": "Not authenticated"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+
+    match percy.patch_custom_bot(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true, "message": "Bot profile updated"})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+/// `POST /percy/dashboard/guild/:guild_id/custom-bot/reset` — reset to defaults.
+pub(super) async fn guild_custom_bot_reset(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false, "error": "Not authenticated"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+
+    match percy.reset_custom_bot(guild_id).await {
+        Ok(()) => Json(serde_json::json!({"ok": true, "message": "Bot profile reset to defaults"})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
     }
 }

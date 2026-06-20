@@ -6,6 +6,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" crossorigin="anonymous"/>
 {% endblock %}
 
 {% block body %}
@@ -87,6 +88,7 @@
         <button role="tab" aria-selected="true" data-tab="general">General</button>
         <button role="tab" data-tab="moderation">Moderation</button>
         <button role="tab" data-tab="sentinel">Sentinel</button>
+        <button role="tab" data-tab="custom-bot">Custom Bot</button>
     </nav>
 
     {# ═══════════════════════════════════════════════════════════════ #}
@@ -580,6 +582,117 @@
             {% endmatch %}
         </section>
     </div>
+
+    {# ═══════════════════════════════════════════════════════════════ #}
+    {# TAB: Custom Bot                                                 #}
+    {# ═══════════════════════════════════════════════════════════════ #}
+    <div class="config-tab-panel" id="tab-custom-bot" role="tabpanel" hidden>
+        <section class="config-section">
+            <h2>Bot Profile</h2>
+            <p class="config-section-description">Customize how Percy appears in this server.</p>
+
+            <div class="cb-layout">
+                <div class="cb-card" id="cb-card">
+                    <div class="cb-banner-area" id="cb-banner-area"{% match bot_profile.accent_color %}{% when Some with (c) %} style="--cb-accent: {{ c }}"{% when None %}{% endmatch %}>
+                        {% match bot_profile.banner_url %}
+                        {% when Some with (url) %}
+                        <img src="{{ url }}" alt="" class="cb-banner-img" id="cb-banner-img">
+                        {% when None %}
+                        <div class="cb-banner-placeholder" id="cb-banner-img"></div>
+                        {% endmatch %}
+                        <div class="cb-banner-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                        </div>
+                        <input type="file" id="cb-banner-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+                    </div>
+                    <div class="cb-body">
+                        <div class="cb-avatar-area" id="cb-avatar-area">
+                            {% match bot_profile.avatar_url %}
+                            {% when Some with (url) %}
+                            <img src="{{ url }}" alt="" class="cb-avatar-img" id="cb-avatar-img">
+                            {% when None %}
+                            <div class="cb-avatar-fallback" id="cb-avatar-img">P</div>
+                            {% endmatch %}
+                            <div class="cb-avatar-overlay">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                            </div>
+                            <input type="file" id="cb-avatar-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+                        </div>
+                        <div class="cb-profile-info">
+                            <div class="cb-username-row">
+                                <input type="text" class="cb-username" id="cb-name-input" maxlength="32"
+                                       value="{{ bot_profile.name.as_deref().unwrap_or("Percy") }}" placeholder="Percy">
+                                <span class="cb-bot-badge"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M10.6 2.7l.9-1.7h-2l-.5 1-.5-1h-2l.9 1.7A5 5 0 003 7.5V14a2 2 0 002 2h6a2 2 0 002-2V7.5a5 5 0 00-2.4-4.8zM6.5 12a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm3 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/></svg> BOT</span>
+                            </div>
+                            <div class="cb-section-divider"></div>
+                            <div class="cb-about-section">
+                                <span class="cb-section-title">ABOUT ME</span>
+                                <textarea class="cb-about-textarea" id="cb-about-input" maxlength="190" rows="3"
+                                          placeholder="No bio set.">{{ bot_profile.about_me.as_deref().unwrap_or("") }}</textarea>
+                                <span class="cb-charcount" id="cb-charcount">{{ bot_profile.about_me.as_deref().unwrap_or("").len() }}/190</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="cb-actions">
+                        <button type="button" class="cb-reset-btn" id="cb-reset-btn">Reset</button>
+                        <button type="button" class="cb-save-btn" id="cb-save-btn">Save Changes</button>
+                    </div>
+                </div>
+
+                <aside class="cb-sidebar">
+                    <div class="cb-tip-card">
+                        <h4>How it works</h4>
+                        <ul>
+                            <li><strong>Banner &amp; Avatar</strong> — click to upload. A crop editor lets you position and zoom the image before applying.</li>
+                            <li><strong>Name</strong> — sets the bot's nickname in this server only.</li>
+                            <li><strong>About Me</strong> — the bio on the bot's Discord profile (max 190 chars).</li>
+                        </ul>
+                    </div>
+                    <div class="cb-tip-card">
+                        <h4>Limits</h4>
+                        <ul>
+                            <li>Avatar/banner changes are rate-limited by Discord (twice per 10 min).</li>
+                            <li>Recommended: avatar 512&times;512, banner 960&times;540.</li>
+                            <li>Reset clears nickname, avatar, banner, and bio.</li>
+                        </ul>
+                    </div>
+                </aside>
+            </div>
+        </section>
+    </div>
+
+    {# Image Crop Modal (Cropper.js — Discord-style) #}
+    <div class="cb-crop-modal" id="cb-crop-modal" hidden>
+        <div class="cb-crop-backdrop"></div>
+        <div class="cb-crop-dialog">
+            <header class="cb-crop-header">
+                <button type="button" class="cb-crop-text-btn" id="cb-crop-reselect">Change file</button>
+                <h1 class="cb-crop-title" id="cb-crop-title">Edit Image</h1>
+                <button type="button" class="cb-crop-close-btn" id="cb-crop-close" aria-label="Close">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path fill="currentColor" d="M19.3 20.7a1 1 0 0 0 1.4-1.4L13.42 12l7.3-7.3a1 1 0 0 0-1.42-1.4L12 10.58l-7.3-7.3a1 1 0 0 0-1.4 1.42L10.58 12l-7.3 7.3a1 1 0 1 0 1.42 1.4L12 13.42l7.3 7.3Z"/></svg>
+                </button>
+            </header>
+            <div class="cb-crop-content">
+                <div class="cb-crop-container" id="cb-crop-container">
+                    <img id="cb-crop-img" alt="">
+                    <div class="cb-crop-controls">
+                        <div class="cb-crop-zoom">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M15.62 17.03a9 9 0 1 1 1.41-1.41l4.68 4.67a1 1 0 0 1-1.42 1.42l-4.67-4.68ZM17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" clip-rule="evenodd"/><path fill="currentColor" d="M6 10a1 1 0 0 1 1-1h6a1 1 0 1 1 0 2H7a1 1 0 0 1-1-1Z"/></svg>
+                            <input type="range" id="cb-crop-zoom" min="0" max="100" value="0">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M15.62 17.03a9 9 0 1 1 1.41-1.41l4.68 4.67a1 1 0 0 1-1.42 1.42l-4.67-4.68ZM17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" clip-rule="evenodd"/><path fill="currentColor" d="M11 7a1 1 0 1 0-2 0v2H7a1 1 0 1 0 0 2h2v2a1 1 0 1 0 2 0v-2h2a1 1 0 1 0 0-2h-2V7Z"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <footer class="cb-crop-footer">
+                <button type="button" class="cb-crop-text-btn" id="cb-crop-reset">Reset</button>
+                <div class="cb-crop-footer-right">
+                    <button type="button" class="cb-crop-btn-secondary" id="cb-crop-cancel">Cancel</button>
+                    <button type="button" class="cb-crop-btn-primary" id="cb-crop-apply">Apply</button>
+                </div>
+            </footer>
+        </div>
+    </div>
     </div>
 </div>
 
@@ -606,6 +719,7 @@
 
 {% block body_end %}
 <script>const GUILD_ID = '{{ guild.id }}';</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" crossorigin="anonymous"></script>
 <script src="/static/js/percy/percy_common.js"></script>
 <script src="/static/js/percy/percy_dashboard.js"></script>
 <script src="/static/js/percy/percy_guild.js"></script>

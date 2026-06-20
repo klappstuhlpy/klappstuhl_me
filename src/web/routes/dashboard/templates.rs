@@ -43,6 +43,7 @@ pub(crate) struct GuildTemplate {
     pub(crate) sentinel: Option<SentinelInfo>,
     pub(crate) lockdowns: LockdownsResponse,
     pub(crate) status_feed: StatusFeedInfo,
+    pub(crate) bot_profile: CustomBotProfile,
     /// True when the guild loaded but a sub-resource (roles/channels) failed to
     /// fetch — the page renders, but with empty pickers, so saving could clobber
     /// config. Drives a warning banner instead of a silently hollow page.
@@ -165,6 +166,24 @@ pub(crate) struct OverviewTemplate {
     pub(crate) active_polls: Vec<PollInfo>,
     pub(crate) active_giveaways: Vec<GiveawayInfo>,
     pub(crate) economy: EconomyInfo,
+}
+
+/// Public leaderboard page — accessible by anyone, no login required.
+#[allow(dead_code)]
+#[derive(Template)]
+#[template(path = "percy/leaderboard.html")]
+pub(crate) struct LeaderboardTemplate {
+    pub(crate) account: Option<Account>,
+    pub(crate) flashes: Flashes,
+    pub(crate) guild_id: u64,
+    pub(crate) guild_name: String,
+    pub(crate) guild_icon: Option<String>,
+    pub(crate) leaderboard: LeaderboardResponse,
+    pub(crate) balances: BalancesResponse,
+    /// The vanity slug claimed for this guild, if any.
+    pub(crate) vanity: Option<String>,
+    /// Whether the current viewer can manage vanity settings (guild admin).
+    pub(crate) can_manage: bool,
 }
 
 /// A resolved level-reward row (role granted at a level threshold).

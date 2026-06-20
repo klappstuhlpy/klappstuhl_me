@@ -806,3 +806,19 @@ pub struct BulkActionResponse {
     pub successes: u32,
     pub failures: Vec<BulkActionFailure>,
 }
+
+// -- Custom Bot Profile types ------------------------------------------------
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct CustomBotProfile {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub banner_url: Option<String>,
+    #[serde(default)]
+    pub about_me: Option<String>,
+    #[serde(default)]
+    pub accent_color: Option<String>,
+}
