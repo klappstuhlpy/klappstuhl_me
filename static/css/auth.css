@@ -355,10 +355,90 @@ a.login-discord:hover {
     flex-wrap: wrap;
 }
 
-.password-optional-hint {
-    margin: -0.5rem 0 1.25rem;
-    max-width: 60ch;
-    font-size: 0.9rem;
+/* Dismissible hint that floats out from under the "Set Password" button and
+   overlaps the header card and the cards below it. Kept deliberately subtle
+   (semi-transparent) so it reads as a passing tip rather than a hard alert. The
+   header clips its own overflow, so the popover lives in .account-header-region
+   (a non-clipping positioning context wrapping the header). */
+.account-header-region {
+    position: relative;
+}
+
+.password-hint-pop {
+    position: absolute;
+    top: calc(100% - 1rem);
+    right: 1.6rem;
+    z-index: 30;
+    width: max(260px, 22rem);
+    max-width: 80vw;
+    padding: 0.7rem 2rem 0.7rem 0.9rem;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--info-bg) 55%, transparent);
+    border: 1px solid color-mix(in srgb, var(--info-border) 50%, transparent);
+    border-radius: 0.625rem;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.password-hint-pop[hidden] {
+    display: none;
+}
+
+.password-hint-pop > p {
+    margin: 0;
+}
+
+.password-hint-pop strong {
+    color: var(--info-text);
+}
+
+/* Caret pointing up at the button. */
+.password-hint-pop::before {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    right: 1.1rem;
+    border: 6px solid transparent;
+    border-bottom-color: color-mix(in srgb, var(--info-border) 50%, transparent);
+}
+
+.password-hint-close {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.45rem;
+    padding: 0;
+    width: 1.4rem;
+    height: 1.4rem;
+    font-size: 1.15rem;
+    line-height: 1;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: 0.3rem;
+    cursor: pointer;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.password-hint-close:hover {
+    color: var(--foreground);
+    background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+}
+
+/* On narrow screens the header wraps and the button position is no longer fixed
+   to the right, so the caret can't reliably point at it. Span the hint full-width
+   under the header and drop the caret instead of letting it point at nothing. */
+@media (max-width: 768px) {
+    .password-hint-pop {
+        left: 1rem;
+        right: 1rem;
+        width: auto;
+        max-width: none;
+    }
+    .password-hint-pop::before {
+        display: none;
+    }
 }
 
 /* ── Account sections (card surfaces) ────────────────────────── */

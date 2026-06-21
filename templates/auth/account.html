@@ -14,6 +14,10 @@
 {% let account = account.as_ref().unwrap() %}
 
 {# ─── Header ──────────────────────────────────────────────────── #}
+{# The region wrapper is the positioning context for the hint popover so it can
+   float on top of this card and the cards below it (the header itself clips its
+   contents with overflow:hidden, so the popover can't live inside it). #}
+<div class="account-header-region">
 <div class="account-header">
     <div class="account-identity">
         <span class="account-avatar-mark" aria-hidden="true"><span class="spark">✻</span></span>
@@ -31,12 +35,13 @@
     </div>
     {% endif %}
 </div>
-
 {% if account.id == user.id && !has_password %}
-<div class="alert-flash info password-optional-hint">
-    <p>You signed in with Discord, so your account has no password. Setting one is optional — it just lets you also log in with your username and password.</p>
+<div class="password-hint-pop" id="password-hint" role="note">
+    <button type="button" class="password-hint-close" id="password-hint-close" aria-label="Dismiss hint" title="Dismiss">&times;</button>
+    <p><strong>Hint:</strong> You signed in with Discord, so your account has no password. Setting one is optional — it just lets you also log in with your username and password.</p>
 </div>
 {% endif %}
+</div>
 
 {# ─── Quick-links (admin only) ───────────────────────────────── #}
 {% if user.flags.is_admin() %}

@@ -45,6 +45,11 @@ document.querySelectorAll('.password-icon').forEach(el => {
 document.getElementById('change-password')?.addEventListener('click', () => {
   document.getElementById('change-password-modal').showModal();
 });
+
+/* Dismiss the "Set Password" hint popover. */
+document.getElementById('password-hint-close')?.addEventListener('click', () => {
+  document.getElementById('password-hint')?.setAttribute('hidden', '');
+});
 document.querySelector('#change-password-modal .button[formmethod="dialog"]')?.addEventListener('click', () => {
   document.getElementById('change-password-modal').close();
 });
