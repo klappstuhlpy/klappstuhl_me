@@ -356,6 +356,16 @@ impl Account {
     pub fn has_discord(&self) -> bool {
         self.discord_id.is_some()
     }
+
+    /// Whether the account has a real, usable password set.
+    ///
+    /// Accounts created through Discord OAuth store [`crate::auth::NO_PASSWORD_SENTINEL`]
+    /// instead of an Argon2 hash (they sign in via Discord). For those, changing
+    /// the password is really *setting* one and must not require a current
+    /// password the user never had.
+    pub fn has_password(&self) -> bool {
+        !self.password.is_empty() && self.password != crate::auth::NO_PASSWORD_SENTINEL
+    }
 }
 
 impl Table for Account {

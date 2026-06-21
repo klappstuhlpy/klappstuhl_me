@@ -355,6 +355,12 @@ a.login-discord:hover {
     flex-wrap: wrap;
 }
 
+.password-optional-hint {
+    margin: -0.5rem 0 1.25rem;
+    max-width: 60ch;
+    font-size: 0.9rem;
+}
+
 /* ── Account sections (card surfaces) ────────────────────────── */
 
 .account-section {

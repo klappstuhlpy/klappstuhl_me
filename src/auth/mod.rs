@@ -10,6 +10,12 @@ use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
 
+/// Sentinel stored in `account.password` for accounts created via Discord OAuth
+/// that have never set a password. It is intentionally *not* a valid Argon2 PHC
+/// string, so [`validate_password`] always fails for it — such accounts can only
+/// sign in through Discord until they optionally set a password of their own.
+pub const NO_PASSWORD_SENTINEL: &str = "!";
+
 /// Hashes a plaintext password using Argon2 with a random salt.
 pub fn hash_password(password: &str) -> anyhow::Result<String> {
     let argon2 = Argon2::default();

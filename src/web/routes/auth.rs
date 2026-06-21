@@ -248,8 +248,13 @@ async fn invalidate_session(
 
 #[derive(Deserialize)]
 struct ChangePasswordForm {
+    /// Absent / empty for accounts that have no password yet (Discord signups).
+    #[serde(default)]
     old_password: String,
     new_password: String,
+    /// Must match `new_password`; guards against typos in the new password.
+    #[serde(default)]
+    confirm_password: String,
     #[serde(deserialize_with = "crate::utils::empty_string_is_none")]
     session_description: Option<String>,
 }
@@ -265,6 +270,9 @@ async fn change_password(
     let url = referrer.map(|r| r.0).unwrap_or_else(|| "/account".to_string());
     if !((8..=128).contains(&form.new_password.len())) {
         return flasher.add("Password length must be 8 to 128 characters").bail(&url);
+    }
+    if form.new_password != form.confirm_password {
+        return flasher.add("The two passwords do not match").bail(&url);
     }
 
     let result = state
@@ -283,7 +291,9 @@ async fn change_password(
         }
     };
 
-    if validate_password(&form.old_password, &account.password).is_err() {
+    // Accounts created via Discord have no password to verify — for them this is
+    // setting a first password, so only require the current one when it exists.
+    if account.has_password() && validate_password(&form.old_password, &account.password).is_err() {
         return flasher.add("Invalid password").bail(&url);
     }
 
@@ -480,6 +490,10 @@ struct AccountInfoTemplate {
     discord_username: String,
     /// Whether Discord OAuth is configured (controls showing the link button).
     discord_enabled: bool,
+    /// Whether the account has a real password set. Discord-created accounts don't,
+    /// so the change-password dialog hides the "current password" field and shows
+    /// a hint that setting one is optional.
+    has_password: bool,
 }
 
 impl AccountInfoTemplate {
@@ -531,6 +545,7 @@ impl AccountInfoTemplate {
             .await
             .unwrap_or_default();
         let discord_enabled = state.config().discord.enabled();
+        let has_password = user.has_password();
 
         Self {
             account: Some(account),
@@ -544,6 +559,7 @@ impl AccountInfoTemplate {
             key,
             discord_username,
             discord_enabled,
+            has_password,
         }
     }
 }
@@ -805,6 +821,15 @@ async fn totp_setup(
     account: Account,
     flasher: Flasher,
 ) -> Response {
+    // 2FA only protects the password login — Discord sign-in deliberately skips
+    // the TOTP challenge. With no password set, enabling it would guard nothing,
+    // so require a password first.
+    if !account.has_password() {
+        return flasher
+            .add("Set a password before enabling two-factor authentication.")
+            .bail("/account");
+    }
+
     let key = state.config().secret_key;
     let secret = crate::totp::generate_secret();
     let Ok(encrypted) = crate::totp::encrypt_secret(&key, &secret) else {

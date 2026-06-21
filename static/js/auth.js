@@ -49,6 +49,20 @@ document.querySelector('#change-password-modal .button[formmethod="dialog"]')?.a
   document.getElementById('change-password-modal').close();
 });
 
+/* Keep the confirm field in lock-step with the new password so the browser
+   blocks submission (with a native message) on a mismatch before it hits the
+   server, which validates the match again. */
+(() => {
+  const newPw = document.getElementById('new-password');
+  const confirmPw = document.getElementById('confirm-password');
+  if (!newPw || !confirmPw) return;
+  const sync = () => {
+    confirmPw.setCustomValidity(confirmPw.value !== newPw.value ? 'Passwords do not match.' : '');
+  };
+  newPw.addEventListener('input', sync);
+  confirmPw.addEventListener('input', sync);
+})();
+
 document.getElementById('disable-2fa')?.addEventListener('click', () => {
   document.getElementById('disable-2fa-modal').showModal();
 });

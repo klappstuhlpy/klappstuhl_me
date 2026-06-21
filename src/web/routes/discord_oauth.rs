@@ -4,7 +4,6 @@ use std::{
 };
 
 use crate::{
-    auth::hash_password,
     flash::Flasher,
     headers::ClientIp,
     models::{is_valid_username, Account},
@@ -360,16 +359,9 @@ async fn login_or_create(
         let discord_id_for_insert = user.id.clone();
         let discord_username_for_insert = user.username.clone();
 
-        // Generate a sentinel password hash that can never be matched.
-        let mut random_bytes = [0u8; 64];
-        if getrandom::getrandom(&mut random_bytes).is_err() {
-            return flasher.add("Internal error during account creation.").bail("/login");
-        }
-        let sentinel_password = base64::Engine::encode(&base64::prelude::BASE64_URL_SAFE_NO_PAD, random_bytes);
-        let password_hash = match hash_password(&sentinel_password) {
-            Ok(h) => h,
-            Err(_) => return flasher.add("Internal error during account creation.").bail("/login"),
-        };
+        // Discord-created accounts have no password: store a sentinel that can
+        // never validate. The user may optionally set one later from /account.
+        let password_hash = crate::auth::NO_PASSWORD_SENTINEL.to_string();
 
         let username_clone = username.clone();
         let tx_result: rusqlite::Result<i64> = state
@@ -417,15 +409,7 @@ async fn login_or_create(
                     let suffixed = append_random_suffix(&username);
                     let discord_id2 = user.id.clone();
                     let discord_username2 = user.username.clone();
-                    let password_hash2 = {
-                        let mut rb = [0u8; 64];
-                        let _ = getrandom::getrandom(&mut rb);
-                        let s = base64::Engine::encode(&base64::prelude::BASE64_URL_SAFE_NO_PAD, rb);
-                        match hash_password(&s) {
-                            Ok(h) => h,
-                            Err(_) => return flasher.add("Internal error.").bail("/login"),
-                        }
-                    };
+                    let password_hash2 = crate::auth::NO_PASSWORD_SENTINEL.to_string();
                     let suffixed_clone = suffixed.clone();
                     let retry: rusqlite::Result<i64> = state
                         .database()

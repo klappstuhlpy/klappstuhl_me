@@ -27,10 +27,14 @@
     </div>
     {% if account.id == user.id %}
     <div class="account-header-actions">
-        <button class="button danger outline" id="change-password">Change Password</button>
+        <button class="button danger outline" id="change-password">{% if has_password %}Change Password{% else %}Set Password{% endif %}</button>
     </div>
     {% endif %}
 </div>
+
+{% if account.id == user.id && !has_password %}
+<p class="muted password-optional-hint">You signed in with Discord, so your account has no password. Setting one is optional — it just lets you also log in with your username and password.</p>
+{% endif %}
 
 {# ─── Quick-links (admin only) ───────────────────────────────── #}
 {% if user.flags.is_admin() %}
@@ -164,6 +168,8 @@
     {% if totp_enabled %}
     <p>2FA is <strong>enabled</strong>. You'll be asked for a code from your authenticator app when you log in.</p>
     <button class="button danger outline" id="disable-2fa" type="button">Deactivate</button>
+    {% else if !has_password %}
+    <p class="muted">2FA only protects username &amp; password logins, and Discord sign-in skips it. Set a password first to enable two-factor authentication.</p>
     {% else %}
     <p>Add a second factor (TOTP) for stronger account security. Recommended for admins.</p>
     <form method="POST" action="/account/2fa/setup">
@@ -216,9 +222,10 @@
 
 <dialog id="change-password-modal">
     <form autocomplete="off" method="POST" action="/account/change_password">
-        <h1>Change password</h1>
-        <p>Pick a new password of at least 8 characters. You'll stay signed in on this device.</p>
+        <h1>{% if has_password %}Change password{% else %}Set password{% endif %}</h1>
+        <p>Pick a password of at least 8 characters. You'll stay signed in on this device.</p>
         <div class="form-container">
+            {% if has_password %}
             <div class="field-group">
                 <label class="field-label" for="old-password">Current password</label>
                 <div class="password-container form-field">
@@ -226,10 +233,18 @@
                     <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
                 </div>
             </div>
+            {% endif %}
             <div class="field-group">
                 <label class="field-label" for="new-password">New password</label>
                 <div class="password-container form-field">
                     <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="new_password" id="new-password" type="password" autocomplete="new-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="confirm-password">Confirm new password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="confirm_password" id="confirm-password" type="password" autocomplete="new-password">
                     <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
                 </div>
             </div>
