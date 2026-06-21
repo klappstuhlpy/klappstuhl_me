@@ -631,7 +631,9 @@ pub struct NowPlaying {
     #[serde(default)]
     pub volume: u32,
     /// 0 = off, 1 = loop track, 2 = loop queue.
-    #[serde(default)]
+    /// Percy sends/expects the JSON key `loop`; rename so it both deserialises
+    /// from Percy and re-serialises as `loop` for the dashboard player JS.
+    #[serde(default, rename = "loop")]
     pub loop_mode: u8,
     #[serde(default)]
     pub shuffle: bool,
