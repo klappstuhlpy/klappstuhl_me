@@ -4,6 +4,7 @@
 
 {% block page_css %}
 <link rel="stylesheet" href="/static/css/percy/music.css" type="text/css"/>
+<link rel="stylesheet" href="/static/css/percy/player.css" type="text/css"/>
 {% endblock %}
 
 {% block content %}
@@ -20,93 +21,83 @@
         </div>
     </div>
 
-    {# ─── Listener Status ────────────────────────────────────────────── #}
-    <section class="config-section" id="status-section">
-        <h2>Player Status</h2>
-        <div id="player-status">
-        {% if music.active %}
-        <div class="listener-status">
-            <span class="ls-indicator active"></span>
-            <span>Active in <strong>{% match music.channel %}{% when Some with (ch) %}{{ ch }}{% when None %}unknown channel{% endmatch %}</strong></span>
-        </div>
-        {% match music.now_playing %}
-        {% when Some with (np) %}
-        <div class="now-playing">
-            <span class="np-dot"></span>
-            <span><strong>{{ np.title }}</strong> &mdash; {{ np.author }}</span>
-        </div>
-        {% when None %}
-        <p class="text-muted">Connected but nothing playing.</p>
-        {% endmatch %}
-        {% else %}
-        <div class="listener-status">
-            <span class="ls-indicator inactive"></span>
-            <span class="text-muted">No active music session in this server.</span>
-        </div>
-        {% endif %}
-        </div>
-    </section>
-
-    {# ─── Music Panel Setup ───────────────────────────────────────────── #}
+    {# ─── Music Panel ─────────────────────────────────────────────────── #}
     <section class="config-section" id="setup-section">
-        <h2>Music Panel Setup</h2>
+        <h2>Music Panel</h2>
+
         {% match music.setup %}
         {% when Some with (setup) %}
-        <p class="config-section-description">The music panel is configured. The bot will use a dedicated channel for the player panel.</p>
-        <div class="listener-status">
-            <span class="ls-indicator active"></span>
-            <span>Panel channel: <strong id="setup-channel-name">{% for ch in channels %}{% if ch.id == setup.channel_id %}#{{ ch.name }}{% endif %}{% endfor %}</strong></span>
-        </div>
-        <div class="config-grid">
-            <label class="config-toggle">
+        <div class="panel-list">
+            <label class="config-toggle panel-item">
                 <div>
                     <span class="config-label">Use Music Panel</span>
-                    <span class="config-description">When disabled, the bot won't send a player panel even though setup exists</span>
+                    <span class="config-description">Interactive now-playing controls — temporary, or pinned to the channel below.</span>
                 </div>
                 <input type="checkbox" id="panel-toggle" {% if setup.use_panel %}checked{% endif %}>
             </label>
-        </div>
-        <div class="config-actions">
-            <button type="button" class="button small danger" id="reset-setup-btn">Reset Configuration</button>
-        </div>
-        {% when None %}
-        <p class="config-section-description">No music panel is configured. Set one up to get a dedicated player channel with auto-cleanup and a persistent now-playing embed.</p>
-        <div class="config-grid">
-            <div class="config-field">
-                <label class="config-label" for="setup-channel">Channel (optional)</label>
-                <span class="config-description">Leave empty to create a new channel automatically</span>
-                <select id="setup-channel" class="config-select">
-                    <option value="">Create new channel</option>
-                    {% for ch in channels %}
-                    <option value="{{ ch.id }}">#{{ ch.name }}</option>
-                    {% endfor %}
-                </select>
+
+            {% match setup.channel_id %}
+            {% when Some with (cid) %}
+            <div class="config-toggle panel-item">
+                <div>
+                    <span class="config-label">Dedicated channel</span>
+                    <span class="config-description">Pinned in <strong id="setup-channel-name">{% for ch in channels %}{% if ch.id == cid.as_str() %}#{{ ch.name }}{% endif %}{% endfor %}</strong> · auto-cleanup. Remove for a temporary panel.</span>
+                </div>
+                <button type="button" class="button small danger" id="reset-setup-btn">Remove</button>
             </div>
+            {% when None %}
+            <div class="config-toggle panel-item">
+                <div>
+                    <span class="config-label">Dedicated channel</span>
+                    <span class="config-description">Optional — pin a persistent panel, or leave it temporary.</span>
+                </div>
+                <div class="panel-item-action">
+                    <select id="setup-channel" class="config-select panel-channel-select">
+                        <option value="">New channel</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="button primary small" id="run-setup-btn">Set</button>
+                </div>
+            </div>
+            {% endmatch %}
         </div>
-        <div class="config-actions">
-            <button type="button" class="button primary small" id="run-setup-btn">Setup Music Panel</button>
+
+        {% when None %}
+        {# Fallback when the live music state couldn't be fetched. #}
+        <div class="panel-list">
+            <label class="config-toggle panel-item">
+                <div>
+                    <span class="config-label">Use Music Panel</span>
+                    <span class="config-description">Interactive now-playing controls — temporary, or pinned to the channel below.</span>
+                </div>
+                <input type="checkbox" id="panel-toggle">
+            </label>
+            <div class="config-toggle panel-item">
+                <div>
+                    <span class="config-label">Dedicated channel</span>
+                    <span class="config-description">Optional — pin a persistent panel, or leave it temporary.</span>
+                </div>
+                <div class="panel-item-action">
+                    <select id="setup-channel" class="config-select panel-channel-select">
+                        <option value="">New channel</option>
+                        {% for ch in channels %}
+                        <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="button primary small" id="run-setup-btn">Set</button>
+                </div>
+            </div>
         </div>
         {% endmatch %}
     </section>
 
-    {# ─── DJ Mode ─────────────────────────────────────────────────── #}
-    <section class="config-section" id="dj-mode-section">
-        <h2>DJ Mode</h2>
-        <p class="config-section-description">Control who can interact with the music player panel and commands. The DJ role is any role named "DJ" or users with the <em>Manage Server</em> permission.</p>
-
-        <div class="config-grid">
-            <div class="config-field">
-                <label class="config-label" for="dj-mode-select">Access Level</label>
-                <select id="dj-mode-select" class="config-select">
-                    <option value="0">Everyone &mdash; anyone in the voice channel can use all controls</option>
-                    <option value="1">DJ Only &mdash; only DJ role or Manage Server can control playback</option>
-                    <option value="2">Hybrid &mdash; everyone can pause/resume; destructive actions require DJ</option>
-                </select>
-            </div>
-        </div>
-        <p class="text-muted" id="dj-mode-description">
-            {% match music.setup %}{% when Some with (setup) %}{% if setup.dj_mode == 1 %}Only members with the DJ role or Manage Server permission can use the player.{% else if setup.dj_mode == 2 %}Basic controls (pause, volume) are available to everyone. Stop, shuffle, skip, and loop require the DJ role.{% else %}All voice channel members can freely interact with the player.{% endif %}{% when None %}Configure the music panel first to use DJ mode.{% endmatch %}
-        </p>
+    {# ─── Live Player ────────────────────────────────────────────────── #}
+    <section class="config-section" id="status-section">
+        <h2>Player Status</h2>
+        <p class="config-section-description">A live, realtime-synced player mirroring exactly what's playing in voice — artwork, queue, synced lyrics, and full controls.</p>
+        <div id="percy-player"></div>
     </section>
 
     {# ─── Equalizer ──────────────────────────────────────────────── #}
@@ -185,6 +176,26 @@
             <button type="button" class="button small danger" id="ao-disable-btn">Disable</button>
         </div>
     </section>
+
+    {# ─── DJ Mode ─────────────────────────────────────────────────── #}
+    <section class="config-section" id="dj-mode-section">
+        <h2>DJ Mode</h2>
+        <p class="config-section-description">Control who can interact with the music player panel and commands. The DJ role is any role named "DJ" or users with the <em>Manage Server</em> permission.</p>
+
+        <div class="config-grid">
+            <div class="config-field">
+                <label class="config-label" for="dj-mode-select">Access Level</label>
+                <select id="dj-mode-select" class="config-select">
+                    <option value="0">Everyone &mdash; anyone in the voice channel can use all controls</option>
+                    <option value="1">DJ Only &mdash; only DJ role or Manage Server can control playback</option>
+                    <option value="2">Hybrid &mdash; everyone can pause/resume; destructive actions require DJ</option>
+                </select>
+            </div>
+        </div>
+        <p class="text-muted" id="dj-mode-description">
+            {% match music.setup %}{% when Some with (setup) %}{% if setup.dj_mode == 1 %}Only members with the DJ role or Manage Server permission can use the player.{% else if setup.dj_mode == 2 %}Basic controls (pause, volume) are available to everyone. Stop, shuffle, skip, and loop require the DJ role.{% else %}All voice channel members can freely interact with the player.{% endif %}{% when None %}Configure the music panel first to use DJ mode.{% endmatch %}
+        </p>
+    </section>
 {% endblock %}
 
 {% block page_js %}
@@ -195,6 +206,7 @@ const MUSIC_EQUALIZER = [{% for g in music.equalizer %}{{ g }}{% if !loop.last %
 const ALWAYS_ON_MODE = '{{ music.always_on.mode.as_deref().unwrap_or("") }}';
 const DJ_MODE_INITIAL = {% match music.setup %}{% when Some with (setup) %}{{ setup.dj_mode }}{% when None %}0{% endmatch %};
 </script>
+<script src="/static/js/percy/percy_player.js"></script>
 <script src="/static/js/percy/percy_music.js"></script>
 <script>
 // 24/7 always-on controls

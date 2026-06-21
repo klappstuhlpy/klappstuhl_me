@@ -609,6 +609,15 @@ impl PercyClient {
         .await
     }
 
+    /// Fetch time-synced lyrics for the guild's currently-playing track.
+    pub async fn get_music_lyrics(&self, guild_id: u64) -> Result<MusicLyrics, PercyError> {
+        self.send_into(
+            self.client
+                .get(self.url(&format!("/api/internal/guilds/{guild_id}/music/lyrics"))),
+        )
+        .await
+    }
+
     /// Apply equalizer settings (preset or custom bands).
     pub async fn post_music_equalizer(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
         self.send_unit(

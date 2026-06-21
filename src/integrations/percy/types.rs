@@ -596,12 +596,91 @@ pub struct BalancesResponse {
 
 // -- Music types -------------------------------------------------------------
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TrackLink {
+    pub name: String,
+    #[serde(default)]
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TrackRequester {
+    pub id: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub avatar: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NowPlaying {
     pub title: String,
     pub author: String,
     pub duration: u64,
     pub position: u64,
+    #[serde(default)]
+    pub uri: Option<String>,
+    #[serde(default)]
+    pub artwork: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub is_stream: bool,
+    #[serde(default)]
+    pub paused: bool,
+    #[serde(default)]
+    pub volume: u32,
+    /// 0 = off, 1 = loop track, 2 = loop queue.
+    #[serde(default)]
+    pub loop_mode: u8,
+    #[serde(default)]
+    pub shuffle: bool,
+    #[serde(default)]
+    pub recommended: bool,
+    #[serde(default)]
+    pub album: Option<TrackLink>,
+    #[serde(default)]
+    pub playlist: Option<TrackLink>,
+    #[serde(default)]
+    pub artist_url: Option<String>,
+    #[serde(default)]
+    pub requester: Option<TrackRequester>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct QueueTrack {
+    pub title: String,
+    pub author: String,
+    #[serde(default)]
+    pub uri: Option<String>,
+    #[serde(default)]
+    pub artwork: Option<String>,
+    #[serde(default)]
+    pub duration: u64,
+    #[serde(default)]
+    pub is_stream: bool,
+    #[serde(default)]
+    pub requester: Option<TrackRequester>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct LyricLine {
+    pub time: u64,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct MusicLyrics {
+    #[serde(default)]
+    pub has_synced: bool,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub lines: Vec<LyricLine>,
+    #[serde(default)]
+    pub plain: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -616,7 +695,10 @@ pub struct MusicFiltersState {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MusicSetup {
-    pub channel_id: String,
+    /// The dedicated panel channel, if one is configured. `None` means the panel
+    /// (when enabled) is created temporarily where playback starts.
+    #[serde(default)]
+    pub channel_id: Option<String>,
     pub message_id: Option<String>,
     pub use_panel: bool,
     #[serde(default)]
@@ -642,7 +724,11 @@ pub struct MusicInfo {
     #[serde(default)]
     pub now_playing: Option<NowPlaying>,
     #[serde(default)]
+    pub queue: Vec<QueueTrack>,
+    #[serde(default)]
     pub channel: Option<String>,
+    #[serde(default)]
+    pub channel_name: Option<String>,
     #[serde(default)]
     pub setup: Option<MusicSetup>,
     #[serde(default)]

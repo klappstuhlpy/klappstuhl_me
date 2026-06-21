@@ -262,7 +262,9 @@ pub(super) async fn guild_overview(
         },
         presets: vec![],
         now_playing: None,
+        queue: Vec::new(),
         channel: None,
+        channel_name: None,
         setup: None,
         always_on: Default::default(),
         listeners: Vec::new(),
@@ -325,11 +327,48 @@ pub(super) async fn guild_overview_music_status(
                 "ok": true,
                 "active": music.active,
                 "channel": music.channel,
+                "channel_name": music.channel_name,
                 "now_playing": music.now_playing,
+                "queue": music.queue,
                 "can_control": can_control,
             }))
             .into_response()
         }
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+/// `GET /percy/dashboard/guild/:guild_id/overview/music/lyrics` — synced lyrics
+/// for the public overview's player. Membership-gated.
+pub(super) async fn guild_overview_music_lyrics(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false})).into_response();
+    };
+    if !check_guild_membership(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    lyrics_json(&percy, guild_id).await
+}
+
+/// Shared helper: fetch lyrics and wrap them with an `ok` flag for the player JS.
+async fn lyrics_json(percy: &PercyClient, guild_id: u64) -> Response {
+    match percy.get_music_lyrics(guild_id).await {
+        Ok(l) => Json(serde_json::json!({
+            "ok": true,
+            "has_synced": l.has_synced,
+            "title": l.title,
+            "source": l.source,
+            "lines": l.lines,
+            "plain": l.plain,
+        }))
+        .into_response(),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
     }
 }
@@ -1774,7 +1813,9 @@ pub(super) async fn guild_music(
         },
         presets: vec![],
         now_playing: None,
+        queue: Vec::new(),
         channel: None,
+        channel_name: None,
         setup: None,
         always_on: Default::default(),
         listeners: Vec::new(),
@@ -1855,7 +1896,11 @@ pub(super) async fn guild_music_status(
             "ok": true,
             "active": music.active,
             "channel": music.channel,
+            "channel_name": music.channel_name,
             "now_playing": music.now_playing,
+            "queue": music.queue,
+            // Dashboard admins (Manage Server) can always drive the player.
+            "can_control": true,
             "equalizer": music.equalizer,
             "filters": music.filters,
             "setup": music.setup,
@@ -1864,6 +1909,53 @@ pub(super) async fn guild_music_status(
         .into_response(),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
     }
+}
+
+/// `POST /percy/dashboard/guild/:guild_id/music/control` — drive the live player
+/// from the admin music page. The viewer's Discord id comes from the session;
+/// Percy enforces DJ-mode rules (admins/Manage-Server always pass).
+pub(super) async fn guild_music_control(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(mut body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false, "error": "Not authenticated"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    // Inject the authenticated identity; never trust a client-supplied user_id.
+    if let Some(obj) = body.as_object_mut() {
+        obj.insert("user_id".into(), serde_json::Value::String(discord_id));
+    }
+    match percy.music_control(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+/// `GET /percy/dashboard/guild/:guild_id/music/lyrics` — synced lyrics for the
+/// admin music page player.
+pub(super) async fn guild_music_lyrics(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    lyrics_json(&percy, guild_id).await
 }
 
 pub(super) async fn guild_music_247(

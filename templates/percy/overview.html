@@ -7,6 +7,7 @@
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
 <link rel="stylesheet" href="/static/css/percy/overview.css" type="text/css"/>
+<link rel="stylesheet" href="/static/css/percy/player.css" type="text/css"/>
 {% endblock %}
 
 {% block body %}
@@ -33,41 +34,9 @@
     </div>
 
     {# ─── Now Playing ─────────────────────────────────────────────── #}
-    <section class="config-section overview-music dash-rise" id="music-section"
-             data-can-control="{% if can_control_music %}1{% else %}0{% endif %}">
+    <section class="config-section overview-music dash-rise" id="music-section">
         <h2>Now Playing</h2>
-        <div id="music-body">
-            {% if music.active %}
-            <div class="listener-status">
-                <span class="ls-indicator active"></span>
-                <span>Playing in <strong id="music-channel">{% match music.channel %}{% when Some with (ch) %}voice channel{% when None %}voice{% endmatch %}</strong></span>
-            </div>
-            {% match music.now_playing %}
-            {% when Some with (np) %}
-            <div class="now-playing">
-                <span class="np-dot"></span>
-                <span><strong id="music-title">{{ np.title }}</strong> <span class="text-muted">&mdash; <span id="music-author">{{ np.author }}</span></span></span>
-            </div>
-            {% when None %}
-            <p class="text-muted" id="music-idle">Connected but nothing playing.</p>
-            {% endmatch %}
-            {% else %}
-            <div class="listener-status">
-                <span class="ls-indicator inactive"></span>
-                <span class="text-muted" id="music-idle">No active music session in this server.</span>
-            </div>
-            {% endif %}
-        </div>
-
-        <div class="overview-music-controls" id="music-controls" {% if !can_control_music %}hidden{% endif %}>
-            <button type="button" class="button small" data-action="resume" title="Resume">▶ Resume</button>
-            <button type="button" class="button small" data-action="pause" title="Pause">⏸ Pause</button>
-            <button type="button" class="button small" data-action="skip" title="Skip">⏭ Skip</button>
-            <button type="button" class="button small danger" data-action="stop" title="Stop">⏹ Stop</button>
-        </div>
-        <p class="overview-music-hint" id="music-hint" {% if can_control_music %}hidden{% endif %}>
-            Join the bot's voice channel to control playback.
-        </p>
+        <div id="percy-player"></div>
     </section>
 
     {# ─── Server Stats ────────────────────────────────────────────── #}
@@ -182,5 +151,6 @@
 const GUILD_ID = '{{ guild_id }}';
 </script>
 <script src="/static/js/percy/percy_common.js"></script>
+<script src="/static/js/percy/percy_player.js"></script>
 <script src="/static/js/percy/percy_overview.js"></script>
 {% endblock %}

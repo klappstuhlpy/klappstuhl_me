@@ -311,6 +311,10 @@ pub fn routes() -> Router<AppState> {
             "/percy/dashboard/guild/:guild_id/overview/music/control",
             post(guild_overview_music_control),
         )
+        .route(
+            "/percy/dashboard/guild/:guild_id/overview/music/lyrics",
+            get(guild_overview_music_lyrics),
+        )
         .route("/percy/dashboard/guild/:guild_id", get(guild_detail))
         .route("/percy/dashboard/guild/:guild_id/config", post(guild_config_update))
         .route("/percy/dashboard/guild/:guild_id/sentinel", post(guild_sentinel_update))
@@ -381,6 +385,11 @@ pub fn routes() -> Router<AppState> {
         )
         .route("/percy/dashboard/guild/:guild_id/music", get(guild_music))
         .route("/percy/dashboard/guild/:guild_id/music/status", get(guild_music_status))
+        .route(
+            "/percy/dashboard/guild/:guild_id/music/control",
+            post(guild_music_control),
+        )
+        .route("/percy/dashboard/guild/:guild_id/music/lyrics", get(guild_music_lyrics))
         .route("/percy/dashboard/guild/:guild_id/music/setup", post(guild_music_setup))
         .route("/percy/dashboard/guild/:guild_id/music/reset", post(guild_music_reset))
         .route(

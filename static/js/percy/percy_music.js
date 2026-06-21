@@ -32,12 +32,12 @@
                 const r = await fetch(`${base}/setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) });
                 const d = await r.json();
                 if (d.ok) {
-                    showToast('success', 'Music panel set up in #' + d.channel_name);
+                    showToast('success', 'Dedicated panel channel set: #' + d.channel_name);
                     setTimeout(function() { location.reload(); }, 1000);
                 } else {
                     showToast('error', d.error || 'Setup failed.');
                     setupBtn.disabled = false;
-                    setupBtn.textContent = 'Setup Music Panel';
+                    setupBtn.textContent = 'Set dedicated channel';
                 }
             } catch { showToast('error', 'Network error.'); setupBtn.disabled = false; setupBtn.textContent = 'Setup Music Panel'; }
         });
@@ -46,13 +46,13 @@
     const resetBtn2 = document.getElementById('reset-setup-btn');
     if (resetBtn2) {
         resetBtn2.addEventListener('click', async function() {
-            if (!confirm('This will delete the music panel channel and reset the configuration. Continue?')) return;
+            if (!confirm('Remove the dedicated panel channel? The Discord channel is deleted; the panel stays enabled as a temporary panel if it\'s turned on.')) return;
             resetBtn2.disabled = true;
             try {
                 const r = await fetch(`${base}/reset`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' });
                 const d = await r.json();
                 if (d.ok) {
-                    showToast('success', 'Music configuration reset.');
+                    showToast('success', 'Dedicated channel removed.');
                     setTimeout(function() { location.reload(); }, 1000);
                 } else {
                     showToast('error', d.error || 'Reset failed.');
@@ -316,28 +316,17 @@
         });
     });
 
-    // ─── Live status polling ───────────────────────────────────────
-    function updatePlayerStatus(data) {
-        const container = document.getElementById('player-status');
-        if (!container) return;
-        if (data.active) {
-            const ch = data.channel || 'unknown channel';
-            let html = '<div class="listener-status"><span class="ls-indicator active"></span><span>Active in <strong>' + ch + '</strong></span></div>';
-            if (data.now_playing) {
-                html += '<div class="now-playing"><span class="np-dot"></span><span><strong>' + escHtml(data.now_playing.title) + '</strong> &mdash; ' + escHtml(data.now_playing.author) + '</span></div>';
-            } else {
-                html += '<p class="text-muted">Connected but nothing playing.</p>';
-            }
-            container.innerHTML = html;
-        } else {
-            container.innerHTML = '<div class="listener-status"><span class="ls-indicator inactive"></span><span class="text-muted">No active music session in this server.</span></div>';
-        }
+    // ─── Live status (driven by the shared player's poll) ──────────
+    // The Apple-Music-style player (percy_player.js) owns the single status
+    // poll; we piggy-back on its callback to keep the EQ/filter sections and the
+    // canvas gains in sync rather than polling a second time.
+    let playerInstance = null;
 
-        // Show/hide EQ and filters sections based on activity
+    function applyActivity(active) {
         const eqSec = document.getElementById('eq-section');
         const filterSec = document.getElementById('filters-section');
-        if (eqSec) eqSec.style.display = data.active ? '' : 'none';
-        if (filterSec) filterSec.style.display = data.active ? '' : 'none';
+        if (eqSec) eqSec.style.display = active ? '' : 'none';
+        if (filterSec) filterSec.style.display = active ? '' : 'none';
     }
 
     function updateFilters(filters) {
@@ -352,41 +341,31 @@
         if (lpVal && filters.lowpass != null) lpVal.value = filters.lowpass;
     }
 
-    function escHtml(s) {
-        const d = document.createElement('div');
-        d.textContent = s;
-        return d.innerHTML;
+    function onPlayerStatus(d) {
+        applyActivity(!!d.active);
+        updateFilters(d.filters);
+        if (d.equalizer && d.equalizer.length === 15) {
+            gains = d.equalizer;
+            if (document.getElementById('eq-canvas') && dragging < 0) draw();
+        }
+        const toggle = document.getElementById('panel-toggle');
+        if (toggle && d.setup) toggle.checked = d.setup.use_panel;
     }
 
-    async function refreshStatus() {
-        try {
-            const r = await fetch(`${base}/status`, { headers: { 'Accept': 'application/json' } });
-            const d = await r.json();
-            if (!d.ok) return;
-            updatePlayerStatus(d);
-            updateFilters(d.filters);
-            if (d.equalizer && d.equalizer.length === 15) {
-                gains = d.equalizer;
-                if (document.getElementById('eq-canvas')) {
-                    if (dragging < 0) draw();
-                }
-            }
-            // Update panel toggle state from polling
-            const toggle = document.getElementById('panel-toggle');
-            if (toggle && d.setup) {
-                toggle.checked = d.setup.use_panel;
-            }
-        } catch {}
-    }
+    // Re-poll after a local EQ/filter mutation so the UI reflects the bot.
+    function refreshStatus() { if (playerInstance) playerInstance.refresh(); }
 
-    // Hide EQ/filters if not active initially
-    if (!initialActive) {
-        const eqSec = document.getElementById('eq-section');
-        const filterSec = document.getElementById('filters-section');
-        if (eqSec) eqSec.style.display = 'none';
-        if (filterSec) filterSec.style.display = 'none';
-    }
+    // Hide EQ/filters until we know the player is active.
+    applyActivity(initialActive);
 
-    // Poll every 10 seconds
-    setInterval(refreshStatus, 10000);
+    // Mount the live player into the Player Status section.
+    if (window.PercyPlayer && document.getElementById('percy-player')) {
+        playerInstance = window.PercyPlayer.mount({
+            root: document.getElementById('percy-player'),
+            statusUrl: `${base}/status`,
+            controlUrl: `${base}/control`,
+            lyricsUrl: `${base}/lyrics`,
+            onStatus: onPlayerStatus,
+        });
+    }
 })();

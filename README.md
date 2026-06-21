@@ -889,8 +889,9 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/account/discord/unlink` | POST | Remove Discord link |
 | `/percy/dashboard` | GET | Server selection: managed servers, read-only servers you're in, and "Add Percy" cards for servers you manage Percy isn't in yet |
 | `/percy/dashboard/guild/:id/overview` | GET | Read-only public overview for members without manage access (stats, leaderboard, polls/giveaways, shop, live music) |
-| `/percy/dashboard/guild/:id/overview/music` | GET | Live now-playing state for the overview (JSON, polled) |
-| `/percy/dashboard/guild/:id/overview/music/control` | POST | Pause/resume/skip/stop — only if the viewer shares the bot's voice channel |
+| `/percy/dashboard/guild/:id/overview/music` | GET | Live now-playing state + queue for the overview player (JSON, polled) |
+| `/percy/dashboard/guild/:id/overview/music/control` | POST | Drive the live player (play/pause/skip/back/seek/volume/loop/shuffle/jump/stop) — only if the viewer shares the bot's voice channel |
+| `/percy/dashboard/guild/:id/overview/music/lyrics` | GET | Time-synced lyrics for the overview player's current track (JSON) |
 | `/percy/dashboard/guild/:id` | GET | Per-guild config editor (tabbed: General, Moderation, Sentinel) |
 | `/percy/dashboard/guild/:id/config` | POST | Save config changes (flags/moderation/polls/music/prefixes) |
 | `/percy/dashboard/guild/:id/sentinel` | POST | Save sentinel settings |
@@ -909,12 +910,13 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/percy/dashboard/guild/:id/leveling/multipliers` | POST | Set/clear a role or channel XP multiplier |
 | `/percy/dashboard/guild/:id/leveling/blacklist` | POST | Add/remove a leveling blacklist entry |
 | `/percy/dashboard/guild/:id/economy` | GET | Economy management (shop, balances, lottery) |
-| `/percy/dashboard/guild/:id/music` | GET | Music page (player status, equalizer, filters, panel config) |
-| `/percy/dashboard/guild/:id/music/status` | GET | Live music status (JSON, polled every 10s) |
+| `/percy/dashboard/guild/:id/music` | GET | Music page (Apple-Music-style live player, equalizer, filters, panel config) |
+| `/percy/dashboard/guild/:id/music/status` | GET | Live music status + now-playing + queue (JSON, polled) |
 | `/percy/dashboard/guild/:id/music/equalizer` | POST | Apply equalizer bands or preset |
 | `/percy/dashboard/guild/:id/music/filters` | POST | Toggle audio filters (nightcore, 8D, lowpass) |
 | `/percy/dashboard/guild/:id/music/247` | POST | Enable/disable the 24/7 always-on player (radio/playlist/autoplay) |
-| `/percy/dashboard/guild/:id/music/control` | POST | Pause/resume/skip/stop the live player (voice-presence + DJ-mode gated) |
+| `/percy/dashboard/guild/:id/music/control` | POST | Drive the live player: play/pause/skip/back/seek/volume/loop/shuffle/jump/stop (voice-presence + DJ-mode gated) |
+| `/percy/dashboard/guild/:id/music/lyrics` | GET | Time-synced lyrics for the current track (JSON) |
 | `/percy/dashboard/guild/:id/economy/items` | POST | Create a shop item |
 | `/percy/dashboard/guild/:id/economy/items/:name` | DELETE | Delete a shop item |
 | `/percy/dashboard/guild/:id/economy/lottery` | POST/DELETE | Start / cancel the lottery |
