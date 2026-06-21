@@ -33,7 +33,9 @@
 </div>
 
 {% if account.id == user.id && !has_password %}
-<p class="muted password-optional-hint">You signed in with Discord, so your account has no password. Setting one is optional — it just lets you also log in with your username and password.</p>
+<div class="alert-flash info password-optional-hint">
+    <p>You signed in with Discord, so your account has no password. Setting one is optional — it just lets you also log in with your username and password.</p>
+</div>
 {% endif %}
 
 {# ─── Quick-links (admin only) ───────────────────────────────── #}
