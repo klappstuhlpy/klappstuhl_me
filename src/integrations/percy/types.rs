@@ -661,6 +661,9 @@ pub struct QueueTrack {
     pub is_stream: bool,
     #[serde(default)]
     pub requester: Option<TrackRequester>,
+    /// True for wavelink autoplay recommendations queued after the manual queue.
+    #[serde(default)]
+    pub autoplay: bool,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -725,6 +728,9 @@ pub struct MusicInfo {
     pub now_playing: Option<NowPlaying>,
     #[serde(default)]
     pub queue: Vec<QueueTrack>,
+    /// Recently played tracks (most-recent-first) for the History tab.
+    #[serde(default)]
+    pub history: Vec<QueueTrack>,
     #[serde(default)]
     pub channel: Option<String>,
     #[serde(default)]

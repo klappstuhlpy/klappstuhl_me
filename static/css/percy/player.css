@@ -314,6 +314,14 @@ a.ap-tag:hover { color: var(--foreground); border-color: var(--box-border-light)
 a.ap-q-title:hover { color: var(--branding-bright); text-decoration: underline; }
 .ap-q-author { color: var(--text-muted); font-size: 0.76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ap-q-req { color: color-mix(in srgb, var(--branding) 70%, var(--text-muted)); }
+.ap-q-row.is-autoplay { opacity: 0.82; }
+.ap-q-badge {
+    margin-left: 0.4rem; padding: 0.05rem 0.4rem; border-radius: 999px;
+    font-size: 0.64rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase;
+    color: var(--branding-bright);
+    background: color-mix(in srgb, var(--branding) 16%, transparent);
+    vertical-align: middle;
+}
 .ap-q-dur { font-size: 0.78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .ap-q-jump {
     width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;

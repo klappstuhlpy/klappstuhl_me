@@ -263,6 +263,7 @@ pub(super) async fn guild_overview(
         presets: vec![],
         now_playing: None,
         queue: Vec::new(),
+        history: Vec::new(),
         channel: None,
         channel_name: None,
         setup: None,
@@ -330,6 +331,7 @@ pub(super) async fn guild_overview_music_status(
                 "channel_name": music.channel_name,
                 "now_playing": music.now_playing,
                 "queue": music.queue,
+                "history": music.history,
                 "can_control": can_control,
             }))
             .into_response()
@@ -373,19 +375,16 @@ async fn lyrics_json(percy: &PercyClient, guild_id: u64) -> Response {
     }
 }
 
-#[derive(Deserialize)]
-pub(super) struct MusicControlForm {
-    action: String,
-}
-
-/// `POST /percy/dashboard/guild/:guild_id/overview/music/control` — pause/resume/
-/// skip/stop from the public overview. The viewer's Discord id is taken from the
-/// session (never the request body); Percy enforces voice-presence and DJ-mode.
+/// `POST /percy/dashboard/guild/:guild_id/overview/music/control` — drive the
+/// shared live player from the public overview (pause/resume/skip/stop, plus
+/// volume/seek/jump/move). The viewer's Discord id is taken from the session
+/// (never the request body); the full body is forwarded so action arguments
+/// (`value`, `position`, …) survive. Percy enforces voice-presence and DJ-mode.
 pub(super) async fn guild_overview_music_control(
     State(state): State<AppState>,
     account: Account,
     Path(guild_id): Path<u64>,
-    Json(form): Json<MusicControlForm>,
+    Json(mut body): Json<serde_json::Value>,
 ) -> Response {
     let Some(percy) = get_percy_client(&state) else {
         return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
@@ -396,8 +395,11 @@ pub(super) async fn guild_overview_music_control(
     if !check_guild_membership(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
     }
-    let payload = serde_json::json!({"action": form.action, "user_id": discord_id});
-    match percy.music_control(guild_id, &payload).await {
+    // Inject the authenticated identity; never trust a client-supplied user_id.
+    if let Some(obj) = body.as_object_mut() {
+        obj.insert("user_id".into(), serde_json::Value::String(discord_id));
+    }
+    match percy.music_control(guild_id, &body).await {
         Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
     }
@@ -1814,6 +1816,7 @@ pub(super) async fn guild_music(
         presets: vec![],
         now_playing: None,
         queue: Vec::new(),
+        history: Vec::new(),
         channel: None,
         channel_name: None,
         setup: None,
@@ -1899,6 +1902,7 @@ pub(super) async fn guild_music_status(
             "channel_name": music.channel_name,
             "now_playing": music.now_playing,
             "queue": music.queue,
+            "history": music.history,
             // Dashboard admins (Manage Server) can always drive the player.
             "can_control": true,
             "equalizer": music.equalizer,

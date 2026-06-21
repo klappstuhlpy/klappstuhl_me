@@ -110,9 +110,11 @@
     <div class="ap-panel">
       <div class="ap-tabs">
         <button class="ap-tab is-active" data-tab="queue">Up Next</button>
+        <button class="ap-tab" data-tab="history">History</button>
         <button class="ap-tab" data-tab="lyrics">Lyrics</button>
       </div>
       <div class="ap-tabpane ap-queue is-active"></div>
+      <div class="ap-tabpane ap-history"></div>
       <div class="ap-tabpane ap-lyrics"></div>
     </div>
   </div>
@@ -158,6 +160,7 @@
         const requesterEl = q('.ap-requester');
         const hintEl = q('.ap-hint');
         const queuePane = q('.ap-queue');
+        const historyPane = q('.ap-history');
         const lyricsPane = q('.ap-lyrics');
 
         // Artwork loads asynchronously: only reveal the <img> once it has actually
@@ -321,6 +324,41 @@
                 return;
             }
             const rows = queue.map((t, i) => {
+                // Autoplay recommendations (wavelink's auto_queue) aren't part of the
+                // manual queue, so they can't be jumped to or reordered by index.
+                const isAuto = !!t.autoplay;
+                const art = t.artwork
+                    ? `<img class="ap-q-art" src="${escapeHtml(t.artwork)}" alt="" loading="lazy" />`
+                    : '<span class="ap-q-art ap-q-art-ph">&#9835;</span>';
+                const dur = t.is_stream ? 'LIVE' : fmtTime(t.duration || 0);
+                const who = t.requester && t.requester.name
+                    ? `<span class="ap-q-req">${escapeHtml(t.requester.name)}</span>` : '';
+                const badge = isAuto ? '<span class="ap-q-badge">Autoplay</span>' : '';
+                const title = t.uri
+                    ? `<a class="ap-q-title" href="${escapeHtml(t.uri)}" target="_blank" rel="noopener">${escapeHtml(t.title)}</a>`
+                    : `<span class="ap-q-title">${escapeHtml(t.title)}</span>`;
+                const jump = (canControl && !isAuto)
+                    ? `<button class="ap-q-jump" data-jump="${i}" title="Play now" aria-label="Play now">${ICON.play}</button>` : '';
+                const draggable = (canControl && !isAuto) ? ' draggable="true"' : '';
+                return `<li class="ap-q-row${isAuto ? ' is-autoplay' : ''}" data-idx="${i}"${draggable}>
+                    <span class="ap-q-idx">${isAuto ? '&#8226;' : (i + 1)}</span>
+                    ${art}
+                    <span class="ap-q-meta">${title}<span class="ap-q-author">${escapeHtml(t.author || 'Unknown')}${who ? ' · ' : ''}${who}${badge}</span></span>
+                    <span class="ap-q-dur">${dur}</span>
+                    ${jump}
+                </li>`;
+            }).join('');
+            queuePane.innerHTML = `<ol class="ap-q-list">${rows}</ol>`;
+        }
+
+        function renderHistory(history) {
+            history = history || [];
+            if (!history.length) {
+                historyPane.innerHTML = '<p class="ap-empty">Nothing has played yet.</p>';
+                return;
+            }
+            // Read-only list (most-recent-first): no jump/drag affordances.
+            const rows = history.map((t, i) => {
                 const art = t.artwork
                     ? `<img class="ap-q-art" src="${escapeHtml(t.artwork)}" alt="" loading="lazy" />`
                     : '<span class="ap-q-art ap-q-art-ph">&#9835;</span>';
@@ -330,17 +368,14 @@
                 const title = t.uri
                     ? `<a class="ap-q-title" href="${escapeHtml(t.uri)}" target="_blank" rel="noopener">${escapeHtml(t.title)}</a>`
                     : `<span class="ap-q-title">${escapeHtml(t.title)}</span>`;
-                const jump = canControl
-                    ? `<button class="ap-q-jump" data-jump="${i}" title="Play now" aria-label="Play now">${ICON.play}</button>` : '';
-                return `<li class="ap-q-row" data-idx="${i}"${canControl ? ' draggable="true"' : ''}>
+                return `<li class="ap-q-row" data-idx="${i}">
                     <span class="ap-q-idx">${i + 1}</span>
                     ${art}
                     <span class="ap-q-meta">${title}<span class="ap-q-author">${escapeHtml(t.author || 'Unknown')}${who ? ' · ' : ''}${who}</span></span>
                     <span class="ap-q-dur">${dur}</span>
-                    ${jump}
                 </li>`;
             }).join('');
-            queuePane.innerHTML = `<ol class="ap-q-list">${rows}</ol>`;
+            historyPane.innerHTML = `<ol class="ap-q-list">${rows}</ol>`;
         }
 
         // ── Lyrics ──────────────────────────────────────────────────
@@ -513,13 +548,16 @@
             if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
             const row = e.target.closest('.ap-q-row');
             queuePane.querySelectorAll('.ap-q-row.drag-over').forEach((r) => r.classList.remove('drag-over'));
-            if (row && !row.classList.contains('dragging')) row.classList.add('drag-over');
+            // Autoplay rows aren't reorderable, so never highlight them as a target.
+            if (row && !row.classList.contains('dragging') && !row.classList.contains('is-autoplay')) {
+                row.classList.add('drag-over');
+            }
         });
         queuePane.addEventListener('drop', (e) => {
             if (dragFrom < 0) return;
             e.preventDefault();
             const row = e.target.closest('.ap-q-row');
-            if (row) {
+            if (row && !row.classList.contains('is-autoplay')) {
                 const to = parseInt(row.dataset.idx, 10);
                 if (!isNaN(to) && to !== dragFrom) send('move', { from: dragFrom, to: to });
             }
@@ -580,6 +618,7 @@
                 root.querySelectorAll('.ap-tab').forEach((t) => t.classList.toggle('is-active', t === tab));
                 const which = tab.dataset.tab;
                 queuePane.classList.toggle('is-active', which === 'queue');
+                historyPane.classList.toggle('is-active', which === 'history');
                 lyricsPane.classList.toggle('is-active', which === 'lyrics');
                 if (which === 'lyrics' && lyricActive >= 0 && lyricEls[lyricActive]) {
                     centerLyric(lyricEls[lyricActive]);
@@ -603,6 +642,7 @@
                     player.dataset.state = 'live';
                     renderTrack(d.now_playing);
                     if (!dragPaused) renderQueue(d.queue);
+                    renderHistory(d.history);
                 } else if (d.active) {
                     // Connected but nothing playing.
                     player.dataset.state = 'idle';
