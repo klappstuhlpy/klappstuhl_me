@@ -139,11 +139,11 @@ pub(super) async fn guild_detail(
     };
 
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
 
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     // Fan out the independent reads concurrently; `join!` (not `try_join!`) so a
@@ -170,7 +170,7 @@ pub(super) async fn guild_detail(
             }
             .into_response();
         }
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     // The guild itself loaded, but if the role/channel pickers failed to fetch we
@@ -216,10 +216,10 @@ pub(super) async fn guild_overview(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_membership(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let (guild, stats, bot_stats, music, leaderboard, polls, giveaways, economy) = tokio::join!(
@@ -235,11 +235,11 @@ pub(super) async fn guild_overview(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
     let stats = match stats {
         Ok(s) => s,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let bot_stats = bot_stats.unwrap_or(BotStats {
@@ -426,15 +426,15 @@ pub(super) async fn guild_config_update(
     };
 
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
 
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return json_or_flash(&headers, &flasher, false, "Access denied.", "/percy/dashboard");
+        return json_or_flash(&headers, &flasher, false, "Access denied.", "/dashboard");
     }
 
     let patch = build_patch(&form.section, &form.fields);
-    let redirect_url = format!("/percy/dashboard/guild/{guild_id}");
+    let redirect_url = format!("/dashboard/guild/{guild_id}");
 
     match percy.patch_guild_config(guild_id, &patch).await {
         Ok(()) => {
@@ -487,14 +487,14 @@ pub(super) async fn guild_sentinel_update(
     };
 
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
 
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return json_or_flash(&headers, &flasher, false, "Access denied.", "/percy/dashboard");
+        return json_or_flash(&headers, &flasher, false, "Access denied.", "/dashboard");
     }
 
-    let redirect_url = format!("/percy/dashboard/guild/{guild_id}");
+    let redirect_url = format!("/dashboard/guild/{guild_id}");
 
     let starter_title = form.get("starter_title").filter(|s| !s.is_empty());
     let starter_content = form.get("starter_content").filter(|s| !s.is_empty());
@@ -551,11 +551,11 @@ pub(super) async fn guild_members(
     };
 
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
 
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let (guild, members, roles) = tokio::join!(
@@ -566,7 +566,7 @@ pub(super) async fn guild_members(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let members = members.unwrap_or_default();
@@ -716,10 +716,10 @@ pub(super) async fn guild_leveling(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     // Fan out the six independent reads concurrently.
@@ -734,7 +734,7 @@ pub(super) async fn guild_leveling(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let config = config.unwrap_or_default();
@@ -887,23 +887,23 @@ pub(super) async fn guild_user_lookup(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let (guild, member) = tokio::join!(percy.get_guild(guild_id), percy.get_member_detail(guild_id, &user_id),);
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let member = match member {
         Ok(m) => m,
         Err(_) => {
-            return Redirect::to(&format!("/percy/dashboard/guild/{guild_id}/members")).into_response();
+            return Redirect::to(&format!("/dashboard/guild/{guild_id}/members")).into_response();
         }
     };
 
@@ -948,10 +948,10 @@ pub(super) async fn guild_polls(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let (guild, channels, roles, polls) = tokio::join!(
@@ -963,7 +963,7 @@ pub(super) async fn guild_polls(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let channels = channels.unwrap_or_default();
@@ -1107,17 +1107,17 @@ pub(super) async fn guild_giveaways(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let (guild, giveaways) = tokio::join!(percy.get_guild(guild_id), percy.get_giveaways(guild_id));
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let giveaways = giveaways.unwrap_or(GiveawaysResponse { giveaways: Vec::new() });
@@ -1148,17 +1148,17 @@ pub(super) async fn guild_tags(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let (guild, tags) = tokio::join!(percy.get_guild(guild_id), percy.get_tags(guild_id));
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let tags = tags.unwrap_or(TagsResponse {
@@ -1190,10 +1190,10 @@ pub(super) async fn guild_commands(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let (guild, commands, channels) = tokio::join!(
@@ -1204,7 +1204,7 @@ pub(super) async fn guild_commands(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let commands = commands.unwrap_or(CommandsResponse {
@@ -1375,10 +1375,10 @@ pub(super) async fn guild_stats(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let (guild, stats, bot_stats) = tokio::join!(
@@ -1389,12 +1389,12 @@ pub(super) async fn guild_stats(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let stats = match stats {
         Ok(s) => s,
-        Err(_) => return Redirect::to(&format!("/percy/dashboard/guild/{guild_id}")).into_response(),
+        Err(_) => return Redirect::to(&format!("/dashboard/guild/{guild_id}")).into_response(),
     };
 
     let bot_stats = bot_stats.unwrap_or(BotStats {
@@ -1569,16 +1569,16 @@ pub(super) async fn guild_autoresponders(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
     let (guild, data) = tokio::join!(percy.get_guild(guild_id), percy.get_autoresponders(guild_id));
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
     let data = data.unwrap_or(AutorespondersResponse {
         entries: Vec::new(),
@@ -1608,12 +1608,12 @@ pub(super) async fn guild_autoresponders_action(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return json_or_flash(&headers, &flasher, false, "Access denied.", "/percy/dashboard");
+        return json_or_flash(&headers, &flasher, false, "Access denied.", "/dashboard");
     }
-    let redirect_url = format!("/percy/dashboard/guild/{guild_id}/autoresponders");
+    let redirect_url = format!("/dashboard/guild/{guild_id}/autoresponders");
     match percy.create_autoresponder(guild_id, &body).await {
         Ok(()) => json_or_flash(&headers, &flasher, true, "Autoresponder created.", &redirect_url),
         Err(e) => {
@@ -1635,12 +1635,12 @@ pub(super) async fn guild_leveling_config_update(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return json_or_flash(&headers, &flasher, false, "Access denied.", "/percy/dashboard");
+        return json_or_flash(&headers, &flasher, false, "Access denied.", "/dashboard");
     }
-    let redirect_url = format!("/percy/dashboard/guild/{guild_id}/leveling");
+    let redirect_url = format!("/dashboard/guild/{guild_id}/leveling");
     match percy.patch_leveling_config(guild_id, &body).await {
         Ok(()) => json_or_flash(&headers, &flasher, true, "Configuration saved.", &redirect_url),
         Err(e) => {
@@ -1660,7 +1660,7 @@ pub(super) async fn guild_leveling_roles(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -1680,7 +1680,7 @@ pub(super) async fn guild_leveling_roles_preset(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -1701,7 +1701,7 @@ pub(super) async fn guild_leveling_multipliers(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -1722,7 +1722,7 @@ pub(super) async fn guild_leveling_blacklist(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -1743,10 +1743,10 @@ pub(super) async fn guild_economy(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
     let (guild, economy, balances, channels, roles) = tokio::join!(
         percy.get_guild(guild_id),
@@ -1757,7 +1757,7 @@ pub(super) async fn guild_economy(
     );
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
     let economy = economy.unwrap_or(EconomyInfo {
         items: Vec::new(),
@@ -1791,10 +1791,10 @@ pub(super) async fn guild_music(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
     let (guild, music, channels) = tokio::join!(
         percy.get_guild(guild_id),
@@ -1803,7 +1803,7 @@ pub(super) async fn guild_music(
     );
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
     let music = music.unwrap_or(MusicInfo {
         active: false,
@@ -1848,7 +1848,7 @@ pub(super) async fn guild_music_equalizer(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -1869,7 +1869,7 @@ pub(super) async fn guild_music_filters(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2060,10 +2060,10 @@ pub(super) async fn guild_comics(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
     let (guild, data, channels, roles) = tokio::join!(
         percy.get_guild(guild_id),
@@ -2074,7 +2074,7 @@ pub(super) async fn guild_comics(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
     let data = data.unwrap_or(ComicsResponse { feeds: Vec::new() });
     let channels = channels.unwrap_or_default();
@@ -2103,10 +2103,10 @@ pub(super) async fn guild_temp_channels(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
     let (guild, data, channels) = tokio::join!(
         percy.get_guild(guild_id),
@@ -2116,7 +2116,7 @@ pub(super) async fn guild_temp_channels(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
     let data = data.unwrap_or(TempChannelsResponse { entries: Vec::new() });
     let channels = channels.unwrap_or_default();
@@ -2143,16 +2143,16 @@ pub(super) async fn guild_highlights(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
     let (guild, data) = tokio::join!(percy.get_guild(guild_id), percy.get_highlights(guild_id));
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
     let data = data.unwrap_or(HighlightsResponse { entries: Vec::new() });
     HighlightsTemplate {
@@ -2177,16 +2177,16 @@ pub(super) async fn guild_emoji_stats(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
     let (guild, data) = tokio::join!(percy.get_guild(guild_id), percy.get_emoji_stats(guild_id, 50));
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
     let data = data.unwrap_or(EmojiStatsResponse {
         total_uses: 0,
@@ -2216,12 +2216,12 @@ pub(super) async fn guild_comics_push(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return json_or_flash(&headers, &flasher, false, "Access denied.", "/percy/dashboard");
+        return json_or_flash(&headers, &flasher, false, "Access denied.", "/dashboard");
     }
-    let redirect_url = format!("/percy/dashboard/guild/{guild_id}/comics");
+    let redirect_url = format!("/dashboard/guild/{guild_id}/comics");
     match percy.push_comic(guild_id, &brand).await {
         Ok(()) => json_or_flash(&headers, &flasher, true, "Feed pushed.", &redirect_url),
         Err(e) => {
@@ -2243,7 +2243,7 @@ pub(super) async fn guild_autoresponder_patch(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2263,7 +2263,7 @@ pub(super) async fn guild_autoresponder_delete(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2283,7 +2283,7 @@ pub(super) async fn guild_economy_item_delete(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2304,7 +2304,7 @@ pub(super) async fn guild_economy_items_create(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2325,7 +2325,7 @@ pub(super) async fn guild_economy_lottery_create(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2345,7 +2345,7 @@ pub(super) async fn guild_economy_lottery_delete(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2368,7 +2368,7 @@ pub(super) async fn guild_economy_balance_update(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2390,7 +2390,7 @@ pub(super) async fn guild_status_feed_subscribe(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2411,7 +2411,7 @@ pub(super) async fn guild_status_feed_unsubscribe(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2432,7 +2432,7 @@ pub(super) async fn guild_comic_patch(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2452,7 +2452,7 @@ pub(super) async fn guild_comic_delete(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2473,7 +2473,7 @@ pub(super) async fn guild_comic_create(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2494,7 +2494,7 @@ pub(super) async fn guild_temp_channel_create(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2515,7 +2515,7 @@ pub(super) async fn guild_temp_channel_patch(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2535,7 +2535,7 @@ pub(super) async fn guild_temp_channel_delete(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2555,7 +2555,7 @@ pub(super) async fn guild_highlight_delete(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
@@ -2599,10 +2599,10 @@ pub(super) async fn guild_audit_log(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let action = if q.action.is_empty() {
@@ -2633,7 +2633,7 @@ pub(super) async fn guild_audit_log(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/percy/dashboard").into_response(),
+        Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
     let cases = cases.unwrap_or(CasesResponse {
@@ -2756,10 +2756,10 @@ pub(super) async fn guild_export_leaderboard(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let leaderboard = percy
@@ -2801,10 +2801,10 @@ pub(super) async fn guild_export_cases(
         return Redirect::to("/").into_response();
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     }
 
     let cases = percy
@@ -3000,7 +3000,7 @@ pub(super) async fn public_leaderboard(
     Path(target): Path<String>,
 ) -> Response {
     let Some(percy) = get_percy_client(&state) else {
-        return Redirect::to("/percy/dashboard").into_response();
+        return Redirect::to("/dashboard").into_response();
     };
     let Some(guild_id) = resolve_leaderboard_target(&state, &target).await else {
         return (StatusCode::NOT_FOUND, "Leaderboard not found").into_response();
@@ -3063,13 +3063,7 @@ pub(super) async fn public_leaderboard_vanity_claim(
     Json(body): Json<VanityClaimBody>,
 ) -> Response {
     let Some(percy) = get_percy_client(&state) else {
-        return json_or_flash(
-            &headers,
-            &flasher,
-            false,
-            "Not configured",
-            &format!("/percy/lb/{guild_id}"),
-        );
+        return json_or_flash(&headers, &flasher, false, "Not configured", &format!("/lb/{guild_id}"));
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
         return json_or_flash(
@@ -3077,7 +3071,7 @@ pub(super) async fn public_leaderboard_vanity_claim(
             &flasher,
             false,
             "No Discord account linked",
-            &format!("/percy/lb/{guild_id}"),
+            &format!("/lb/{guild_id}"),
         );
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
@@ -3086,7 +3080,7 @@ pub(super) async fn public_leaderboard_vanity_claim(
             &flasher,
             false,
             "You don't have permission to manage this server",
-            &format!("/percy/lb/{guild_id}"),
+            &format!("/lb/{guild_id}"),
         );
     }
 
@@ -3097,7 +3091,7 @@ pub(super) async fn public_leaderboard_vanity_claim(
             &flasher,
             false,
             "Vanity URL must be 1-32 characters",
-            &format!("/percy/lb/{guild_id}"),
+            &format!("/lb/{guild_id}"),
         );
     }
     if !slug.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
@@ -3106,7 +3100,7 @@ pub(super) async fn public_leaderboard_vanity_claim(
             &flasher,
             false,
             "Vanity URL can only contain letters, numbers, hyphens, and underscores",
-            &format!("/percy/lb/{guild_id}"),
+            &format!("/lb/{guild_id}"),
         );
     }
     if slug.parse::<u64>().is_ok() {
@@ -3115,7 +3109,7 @@ pub(super) async fn public_leaderboard_vanity_claim(
             &flasher,
             false,
             "Vanity URL cannot be a number",
-            &format!("/percy/lb/{guild_id}"),
+            &format!("/lb/{guild_id}"),
         );
     }
 
@@ -3151,16 +3145,10 @@ pub(super) async fn public_leaderboard_vanity_claim(
             &flasher,
             true,
             &format!("Vanity URL set to /percy/lb/{slug}"),
-            &format!("/percy/lb/{guild_id}"),
+            &format!("/lb/{guild_id}"),
         ),
-        Ok(Err(msg)) => json_or_flash(&headers, &flasher, false, msg, &format!("/percy/lb/{guild_id}")),
-        Err(_) => json_or_flash(
-            &headers,
-            &flasher,
-            false,
-            "Database error",
-            &format!("/percy/lb/{guild_id}"),
-        ),
+        Ok(Err(msg)) => json_or_flash(&headers, &flasher, false, msg, &format!("/lb/{guild_id}")),
+        Err(_) => json_or_flash(&headers, &flasher, false, "Database error", &format!("/lb/{guild_id}")),
     }
 }
 
@@ -3173,13 +3161,7 @@ pub(super) async fn public_leaderboard_vanity_delete(
     Path(guild_id): Path<u64>,
 ) -> Response {
     let Some(percy) = get_percy_client(&state) else {
-        return json_or_flash(
-            &headers,
-            &flasher,
-            false,
-            "Not configured",
-            &format!("/percy/lb/{guild_id}"),
-        );
+        return json_or_flash(&headers, &flasher, false, "Not configured", &format!("/lb/{guild_id}"));
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
         return json_or_flash(
@@ -3187,7 +3169,7 @@ pub(super) async fn public_leaderboard_vanity_delete(
             &flasher,
             false,
             "No Discord account linked",
-            &format!("/percy/lb/{guild_id}"),
+            &format!("/lb/{guild_id}"),
         );
     };
     if !check_guild_access(&percy, &discord_id, guild_id).await {
@@ -3196,7 +3178,7 @@ pub(super) async fn public_leaderboard_vanity_delete(
             &flasher,
             false,
             "You don't have permission to manage this server",
-            &format!("/percy/lb/{guild_id}"),
+            &format!("/lb/{guild_id}"),
         );
     }
 
@@ -3211,7 +3193,7 @@ pub(super) async fn public_leaderboard_vanity_delete(
         &flasher,
         true,
         "Vanity URL removed",
-        &format!("/percy/lb/{guild_id}"),
+        &format!("/lb/{guild_id}"),
     )
 }
 

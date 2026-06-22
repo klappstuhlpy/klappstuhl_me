@@ -4,7 +4,7 @@
 
 (function() {
     const guildId = GUILD_ID;
-    const base = `/percy/dashboard/guild/${guildId}/music`;
+    const base = `/dashboard/guild/${guildId}/music`;
     const initialActive = MUSIC_INITIAL_ACTIVE;
 
     const BANDS = ['25', '40', '63', '100', '160', '250', '400', '630', '1K', '1.6K', '2.5K', '4K', '6.3K', '10K', '16K'];
@@ -66,7 +66,7 @@
     if (panelToggle) {
         panelToggle.addEventListener('change', async function() {
             try {
-                const r = await fetch(`/percy/dashboard/guild/${guildId}/config`, {
+                const r = await fetch(`/dashboard/guild/${guildId}/config`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
                     body: '_section=music&' + (panelToggle.checked ? 'use_music_panel=true' : ''),

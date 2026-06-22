@@ -3,7 +3,7 @@
 
 (function() {
     const guildId = GUILD_ID;
-    const baseUrl = `/percy/dashboard/guild/${guildId}/autoresponders`;
+    const baseUrl = `/dashboard/guild/${guildId}/autoresponders`;
 
     // Add modal
     const addBtn = document.getElementById('add-responder-btn');

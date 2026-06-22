@@ -3,7 +3,7 @@
 
 (function() {
     const guildId = GUILD_ID;
-    const baseUrl = `/percy/dashboard/guild/${guildId}/comics`;
+    const baseUrl = `/dashboard/guild/${guildId}/comics`;
     let editingBrand = null;
     let original = null; // snapshot of the feed being edited, for change detection
 

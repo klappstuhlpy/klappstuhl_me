@@ -58,7 +58,7 @@ pub(crate) struct NoDiscordTemplate {
     pub(crate) flashes: Flashes,
 }
 
-/// Logged-out welcome/landing page shown at `/percy/dashboard` to visitors who
+/// Logged-out welcome/landing page shown at `/dashboard` to visitors who
 /// haven't signed in yet. Introduces the bot and points to login/signup (which
 /// redirect back to the dashboard afterwards).
 #[allow(dead_code)]

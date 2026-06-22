@@ -24,7 +24,7 @@
             if (!/^\d{15,20}$/.test(id)) { toast('error', 'Select an entity or paste a valid Discord ID.'); return; }
             ignoreAdd.disabled = true;
             try {
-                var data = await postJSON('/percy/dashboard/guild/' + GUILD_ID + '/moderation/ignore', { action: 'add', entity_id: id });
+                var data = await postJSON('/dashboard/guild/' + GUILD_ID + '/moderation/ignore', { action: 'add', entity_id: id });
                 if (data.ok) { toast('success', 'Added to ignore list.'); setTimeout(function() { location.reload(); }, 400); }
                 else { toast('error', data.error || 'Failed.'); ignoreAdd.disabled = false; }
             } catch (e) { toast('error', 'Network error'); ignoreAdd.disabled = false; }
@@ -56,9 +56,9 @@
         });
     }
 
-    bindRemove('.ignore-remove-btn', '/percy/dashboard/guild/' + GUILD_ID + '/moderation/ignore',
+    bindRemove('.ignore-remove-btn', '/dashboard/guild/' + GUILD_ID + '/moderation/ignore',
         '#ignore-tbody tr[data-entity-id="{id}"]', 'ignore-tbody', 'ignore-empty', 'ignore-table-wrap', 'entity-id');
-    bindRemove('.lockdown-unlock-btn', '/percy/dashboard/guild/' + GUILD_ID + '/lockdowns/unlock',
+    bindRemove('.lockdown-unlock-btn', '/dashboard/guild/' + GUILD_ID + '/lockdowns/unlock',
         '#lockdown-tbody tr[data-channel-id="{id}"]', 'lockdown-tbody', 'lockdown-empty', 'lockdown-table-wrap', 'channel-id');
 
     // -- Lockdown (lock selected) --
@@ -71,7 +71,7 @@
             if (!confirm('Lock ' + ids.length + ' channel(s)? @everyone will not be able to send messages.')) return;
             lockBtn.disabled = true;
             try {
-                var data = await postJSON('/percy/dashboard/guild/' + GUILD_ID + '/lockdowns/lock', { channel_ids: ids });
+                var data = await postJSON('/dashboard/guild/' + GUILD_ID + '/lockdowns/lock', { channel_ids: ids });
                 if (data.ok) { toast('success', 'Channels locked.'); setTimeout(function() { location.reload(); }, 400); }
                 else { toast('error', data.error || 'Failed.'); lockBtn.disabled = false; }
             } catch (e) { toast('error', 'Network error'); lockBtn.disabled = false; }
@@ -83,7 +83,7 @@
     if (auditGrid) {
         async function saveAuditFlags(flags) {
             try {
-                var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/audit-log-flags', {
+                var resp = await fetch('/dashboard/guild/' + GUILD_ID + '/audit-log-flags', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify(flags),
@@ -129,7 +129,7 @@
     var statusSubBtn = document.getElementById('status-feed-sub');
     var statusUnsubBtn = document.getElementById('status-feed-unsub');
     var statusSelect = document.getElementById('status-feed-channel');
-    var statusFeedUrl = '/percy/dashboard/guild/' + GUILD_ID + '/status-feed';
+    var statusFeedUrl = '/dashboard/guild/' + GUILD_ID + '/status-feed';
     if (statusSubBtn && statusSelect) {
         statusSubBtn.addEventListener('click', async function() {
             var channelId = statusSelect.value;
@@ -358,7 +358,7 @@
             if (!Object.keys(body).length) { toast('info', 'Nothing to save.'); return; }
             cbSaveBtn.disabled = true;
             try {
-                var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/custom-bot', {
+                var resp = await fetch('/dashboard/guild/' + GUILD_ID + '/custom-bot', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify(body)
@@ -376,7 +376,7 @@
             if (!confirm('Reset the bot profile to defaults?')) return;
             cbResetBtn.disabled = true;
             try {
-                var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/custom-bot/reset', {
+                var resp = await fetch('/dashboard/guild/' + GUILD_ID + '/custom-bot/reset', {
                     method: 'POST',
                     headers: { 'Accept': 'application/json' }
                 });

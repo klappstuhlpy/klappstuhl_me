@@ -829,7 +829,7 @@ the toggle.
 
 ## Percy Bot Dashboard
 
-The Percy bot dashboard at `/percy/dashboard` is a full-featured web management interface for the Percy Discord bot. Server administrators can configure the bot, moderate members, manage economy/leveling/autoresponders/comics/temp-channels, browse polls/giveaways/tags/highlights/emoji-stats, control command availability, and view server/bot statistics — all through a terminal-aesthetic UI that connects to Percy's internal API. The server picker also lists servers you're in but don't manage (each opens a **read-only public overview** — stats, leaderboard, active polls/giveaways, shop, and a live music panel that's only controllable when you share the bot's voice channel) and "Add Percy" cards for servers you administrate that Percy isn't in yet (sourced from your Discord OAuth guild list, since Percy's API can only see guilds it's already in).
+The Percy bot dashboard is served from its own subdomain — `percy.<your-domain>` (e.g. `percy.klappstuhl.me`) — and is a full-featured web management interface for the Percy Discord bot. Server administrators can configure the bot, moderate members, manage economy/leveling/autoresponders/comics/temp-channels, browse polls/giveaways/tags/highlights/emoji-stats, control command availability, and view server/bot statistics — all through a terminal-aesthetic UI that connects to Percy's internal API. The server picker also lists servers you're in but don't manage (each opens a **read-only public overview** — stats, leaderboard, active polls/giveaways, shop, and a live music panel that's only controllable when you share the bot's voice channel) and "Add Percy" cards for servers you administrate that Percy isn't in yet (sourced from your Discord OAuth guild list, since Percy's API can only see guilds it's already in).
 
 ### Requirements
 
@@ -851,6 +851,11 @@ Add two config blocks to `config.json`:
 ```
 
 Register the redirect URI in the [Discord Developer Portal](https://discord.com/developers/applications) under OAuth2. The OAuth flow requests `identify` and `guilds` scopes.
+
+The dashboard lives on the `percy.<domain>` subdomain, served by the same binary via host-based routing (the dashboard's internal routes keep a `/percy/...` prefix that the `percy_host_rewrite` middleware maps onto the bare subdomain; legacy `klappstuhl.me/percy/*` links 301-redirect to it). Two deployment notes:
+
+- **TLS:** add `percy.<domain>` to the `domains` list in `config.json` so the ACME cert covers it (the primary apex must stay first — it's used for `canonical_url`, the cookie `Domain`, and to derive the `percy.`/`r.` subdomains). Point the subdomain's DNS/reverse proxy at the same binary, forwarding the `Host` header (exactly as the `r.` short-link subdomain is wired).
+- **Auth cookie:** the session cookie is scoped to the registrable domain (`Domain=<apex>`) so a login on the apex is also presented to `percy.<domain>`. In local dev the dashboard is `percy.localhost:<port>` (resolves to loopback in Chromium/Firefox) and the cookie is scoped to `localhost` — access the apex via `localhost`, not a raw `127.0.0.1`, or the browser rejects the shared cookie.
 
 ### Features
 
@@ -887,67 +892,67 @@ Register the redirect URI in the [Discord Developer Portal](https://discord.com/
 | `/auth/discord` | GET | Initiate Discord OAuth2 link |
 | `/auth/discord/callback` | GET | OAuth2 callback |
 | `/account/discord/unlink` | POST | Remove Discord link |
-| `/percy/dashboard` | GET | Server selection: managed servers, read-only servers you're in, and "Add Percy" cards for servers you manage Percy isn't in yet |
-| `/percy/dashboard/guild/:id/overview` | GET | Read-only public overview for members without manage access (stats, leaderboard, polls/giveaways, shop, live music) |
-| `/percy/dashboard/guild/:id/overview/music` | GET | Live now-playing state + queue for the overview player (JSON, polled) |
-| `/percy/dashboard/guild/:id/overview/music/control` | POST | Drive the live player (play/pause/skip/back/seek/volume/loop/shuffle/jump/stop) — only if the viewer shares the bot's voice channel |
-| `/percy/dashboard/guild/:id/overview/music/lyrics` | GET | Time-synced lyrics for the overview player's current track (JSON) |
-| `/percy/dashboard/guild/:id` | GET | Per-guild config editor (tabbed: General, Moderation, Sentinel) |
-| `/percy/dashboard/guild/:id/config` | POST | Save config changes (flags/moderation/polls/music/prefixes) |
-| `/percy/dashboard/guild/:id/sentinel` | POST | Save sentinel settings |
-| `/percy/dashboard/guild/:id/members` | GET | Member management page |
-| `/percy/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API) |
-| `/percy/dashboard/guild/:id/members/:uid` | GET | User lookup page (profile, leveling, moderation cases incl. opening new ones, activity heatmap) |
-| `/percy/dashboard/guild/:id/members/:uid/action` | POST | Execute moderation action (kick/ban/unban) |
-| `/percy/dashboard/guild/:id/members/:uid/roles` | POST | Add/remove member roles |
-| `/percy/dashboard/guild/:id/members/:uid/activity` | GET | Daily activity data for heatmap (JSON) |
-| `/percy/dashboard/guild/:id/members/bulk-action` | POST | Batch moderation action on multiple members |
-| `/percy/dashboard/guild/:id/leveling` | GET | Leveling config + leaderboard + collection editors |
-| `/percy/dashboard/guild/:id/leveling/config` | POST | Update leveling configuration |
-| `/percy/dashboard/guild/:id/leveling/users/:uid` | POST | Update user level/XP |
-| `/percy/dashboard/guild/:id/leveling/roles` | POST | Add/remove a level reward role |
-| `/percy/dashboard/guild/:id/leveling/roles/preset` | POST | Generate the milestone reward-role preset (levels 5–100) |
-| `/percy/dashboard/guild/:id/leveling/multipliers` | POST | Set/clear a role or channel XP multiplier |
-| `/percy/dashboard/guild/:id/leveling/blacklist` | POST | Add/remove a leveling blacklist entry |
-| `/percy/dashboard/guild/:id/economy` | GET | Economy management (shop, balances, lottery) |
-| `/percy/dashboard/guild/:id/music` | GET | Music page (Apple-Music-style live player, equalizer, filters, panel config) |
-| `/percy/dashboard/guild/:id/music/status` | GET | Live music status + now-playing + queue (JSON, polled) |
-| `/percy/dashboard/guild/:id/music/equalizer` | POST | Apply equalizer bands or preset |
-| `/percy/dashboard/guild/:id/music/filters` | POST | Toggle audio filters (nightcore, 8D, lowpass) |
-| `/percy/dashboard/guild/:id/music/247` | POST | Enable/disable the 24/7 always-on player (radio/playlist/autoplay) |
-| `/percy/dashboard/guild/:id/music/control` | POST | Drive the live player: play/pause/skip/back/seek/volume/loop/shuffle/jump/stop (voice-presence + DJ-mode gated) |
-| `/percy/dashboard/guild/:id/music/lyrics` | GET | Time-synced lyrics for the current track (JSON) |
-| `/percy/dashboard/guild/:id/economy/items` | POST | Create a shop item |
-| `/percy/dashboard/guild/:id/economy/items/:name` | DELETE | Delete a shop item |
-| `/percy/dashboard/guild/:id/economy/lottery` | POST/DELETE | Start / cancel the lottery |
-| `/percy/dashboard/guild/:id/autoresponders` | GET/POST | List / create autoresponders |
-| `/percy/dashboard/guild/:id/autoresponders/:trigger` | PATCH/DELETE | Toggle / delete an autoresponder |
-| `/percy/dashboard/guild/:id/comics` | GET/POST | List / subscribe to a comic feed |
-| `/percy/dashboard/guild/:id/comics/:brand` | PATCH/DELETE | Edit / unsubscribe a feed |
-| `/percy/dashboard/guild/:id/comics/:brand/push` | POST | Manually push a comic feed |
-| `/percy/dashboard/guild/:id/temp-channels` | GET/POST | List / create temp voice channel hubs |
-| `/percy/dashboard/guild/:id/temp-channels/:cid` | PATCH/DELETE | Edit / remove a hub |
-| `/percy/dashboard/guild/:id/highlights` | GET | Highlights admin view |
-| `/percy/dashboard/guild/:id/highlights/:uid` | DELETE | Remove a user's highlights |
-| `/percy/dashboard/guild/:id/emoji-stats` | GET | Emoji usage statistics |
-| `/percy/dashboard/guild/:id/polls` | GET | Polls overview + settings + create-poll UI |
-| `/percy/dashboard/guild/:id/polls` | POST | Create and publish a new poll |
-| `/percy/dashboard/guild/:id/polls/image` | POST | Upload a poll banner image (stored in the image host), returns its public URL |
-| `/percy/dashboard/guild/:id/polls/:poll_id` | POST | Edit a running poll |
-| `/percy/dashboard/guild/:id/polls/:poll_id/end` | POST | End a running poll |
-| `/percy/dashboard/guild/:id/giveaways` | GET | Giveaways overview |
-| `/percy/dashboard/guild/:id/tags` | GET | Tags and usage stats |
-| `/percy/dashboard/guild/:id/commands` | GET | Command management |
-| `/percy/dashboard/guild/:id/commands/toggle` | POST | Enable/disable a command |
-| `/percy/dashboard/guild/:id/plonks` | POST | Add/remove plonked entities |
-| `/percy/dashboard/guild/:id/audit-log` | GET | Moderation audit log with filters, inline reason editing and case closing |
-| `/percy/dashboard/guild/:id/audit-log.json` | GET | Filtered cases (JSON API) |
-| `/percy/dashboard/guild/:id/audit-log/recent` | GET | Recent cases since timestamp (live polling) |
-| `/percy/dashboard/guild/:id/cases` | POST | Open a moderation case manually (action, target, reason) |
-| `/percy/dashboard/guild/:id/cases/:case_index` | PATCH/DELETE | Edit a case's reason / close (delete) a case |
-| `/percy/dashboard/guild/:id/export/leaderboard` | GET | CSV export of XP leaderboard |
-| `/percy/dashboard/guild/:id/export/cases` | GET | CSV export of moderation cases |
-| `/percy/dashboard/guild/:id/stats` | GET | Server and bot statistics |
+| `/dashboard` | GET | Server selection: managed servers, read-only servers you're in, and "Add Percy" cards for servers you manage Percy isn't in yet |
+| `/dashboard/guild/:id/overview` | GET | Read-only public overview for members without manage access (stats, leaderboard, polls/giveaways, shop, live music) |
+| `/dashboard/guild/:id/overview/music` | GET | Live now-playing state + queue for the overview player (JSON, polled) |
+| `/dashboard/guild/:id/overview/music/control` | POST | Drive the live player (play/pause/skip/back/seek/volume/loop/shuffle/jump/stop) — only if the viewer shares the bot's voice channel |
+| `/dashboard/guild/:id/overview/music/lyrics` | GET | Time-synced lyrics for the overview player's current track (JSON) |
+| `/dashboard/guild/:id` | GET | Per-guild config editor (tabbed: General, Moderation, Sentinel) |
+| `/dashboard/guild/:id/config` | POST | Save config changes (flags/moderation/polls/music/prefixes) |
+| `/dashboard/guild/:id/sentinel` | POST | Save sentinel settings |
+| `/dashboard/guild/:id/members` | GET | Member management page |
+| `/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API) |
+| `/dashboard/guild/:id/members/:uid` | GET | User lookup page (profile, leveling, moderation cases incl. opening new ones, activity heatmap) |
+| `/dashboard/guild/:id/members/:uid/action` | POST | Execute moderation action (kick/ban/unban) |
+| `/dashboard/guild/:id/members/:uid/roles` | POST | Add/remove member roles |
+| `/dashboard/guild/:id/members/:uid/activity` | GET | Daily activity data for heatmap (JSON) |
+| `/dashboard/guild/:id/members/bulk-action` | POST | Batch moderation action on multiple members |
+| `/dashboard/guild/:id/leveling` | GET | Leveling config + leaderboard + collection editors |
+| `/dashboard/guild/:id/leveling/config` | POST | Update leveling configuration |
+| `/dashboard/guild/:id/leveling/users/:uid` | POST | Update user level/XP |
+| `/dashboard/guild/:id/leveling/roles` | POST | Add/remove a level reward role |
+| `/dashboard/guild/:id/leveling/roles/preset` | POST | Generate the milestone reward-role preset (levels 5–100) |
+| `/dashboard/guild/:id/leveling/multipliers` | POST | Set/clear a role or channel XP multiplier |
+| `/dashboard/guild/:id/leveling/blacklist` | POST | Add/remove a leveling blacklist entry |
+| `/dashboard/guild/:id/economy` | GET | Economy management (shop, balances, lottery) |
+| `/dashboard/guild/:id/music` | GET | Music page (Apple-Music-style live player, equalizer, filters, panel config) |
+| `/dashboard/guild/:id/music/status` | GET | Live music status + now-playing + queue (JSON, polled) |
+| `/dashboard/guild/:id/music/equalizer` | POST | Apply equalizer bands or preset |
+| `/dashboard/guild/:id/music/filters` | POST | Toggle audio filters (nightcore, 8D, lowpass) |
+| `/dashboard/guild/:id/music/247` | POST | Enable/disable the 24/7 always-on player (radio/playlist/autoplay) |
+| `/dashboard/guild/:id/music/control` | POST | Drive the live player: play/pause/skip/back/seek/volume/loop/shuffle/jump/stop (voice-presence + DJ-mode gated) |
+| `/dashboard/guild/:id/music/lyrics` | GET | Time-synced lyrics for the current track (JSON) |
+| `/dashboard/guild/:id/economy/items` | POST | Create a shop item |
+| `/dashboard/guild/:id/economy/items/:name` | DELETE | Delete a shop item |
+| `/dashboard/guild/:id/economy/lottery` | POST/DELETE | Start / cancel the lottery |
+| `/dashboard/guild/:id/autoresponders` | GET/POST | List / create autoresponders |
+| `/dashboard/guild/:id/autoresponders/:trigger` | PATCH/DELETE | Toggle / delete an autoresponder |
+| `/dashboard/guild/:id/comics` | GET/POST | List / subscribe to a comic feed |
+| `/dashboard/guild/:id/comics/:brand` | PATCH/DELETE | Edit / unsubscribe a feed |
+| `/dashboard/guild/:id/comics/:brand/push` | POST | Manually push a comic feed |
+| `/dashboard/guild/:id/temp-channels` | GET/POST | List / create temp voice channel hubs |
+| `/dashboard/guild/:id/temp-channels/:cid` | PATCH/DELETE | Edit / remove a hub |
+| `/dashboard/guild/:id/highlights` | GET | Highlights admin view |
+| `/dashboard/guild/:id/highlights/:uid` | DELETE | Remove a user's highlights |
+| `/dashboard/guild/:id/emoji-stats` | GET | Emoji usage statistics |
+| `/dashboard/guild/:id/polls` | GET | Polls overview + settings + create-poll UI |
+| `/dashboard/guild/:id/polls` | POST | Create and publish a new poll |
+| `/dashboard/guild/:id/polls/image` | POST | Upload a poll banner image (stored in the image host), returns its public URL |
+| `/dashboard/guild/:id/polls/:poll_id` | POST | Edit a running poll |
+| `/dashboard/guild/:id/polls/:poll_id/end` | POST | End a running poll |
+| `/dashboard/guild/:id/giveaways` | GET | Giveaways overview |
+| `/dashboard/guild/:id/tags` | GET | Tags and usage stats |
+| `/dashboard/guild/:id/commands` | GET | Command management |
+| `/dashboard/guild/:id/commands/toggle` | POST | Enable/disable a command |
+| `/dashboard/guild/:id/plonks` | POST | Add/remove plonked entities |
+| `/dashboard/guild/:id/audit-log` | GET | Moderation audit log with filters, inline reason editing and case closing |
+| `/dashboard/guild/:id/audit-log.json` | GET | Filtered cases (JSON API) |
+| `/dashboard/guild/:id/audit-log/recent` | GET | Recent cases since timestamp (live polling) |
+| `/dashboard/guild/:id/cases` | POST | Open a moderation case manually (action, target, reason) |
+| `/dashboard/guild/:id/cases/:case_index` | PATCH/DELETE | Edit a case's reason / close (delete) a case |
+| `/dashboard/guild/:id/export/leaderboard` | GET | CSV export of XP leaderboard |
+| `/dashboard/guild/:id/export/cases` | GET | CSV export of moderation cases |
+| `/dashboard/guild/:id/stats` | GET | Server and bot statistics |
 
 ### Source layout
 

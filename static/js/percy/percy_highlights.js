@@ -3,7 +3,7 @@
 
 (function() {
     const guildId = GUILD_ID;
-    const baseUrl = `/percy/dashboard/guild/${guildId}/highlights`;
+    const baseUrl = `/dashboard/guild/${guildId}/highlights`;
 
     document.querySelectorAll('.delete-highlight-btn').forEach(btn => {
         btn.addEventListener('click', async () => {

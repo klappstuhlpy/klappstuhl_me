@@ -19,7 +19,7 @@
         tr.innerHTML = `
             <td>${c.case_index}</td>
             <td>${actionPillHtml(c.action)}</td>
-            <td><a href="/percy/dashboard/guild/${GUILD_ID}/members/${c.target_id}">${c.target_name}</a></td>
+            <td><a href="/dashboard/guild/${GUILD_ID}/members/${c.target_id}">${c.target_name}</a></td>
             <td>${c.moderator_name || 'System'}</td>
             <td class="text-muted case-reason-cell truncate-cell" title="${c.reason || ''}">${c.reason || '—'}</td>
             <td class="member-joined"><time class="js-ts">${c.created_at || '—'}</time></td>
@@ -43,7 +43,7 @@
         const reason = prompt(`New reason for case #${idx}:`, current);
         if (reason === null || !reason.trim()) return;
         try {
-            const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/cases/${idx}`, {
+            const resp = await fetch(`/dashboard/guild/${GUILD_ID}/cases/${idx}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason: reason.trim() }),
@@ -61,7 +61,7 @@
     window.closeCase = async function(idx) {
         if (!confirm(`Close (delete) case #${idx}? This removes the case and its modlog post permanently.`)) return;
         try {
-            const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/cases/${idx}`, { method: 'DELETE' });
+            const resp = await fetch(`/dashboard/guild/${GUILD_ID}/cases/${idx}`, { method: 'DELETE' });
             const data = await resp.json();
             if (data.error) { showToast('error', data.error); return; }
             caseRow(idx)?.remove();
@@ -75,7 +75,7 @@
 
     async function pollNewCases() {
         try {
-            const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/audit-log/recent?since=${encodeURIComponent(lastPollTime)}`);
+            const resp = await fetch(`/dashboard/guild/${GUILD_ID}/audit-log/recent?since=${encodeURIComponent(lastPollTime)}`);
             if (!resp.ok) return;
             const data = await resp.json();
             if (data.cases && data.cases.length > 0) {

@@ -71,7 +71,7 @@
 
         try {
             if (currentMode === 'enabled') {
-                var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
+                var resp = await fetch('/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify({ name: cmd.name, enabled: true, channel_id: null }),
@@ -79,7 +79,7 @@
                 var data = await resp.json();
                 if (!data.ok) { showToast('error', data.error || 'Failed'); btn.disabled = false; return; }
             } else if (currentMode === 'disabled') {
-                var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
+                var resp = await fetch('/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify({ name: cmd.name, enabled: false, channel_id: null }),
@@ -88,7 +88,7 @@
                 if (!data.ok) { showToast('error', data.error || 'Failed'); btn.disabled = false; return; }
             } else {
                 // Partial: clear all, then disable in selected channels
-                await fetch('/percy/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
+                await fetch('/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                     body: JSON.stringify({ name: cmd.name, enabled: true, channel_id: null }),
@@ -96,7 +96,7 @@
 
                 var checked = document.querySelectorAll('#cmd-channels-list input:checked');
                 for (var i = 0; i < checked.length; i++) {
-                    await fetch('/percy/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
+                    await fetch('/dashboard/guild/' + GUILD_ID + '/commands/toggle', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                         body: JSON.stringify({ name: cmd.name, enabled: false, channel_id: checked[i].value }),
@@ -136,7 +136,7 @@
         var btn = this;
         btn.disabled = true;
         try {
-            var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/plonks', {
+            var resp = await fetch('/dashboard/guild/' + GUILD_ID + '/plonks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({ action: 'add', entity_id: id }),
@@ -170,7 +170,7 @@
     // Plonk removal (expose globally for inline onclick)
     window.removePlonk = async function(entityId) {
         try {
-            var resp = await fetch('/percy/dashboard/guild/' + GUILD_ID + '/plonks', {
+            var resp = await fetch('/dashboard/guild/' + GUILD_ID + '/plonks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({ action: 'remove', entity_id: entityId }),

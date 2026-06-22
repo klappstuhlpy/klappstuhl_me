@@ -632,6 +632,50 @@ impl Config {
             format!("https://r.{domain}/{code}")
         }
     }
+
+    /// The host the Percy bot dashboard is served from. In production this is the
+    /// `percy.` subdomain of the primary domain (e.g. `percy.klappstuhl.me`); in
+    /// dev it's the `percy.localhost` label, which Chromium and Firefox resolve to
+    /// loopback. Used to recognise inbound dashboard requests by their `Host`
+    /// header (see the host-rewrite middleware in `routes`). Note: in production
+    /// `percy.<domain>` must also be listed in `domains` so the ACME cert covers it.
+    pub fn percy_domain(&self) -> String {
+        let domain = self.domains.first().map(|x| x.as_str()).unwrap_or("localhost");
+        if !self.production || domain == "localhost" {
+            "percy.localhost".to_string()
+        } else {
+            format!("percy.{domain}")
+        }
+    }
+
+    /// Absolute URL to `path` (which must begin with `/`) on the Percy dashboard
+    /// host. `https://percy.<domain>{path}` in production; the dev equivalent on
+    /// `percy.localhost:<port>`. Used to build cross-origin redirects from the
+    /// apex to the dashboard subdomain.
+    pub fn percy_url(&self, path: &str) -> String {
+        let domain = self.domains.first().map(|x| x.as_str()).unwrap_or("localhost");
+        if !self.production || domain == "localhost" {
+            format!("http://percy.localhost:{}{path}", self.server.port)
+        } else {
+            format!("https://percy.{domain}{path}")
+        }
+    }
+
+    /// The `Domain` attribute to set on the auth/session cookie, so a login on the
+    /// apex (`klappstuhl.me`) is also presented to the dashboard subdomain
+    /// (`percy.klappstuhl.me`) — without it the host-only cookie never reaches the
+    /// subdomain and dashboard users appear logged out there. Resolves to the
+    /// primary domain (covers it plus every subdomain), or `localhost` in dev
+    /// (covers `percy.localhost`). Dev caveat: accessing the apex via a raw IP
+    /// (e.g. `127.0.0.1`) instead of `localhost` makes the browser reject the
+    /// `Domain=localhost` cookie — use `localhost` in dev.
+    pub fn cookie_domain(&self) -> String {
+        self.domains
+            .first()
+            .map(|x| x.as_str())
+            .unwrap_or("localhost")
+            .to_string()
+    }
 }
 
 /// One-time, in-memory migration from the old flat config keys to the grouped

@@ -7,7 +7,7 @@
     const root = document.getElementById('percy-player');
     if (!root || !window.PercyPlayer) return;
 
-    const base = `/percy/dashboard/guild/${GUILD_ID}/overview/music`;
+    const base = `/dashboard/guild/${GUILD_ID}/overview/music`;
     window.PercyPlayer.mount({
         root: root,
         statusUrl: base,

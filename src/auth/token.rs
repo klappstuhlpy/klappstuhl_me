@@ -125,24 +125,47 @@ impl Token {
     }
 
     /// Returns a persistent Cookie containing the signed token (survives browser restart).
-    pub fn to_cookie(&self, key: &SecretKey) -> Cookie<'static> {
-        Cookie::build(("token", self.signed(key)))
-            .path("/")
-            .same_site(cookie::SameSite::Lax)
-            .http_only(true)
-            .max_age(MAX_TOKEN_AGE)
-            .build()
+    ///
+    /// `domain` is the cookie's `Domain` attribute ([`crate::config::Config::cookie_domain`]):
+    /// setting it lets the apex login be presented to the Percy dashboard subdomain.
+    /// `None` keeps the cookie host-only.
+    pub fn to_cookie(&self, key: &SecretKey, domain: Option<&str>) -> Cookie<'static> {
+        Self::apply_domain(
+            Cookie::build(("token", self.signed(key)))
+                .path("/")
+                .same_site(cookie::SameSite::Lax)
+                .http_only(true)
+                .max_age(MAX_TOKEN_AGE),
+            domain,
+        )
+        .build()
     }
 
     /// Returns a session-only Cookie containing the signed token (expires on browser close).
-    pub fn to_session_cookie(&self, key: &SecretKey) -> Cookie<'static> {
-        Cookie::build(("token", self.signed(key)))
-            .path("/")
-            .same_site(cookie::SameSite::Lax)
-            .http_only(true)
-            .build()
+    pub fn to_session_cookie(&self, key: &SecretKey, domain: Option<&str>) -> Cookie<'static> {
+        Self::apply_domain(
+            Cookie::build(("token", self.signed(key)))
+                .path("/")
+                .same_site(cookie::SameSite::Lax)
+                .http_only(true),
+            domain,
+        )
+        .build()
+    }
+
+    fn apply_domain(builder: cookie::CookieBuilder<'static>, domain: Option<&str>) -> cookie::CookieBuilder<'static> {
+        match domain {
+            Some(d) => builder.domain(d.to_string()),
+            None => builder,
+        }
     }
 }
+
+/// The `Domain` attribute to apply to the auth cookie, injected as an extension
+/// layer (sibling to [`SecretKey`]) so the cookie is shared between the apex and
+/// the Percy dashboard subdomain. `None` = host-only.
+#[derive(Clone)]
+pub struct CookieDomain(pub Option<String>);
 
 impl IntoResponseParts for Token {
     type Error = Infallible;
@@ -152,8 +175,9 @@ impl IntoResponseParts for Token {
         mut res: axum::response::ResponseParts,
     ) -> Result<axum::response::ResponseParts, Self::Error> {
         // This is a silent failure unfortunately
+        let domain = res.extensions().get::<CookieDomain>().and_then(|d| d.0.clone());
         if let Some(key) = res.extensions().get::<SecretKey>() {
-            let cookie = self.to_cookie(key);
+            let cookie = self.to_cookie(key, domain.as_deref());
             res.headers_mut()
                 .insert(SET_COOKIE, HeaderValue::from_str(&cookie.to_string()).unwrap());
         }
@@ -161,16 +185,29 @@ impl IntoResponseParts for Token {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct TokenRejection;
+/// Auth-extractor rejection / explicit logout responder. Carries the cookie
+/// `Domain` (from [`CookieDomain`]) so the clearing `Set-Cookie` matches the
+/// scope the cookie was set with — a host-only clear cannot remove a
+/// domain-scoped cookie, which would otherwise leave a logged-out user still
+/// authenticated on the dashboard subdomain.
+#[derive(Clone)]
+pub struct TokenRejection(pub Option<String>);
+
+/// Reads the configured cookie `Domain` out of request extensions, for building
+/// a [`TokenRejection`] that clears the cookie at the right scope.
+pub fn cookie_domain_from(exts: &Extensions) -> Option<String> {
+    exts.get::<CookieDomain>().and_then(|d| d.0.clone())
+}
 
 impl IntoResponse for TokenRejection {
     fn into_response(self) -> Response {
-        let cookie = Cookie::build(("token", ""))
+        let mut builder = Cookie::build(("token", ""))
             .path("/")
-            .expires(cookie::time::OffsetDateTime::UNIX_EPOCH)
-            .build()
-            .to_string();
+            .expires(cookie::time::OffsetDateTime::UNIX_EPOCH);
+        if let Some(domain) = self.0 {
+            builder = builder.domain(domain);
+        }
+        let cookie = builder.build().to_string();
         (
             StatusCode::SEE_OTHER,
             [
@@ -200,7 +237,8 @@ where
     type Rejection = TokenRejection;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let token = get_token_from_request(&parts.extensions).ok_or(TokenRejection)?;
+        let token = get_token_from_request(&parts.extensions)
+            .ok_or_else(|| TokenRejection(cookie_domain_from(&parts.extensions)))?;
         parts.extensions.insert(token.clone());
         Ok(token)
     }
@@ -215,19 +253,20 @@ impl FromRequestParts<AppState> for Account {
             .extensions
             .get::<Vec<Cookie>>()
             .and_then(|cookies| cookies.iter().find(|c| c.name() == "token"))
-            .ok_or(TokenRejection)?;
+            .ok_or_else(|| TokenRejection(cookie_domain_from(&parts.extensions)))?;
 
         let token = parts
             .extensions
             .get::<SecretKey>()
             .and_then(|key| Token::from_signed(cookie.value(), key))
-            .ok_or(TokenRejection)?;
+            .ok_or_else(|| TokenRejection(cookie_domain_from(&parts.extensions)))?;
 
         // This unwrap is safe because it's validated above
         let (session_id, _) = cookie.value().split_once('.').unwrap();
+        let domain = cookie_domain_from(&parts.extensions);
         state
             .get_session_account(session_id, token.id, false)
             .await
-            .ok_or(TokenRejection)
+            .ok_or(TokenRejection(domain))
     }
 }

@@ -7,7 +7,7 @@
 let editingUserId = null;
 
 async function postJSON(path, body) {
-    const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}${path}`, {
+    const resp = await fetch(`/dashboard/guild/${GUILD_ID}${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(body),
@@ -253,7 +253,7 @@ document.getElementById('level-save-btn').addEventListener('click', async () => 
     const xp = parseInt(document.getElementById('edit-xp').value);
 
     try {
-        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/leveling/users/${editingUserId}`, {
+        const resp = await fetch(`/dashboard/guild/${GUILD_ID}/leveling/users/${editingUserId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ level, xp }),

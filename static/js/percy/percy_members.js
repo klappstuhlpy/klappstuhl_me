@@ -47,7 +47,7 @@
         loadMoreBtn.disabled = true;
 
         try {
-            const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/members.json?after=${lastId}`);
+            const resp = await fetch(`/dashboard/guild/${GUILD_ID}/members.json?after=${lastId}`);
             const data = await resp.json();
             if (data.members && data.members.length > 0) {
                 data.members.forEach(m => {
@@ -129,7 +129,7 @@
         const reason = modalReason.value.trim() || undefined;
 
         try {
-            const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/members/${userId}/action`, {
+            const resp = await fetch(`/dashboard/guild/${GUILD_ID}/members/${userId}/action`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action, reason }),
@@ -197,7 +197,7 @@
         if (!confirm(`Are you sure you want to ${action} ${userIds.length} member(s)?`)) return;
 
         try {
-            const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/members/bulk-action`, {
+            const resp = await fetch(`/dashboard/guild/${GUILD_ID}/members/bulk-action`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ user_ids: userIds, action }),

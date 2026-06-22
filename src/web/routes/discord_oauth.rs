@@ -571,8 +571,8 @@ async fn create_session_response(
     let Ok(token) = Token::new(account.id) else {
         return Redirect::to("/login").into_response();
     };
-    let key = &state.config().secret_key;
-    let cookie = token.to_cookie(key);
+    let cfg = state.config();
+    let cookie = token.to_cookie(&cfg.secret_key, Some(&cfg.cookie_domain()));
     state.save_session(&token, Some("Discord OAuth".to_string())).await;
     state.audit(audit_action).actor(account).ip_opt(client_ip).fire();
 

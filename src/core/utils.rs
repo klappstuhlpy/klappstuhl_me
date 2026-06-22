@@ -36,7 +36,7 @@ pub fn join_iter<T: ToString>(sep: impl AsRef<str>, mut iter: impl Iterator<Item
 
 /// Validate a post-authentication redirect target.
 ///
-/// Only accepts same-origin **absolute paths** (e.g. `/percy/dashboard`).
+/// Only accepts same-origin **absolute paths** (e.g. `/dashboard`).
 /// Rejects protocol-relative (`//evil.com`) and absolute URLs (`https://…`)
 /// so a crafted `?next=` cannot turn login into an open redirect. Returns the
 /// trimmed path when safe, otherwise `None`.
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn safe_next_accepts_internal_paths() {
-        assert_eq!(safe_next(Some("/percy/dashboard")).as_deref(), Some("/percy/dashboard"));
+        assert_eq!(safe_next(Some("/dashboard")).as_deref(), Some("/dashboard"));
         assert_eq!(safe_next(Some("/a?b=c#d")).as_deref(), Some("/a?b=c#d"));
     }
 

@@ -150,10 +150,11 @@ async fn authenticate(
                 }
 
                 let token = Token::new(acc.id)?;
+                let domain = state.config().cookie_domain();
                 let cookie = if credentials.remember_me.is_some() {
-                    token.to_cookie(key)
+                    token.to_cookie(key, Some(&domain))
                 } else {
-                    token.to_session_cookie(key)
+                    token.to_session_cookie(key, Some(&domain))
                 };
                 state.save_session(&token, credentials.session_description).await;
                 state.audit("auth.login.success").actor(&acc).ip_opt(client_ip).fire();
@@ -205,14 +206,14 @@ async fn logout(State(state): State<AppState>, ClientIp(client_ip): ClientIp, to
         .actor_label(format!("id:{}", token.id))
         .ip_opt(client_ip)
         .fire();
-    TokenRejection
+    TokenRejection(Some(state.config().cookie_domain()))
 }
 
 async fn logout_all(State(state): State<AppState>, ClientIp(client_ip): ClientIp, account: Account) -> TokenRejection {
     state.invalidate_account_cache(account.id);
     state.invalidate_account_sessions(account.id).await;
     state.audit("auth.logout_all").actor(&account).ip_opt(client_ip).fire();
-    TokenRejection
+    TokenRejection(Some(state.config().cookie_domain()))
 }
 
 #[derive(Deserialize)]
@@ -284,7 +285,7 @@ async fn change_password(
         Ok(Some(account)) => account,
         Ok(None) => {
             flasher.add("Somehow, this account does not exist.");
-            return TokenRejection.into_response();
+            return TokenRejection(Some(state.config().cookie_domain())).into_response();
         }
         Err(e) => {
             return flasher.add(format!("SQL error: {e}")).bail(&url);
@@ -315,7 +316,8 @@ async fn change_password(
             let Ok(token) = Token::new(account.id) else {
                 return flasher.add("Failed to obtain new token cookie").bail(&url);
             };
-            let cookie = token.to_cookie(&state.config().secret_key);
+            let cfg = state.config();
+            let cookie = token.to_cookie(&cfg.secret_key, Some(&cfg.cookie_domain()));
             state.invalidate_account_sessions(account.id).await;
             state.save_session(&token, form.session_description).await;
             state
@@ -457,8 +459,8 @@ async fn signup_submit(
     let Ok(token) = Token::new(new_account_id) else {
         return flasher.add("Account created — please log in").bail("/login");
     };
-    let key = &state.config().secret_key;
-    let cookie = token.to_cookie(key);
+    let cfg = state.config();
+    let cookie = token.to_cookie(&cfg.secret_key, Some(&cfg.cookie_domain()));
     state.save_session(&token, form.session_description).await;
     state
         .audit("auth.signup")
@@ -778,10 +780,11 @@ async fn login_totp_verify(
     let Ok(token) = Token::new(acc.id) else {
         return flasher.add("Could not create a session. Try again.").bail("/login");
     };
+    let domain = state.config().cookie_domain();
     let session_cookie = if pending.remember {
-        token.to_cookie(&key)
+        token.to_cookie(&key, Some(&domain))
     } else {
-        token.to_session_cookie(&key)
+        token.to_session_cookie(&key, Some(&domain))
     };
     state.save_session(&token, pending.description.clone()).await;
     state

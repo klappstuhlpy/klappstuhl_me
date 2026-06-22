@@ -2,6 +2,17 @@
 //!
 //! Split into [`templates`] (Askama views) and [`handlers`] (route handlers);
 //! this module owns the shared helpers and the router assembly.
+//!
+//! ## URL prefix vs. public URL
+//!
+//! Every route below is registered under a `/percy/...` prefix, but the
+//! dashboard's *public* URL is the bare `percy.<domain>` subdomain (e.g.
+//! `percy.klappstuhl.me/dashboard`, not `klappstuhl.me/percy/dashboard`). The
+//! [`crate::routes::percy_host_rewrite`] middleware maps the subdomain's bare
+//! paths onto this `/percy/...` table (and 301-redirects the legacy apex paths),
+//! so the prefix here is an internal implementation detail. **Handlers and
+//! templates must emit links *without* the prefix** (`/dashboard/...`,
+//! `/lb/...`) — those resolve correctly on the subdomain.
 
 mod handlers;
 mod templates;
@@ -287,10 +298,7 @@ fn json_or_flash(headers: &HeaderMap, flasher: &Flasher, ok: bool, msg: &str, re
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route(
-            "/percy",
-            get(|| async { axum::response::Redirect::to("/percy/dashboard") }),
-        )
+        .route("/percy", get(|| async { axum::response::Redirect::to("/dashboard") }))
         // Public legal docs, rendered live from the canonical GitHub repo.
         .route("/percy/privacy-policy", get(percy_privacy))
         .route("/percy/terms-of-service", get(percy_terms))

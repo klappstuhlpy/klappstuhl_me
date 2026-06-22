@@ -14,7 +14,7 @@
     {% let guild_id = guild.id %}
     <aside class="dash-sidebar" id="dash-sidebar">
         <div class="dash-sidebar-top">
-            <a href="/percy/dashboard" class="dash-sidebar-back">&larr; All servers</a>
+            <a href="/dashboard" class="dash-sidebar-back">&larr; All servers</a>
             <div class="dash-sidebar-guild">
                 <span class="dash-sidebar-guild-mark" aria-hidden="true"><span class="spark">✻</span></span>
                 <div class="dash-sidebar-guild-text">
@@ -27,27 +27,27 @@
         <nav class="dash-nav" aria-label="Dashboard sections">
             <div class="dash-nav-group">
                 <span class="dash-nav-heading">Overview</span>
-                <a href="/percy/dashboard/guild/{{ guild_id }}" class="dash-nav-link active">Configuration</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/members" class="dash-nav-link">Members</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/stats" class="dash-nav-link">Statistics</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/commands" class="dash-nav-link">Commands</a>
+                <a href="/dashboard/guild/{{ guild_id }}" class="dash-nav-link active">Configuration</a>
+                <a href="/dashboard/guild/{{ guild_id }}/members" class="dash-nav-link">Members</a>
+                <a href="/dashboard/guild/{{ guild_id }}/stats" class="dash-nav-link">Statistics</a>
+                <a href="/dashboard/guild/{{ guild_id }}/commands" class="dash-nav-link">Commands</a>
             </div>
             <div class="dash-nav-group">
                 <span class="dash-nav-heading">Features</span>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/leveling" class="dash-nav-link">Leveling</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/economy" class="dash-nav-link">Economy</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/music" class="dash-nav-link">Music</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/autoresponders" class="dash-nav-link">Autoresponders</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/comics" class="dash-nav-link">Comics</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/temp-channels" class="dash-nav-link">Temp Channels</a>
+                <a href="/dashboard/guild/{{ guild_id }}/leveling" class="dash-nav-link">Leveling</a>
+                <a href="/dashboard/guild/{{ guild_id }}/economy" class="dash-nav-link">Economy</a>
+                <a href="/dashboard/guild/{{ guild_id }}/music" class="dash-nav-link">Music</a>
+                <a href="/dashboard/guild/{{ guild_id }}/autoresponders" class="dash-nav-link">Autoresponders</a>
+                <a href="/dashboard/guild/{{ guild_id }}/comics" class="dash-nav-link">Comics</a>
+                <a href="/dashboard/guild/{{ guild_id }}/temp-channels" class="dash-nav-link">Temp Channels</a>
             </div>
             <div class="dash-nav-group">
                 <span class="dash-nav-heading">Community</span>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/polls" class="dash-nav-link">Polls</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/giveaways" class="dash-nav-link">Giveaways</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/tags" class="dash-nav-link">Tags</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/highlights" class="dash-nav-link">Highlights</a>
-                <a href="/percy/dashboard/guild/{{ guild_id }}/emoji-stats" class="dash-nav-link">Emoji Stats</a>
+                <a href="/dashboard/guild/{{ guild_id }}/polls" class="dash-nav-link">Polls</a>
+                <a href="/dashboard/guild/{{ guild_id }}/giveaways" class="dash-nav-link">Giveaways</a>
+                <a href="/dashboard/guild/{{ guild_id }}/tags" class="dash-nav-link">Tags</a>
+                <a href="/dashboard/guild/{{ guild_id }}/highlights" class="dash-nav-link">Highlights</a>
+                <a href="/dashboard/guild/{{ guild_id }}/emoji-stats" class="dash-nav-link">Emoji Stats</a>
             </div>
         </nav>
     </aside>
@@ -68,7 +68,7 @@
             {% when None %}
             {% endmatch %}
         </div>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/members" class="button small ml-auto guild-header-action">Manage Members</a>
+        <a href="/dashboard/guild/{{ guild.id }}/members" class="button small ml-auto guild-header-action">Manage Members</a>
     </div>
 
     {% if guild.is_new_config %}
@@ -100,7 +100,7 @@
         <section class="config-section">
             <h2>Feature Flags</h2>
             <p class="config-section-description">Toggle core bot features on or off for this server.</p>
-            <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
+            <form method="POST" action="/dashboard/guild/{{ guild.id }}/config">
                 <input type="hidden" name="_section" value="flags">
                 <div class="config-grid">
                     <label class="config-toggle">
@@ -213,7 +213,7 @@
         <section class="config-section">
             <h2>Prefixes</h2>
             <p class="config-section-description">Set custom command prefixes for this server. The bot always responds to mentions.</p>
-            <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
+            <form method="POST" action="/dashboard/guild/{{ guild.id }}/config">
                 <input type="hidden" name="_section" value="prefixes">
                 <div class="config-grid grid-cols-1">
                     <div class="config-field">
@@ -258,7 +258,7 @@
         <section class="config-section">
             <h2>Moderation</h2>
             <p class="config-section-description">Configure moderation channels, roles, and thresholds.</p>
-            <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config">
+            <form method="POST" action="/dashboard/guild/{{ guild.id }}/config">
                 <input type="hidden" name="_section" value="moderation">
                 <div class="config-grid">
                     <div class="config-field">
@@ -487,7 +487,7 @@
                 <span>Standing by</span>
             </div>
             {% endmatch %}
-            <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/sentinel">
+            <form method="POST" action="/dashboard/guild/{{ guild.id }}/sentinel">
                 <input type="hidden" name="starter_title" id="gk_starter_title" value="">
                 <input type="hidden" name="starter_content" id="gk_starter_content" value="">
                 <div class="config-grid">

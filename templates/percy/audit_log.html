@@ -1,4 +1,4 @@
-﻿{% extends "percy/dashboard_layout.html" %}
+{% extends "percy/dashboard_layout.html" %}
 
 {% block page_header %}
 <div class="dashboard-header dash-rise">
@@ -8,7 +8,7 @@
     </div>
     <div class="audit-header-actions">
         <span class="live-indicator" id="live-status">Live</span>
-        <a href="/percy/dashboard/guild/{{ guild_id }}/export/cases.csv" class="export-link">Export CSV</a>
+        <a href="/dashboard/guild/{{ guild_id }}/export/cases.csv" class="export-link">Export CSV</a>
     </div>
 </div>
 {% endblock %}
@@ -58,7 +58,7 @@
         </div>
         <div class="filter-actions">
             <button type="submit" class="button small primary">Filter</button>
-            <a href="/percy/dashboard/guild/{{ guild_id }}/audit-log" class="button small">Clear</a>
+            <a href="/dashboard/guild/{{ guild_id }}/audit-log" class="button small">Clear</a>
         </div>
     </form>
 
@@ -88,7 +88,7 @@
                     <td>{{ case.case_index }}</td>
                     <td><span class="action-pill {{ case.action }}">{{ case.action }}</span></td>
                     <td>
-                        <a href="/percy/dashboard/guild/{{ guild_id }}/members/{{ case.target_id }}">{{ case.target_name }}</a>
+                        <a href="/dashboard/guild/{{ guild_id }}/members/{{ case.target_id }}">{{ case.target_name }}</a>
                     </td>
                     <td>{{ case.moderator_name.as_deref().unwrap_or("System") }}</td>
                     <td class="text-muted case-reason-cell truncate-cell" title="{{ case.reason.as_deref().unwrap_or("") }}">

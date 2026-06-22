@@ -104,6 +104,10 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     let _ = klappstuhl_me::CONFIG.set(config.clone());
     let addr = config.server.address();
     let secret_key = config.secret_key;
+    // The `Domain` to scope the auth cookie to, so a login on the apex is also
+    // presented to the Percy dashboard subdomain. Captured before `config.domains`
+    // is consumed by the ACME setup below.
+    let cookie_domain = config.cookie_domain();
 
     let request_logger = state.requests.clone();
     tokio::spawn(async move {
@@ -211,7 +215,15 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         .layer(klappstuhl_me::logging::HttpTrace::new(state.requests.clone()))
         .layer(middleware::from_fn(klappstuhl_me::flash::process_flash_messages))
         .layer(middleware::from_fn(klappstuhl_me::parse_cookies))
+        // Host-based routing for the Percy dashboard subdomain: rewrites bare
+        // `percy.<domain>/dashboard` → internal `/percy/dashboard`, and redirects
+        // legacy `/percy/*` apex links to the subdomain. Must run before routing.
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            klappstuhl_me::routes::percy_host_rewrite,
+        ))
         .layer(Extension(secret_key))
+        .layer(Extension(klappstuhl_me::token::CookieDomain(Some(cookie_domain))))
         .layer(Extension(klappstuhl_me::cached::BodyCache::new(Duration::from_secs(
             120,
         ))))

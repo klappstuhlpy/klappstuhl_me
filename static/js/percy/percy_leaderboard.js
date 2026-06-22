@@ -6,7 +6,7 @@
             e.preventDefault();
             var slug = document.getElementById('vanity-slug').value.trim();
             if (!slug) return;
-            fetch('/percy/lb/' + GUILD_ID + '/vanity', {
+            fetch('/lb/' + GUILD_ID + '/vanity', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({ slug: slug })
@@ -31,7 +31,7 @@
     if (deleteBtn) {
         deleteBtn.addEventListener('click', function () {
             if (!confirm('Remove your vanity URL?')) return;
-            fetch('/percy/lb/' + GUILD_ID + '/vanity', {
+            fetch('/lb/' + GUILD_ID + '/vanity', {
                 method: 'DELETE',
                 headers: { 'Accept': 'application/json' }
             })

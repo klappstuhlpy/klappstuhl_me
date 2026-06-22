@@ -3,7 +3,7 @@
 
 (function() {
     const guildId = GUILD_ID;
-    const base = `/percy/dashboard/guild/${guildId}/economy`;
+    const base = `/dashboard/guild/${guildId}/economy`;
 
     // Add item
     const addItemBtn = document.getElementById('add-item-btn');

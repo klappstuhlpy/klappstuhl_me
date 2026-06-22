@@ -1,4 +1,4 @@
-﻿{% extends "percy/dashboard_layout.html" %}
+{% extends "percy/dashboard_layout.html" %}
 
 {% block page_subtitle %}<p>View and manage running and completed polls.</p>{% endblock %}
 
@@ -41,7 +41,7 @@
     <section class="config-section">
         <h2>Poll Settings</h2>
         <p class="config-section-description">Configure where polls are posted and who gets notified.</p>
-        <form method="POST" action="/percy/dashboard/guild/{{ guild.id }}/config" id="poll-config-form">
+        <form method="POST" action="/dashboard/guild/{{ guild.id }}/config" id="poll-config-form">
             <input type="hidden" name="_section" value="polls">
             <div class="config-grid">
                 <div class="config-field">

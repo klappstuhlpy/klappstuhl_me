@@ -3,7 +3,7 @@
 
 (function() {
     const guildId = GUILD_ID;
-    const baseUrl = `/percy/dashboard/guild/${guildId}/temp-channels`;
+    const baseUrl = `/dashboard/guild/${guildId}/temp-channels`;
     let editingChannelId = null;
 
     const addBtn = document.getElementById('add-hub-btn');

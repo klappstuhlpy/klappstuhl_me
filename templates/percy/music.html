@@ -1,4 +1,4 @@
-﻿{% extends "percy/dashboard_layout.html" %}
+{% extends "percy/dashboard_layout.html" %}
 
 {% block page_subtitle %}<p>Player status, panel configuration, equalizer, and audio filters.</p>{% endblock %}
 
@@ -223,7 +223,7 @@ const DJ_MODE_INITIAL = {% match music.setup %}{% when Some with (setup) %}{{ se
     if (ALWAYS_ON_MODE) modeSel.value = ALWAYS_ON_MODE;
 
     async function post(body) {
-        const res = await fetch(`/percy/dashboard/guild/${GUILD_ID}/music/247`, {
+        const res = await fetch(`/dashboard/guild/${GUILD_ID}/music/247`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -277,7 +277,7 @@ const DJ_MODE_INITIAL = {% match music.setup %}{% when Some with (setup) %}{{ se
         const mode = parseInt(select.value, 10);
         select.disabled = true;
         try {
-            const res = await fetch(`/percy/dashboard/guild/${GUILD_ID}/music/dj-mode`, {
+            const res = await fetch(`/dashboard/guild/${GUILD_ID}/music/dj-mode`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ dj_mode: mode }),

@@ -90,7 +90,7 @@ document.getElementById('poll-save-btn').addEventListener('click', async () => {
     btn.disabled = true;
 
     try {
-        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/polls/${editingPollId}`, {
+        const resp = await fetch(`/dashboard/guild/${GUILD_ID}/polls/${editingPollId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify(body),
@@ -115,7 +115,7 @@ async function endPoll(pollId, btn) {
 
     btn.disabled = true;
     try {
-        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/polls/${pollId}/end`, {
+        const resp = await fetch(`/dashboard/guild/${GUILD_ID}/polls/${pollId}/end`, {
             method: 'POST',
             headers: { 'Accept': 'application/json' },
         });
@@ -214,7 +214,7 @@ function closeCreatePoll() {
 async function uploadPollBanner(file) {
     const fd = new FormData();
     fd.append('file', file);
-    const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/polls/image`, {
+    const resp = await fetch(`/dashboard/guild/${GUILD_ID}/polls/image`, {
         method: 'POST',
         headers: { 'Accept': 'application/json' },
         body: fd,
@@ -276,7 +276,7 @@ document.getElementById('poll-create-btn').addEventListener('click', async () =>
         if (channel_id) body.channel_id = channel_id;
         if (thread_question) body.thread_question = thread_question;
 
-        const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/polls`, {
+        const resp = await fetch(`/dashboard/guild/${GUILD_ID}/polls`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify(body),

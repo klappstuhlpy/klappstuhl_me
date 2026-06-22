@@ -42,7 +42,7 @@
         <p class="guild-section-sub">You have Manage Server or Administrator here — full dashboard access.</p>
         <div class="guild-grid">
             {% for guild in managed %}
-            <a href="/percy/dashboard/guild/{{ guild.id }}" class="guild-card button-card" style="--i:{{ loop.index0 }}">
+            <a href="/dashboard/guild/{{ guild.id }}" class="guild-card button-card" style="--i:{{ loop.index0 }}">
                 {% match guild.icon_url %}
                 {% when Some with (url) %}
                 <img class="guild-icon" src="{{ url }}?size=128" alt="" width="56" height="56">
@@ -77,7 +77,7 @@
         <p class="guild-section-sub">Percy is here, but you don't manage it — open a read-only overview.</p>
         <div class="guild-grid">
             {% for guild in public %}
-            <a href="/percy/dashboard/guild/{{ guild.id }}/overview" class="guild-card button-card" style="--i:{{ loop.index0 }}">
+            <a href="/dashboard/guild/{{ guild.id }}/overview" class="guild-card button-card" style="--i:{{ loop.index0 }}">
                 {% match guild.icon_url %}
                 {% when Some with (url) %}
                 <img class="guild-icon" src="{{ url }}?size=128" alt="" width="56" height="56">

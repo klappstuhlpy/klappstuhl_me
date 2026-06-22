@@ -48,7 +48,7 @@
                 <tr data-user-id="{{ member.id }}" data-name="{{ member.display_name|lower }}" data-bot="{{ member.bot }}">
                     <td><input type="checkbox" class="bulk-check" data-user-id="{{ member.id }}" {% if member.bot %}disabled{% endif %}></td>
                     <td>
-                        <a class="member-cell" href="/percy/dashboard/guild/{{ guild_id }}/members/{{ member.id }}">
+                        <a class="member-cell" href="/dashboard/guild/{{ guild_id }}/members/{{ member.id }}">
                             <img class="member-avatar" src="{{ member.avatar_url }}?size=64" alt="" width="36" height="36">
                             <div class="member-info">
                                 <span class="member-name">{{ member.display_name }}</span>

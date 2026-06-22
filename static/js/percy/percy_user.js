@@ -8,7 +8,7 @@
 (function() {
     const grid = document.getElementById('avatar-grid');
     if (!grid) return;
-    fetch(`/percy/dashboard/guild/${GUILD_ID}/members/${MEMBER_ID}/avatars`)
+    fetch(`/dashboard/guild/${GUILD_ID}/members/${MEMBER_ID}/avatars`)
         .then(r => r.json())
         .then(data => {
             if (!data.avatars || !data.avatars.length) {
@@ -47,7 +47,7 @@
         const button = form.querySelector('button[type="submit"]');
         button.disabled = true;
         try {
-            const resp = await fetch(`/percy/dashboard/guild/${GUILD_ID}/cases`, {
+            const resp = await fetch(`/dashboard/guild/${GUILD_ID}/cases`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action, target_id: MEMBER_ID, reason: reason || null }),
@@ -72,7 +72,7 @@
     const timeline = document.querySelector('.case-timeline');
     if (!timeline) return;
 
-    const caseUrl = (idx) => `/percy/dashboard/guild/${GUILD_ID}/cases/${idx}`;
+    const caseUrl = (idx) => `/dashboard/guild/${GUILD_ID}/cases/${idx}`;
 
     timeline.addEventListener('click', async (e) => {
         const btn = e.target.closest('button');
@@ -152,7 +152,7 @@
     const container = document.getElementById('activity-heatmap');
     if (!container) return;
 
-    fetch(`/percy/dashboard/guild/${GUILD_ID}/members/${MEMBER_ID}/activity`)
+    fetch(`/dashboard/guild/${GUILD_ID}/members/${MEMBER_ID}/activity`)
         .then(r => r.json())
         .then(data => {
             if (!data.activity || data.error) {

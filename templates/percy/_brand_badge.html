@@ -1,10 +1,11 @@
 {# Percy section indicator shown in the global top nav (fills layout.html's
    `nav_section` block). Visual-only — it does not affect routing or auth; the
-   dashboard stays at /percy/... See dashboard CLAUDE.md.
+   dashboard lives on the percy.<domain> subdomain (served via the host-rewrite
+   middleware). See dashboard CLAUDE.md.
    Wrapped in a `.nav-item` so it inherits the nav's spacing/alignment. #}
 <span class="nav-item nav-section">
     <span class="nav-section-sep" aria-hidden="true">/</span>
-    <a class="nav-section-badge" href="/percy/dashboard" title="Percy bot dashboard">
+    <a class="nav-section-badge" href="/dashboard" title="Percy bot dashboard">
         <span class="nav-section-glyph" aria-hidden="true">◆</span> Percy
     </a>
 </span>

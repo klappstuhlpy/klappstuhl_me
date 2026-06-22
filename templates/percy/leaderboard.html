@@ -23,7 +23,7 @@
             <h1>{{ guild_name }}</h1>
             {% match vanity %}
             {% when Some with (slug) %}
-            <p class="lb-vanity-display">klappstuhl.me/percy/lb/{{ slug }}</p>
+            <p class="lb-vanity-display">percy.klappstuhl.me/lb/{{ slug }}</p>
             {% when None %}
             {% endmatch %}
         </div>
@@ -39,9 +39,9 @@
     <section class="config-section lb-vanity-section dash-rise">
         <h3>Custom URL</h3>
         <p class="text-muted lb-vanity-hint">Claim a vanity URL for your server's leaderboard. First-come-first-serve. Vanity URLs can be transferred on request.</p>
-        <form class="lb-vanity-form" id="vanity-form" method="post" action="/percy/lb/{{ guild_id }}/vanity">
+        <form class="lb-vanity-form" id="vanity-form" method="post" action="/lb/{{ guild_id }}/vanity">
             <div class="lb-vanity-input-row">
-                <span class="lb-vanity-prefix">klappstuhl.me/percy/lb/</span>
+                <span class="lb-vanity-prefix">percy.klappstuhl.me/lb/</span>
                 <input type="text" name="slug" id="vanity-slug" placeholder="my-server" maxlength="32"
                        pattern="[a-zA-Z0-9_-]+" title="Letters, numbers, hyphens and underscores only"
                        {% match vanity %}{% when Some with (slug) %}value="{{ slug }}"{% when None %}{% endmatch %}>
