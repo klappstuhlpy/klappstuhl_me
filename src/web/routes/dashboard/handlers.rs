@@ -8,7 +8,6 @@ use axum::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::env;
 use crate::{
     flash::{Flasher, Flashes},
     models::Account,
@@ -75,18 +74,13 @@ pub(super) async fn percy_commands(
     account: Option<Account>,
     flashes: Flashes,
 ) -> Response {
-    let dir = env::current_dir().unwrap();
-    let path = std::path::Path::new(&dir).join("templates/percy/discord_command_syntax_guide-v2.md");
-    let path_str = path.to_string_lossy().to_string();
-    let flags_md: String;
-
-    match cached_md_file(path_str.clone()) {
-        Ok(content) => flags_md = (*content).clone(),
+    let flags_md = match cached_md_file("static/discord_command_syntax_guide.md".to_string()) {
+        Ok(content) => (*content).clone(),
         Err(e) => {
-            tracing::warn!(error = %e, "{} {}", path_str, "failed to fetch local md file for /commands page");
-            flags_md = "# Command Syntax & Flags Guide".to_string();
+            tracing::warn!(error = %e, "failed to read static/discord_command_syntax_guide.md");
+            "# Command Syntax & Flags Guide".to_string()
         }
-    }
+    };
 
     let categories = if let Some(percy) = get_percy_client(&state) {
         // Fetch commands from the bot; if it fails, show an empty page rather than erroring.
