@@ -60,7 +60,7 @@
         {% when None %}
         <div class="guild-header-icon guild-icon-placeholder large">{{ guild.name.chars().next().unwrap_or('?') }}</div>
         {% endmatch %}
-        <div>
+        <div class="guild-header-meta">
             <h1 class="guild-header-name">{{ guild.name }}</h1>
             {% match guild.member_count %}
             {% when Some with (count) %}
@@ -68,7 +68,7 @@
             {% when None %}
             {% endmatch %}
         </div>
-        <a href="/percy/dashboard/guild/{{ guild.id }}/members" class="button small ml-auto">Manage Members</a>
+        <a href="/percy/dashboard/guild/{{ guild.id }}/members" class="button small ml-auto guild-header-action">Manage Members</a>
     </div>
 
     {% if guild.is_new_config %}

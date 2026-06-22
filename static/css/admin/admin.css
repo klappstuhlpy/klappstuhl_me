@@ -34,6 +34,32 @@
 }
 .admin-sidebar-title .spark { color: var(--branding); text-transform: none; }
 
+/* Mobile-only collapse toggle (hidden on desktop; revealed in the media query). */
+.admin-sidebar-toggle {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.55rem 0.85rem;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--foreground);
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+.admin-sidebar-toggle::after {
+    content: "\25BE";
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+.admin-sidebar.open .admin-sidebar-toggle::after {
+    transform: rotate(180deg);
+}
+
 .admin-nav {
     display: flex;
     flex-direction: column;
@@ -116,9 +142,15 @@
         position: static;
     }
 
-    .admin-nav {
-        flex-direction: row;
-        flex-wrap: wrap;
+    .admin-sidebar-toggle { display: flex; margin-top: 0.25rem; }
+
+    /* Collapsed by default on mobile; the toggle adds .open to reveal the nav as
+       a vertical list of all pages. */
+    .admin-nav { display: none; }
+    .admin-sidebar.open .admin-nav {
+        display: flex;
+        flex-direction: column;
+        margin-top: 0.5rem;
     }
 
     .admin-sidebar-section { display: none; }

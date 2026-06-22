@@ -45,6 +45,10 @@ main.grid-item:has(.dashboard-shell) {
 
 .dashboard-content {
     min-width: 0; /* let tables/charts shrink instead of overflowing the grid */
+    /* Guard against any page sub-element (e.g. the live player / eq canvas)
+       poking past the viewport, which lets mobile zoom out and reveals a blank
+       gap on the right. Inner scroll wrappers keep their own overflow-x: auto. */
+    overflow-x: hidden;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────── */
@@ -590,11 +594,21 @@ a.invite-percy-btn:hover {
 }
 
 /* A smaller header-aligned variant of the invite button. */
+/* Compact header pill — override the wide base button (drop its 22rem width,
+   auto top margin and large gap/img) so it's just the Discord logo + "Add". */
 .invite-percy-btn-sm {
-    padding: 0.45rem 0.85rem;
-    font-size: 0.85rem;
+    width: auto;
+    margin: 0;
+    gap: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.82rem;
     align-self: center;
     flex-shrink: 0;
+    white-space: nowrap;
+}
+.invite-percy-btn-sm img {
+    width: 1rem;
+    height: 1rem;
 }
 
 .guild-addhint {
@@ -650,6 +664,7 @@ a.invite-percy-btn:hover {
 .guild-header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 1.25rem;
     padding: 1.4rem 1.5rem;
     border: 1px solid var(--box-border);
@@ -658,6 +673,15 @@ a.invite-percy-btn:hover {
         radial-gradient(110% 160% at 0% 0%, var(--branding-dim), transparent 55%),
         var(--box);
     margin-bottom: 1.5rem;
+}
+/* Let the name block shrink and wrap long guild names instead of shoving the
+   "Manage Members" action past the edge on narrow/mobile screens. */
+.guild-header-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.guild-header-action {
+    flex-shrink: 0;
 }
 .guild-header-icon {
     width: 64px;
@@ -671,6 +695,7 @@ a.invite-percy-btn:hover {
     font-size: 1.5rem;
     font-weight: 700;
     margin: 0;
+    overflow-wrap: anywhere;
 }
 
 /* -- Config sections (reuses account-section pattern) -- */
@@ -997,6 +1022,12 @@ select.config-select[multiple] {
     gap: 0;
     border-bottom: 1px solid var(--box-border);
     margin-bottom: 1.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.config-tabs::-webkit-scrollbar {
+    display: none;
 }
 .config-tabs button[role="tab"] {
     background: transparent;
@@ -1009,6 +1040,8 @@ select.config-select[multiple] {
     border-bottom: 2px solid transparent;
     cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    flex: 0 0 auto;
 }
 .config-tabs button[role="tab"]:hover {
     color: var(--foreground);

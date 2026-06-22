@@ -17,8 +17,9 @@
 
 {% block body %}
 <div class="admin-shell">
-    <aside class="admin-sidebar">
+    <aside class="admin-sidebar" id="admin-sidebar">
         <div class="admin-sidebar-title"><span class="spark" aria-hidden="true">✻</span> Admin</div>
+        <button type="button" class="admin-sidebar-toggle" aria-expanded="false" aria-controls="admin-sidebar"><span>Menu</span></button>
         <nav class="admin-nav">
             <a href="/admin" class="admin-nav-item{% if active_page == "dashboard" %} active{% endif %}">
                 <span>Dashboard</span>
@@ -106,5 +107,6 @@
     </div>
 </div>
 
+<script src="/static/js/admin/admin_nav.js" defer></script>
 <script src="/static/js/spotlight.js" defer></script>
 {% endblock %}
