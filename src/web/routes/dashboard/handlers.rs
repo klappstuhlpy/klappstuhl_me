@@ -75,8 +75,8 @@ pub(super) async fn percy_commands(
     account: Option<Account>,
     flashes: Flashes,
 ) -> Response {
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is always set by cargo");
-    let path = std::path::Path::new(&manifest_dir).join("templates/percy/discord_command_syntax_guide-v2.md");
+    let dir = env::current_dir().unwrap();
+    let path = std::path::Path::new(&dir).join("templates/percy/discord_command_syntax_guide-v2.md");
     let path_str = path.to_string_lossy().to_string();
     let flags_md: String;
 
