@@ -3,16 +3,12 @@
 //! Split into [`templates`] (Askama views) and [`handlers`] (route handlers);
 //! this module owns the shared helpers and the router assembly.
 //!
-//! ## URL prefix vs. public URL
-//!
-//! Every route below is registered under a `/percy/...` prefix, but the
-//! dashboard's *public* URL is the bare `percy.<domain>` subdomain (e.g.
-//! `percy.klappstuhl.me/dashboard`, not `klappstuhl.me/percy/dashboard`). The
-//! [`crate::routes::percy_host_rewrite`] middleware maps the subdomain's bare
-//! paths onto this `/percy/...` table (and 301-redirects the legacy apex paths),
-//! so the prefix here is an internal implementation detail. **Handlers and
-//! templates must emit links *without* the prefix** (`/dashboard/...`,
-//! `/lb/...`) — those resolve correctly on the subdomain.
+//! The dashboard is reached at the bare `percy.<domain>` subdomain (e.g.
+//! `percy.klappstuhl.me/dashboard`); its routes are registered here at their
+//! bare paths (`/dashboard`, `/lb`, `/privacy-policy`, `/terms-of-service`) and
+//! are served on whatever host the request arrives at. Auth carries over from
+//! the apex because the session cookie is scoped to the registrable domain (see
+//! [`crate::config::Config::cookie_domain`]).
 
 mod handlers;
 mod templates;
@@ -298,231 +294,188 @@ fn json_or_flash(headers: &HeaderMap, flasher: &Flasher, ok: bool, msg: &str, re
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/percy", get(|| async { axum::response::Redirect::to("/dashboard") }))
         // Public legal docs, rendered live from the canonical GitHub repo.
-        .route("/percy/privacy-policy", get(percy_privacy))
-        .route("/percy/terms-of-service", get(percy_terms))
+        .route("/privacy-policy", get(percy_privacy))
+        .route("/terms-of-service", get(percy_terms))
         // Public leaderboard (no auth required to view).
-        .route("/percy/lb/:target", get(public_leaderboard))
+        .route("/lb/:target", get(public_leaderboard))
         .route(
-            "/percy/lb/:guild_id/vanity",
+            "/lb/:guild_id/vanity",
             post(public_leaderboard_vanity_claim).delete(public_leaderboard_vanity_delete),
         )
-        .route("/percy/dashboard", get(guild_list))
+        .route("/dashboard", get(guild_list))
         // Public read-only server overview for members without manage access.
-        .route("/percy/dashboard/guild/:guild_id/overview", get(guild_overview))
+        .route("/dashboard/guild/:guild_id/overview", get(guild_overview))
         .route(
-            "/percy/dashboard/guild/:guild_id/overview/music",
+            "/dashboard/guild/:guild_id/overview/music",
             get(guild_overview_music_status),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/overview/music/control",
+            "/dashboard/guild/:guild_id/overview/music/control",
             post(guild_overview_music_control),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/overview/music/lyrics",
+            "/dashboard/guild/:guild_id/overview/music/lyrics",
             get(guild_overview_music_lyrics),
         )
-        .route("/percy/dashboard/guild/:guild_id", get(guild_detail))
-        .route("/percy/dashboard/guild/:guild_id/config", post(guild_config_update))
-        .route("/percy/dashboard/guild/:guild_id/sentinel", post(guild_sentinel_update))
-        .route("/percy/dashboard/guild/:guild_id/members", get(guild_members))
-        .route("/percy/dashboard/guild/:guild_id/members.json", get(guild_members_json))
+        .route("/dashboard/guild/:guild_id", get(guild_detail))
+        .route("/dashboard/guild/:guild_id/config", post(guild_config_update))
+        .route("/dashboard/guild/:guild_id/sentinel", post(guild_sentinel_update))
+        .route("/dashboard/guild/:guild_id/members", get(guild_members))
+        .route("/dashboard/guild/:guild_id/members.json", get(guild_members_json))
+        .route("/dashboard/guild/:guild_id/members/:user_id", get(guild_user_lookup))
         .route(
-            "/percy/dashboard/guild/:guild_id/members/:user_id",
-            get(guild_user_lookup),
-        )
-        .route(
-            "/percy/dashboard/guild/:guild_id/members/:user_id/avatars",
+            "/dashboard/guild/:guild_id/members/:user_id/avatars",
             get(guild_member_avatars),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/members/:user_id/action",
+            "/dashboard/guild/:guild_id/members/:user_id/action",
             post(guild_member_action),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/members/:user_id/roles",
+            "/dashboard/guild/:guild_id/members/:user_id/roles",
             post(guild_member_roles),
         )
         // Feature pages
-        .route("/percy/dashboard/guild/:guild_id/leveling", get(guild_leveling))
+        .route("/dashboard/guild/:guild_id/leveling", get(guild_leveling))
         .route(
-            "/percy/dashboard/guild/:guild_id/leveling/users/:user_id",
+            "/dashboard/guild/:guild_id/leveling/users/:user_id",
             post(guild_leveling_update),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/leveling/config",
+            "/dashboard/guild/:guild_id/leveling/config",
             post(guild_leveling_config_update),
         )
+        .route("/dashboard/guild/:guild_id/leveling/roles", post(guild_leveling_roles))
         .route(
-            "/percy/dashboard/guild/:guild_id/leveling/roles",
-            post(guild_leveling_roles),
-        )
-        .route(
-            "/percy/dashboard/guild/:guild_id/leveling/roles/preset",
+            "/dashboard/guild/:guild_id/leveling/roles/preset",
             post(guild_leveling_roles_preset),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/leveling/multipliers",
+            "/dashboard/guild/:guild_id/leveling/multipliers",
             post(guild_leveling_multipliers),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/leveling/blacklist",
+            "/dashboard/guild/:guild_id/leveling/blacklist",
             post(guild_leveling_blacklist),
         )
-        .route("/percy/dashboard/guild/:guild_id/economy", get(guild_economy))
+        .route("/dashboard/guild/:guild_id/economy", get(guild_economy))
         .route(
-            "/percy/dashboard/guild/:guild_id/economy/items",
+            "/dashboard/guild/:guild_id/economy/items",
             post(guild_economy_items_create),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/economy/items/:name",
+            "/dashboard/guild/:guild_id/economy/items/:name",
             delete(guild_economy_item_delete),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/economy/lottery",
+            "/dashboard/guild/:guild_id/economy/lottery",
             post(guild_economy_lottery_create).delete(guild_economy_lottery_delete),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/economy/balances/:user_id",
+            "/dashboard/guild/:guild_id/economy/balances/:user_id",
             patch(guild_economy_balance_update),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/status-feed",
+            "/dashboard/guild/:guild_id/status-feed",
             post(guild_status_feed_subscribe).delete(guild_status_feed_unsubscribe),
         )
-        .route("/percy/dashboard/guild/:guild_id/music", get(guild_music))
-        .route("/percy/dashboard/guild/:guild_id/music/status", get(guild_music_status))
+        .route("/dashboard/guild/:guild_id/music", get(guild_music))
+        .route("/dashboard/guild/:guild_id/music/status", get(guild_music_status))
+        .route("/dashboard/guild/:guild_id/music/control", post(guild_music_control))
+        .route("/dashboard/guild/:guild_id/music/lyrics", get(guild_music_lyrics))
+        .route("/dashboard/guild/:guild_id/music/setup", post(guild_music_setup))
+        .route("/dashboard/guild/:guild_id/music/reset", post(guild_music_reset))
         .route(
-            "/percy/dashboard/guild/:guild_id/music/control",
-            post(guild_music_control),
-        )
-        .route("/percy/dashboard/guild/:guild_id/music/lyrics", get(guild_music_lyrics))
-        .route("/percy/dashboard/guild/:guild_id/music/setup", post(guild_music_setup))
-        .route("/percy/dashboard/guild/:guild_id/music/reset", post(guild_music_reset))
-        .route(
-            "/percy/dashboard/guild/:guild_id/music/equalizer",
+            "/dashboard/guild/:guild_id/music/equalizer",
             post(guild_music_equalizer),
         )
+        .route("/dashboard/guild/:guild_id/music/filters", post(guild_music_filters))
+        .route("/dashboard/guild/:guild_id/music/247", post(guild_music_247))
+        .route("/dashboard/guild/:guild_id/music/dj-mode", patch(guild_music_dj_mode))
+        .route("/dashboard/guild/:guild_id/custom-bot", patch(guild_custom_bot_update))
         .route(
-            "/percy/dashboard/guild/:guild_id/music/filters",
-            post(guild_music_filters),
-        )
-        .route("/percy/dashboard/guild/:guild_id/music/247", post(guild_music_247))
-        .route(
-            "/percy/dashboard/guild/:guild_id/music/dj-mode",
-            patch(guild_music_dj_mode),
-        )
-        .route(
-            "/percy/dashboard/guild/:guild_id/custom-bot",
-            patch(guild_custom_bot_update),
-        )
-        .route(
-            "/percy/dashboard/guild/:guild_id/custom-bot/reset",
+            "/dashboard/guild/:guild_id/custom-bot/reset",
             post(guild_custom_bot_reset),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/autoresponders",
+            "/dashboard/guild/:guild_id/autoresponders",
             get(guild_autoresponders).post(guild_autoresponders_action),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/autoresponders/:trigger",
+            "/dashboard/guild/:guild_id/autoresponders/:trigger",
             patch(guild_autoresponder_patch).delete(guild_autoresponder_delete),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/comics",
+            "/dashboard/guild/:guild_id/comics",
             get(guild_comics).post(guild_comic_create),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/comics/:brand",
+            "/dashboard/guild/:guild_id/comics/:brand",
             patch(guild_comic_patch).delete(guild_comic_delete),
         )
+        .route("/dashboard/guild/:guild_id/comics/:brand/push", post(guild_comics_push))
         .route(
-            "/percy/dashboard/guild/:guild_id/comics/:brand/push",
-            post(guild_comics_push),
-        )
-        .route(
-            "/percy/dashboard/guild/:guild_id/temp-channels",
+            "/dashboard/guild/:guild_id/temp-channels",
             get(guild_temp_channels).post(guild_temp_channel_create),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/temp-channels/:channel_id",
+            "/dashboard/guild/:guild_id/temp-channels/:channel_id",
             patch(guild_temp_channel_patch).delete(guild_temp_channel_delete),
         )
         // Browse pages
         .route(
-            "/percy/dashboard/guild/:guild_id/polls",
+            "/dashboard/guild/:guild_id/polls",
             get(guild_polls).post(guild_poll_create),
         )
+        .route("/dashboard/guild/:guild_id/polls/image", post(guild_poll_image_upload))
+        .route("/dashboard/guild/:guild_id/polls/:poll_id", post(guild_poll_edit))
+        .route("/dashboard/guild/:guild_id/polls/:poll_id/end", post(guild_poll_end))
+        .route("/dashboard/guild/:guild_id/giveaways", get(guild_giveaways))
+        .route("/dashboard/guild/:guild_id/tags", get(guild_tags))
+        .route("/dashboard/guild/:guild_id/highlights", get(guild_highlights))
         .route(
-            "/percy/dashboard/guild/:guild_id/polls/image",
-            post(guild_poll_image_upload),
-        )
-        .route("/percy/dashboard/guild/:guild_id/polls/:poll_id", post(guild_poll_edit))
-        .route(
-            "/percy/dashboard/guild/:guild_id/polls/:poll_id/end",
-            post(guild_poll_end),
-        )
-        .route("/percy/dashboard/guild/:guild_id/giveaways", get(guild_giveaways))
-        .route("/percy/dashboard/guild/:guild_id/tags", get(guild_tags))
-        .route("/percy/dashboard/guild/:guild_id/highlights", get(guild_highlights))
-        .route(
-            "/percy/dashboard/guild/:guild_id/highlights/:user_id",
+            "/dashboard/guild/:guild_id/highlights/:user_id",
             delete(guild_highlight_delete),
         )
-        .route("/percy/dashboard/guild/:guild_id/emoji-stats", get(guild_emoji_stats))
-        .route("/percy/dashboard/guild/:guild_id/commands", get(guild_commands))
+        .route("/dashboard/guild/:guild_id/emoji-stats", get(guild_emoji_stats))
+        .route("/dashboard/guild/:guild_id/commands", get(guild_commands))
+        .route("/dashboard/guild/:guild_id/commands/toggle", post(guild_command_toggle))
+        .route("/dashboard/guild/:guild_id/plonks", post(guild_plonk_manage))
+        .route("/dashboard/guild/:guild_id/lockdowns/lock", post(guild_lockdown_lock))
         .route(
-            "/percy/dashboard/guild/:guild_id/commands/toggle",
-            post(guild_command_toggle),
-        )
-        .route("/percy/dashboard/guild/:guild_id/plonks", post(guild_plonk_manage))
-        .route(
-            "/percy/dashboard/guild/:guild_id/lockdowns/lock",
-            post(guild_lockdown_lock),
-        )
-        .route(
-            "/percy/dashboard/guild/:guild_id/lockdowns/unlock",
+            "/dashboard/guild/:guild_id/lockdowns/unlock",
             post(guild_lockdown_unlock),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/moderation/ignore",
+            "/dashboard/guild/:guild_id/moderation/ignore",
             post(guild_moderation_ignore),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/audit-log-flags",
+            "/dashboard/guild/:guild_id/audit-log-flags",
             patch(guild_audit_log_flags),
         )
-        .route("/percy/dashboard/guild/:guild_id/stats", get(guild_stats))
+        .route("/dashboard/guild/:guild_id/stats", get(guild_stats))
         // Phase 5: Audit log, bulk actions, activity, export
-        .route("/percy/dashboard/guild/:guild_id/audit-log", get(guild_audit_log))
+        .route("/dashboard/guild/:guild_id/audit-log", get(guild_audit_log))
+        .route("/dashboard/guild/:guild_id/audit-log.json", get(guild_audit_log_json))
+        .route("/dashboard/guild/:guild_id/audit-log/recent", get(guild_cases_recent))
+        .route("/dashboard/guild/:guild_id/cases", post(guild_case_create))
         .route(
-            "/percy/dashboard/guild/:guild_id/audit-log.json",
-            get(guild_audit_log_json),
-        )
-        .route(
-            "/percy/dashboard/guild/:guild_id/audit-log/recent",
-            get(guild_cases_recent),
-        )
-        .route("/percy/dashboard/guild/:guild_id/cases", post(guild_case_create))
-        .route(
-            "/percy/dashboard/guild/:guild_id/cases/:case_index",
+            "/dashboard/guild/:guild_id/cases/:case_index",
             patch(guild_case_update).delete(guild_case_delete),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/members/bulk-action",
+            "/dashboard/guild/:guild_id/members/bulk-action",
             post(guild_bulk_action),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/members/:user_id/activity",
+            "/dashboard/guild/:guild_id/members/:user_id/activity",
             get(guild_member_activity),
         )
         .route(
-            "/percy/dashboard/guild/:guild_id/export/leaderboard.csv",
+            "/dashboard/guild/:guild_id/export/leaderboard.csv",
             get(guild_export_leaderboard),
         )
-        .route(
-            "/percy/dashboard/guild/:guild_id/export/cases.csv",
-            get(guild_export_cases),
-        )
+        .route("/dashboard/guild/:guild_id/export/cases.csv", get(guild_export_cases))
 }

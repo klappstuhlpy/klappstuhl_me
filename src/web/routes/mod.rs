@@ -1,14 +1,7 @@
 use crate::AppState;
 use crate::{flash::Flashes, models::Account};
 use askama::Template;
-use axum::{
-    extract::{Request, State},
-    http::{header::HOST, Uri},
-    middleware::Next,
-    response::{IntoResponse, Redirect, Response},
-    routing::get,
-    Router,
-};
+use axum::{extract::State, response::IntoResponse, response::Redirect, routing::get, Router};
 
 mod admin;
 mod api;
@@ -59,109 +52,6 @@ async fn index(State(state): State<AppState>, account: Option<Account>, flashes:
 /// `navigate` tool's whitelisted `/projects` route still resolve.
 async fn projects() -> impl IntoResponse {
     Redirect::to("/#projects")
-}
-
-/// The closed set of public URL prefixes the Percy dashboard is reachable at on
-/// its subdomain (the `/percy` route-table prefix is stripped from the public
-/// URL). Anything else on the subdomain — `/static`, `/ws`, `/login`,
-/// `/account`, … — is a request for the *shared* site routes and passes through
-/// untouched. `/` is included so the bare subdomain lands on the dashboard.
-fn is_percy_dashboard_path(path: &str) -> bool {
-    const ENTRIES: &[&str] = &["/dashboard", "/lb", "/privacy-policy", "/terms-of-service"];
-    path == "/" || ENTRIES.iter().any(|p| path == *p || path.starts_with(&format!("{p}/")))
-}
-
-/// Builds a path-only [`Uri`] from a path-and-query string, preserving any query.
-fn path_uri(path_and_query: &str) -> Option<Uri> {
-    path_and_query.parse().ok()
-}
-
-/// Host-based routing for the Percy dashboard subdomain.
-///
-/// The dashboard's routes are registered under a `/percy/...` prefix (see
-/// [`dashboard::routes`]), but its public URL is the bare `percy.<domain>`
-/// subdomain. This middleware bridges the two:
-///
-/// * On the dashboard host (`config.percy_domain()`): a public dashboard path
-///   (`/dashboard`, `/lb`, …) is internally rewritten to `/percy/...` so the
-///   existing route table matches, while shared paths pass through.
-/// * On the production apex: legacy `/percy/*` links **and** bare dashboard
-///   entry paths are 301-redirected to the subdomain, so old bookmarks and the
-///   main-site "Dashboard" nav link land on `percy.<domain>`.
-///
-/// In dev the apex redirect is skipped (there's no public subdomain to send a
-/// browser to beyond `percy.localhost`, and devs may use the path-based
-/// `/percy/...` fallback on `localhost`).
-pub async fn percy_host_rewrite(State(state): State<AppState>, mut req: Request, next: Next) -> Response {
-    let config = state.config();
-
-    // Resolve the request host. HTTP/1 carries it in the `Host` header, but
-    // HTTP/2 — which our ACME TLS listener negotiates via ALPN `h2`, so it's what
-    // browsers actually use — has *no* `Host` header: the `:authority` lands in
-    // the request URI instead. Fall back to the URI authority so the dashboard
-    // subdomain is recognised over h2 (otherwise the host comes back empty and
-    // every `percy.<domain>/…` request misses the rewrite). `x-forwarded-host`
-    // covers a reverse proxy that forwards it.
-    let host_raw = req
-        .headers()
-        .get(HOST)
-        .and_then(|h| h.to_str().ok())
-        .or_else(|| req.headers().get("x-forwarded-host").and_then(|h| h.to_str().ok()))
-        .map(str::to_owned)
-        .or_else(|| req.uri().host().map(str::to_owned))
-        .unwrap_or_default();
-    let host = host_raw.split(':').next().unwrap_or("").to_ascii_lowercase();
-
-    let percy_host = config.percy_domain().to_ascii_lowercase();
-    let apex = config.domains.first().map(|d| d.to_ascii_lowercase()).unwrap_or_default();
-    let on_dashboard_host = !host.is_empty() && host == percy_host;
-    // True for real-domain deployments; false only in pure-localhost dev (where the
-    // apex is `localhost` and there's no public subdomain to redirect a browser to).
-    let has_real_domain = percy_host != "percy.localhost";
-
-    if on_dashboard_host {
-        let path = req.uri().path();
-        if is_percy_dashboard_path(path) && !path.starts_with("/percy") {
-            let pq = req.uri().path_and_query().map(|p| p.as_str()).unwrap_or(path);
-            // Strip the leading slash for the bare root so we get `/percy`
-            // (+ query) rather than the unmatched `/percy/`.
-            let rewritten = if path == "/" {
-                format!("/percy{}", &pq[1..])
-            } else {
-                format!("/percy{pq}")
-            };
-            if let Some(uri) = path_uri(&rewritten) {
-                *req.uri_mut() = uri;
-            }
-        }
-        return next.run(req).await;
-    }
-
-    // Apex → subdomain redirects, fired only when we're certain the request is on
-    // the apex host. Gating on the exact apex (not merely "not the dashboard host")
-    // means an unresolved/empty host can never bounce `/dashboard` to the subdomain
-    // and back in a loop — it just falls through to normal routing.
-    if has_real_domain && host == apex {
-        let path = req.uri().path();
-        let pq = req.uri().path_and_query().map(|p| p.as_str()).unwrap_or(path);
-        // Legacy `/percy/*` (and the bare `/percy`) → subdomain without the prefix.
-        // This covers old bookmarks to every dashboard page and the public
-        // leaderboard / legal docs.
-        if path == "/percy" || path.starts_with("/percy/") {
-            let rest = &pq["/percy".len()..];
-            let target = if rest.starts_with('/') { rest } else { "/dashboard" };
-            return Redirect::permanent(&config.percy_url(target)).into_response();
-        }
-        // The main-site nav's "Dashboard" link is the bare `/dashboard`; send it
-        // to the subdomain. Scoped to `/dashboard` only (not `/lb`, `/privacy-policy`,
-        // …) so the apex stays free to define those paths itself — the public
-        // dashboard pages are only ever linked as absolute `percy.<domain>` URLs.
-        if path == "/dashboard" || path.starts_with("/dashboard/") {
-            return Redirect::permanent(&config.percy_url(pq)).into_response();
-        }
-    }
-
-    next.run(req).await
 }
 
 pub fn all() -> Router<AppState> {

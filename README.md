@@ -852,10 +852,10 @@ Add two config blocks to `config.json`:
 
 Register the redirect URI in the [Discord Developer Portal](https://discord.com/developers/applications) under OAuth2. The OAuth flow requests `identify` and `guilds` scopes.
 
-The dashboard lives on the `percy.<domain>` subdomain, served by the same binary via host-based routing (the dashboard's internal routes keep a `/percy/...` prefix that the `percy_host_rewrite` middleware maps onto the bare subdomain; legacy `klappstuhl.me/percy/*` links 301-redirect to it). Two deployment notes:
+The dashboard lives on the `percy.<domain>` subdomain (e.g. `percy.klappstuhl.me/dashboard`). Its routes are registered at their bare paths (`/dashboard`, `/lb`, `/privacy-policy`, `/terms-of-service`) and are served on whatever host reaches the binary — point the `percy.` subdomain's DNS/proxy at the same app. Two deployment notes:
 
-- **TLS:** add `percy.<domain>` to the `domains` list in `config.json` so the ACME cert covers it (the primary apex must stay first — it's used for `canonical_url`, the cookie `Domain`, and to derive the `percy.`/`r.` subdomains). Point the subdomain's DNS/reverse proxy at the same binary, forwarding the `Host` header (exactly as the `r.` short-link subdomain is wired).
-- **Auth cookie:** the session cookie is scoped to the registrable domain (`Domain=<apex>`) so a login on the apex is also presented to `percy.<domain>`. In local dev the dashboard is `percy.localhost:<port>` (resolves to loopback in Chromium/Firefox) and the cookie is scoped to `localhost` — access the apex via `localhost`, not a raw `127.0.0.1`, or the browser rejects the shared cookie.
+- **TLS:** add `percy.<domain>` to the `domains` list in `config.json` so the ACME cert covers it (keep the primary apex first — it's used for `canonical_url`, the cookie `Domain`, and to derive the `r.` short-link subdomain).
+- **Auth cookie:** the session cookie is scoped to the registrable domain (`Domain=<apex>`) so a login on the apex is also presented to `percy.<domain>`. Existing sessions issued before this was added are host-only — log out and back in once to get a domain-scoped cookie. In local dev the cookie is scoped to `localhost`; access the app via `localhost`, not a raw `127.0.0.1`, or the browser rejects the shared cookie.
 
 ### Features
 

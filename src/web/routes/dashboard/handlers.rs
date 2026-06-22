@@ -26,7 +26,7 @@ use super::{
 const PRIVACY_POLICY_URL: &str = "https://raw.githubusercontent.com/klappstuhlpy/Percy/master/PRIVACY_POLICY.md";
 const TERMS_OF_SERVICE_URL: &str = "https://raw.githubusercontent.com/klappstuhlpy/Percy/master/TERMS_OF_SERVICE.md";
 
-/// `GET /percy/privacy-policy` — Percy's Privacy Policy.
+/// `GET /privacy-policy` — Percy's Privacy Policy.
 pub(super) async fn percy_privacy(
     State(state): State<AppState>,
     account: Option<Account>,
@@ -35,7 +35,7 @@ pub(super) async fn percy_privacy(
     render_legal_doc(&state, account, flashes, "Privacy Policy", PRIVACY_POLICY_URL).await
 }
 
-/// `GET /percy/terms-of-service` — Percy's Terms of Service.
+/// `GET /terms-of-service` — Percy's Terms of Service.
 pub(super) async fn percy_terms(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
     render_legal_doc(&state, account, flashes, "Terms of Service", TERMS_OF_SERVICE_URL).await
 }
@@ -202,7 +202,7 @@ pub(super) async fn guild_detail(
     .into_response()
 }
 
-/// `GET /percy/dashboard/guild/:guild_id/overview` — read-only public overview
+/// `GET /dashboard/guild/:guild_id/overview` — read-only public overview
 /// for members who can't manage the guild. Access requires only that the viewer
 /// shares the guild with Percy; everything shown is already visible to members
 /// in Discord.
@@ -305,7 +305,7 @@ pub(super) async fn guild_overview(
     .into_response()
 }
 
-/// `GET /percy/dashboard/guild/:guild_id/overview/music` — live now-playing
+/// `GET /dashboard/guild/:guild_id/overview/music` — live now-playing
 /// state for the public overview's auto-refreshing music panel. Membership-gated.
 pub(super) async fn guild_overview_music_status(
     State(state): State<AppState>,
@@ -340,7 +340,7 @@ pub(super) async fn guild_overview_music_status(
     }
 }
 
-/// `GET /percy/dashboard/guild/:guild_id/overview/music/lyrics` — synced lyrics
+/// `GET /dashboard/guild/:guild_id/overview/music/lyrics` — synced lyrics
 /// for the public overview's player. Membership-gated.
 pub(super) async fn guild_overview_music_lyrics(
     State(state): State<AppState>,
@@ -375,7 +375,7 @@ async fn lyrics_json(percy: &PercyClient, guild_id: u64) -> Response {
     }
 }
 
-/// `POST /percy/dashboard/guild/:guild_id/overview/music/control` — drive the
+/// `POST /dashboard/guild/:guild_id/overview/music/control` — drive the
 /// shared live player from the public overview (pause/resume/skip/stop, plus
 /// volume/seek/jump/move). The viewer's Discord id is taken from the session
 /// (never the request body); the full body is forwarded so action arguments
@@ -1915,7 +1915,7 @@ pub(super) async fn guild_music_status(
     }
 }
 
-/// `POST /percy/dashboard/guild/:guild_id/music/control` — drive the live player
+/// `POST /dashboard/guild/:guild_id/music/control` — drive the live player
 /// from the admin music page. The viewer's Discord id comes from the session;
 /// Percy enforces DJ-mode rules (admins/Manage-Server always pass).
 pub(super) async fn guild_music_control(
@@ -1943,7 +1943,7 @@ pub(super) async fn guild_music_control(
     }
 }
 
-/// `GET /percy/dashboard/guild/:guild_id/music/lyrics` — synced lyrics for the
+/// `GET /dashboard/guild/:guild_id/music/lyrics` — synced lyrics for the
 /// admin music page player.
 pub(super) async fn guild_music_lyrics(
     State(state): State<AppState>,
@@ -2992,7 +2992,7 @@ async fn get_vanity_for_guild(state: &AppState, guild_id: u64) -> Option<String>
         .ok()
 }
 
-/// `GET /percy/lb/:target` — public leaderboard page (no login required).
+/// `GET /lb/:target` — public leaderboard page (no login required).
 pub(super) async fn public_leaderboard(
     State(state): State<AppState>,
     account: Option<Account>,
@@ -3053,7 +3053,7 @@ pub(super) struct VanityClaimBody {
     slug: String,
 }
 
-/// `POST /percy/lb/:guild_id/vanity` — claim or update a vanity slug.
+/// `POST /lb/:guild_id/vanity` — claim or update a vanity slug.
 pub(super) async fn public_leaderboard_vanity_claim(
     State(state): State<AppState>,
     account: Account,
@@ -3144,7 +3144,7 @@ pub(super) async fn public_leaderboard_vanity_claim(
             &headers,
             &flasher,
             true,
-            &format!("Vanity URL set to /percy/lb/{slug}"),
+            &format!("Vanity URL set to /lb/{slug}"),
             &format!("/lb/{guild_id}"),
         ),
         Ok(Err(msg)) => json_or_flash(&headers, &flasher, false, msg, &format!("/lb/{guild_id}")),
@@ -3152,7 +3152,7 @@ pub(super) async fn public_leaderboard_vanity_claim(
     }
 }
 
-/// `DELETE /percy/lb/:guild_id/vanity` — remove a vanity slug.
+/// `DELETE /lb/:guild_id/vanity` — remove a vanity slug.
 pub(super) async fn public_leaderboard_vanity_delete(
     State(state): State<AppState>,
     account: Account,
@@ -3199,7 +3199,7 @@ pub(super) async fn public_leaderboard_vanity_delete(
 
 // -- Custom Bot Profile -------------------------------------------------------
 
-/// `PATCH /percy/dashboard/guild/:guild_id/custom-bot` — update bot profile.
+/// `PATCH /dashboard/guild/:guild_id/custom-bot` — update bot profile.
 pub(super) async fn guild_custom_bot_update(
     State(state): State<AppState>,
     account: Account,
@@ -3222,7 +3222,7 @@ pub(super) async fn guild_custom_bot_update(
     }
 }
 
-/// `POST /percy/dashboard/guild/:guild_id/custom-bot/reset` — reset to defaults.
+/// `POST /dashboard/guild/:guild_id/custom-bot/reset` — reset to defaults.
 pub(super) async fn guild_custom_bot_reset(
     State(state): State<AppState>,
     account: Account,

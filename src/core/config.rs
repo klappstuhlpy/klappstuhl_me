@@ -633,41 +633,6 @@ impl Config {
         }
     }
 
-    /// The host the Percy bot dashboard is served from: the `percy.` subdomain of
-    /// the primary domain (e.g. `percy.klappstuhl.me`), or `percy.localhost` when
-    /// the primary domain is `localhost` (dev — Chromium/Firefox resolve it to
-    /// loopback). Used to recognise inbound dashboard requests by their `Host`
-    /// header (see the host-rewrite middleware in `routes`).
-    ///
-    /// Deliberately keyed off the configured **domain**, *not* the `production`
-    /// flag: a deployment behind a TLS-terminating proxy (Cloudflare, nginx) often
-    /// runs with `production = false` on a plain port, yet is still reached at
-    /// `percy.<domain>` — gating on `production` would make the subdomain
-    /// unrecognised and every dashboard URL 404. Note: when the app terminates TLS
-    /// itself, `percy.<domain>` must also be listed in `domains` so the ACME cert
-    /// covers it.
-    pub fn percy_domain(&self) -> String {
-        let domain = self.domains.first().map(|x| x.as_str()).unwrap_or("localhost");
-        if domain == "localhost" {
-            "percy.localhost".to_string()
-        } else {
-            format!("percy.{domain}")
-        }
-    }
-
-    /// Absolute URL to `path` (which must begin with `/`) on the Percy dashboard
-    /// host. `https://percy.<domain>{path}` for a real domain; the dev equivalent
-    /// on `percy.localhost:<port>`. Used to build cross-origin redirects from the
-    /// apex to the dashboard subdomain.
-    pub fn percy_url(&self, path: &str) -> String {
-        let domain = self.domains.first().map(|x| x.as_str()).unwrap_or("localhost");
-        if domain == "localhost" {
-            format!("http://percy.localhost:{}{path}", self.server.port)
-        } else {
-            format!("https://percy.{domain}{path}")
-        }
-    }
-
     /// The `Domain` attribute to set on the auth/session cookie, so a login on the
     /// apex (`klappstuhl.me`) is also presented to the dashboard subdomain
     /// (`percy.klappstuhl.me`) — without it the host-only cookie never reaches the
