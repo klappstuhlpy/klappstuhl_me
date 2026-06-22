@@ -106,7 +106,11 @@ pub async fn percy_host_rewrite(State(state): State<AppState>, mut req: Request,
         .unwrap_or("")
         .to_ascii_lowercase();
 
-    let on_dashboard_host = host == config.percy_domain().to_ascii_lowercase();
+    let percy_host = config.percy_domain().to_ascii_lowercase();
+    let on_dashboard_host = host == percy_host;
+    // True for real-domain deployments; false only in pure-localhost dev (where the
+    // apex is `localhost` and there's no public subdomain to redirect a browser to).
+    let has_real_domain = percy_host != "percy.localhost";
 
     if on_dashboard_host {
         let path = req.uri().path();
@@ -126,7 +130,7 @@ pub async fn percy_host_rewrite(State(state): State<AppState>, mut req: Request,
         return next.run(req).await;
     }
 
-    if config.production {
+    if has_real_domain {
         let path = req.uri().path();
         let pq = req.uri().path_and_query().map(|p| p.as_str()).unwrap_or(path);
         // Legacy `/percy/*` (and the bare `/percy`) → subdomain without the prefix.
