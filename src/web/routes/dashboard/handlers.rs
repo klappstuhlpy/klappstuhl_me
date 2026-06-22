@@ -362,6 +362,102 @@ pub(super) async fn guild_user_settings_update(
     }
 }
 
+/// `GET /dashboard/guild/:guild_id/me/history` — the logged-in user's
+/// consent-tracked history (names, avatars, presence), as JSON for the page's
+/// client renderer. Avatar bytes are kept out of the server-rendered HTML and
+/// fetched here lazily; presence feeds the uPlot timeline.
+pub(super) async fn guild_user_history(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    if !check_guild_membership(&percy, &discord_id, guild_id).await {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    match percy.get_user_history(&discord_id).await {
+        Ok(history) => Json(history).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+/// `GET /dashboard/guild/:guild_id/me/data-export` — downloads the full
+/// GDPR-style export of everything Percy stores about the user as a JSON file.
+pub(super) async fn guild_user_data_export(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    if !check_guild_membership(&percy, &discord_id, guild_id).await {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    match percy.export_user_data(&discord_id).await {
+        Ok(data) => {
+            let body = serde_json::to_vec_pretty(&data).unwrap_or_default();
+            (
+                [
+                    (axum::http::header::CONTENT_TYPE, "application/json".to_string()),
+                    (
+                        axum::http::header::CONTENT_DISPOSITION,
+                        format!("attachment; filename=\"percy-data-{discord_id}.json\""),
+                    ),
+                ],
+                body,
+            )
+                .into_response()
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+/// `POST /dashboard/guild/:guild_id/me/delete-data` — permanently erases the
+/// user's stored presence/avatar/name history. Irreversible.
+pub(super) async fn guild_user_data_delete(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    if !check_guild_membership(&percy, &discord_id, guild_id).await {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    match percy.delete_user_personal_data(&discord_id).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
 /// `GET /dashboard/guild/:guild_id/overview` — read-only public overview
 /// for members who can't manage the guild. Access requires only that the viewer
 /// shares the guild with Percy; everything shown is already visible to members
@@ -601,7 +697,10 @@ pub(super) async fn guild_config_update(
         // Batch: config + sentinel toggle + clear in one round-trip.
         let gk_enabled = form.fields.contains_key("sentinel");
         let mut ops = vec![
-            BatchOperation { op_type: "config".into(), data: patch },
+            BatchOperation {
+                op_type: "config".into(),
+                data: patch,
+            },
             BatchOperation {
                 op_type: "sentinel_toggle".into(),
                 data: serde_json::json!({"enabled": gk_enabled}),
@@ -1142,7 +1241,10 @@ pub(super) async fn guild_polls(
     let channels = channels.unwrap_or_default();
     let roles = roles.unwrap_or_default();
 
-    let polls = polls.unwrap_or(PollsResponse { polls: Vec::new(), total: 0 });
+    let polls = polls.unwrap_or(PollsResponse {
+        polls: Vec::new(),
+        total: 0,
+    });
     let active_count = polls.polls.iter().filter(|p| !p.ended).count();
     let ended_count = polls.polls.iter().filter(|p| p.ended).count();
 
@@ -1293,7 +1395,10 @@ pub(super) async fn guild_giveaways(
         Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
-    let giveaways = giveaways.unwrap_or(GiveawaysResponse { giveaways: Vec::new(), total: 0 });
+    let giveaways = giveaways.unwrap_or(GiveawaysResponse {
+        giveaways: Vec::new(),
+        total: 0,
+    });
     let active_count = giveaways.giveaways.iter().filter(|g| !g.ended).count();
     let ended_count = giveaways.giveaways.iter().filter(|g| g.ended).count();
 
@@ -1937,7 +2042,10 @@ pub(super) async fn guild_economy(
         items: Vec::new(),
         lottery: None,
     });
-    let balances = balances.unwrap_or(BalancesResponse { entries: Vec::new(), total: 0 });
+    let balances = balances.unwrap_or(BalancesResponse {
+        entries: Vec::new(),
+        total: 0,
+    });
     let channels = channels.unwrap_or_default();
     let roles = roles.unwrap_or_default();
     EconomyTemplate {
@@ -2328,7 +2436,10 @@ pub(super) async fn guild_highlights(
         Ok(g) => g,
         Err(_) => return Redirect::to("/dashboard").into_response(),
     };
-    let data = data.unwrap_or(HighlightsResponse { entries: Vec::new(), total: 0 });
+    let data = data.unwrap_or(HighlightsResponse {
+        entries: Vec::new(),
+        total: 0,
+    });
     HighlightsTemplate {
         account: Some(account),
         flashes,
@@ -3196,7 +3307,10 @@ pub(super) async fn public_leaderboard(
         entries: Vec::new(),
         total: 0,
     });
-    let balances = balances.unwrap_or(BalancesResponse { entries: Vec::new(), total: 0 });
+    let balances = balances.unwrap_or(BalancesResponse {
+        entries: Vec::new(),
+        total: 0,
+    });
     let vanity = get_vanity_for_guild(&state, guild_id).await;
 
     let can_manage = if let Some(ref acc) = account {

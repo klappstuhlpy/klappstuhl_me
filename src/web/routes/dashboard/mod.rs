@@ -354,7 +354,16 @@ pub fn routes() -> Router<AppState> {
         .route("/dashboard", get(guild_list))
         // Personal dashboard for non-admin members (own stats/leveling/economy).
         .route("/dashboard/guild/:guild_id/me", get(guild_user_self))
-        .route("/dashboard/guild/:guild_id/me/settings", post(guild_user_settings_update))
+        .route(
+            "/dashboard/guild/:guild_id/me/settings",
+            post(guild_user_settings_update),
+        )
+        .route("/dashboard/guild/:guild_id/me/history", get(guild_user_history))
+        .route("/dashboard/guild/:guild_id/me/data-export", get(guild_user_data_export))
+        .route(
+            "/dashboard/guild/:guild_id/me/delete-data",
+            post(guild_user_data_delete),
+        )
         // Public read-only server overview for members without manage access.
         .route("/dashboard/guild/:guild_id/overview", get(guild_overview))
         .route(

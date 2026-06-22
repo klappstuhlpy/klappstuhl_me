@@ -123,11 +123,8 @@ impl PercyClient {
 
     /// Fetch guild roles.
     pub async fn get_guild_roles(&self, guild_id: u64) -> Result<Vec<Role>, PercyError> {
-        self.send_into(
-            self.client
-                .get(self.url(&format!("/api/v1/guilds/{guild_id}/roles"))),
-        )
-        .await
+        self.send_into(self.client.get(self.url(&format!("/api/v1/guilds/{guild_id}/roles"))))
+            .await
     }
 
     /// Fetch guild channels.
@@ -249,11 +246,7 @@ impl PercyClient {
         .await
     }
 
-    pub async fn patch_user_settings(
-        &self,
-        discord_id: &str,
-        patch: &UserSettingsPatch,
-    ) -> Result<(), PercyError> {
+    pub async fn patch_user_settings(&self, discord_id: &str, patch: &UserSettingsPatch) -> Result<(), PercyError> {
         self.send_unit(
             self.client
                 .patch(self.url(&format!("/api/v1/users/{discord_id}/settings")))
@@ -273,6 +266,33 @@ impl PercyClient {
             self.client
                 .get(self.url(&format!("/api/v1/guilds/{guild_id}/members/{user_id}/avatars")))
                 .query(&[("limit", limit.to_string())]),
+        )
+        .await
+    }
+
+    /// Fetch a user's consent-tracked history (names, avatars, presence).
+    pub async fn get_user_history(&self, discord_id: &str) -> Result<UserHistory, PercyError> {
+        self.send_into(
+            self.client
+                .get(self.url(&format!("/api/v1/users/{discord_id}/history"))),
+        )
+        .await
+    }
+
+    /// Fetch the full GDPR-style data export for a user (raw JSON passthrough).
+    pub async fn export_user_data(&self, discord_id: &str) -> Result<serde_json::Value, PercyError> {
+        self.send_into(
+            self.client
+                .get(self.url(&format!("/api/v1/users/{discord_id}/data-export"))),
+        )
+        .await
+    }
+
+    /// Permanently delete a user's stored presence/avatar/name history.
+    pub async fn delete_user_personal_data(&self, discord_id: &str) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .delete(self.url(&format!("/api/v1/users/{discord_id}/personal-data"))),
         )
         .await
     }
@@ -431,11 +451,8 @@ impl PercyClient {
 
     /// Fetch polls for a guild.
     pub async fn get_polls(&self, guild_id: u64) -> Result<PollsResponse, PercyError> {
-        self.send_into(
-            self.client
-                .get(self.url(&format!("/api/v1/guilds/{guild_id}/polls"))),
-        )
-        .await
+        self.send_into(self.client.get(self.url(&format!("/api/v1/guilds/{guild_id}/polls"))))
+            .await
     }
 
     /// Create a new poll. Surfaces Percy's validation error text via [`PercyError::Api`].
@@ -480,11 +497,8 @@ impl PercyClient {
 
     /// Fetch tags for a guild.
     pub async fn get_tags(&self, guild_id: u64) -> Result<TagsResponse, PercyError> {
-        self.send_into(
-            self.client
-                .get(self.url(&format!("/api/v1/guilds/{guild_id}/tags"))),
-        )
-        .await
+        self.send_into(self.client.get(self.url(&format!("/api/v1/guilds/{guild_id}/tags"))))
+            .await
     }
 
     // -- Commands ------------------------------------------------------------
@@ -522,23 +536,18 @@ impl PercyClient {
 
     /// Fetch guild stats.
     pub async fn get_guild_stats(&self, guild_id: u64) -> Result<GuildStats, PercyError> {
-        self.send_into(
-            self.client
-                .get(self.url(&format!("/api/v1/guilds/{guild_id}/stats"))),
-        )
-        .await
+        self.send_into(self.client.get(self.url(&format!("/api/v1/guilds/{guild_id}/stats"))))
+            .await
     }
 
     /// Fetch bot-wide stats.
     pub async fn get_bot_stats(&self) -> Result<BotStats, PercyError> {
-        self.send_into(self.client.get(self.url("/api/v1/bot/stats")))
-            .await
+        self.send_into(self.client.get(self.url("/api/v1/bot/stats"))).await
     }
 
     /// Fetch bot changelog (git log grouped by version tags).
     pub async fn get_changelog(&self) -> Result<ChangelogResponse, PercyError> {
-        self.send_into(self.client.get(self.url("/api/v1/bot/changelog")))
-            .await
+        self.send_into(self.client.get(self.url("/api/v1/bot/changelog"))).await
     }
 
     /// Composite: fetch guild overview (config summary + stats + bot stats + feature flags)
@@ -553,8 +562,9 @@ impl PercyClient {
 
     /// Fetch all bot commands (public, no guild context).
     pub async fn get_bot_commands(&self) -> Result<Vec<CommandInfo>, PercyError> {
-        let resp: PublicCommandsResponse =
-            self.send_into(self.client.get(self.url("/api/v1/commands/public"))).await?;
+        let resp: PublicCommandsResponse = self
+            .send_into(self.client.get(self.url("/api/v1/commands/public")))
+            .await?;
         Ok(resp.commands)
     }
 
@@ -607,11 +617,8 @@ impl PercyClient {
 
     /// Fetch economy info (shop items + lottery) for a guild.
     pub async fn get_economy(&self, guild_id: u64) -> Result<EconomyInfo, PercyError> {
-        self.send_into(
-            self.client
-                .get(self.url(&format!("/api/v1/guilds/{guild_id}/economy"))),
-        )
-        .await
+        self.send_into(self.client.get(self.url(&format!("/api/v1/guilds/{guild_id}/economy"))))
+            .await
     }
 
     /// Create a shop item.
@@ -681,11 +688,8 @@ impl PercyClient {
 
     /// Fetch music/equalizer state for a guild.
     pub async fn get_music(&self, guild_id: u64) -> Result<MusicInfo, PercyError> {
-        self.send_into(
-            self.client
-                .get(self.url(&format!("/api/v1/guilds/{guild_id}/music"))),
-        )
-        .await
+        self.send_into(self.client.get(self.url(&format!("/api/v1/guilds/{guild_id}/music"))))
+            .await
     }
 
     /// Fetch time-synced lyrics for the guild's currently-playing track.
@@ -777,11 +781,8 @@ impl PercyClient {
 
     /// Fetch comic feeds for a guild.
     pub async fn get_comics(&self, guild_id: u64) -> Result<ComicsResponse, PercyError> {
-        self.send_into(
-            self.client
-                .get(self.url(&format!("/api/v1/guilds/{guild_id}/comics"))),
-        )
-        .await
+        self.send_into(self.client.get(self.url(&format!("/api/v1/guilds/{guild_id}/comics"))))
+            .await
     }
 
     /// Create a comic feed.

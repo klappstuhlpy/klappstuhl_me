@@ -454,6 +454,27 @@ pub struct AvatarHistoryResponse {
     pub total: u32,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PresenceEntry {
+    pub status: Option<String>,
+    pub status_before: Option<String>,
+    pub changed_at: Option<String>,
+}
+
+/// Consent-tracked history for a user (names, avatars, presence) — the payload
+/// behind the personal dashboard's "Your History" view.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UserHistory {
+    #[serde(default)]
+    pub usernames: Vec<NameHistoryEntry>,
+    #[serde(default)]
+    pub nicknames: Vec<NameHistoryEntry>,
+    #[serde(default)]
+    pub avatars: Vec<AvatarEntry>,
+    #[serde(default)]
+    pub presence: Vec<PresenceEntry>,
+}
+
 // -- Polls types -------------------------------------------------------------
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -5,6 +5,7 @@
 {% block title %}My Profile — {{ guild_name }} | Percy{% endblock %}
 
 {% block css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.min.css">
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
 <link rel="stylesheet" href="/static/css/percy/user_dashboard.css" type="text/css"/>
 {% endblock %}
@@ -201,6 +202,47 @@
     {% endif %}
     {% when None %}
     {% endmatch %}
+
+    {# ─── Presence History ───────────────────────────────────────── #}
+    <section class="config-section dash-rise" style="--i:6" id="presence-section" hidden>
+        <h2>Presence History</h2>
+        <p class="config-section-description">Your online status over the last 30 days. Recorded only while presence tracking is enabled.</p>
+        <div id="presence-chart" class="presence-chart"></div>
+    </section>
+
+    {# ─── Name &amp; Nickname History ──────────────────────────────── #}
+    <section class="config-section dash-rise" style="--i:7" id="names-section" hidden>
+        <h2>Name &amp; Nickname History</h2>
+        <p class="config-section-description">Username and nickname changes Percy has logged. Recorded only while name/avatar history is enabled.</p>
+        <div class="history-columns">
+            <div class="history-column">
+                <h3>Usernames</h3>
+                <ul class="history-list" id="username-history"></ul>
+            </div>
+            <div class="history-column">
+                <h3>Nicknames</h3>
+                <ul class="history-list" id="nickname-history"></ul>
+            </div>
+        </div>
+    </section>
+
+    {# ─── Avatar History ─────────────────────────────────────────── #}
+    <section class="config-section dash-rise" style="--i:8" id="avatars-section" hidden>
+        <h2>Avatar History</h2>
+        <p class="config-section-description">Past avatars Percy has snapshotted, newest first.</p>
+        <div class="avatar-gallery" id="avatar-history"></div>
+    </section>
+
+    {# ─── Your Data ──────────────────────────────────────────────── #}
+    <section class="config-section dash-rise" style="--i:9">
+        <h2>Your Data</h2>
+        <p class="config-section-description">Download a copy of everything Percy has stored about you, or permanently erase your tracked history.</p>
+        <div class="data-actions">
+            <a class="button small primary outline" href="/dashboard/guild/{{ guild_id }}/me/data-export">Download my data</a>
+            <button type="button" class="button small danger" id="delete-data-btn">Delete my history…</button>
+        </div>
+        <p class="setting-hint">Deleting removes your stored presence, avatar and name/nickname history. This cannot be undone.</p>
+    </section>
 </div>
 {% endblock %}
 
@@ -208,6 +250,8 @@
 <script>
 const GUILD_ID = '{{ guild_id }}';
 </script>
+<script src="/static/js/timestamps.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.iife.min.js"></script>
 <script src="/static/js/percy/percy_common.js"></script>
 <script src="/static/js/percy/percy_user_dashboard.js"></script>
 {% endblock %}
