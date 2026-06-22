@@ -67,7 +67,10 @@ pub fn safe_next_for_domain(next: Option<&str>, trusted_domain: Option<&str>) ->
     // Full URL — only allow if the host is a trusted (sub)domain.
     if let Some(domain) = trusted_domain {
         if let Some(url) = n.strip_prefix("http://").or_else(|| n.strip_prefix("https://")) {
-            let host_and_path = url.split_once('/').map(|(h, p)| (h, format!("/{p}"))).unwrap_or((url, "/".to_string()));
+            let host_and_path = url
+                .split_once('/')
+                .map(|(h, p)| (h, format!("/{p}")))
+                .unwrap_or((url, "/".to_string()));
             let host = host_and_path.0.split(':').next().unwrap_or(host_and_path.0);
             if host == domain || host.ends_with(&format!(".{domain}")) {
                 return Some(n.to_string());
@@ -133,7 +136,10 @@ mod tests {
             Some("https://percy.klappstuhl.me/dashboard")
         );
         // Bare paths still work
-        assert_eq!(safe_next_for_domain(Some("/dashboard"), d).as_deref(), Some("/dashboard"));
+        assert_eq!(
+            safe_next_for_domain(Some("/dashboard"), d).as_deref(),
+            Some("/dashboard")
+        );
     }
 
     #[test]

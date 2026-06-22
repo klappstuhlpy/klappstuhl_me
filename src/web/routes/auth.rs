@@ -224,7 +224,8 @@ async fn logout(
         .ip_opt(client_ip)
         .fire();
     let trusted = state.config().trusted_domain();
-    let target = crate::utils::safe_next_for_domain(query.next.as_deref(), Some(&trusted)).unwrap_or_else(|| "/".to_string());
+    let target =
+        crate::utils::safe_next_for_domain(query.next.as_deref(), Some(&trusted)).unwrap_or_else(|| "/".to_string());
     let mut builder = Cookie::build(("token", ""))
         .path("/")
         .expires(cookie::time::OffsetDateTime::UNIX_EPOCH);

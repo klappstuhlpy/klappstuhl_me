@@ -41,13 +41,10 @@ pub use image::spawn_expiry_reaper;
 
 /// Returns `true` if the request's Host header indicates the percy subdomain.
 fn is_percy_host(headers: &HeaderMap) -> bool {
-    headers
-        .get("host")
-        .and_then(|h| h.to_str().ok())
-        .is_some_and(|h| {
-            let host = h.split(':').next().unwrap_or(h);
-            host.starts_with("percy.")
-        })
+    headers.get("host").and_then(|h| h.to_str().ok()).is_some_and(|h| {
+        let host = h.split(':').next().unwrap_or(h);
+        host.starts_with("percy.")
+    })
 }
 
 /// Paths that belong on the percy subdomain. Requests to these paths on the

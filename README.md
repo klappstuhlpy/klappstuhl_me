@@ -897,6 +897,11 @@ The dashboard lives on the `percy.<domain>` subdomain (e.g. `percy.klappstuhl.me
 | `/dashboard/guild/:id/overview/music` | GET | Live now-playing state + queue for the overview player (JSON, polled) |
 | `/dashboard/guild/:id/overview/music/control` | POST | Drive the live player (play/pause/skip/back/seek/volume/loop/shuffle/jump/stop) — only if the viewer shares the bot's voice channel |
 | `/dashboard/guild/:id/overview/music/lyrics` | GET | Time-synced lyrics for the overview player's current track (JSON) |
+| `/dashboard/guild/:id/me` | GET | Personal member dashboard: own profile, roles, leveling, economy, command stats, settings, and consent-tracked history |
+| `/dashboard/guild/:id/me/settings` | POST | Update personal bot settings (timezone, presence/history tracking) |
+| `/dashboard/guild/:id/me/history` | GET | Own name/nickname/avatar history + presence timeline (JSON; presence is rendered as a uPlot chart) |
+| `/dashboard/guild/:id/me/data-export` | GET | Download a full GDPR-style export of stored personal data (JSON file attachment) |
+| `/dashboard/guild/:id/me/delete-data` | POST | Permanently delete stored presence/avatar/name-history data |
 | `/dashboard/guild/:id` | GET | Per-guild config editor (tabbed: General, Moderation, Sentinel) |
 | `/dashboard/guild/:id/config` | POST | Save config changes (flags/moderation/polls/music/prefixes) |
 | `/dashboard/guild/:id/sentinel` | POST | Save sentinel settings |
