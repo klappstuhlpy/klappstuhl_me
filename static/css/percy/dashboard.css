@@ -254,11 +254,17 @@ main.grid-item:has(.dashboard-shell) {
 
 .dashboard-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 1rem;
     padding-bottom: 1.5rem;
     border-bottom: 1px solid var(--box-border);
     margin-bottom: 1.5rem;
+}
+/* Let the title/intro block shrink so the compact Add button stays pinned to
+   the top-right corner instead of being pushed out on narrow screens. */
+.dashboard-header > div:first-child {
+    min-width: 0;
 }
 .dashboard-header h1 {
     font-size: 1.5rem;
@@ -593,22 +599,36 @@ a.invite-percy-btn:hover {
     padding: 0.25rem 0.6rem;
 }
 
-/* A smaller header-aligned variant of the invite button. */
-/* Compact header pill — override the wide base button (drop its 22rem width,
-   auto top margin and large gap/img) so it's just the Discord logo + "Add". */
-.invite-percy-btn-sm {
-    width: auto;
-    margin: 0;
+/* Compact "Add" action in the Your Servers header — a small, self-contained
+   button (not the big blurple invite pill). Subtle box-styled chip with a coral
+   hover, sized to its content so it tucks neatly beside the heading. */
+.dash-add-btn {
+    display: inline-flex;
+    align-items: center;
     gap: 0.4rem;
-    padding: 0.4rem 0.8rem;
-    font-size: 0.82rem;
-    align-self: center;
     flex-shrink: 0;
+    align-self: flex-start;
+    padding: 0.38rem 0.72rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--foreground);
+    text-decoration: none;
     white-space: nowrap;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
-.invite-percy-btn-sm img {
+.dash-add-btn:hover {
+    color: var(--branding);
+    border-color: color-mix(in srgb, var(--branding) 55%, var(--box-border));
+    background: var(--branding-dim);
+}
+.dash-add-btn img {
     width: 1rem;
     height: 1rem;
+    flex-shrink: 0;
 }
 
 .guild-addhint {
