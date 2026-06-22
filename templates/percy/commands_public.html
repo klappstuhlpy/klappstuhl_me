@@ -18,6 +18,29 @@
 .cmd-desc { font-size: 0.82rem; color: var(--text-muted); }
 .cmd-usage { font-size: 0.75rem; color: var(--text-muted); opacity: 0.7; margin-left: auto; white-space: nowrap; }
 .cmd-empty { text-align: center; color: var(--text-muted); padding: 3rem 0; }
+
+/* Mobile: the single-row layout (fixed-width name + description + non-wrapping
+   signature) is wider than a phone, so a long signature pushes the page out of
+   bounds. Stack the row instead and drop the signature onto its own line as a
+   monospace chip that scrolls horizontally — it stays one clean line rather than
+   wrapping into several cramped ones, and never overflows the viewport. */
+@media (max-width: 768px) {
+    .cmd-item { flex-direction: column; gap: 0.3rem; align-items: stretch; }
+    .cmd-name { min-width: 0; }
+    .cmd-usage {
+        margin-left: 0;
+        opacity: 1;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        padding: 0.25rem 0.55rem;
+        background: var(--box-shade);
+        border: 1px solid var(--box-border);
+        border-radius: 5px;
+        color: var(--foreground);
+    }
+}
 </style>
 {% endblock %}
 
