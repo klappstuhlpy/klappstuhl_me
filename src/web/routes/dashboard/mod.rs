@@ -179,6 +179,27 @@ fn render_markdown(markdown: &str) -> String {
     out
 }
 
+fn md_files_cache() -> &'static Cache<String, Arc<String>> {
+    // storage for locally saved md files, files that get saved in this cache are cached once
+    // and will remain there for as long as the server runs so we don't have to fetch them from the disk every time we need them
+    // so we dont need a timed cache
+    static CACHE: OnceLock<Cache<String, Arc<String>>> = OnceLock::new();
+    CACHE.get_or_init(|| Cache::new(100))
+}
+
+fn cached_md_file(path: String) -> Result<Arc<String>, std::io::Error> {
+    if let Some(html) = md_files_cache().get(&path) {
+        return Ok(html);
+    }
+
+    // Notice the `?` operator here to propagate actual I/O errors
+    let content = std::fs::read_to_string(&path)?;
+    let html = Arc::new(render_markdown(&content));
+
+    md_files_cache().insert(path.to_string(), html.clone());
+    Ok(html)
+}
+
 /// Cached bot version string (60 s TTL, matching the stats poller interval).
 fn bot_version_cache() -> &'static Cache<(), Timed<String>> {
     static CACHE: OnceLock<Cache<(), Timed<String>>> = OnceLock::new();

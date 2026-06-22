@@ -89,6 +89,7 @@ pub(crate) struct PercyCommandsTemplate {
     pub(crate) account: Option<Account>,
     pub(crate) flashes: Flashes,
     pub(crate) categories: Vec<CommandCategory>,
+    pub(crate) flags_md: String,
 }
 
 /// A command category for the public commands page.

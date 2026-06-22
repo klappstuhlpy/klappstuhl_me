@@ -5,6 +5,8 @@
 {% block title %}Commands — Percy{% endblock %}
 
 {% block css %}
+<link rel="stylesheet" href="/static/css/percy/md.css" type="text/css"/>
+
 <style>
 /* Widen the page and let the command-name column auto-size to the longest
    command. `--cmd-name-width` is computed at load time from the longest name
@@ -22,6 +24,40 @@
 .cmd-desc { font-size: 0.82rem; color: var(--text-muted); }
 .cmd-usage { font-size: 0.75rem; color: var(--text-muted); opacity: 0.7; margin-left: auto; white-space: nowrap; }
 .cmd-empty { text-align: center; color: var(--text-muted); padding: 3rem 0; }
+
+.cmd-item.stacked {
+    flex-wrap: wrap;
+}
+
+/* keep name + description on same line */
+.cmd-item.stacked .cmd-name {
+    flex: 0 0 auto;
+}
+
+.cmd-item.stacked .cmd-desc {
+    flex: 1 1 auto;
+}
+
+/* force usage onto its own row */
+.cmd-item.stacked .cmd-usage {
+    flex: 0 0 100%;
+    margin-left: 0;
+    align-self: flex-end;
+
+    opacity: 0.7;
+    color: var(--text-muted);
+
+    margin-top: 0.3rem;
+
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+
+    padding: 0.25rem 0.55rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 5px;
+}
 
 /* Mobile: the single-row layout (fixed-width name + description + non-wrapping
    signature) is wider than a phone, so a long signature pushes the page out of
@@ -44,6 +80,13 @@
         border-radius: 5px;
         color: var(--foreground);
     }
+}
+
+/* MD TABLE */
+.md-doc {
+    max-width: 1640px;
+    margin: 2.5rem auto 4rem;
+    padding: 0 1.25rem;
 }
 </style>
 {% endblock %}
@@ -80,6 +123,14 @@
     {% endfor %}
     {% endif %}
 </div>
+
+<hr class="md-border" style="height: 3px; background-color: var(--text-muted); border: none; border-radius: 2px; margin: 3rem 3rem;">
+
+<article class="md-doc">
+    <div class="md-body">
+        {{ flags_md|safe }}
+    </div>
+</article>
 {% endblock %}
 
 {% block body_end %}
@@ -95,6 +146,25 @@
         // +1 for breathing room; clamp so one pathological name can't dominate.
         page.style.setProperty('--cmd-name-width', Math.min(max + 1, 48) + 'ch');
     }
+
+    document.querySelectorAll('.cmd-item').forEach(item => {
+        const usage = item.querySelector('.cmd-usage');
+        if (!usage) return;
+
+        if (usage.scrollWidth > 270) {
+            item.classList.add('stacked');
+        }
+    });
+
+    document.querySelectorAll('.cmd-usage').forEach(el => {
+        el.addEventListener('wheel', (e) => {
+            // only hijack if horizontal overflow exists
+            if (el.scrollWidth <= el.clientWidth) return;
+
+            e.preventDefault();
+            el.scrollLeft += e.deltaY;
+        }, { passive: false });
+    });
 
     const input = document.getElementById('cmd-search');
     if (!input) return;

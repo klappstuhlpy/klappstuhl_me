@@ -8,14 +8,14 @@ use axum::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
-
+use std::env;
 use crate::{
     flash::{Flasher, Flashes},
     models::Account,
     percy::*,
     AppState,
 };
-
+use crate::routes::dashboard::cached_md_file;
 use super::templates::*;
 use super::{
     build_general_invite_url, build_invite_url, cached_channels, cached_legal_doc, cached_roles, check_guild_access,
@@ -75,6 +75,19 @@ pub(super) async fn percy_commands(
     account: Option<Account>,
     flashes: Flashes,
 ) -> Response {
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is always set by cargo");
+    let path = std::path::Path::new(&manifest_dir).join("templates/percy/discord_command_syntax_guide-v2.md");
+    let path_str = path.to_string_lossy().to_string();
+    let flags_md: String;
+
+    match cached_md_file(path_str.clone()) {
+        Ok(content) => flags_md = (*content).clone(),
+        Err(e) => {
+            tracing::warn!(error = %e, "{} {}", path_str, "failed to fetch local md file for /commands page");
+            flags_md = "# Command Syntax & Flags Guide".to_string();
+        }
+    }
+
     let categories = if let Some(percy) = get_percy_client(&state) {
         // Fetch commands from the bot; if it fails, show an empty page rather than erroring.
         match percy.get_bot_commands().await {
@@ -89,6 +102,7 @@ pub(super) async fn percy_commands(
         account,
         flashes,
         categories,
+        flags_md,
     }
     .into_response()
 }
@@ -467,15 +481,15 @@ pub(super) async fn guild_overview(
     account: Account,
     flashes: Flashes,
     Path(guild_id): Path<u64>,
-) -> Response {
+) -> Result<OverviewTemplate, StatusCode> {
     let Some(percy) = get_percy_client(&state) else {
-        return Redirect::to("/").into_response();
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
     };
     let Some(discord_id) = get_discord_id(&state, account.id).await else {
-        return Redirect::to("/dashboard").into_response();
+        return Err(StatusCode::UNAUTHORIZED);
     };
     if !check_guild_membership(&percy, &discord_id, guild_id).await {
-        return Redirect::to("/dashboard").into_response();
+        return Err(StatusCode::FORBIDDEN);
     }
 
     let (guild, stats, bot_stats, music, leaderboard, polls, giveaways, economy) = tokio::join!(
@@ -491,11 +505,11 @@ pub(super) async fn guild_overview(
 
     let guild = match guild {
         Ok(g) => g,
-        Err(_) => return Redirect::to("/dashboard").into_response(),
+        Err(_) => return Err(StatusCode::NOT_FOUND),
     };
     let stats = match stats {
         Ok(s) => s,
-        Err(_) => return Redirect::to("/dashboard").into_response(),
+        Err(_) => return Err(StatusCode::BAD_GATEWAY),
     };
 
     let bot_stats = bot_stats.unwrap_or(BotStats {
@@ -543,7 +557,7 @@ pub(super) async fn guild_overview(
         lottery: None,
     });
 
-    OverviewTemplate {
+    Ok(OverviewTemplate {
         account: Some(account),
         flashes,
         guild_id,
@@ -558,8 +572,7 @@ pub(super) async fn guild_overview(
         active_polls,
         active_giveaways,
         economy,
-    }
-    .into_response()
+    })
 }
 
 /// `GET /dashboard/guild/:guild_id/overview/music` — live now-playing
