@@ -6,14 +6,17 @@
 
 {% block css %}
 <style>
-.cl-page { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+/* `.percy-main` already supplies horizontal padding; only add our own max-width
+   and vertical rhythm. box-sizing keeps the block inside the viewport and
+   overflow-wrap stops long unbroken tokens (URLs, hashes) pushing it sideways. */
+.cl-page { box-sizing: border-box; width: 100%; max-width: 900px; margin: 2rem auto; overflow-wrap: anywhere; }
 .cl-entry { margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--box-border); }
 .cl-entry:last-child { border-bottom: none; }
-.cl-version { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.25rem; }
+.cl-version { font-size: 1.1rem; font-weight: 600; margin: 0 0 0.25rem; overflow-wrap: anywhere; }
 .cl-version .percy-version-badge { font-size: 0.65em; }
 .cl-date { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem; }
 .cl-changes { list-style: none; padding: 0; margin: 0; }
-.cl-changes li { position: relative; padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.8; }
+.cl-changes li { position: relative; padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.8; overflow-wrap: anywhere; }
 .cl-changes li::before { content: "~"; position: absolute; left: 0; color: var(--branding); font-weight: 600; }
 .cl-empty { text-align: center; color: var(--text-muted); padding: 3rem 0; }
 </style>

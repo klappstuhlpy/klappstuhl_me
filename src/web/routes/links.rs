@@ -49,7 +49,6 @@ const RESERVED_CODES: &[&str] = &[
     "account",
     "percy",
     "status",
-    "terminal",
     "projects",
     "static",
     "m",

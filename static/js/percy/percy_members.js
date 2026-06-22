@@ -13,6 +13,13 @@
 
     let pendingAction = null;
 
+    // Escape user-controlled text before interpolating into innerHTML.
+    function esc(s) {
+        return String(s).replace(/[&<>"']/g, c => (
+            { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+        ));
+    }
+
     // Resolve role names from the ROLES global
     const roleMap = {};
     if (typeof ROLES !== 'undefined') {
@@ -54,29 +61,36 @@
                     const row = document.createElement('tr');
                     row.dataset.userId = m.id;
                     row.dataset.name = m.display_name.toLowerCase();
+                    row.dataset.bot = m.bot;
 
                     const rolesHtml = m.roles.map(rid => {
                         const role = roleMap[rid];
                         const name = role ? '@' + role.name : rid;
                         const style = role && role.color ? `border-color:#${role.color.toString(16).padStart(6,'0')}` : '';
-                        return `<span class="role-chip" style="${style}">${name}</span>`;
+                        return `<span class="role-chip" style="${style}">${esc(name)}</span>`;
                     }).join('');
 
                     const actionsHtml = m.bot ? '' :
-                        `<button class="button small" data-action="kick" data-user-id="${m.id}" data-name="${m.display_name}">Kick</button>` +
-                        `<button class="button small danger" data-action="ban" data-user-id="${m.id}" data-name="${m.display_name}">Ban</button>`;
+                        `<button class="button small" data-action="kick" data-user-id="${m.id}" data-name="${esc(m.display_name)}">Kick</button>` +
+                        `<button class="button small danger" data-action="ban" data-user-id="${m.id}" data-name="${esc(m.display_name)}">Ban</button>`;
 
+                    // Mirror the server-rendered row structure so the responsive
+                    // card layout, the selection checkbox and the profile link all
+                    // work identically on loaded-more rows.
                     row.innerHTML = `
-                        <td class="member-cell">
-                            <img class="member-avatar" src="${m.avatar_url}?size=32" alt="" width="32" height="32">
-                            <div class="member-info">
-                                <span class="member-name">${m.display_name}</span>
-                                <span class="member-username">${m.name}${m.bot ? ' <span class="badge">BOT</span>' : ''}</span>
-                            </div>
+                        <td><input type="checkbox" class="bulk-check" data-user-id="${m.id}" ${m.bot ? 'disabled' : ''}></td>
+                        <td>
+                            <a class="member-cell" href="/dashboard/guild/${GUILD_ID}/members/${m.id}">
+                                <img class="member-avatar" src="${m.avatar_url}?size=64" alt="" width="36" height="36">
+                                <div class="member-info">
+                                    <span class="member-name">${esc(m.display_name)}</span>
+                                    <span class="member-username">${esc(m.name)}${m.bot ? ' <span class="badge">BOT</span>' : ''}</span>
+                                </div>
+                            </a>
                         </td>
                         <td class="member-joined"><time class="js-ts">${m.joined_at || '—'}</time></td>
-                        <td class="member-roles">${rolesHtml}</td>
-                        <td class="member-actions">${actionsHtml}</td>
+                        <td><div class="member-roles">${rolesHtml}</div></td>
+                        <td><div class="member-actions">${actionsHtml}</div></td>
                     `;
                     tbody.appendChild(row);
                 });

@@ -13,6 +13,7 @@ use axum::{
 
 mod admin;
 mod api;
+mod ask;
 mod audit;
 mod auth;
 mod backups;
@@ -33,7 +34,6 @@ mod secrets;
 mod security;
 mod spotlight;
 mod ssh;
-mod terminal;
 mod ws;
 
 pub use api::{copy_api_token, ApiToken};
@@ -181,7 +181,7 @@ pub fn all() -> Router<AppState> {
         .merge(backups::routes())
         .merge(logs::routes())
         .merge(spotlight::routes())
-        .merge(terminal::routes())
+        .merge(ask::routes())
         .merge(ws::routes())
         .nest("/api", api::routes())
         // Resolves bare `r.<domain>/<code>` short links; 404s everything else.

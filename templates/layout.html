@@ -59,7 +59,7 @@
 <div class="grid">
     <header class="grid-item">
         <nav class="main-navigation">
-            <a class="nav-item branding" href="/"><span class="branding-glyph spark" aria-hidden="true">✻</span> Klappstuhl.me</a>
+            <a class="nav-item branding" href="/">Klappstuhl.me</a>
             {# Section indicator: child templates fill this to show which area
                of the site you're in (e.g. the Percy badge). Visual only. #}
             {% block nav_section %}{% endblock %}
@@ -104,12 +104,11 @@
                     <a class="account-dropdown-item" role="menuitem" href="/links">Short Links</a>
                     <a class="account-dropdown-item" role="menuitem" href="/percy">Percy</a>
                     <hr class="account-dropdown-sep">
-                    {# Status / Terminal group. The site links (Projects, GitHub) are
+                    {# Status group. The site links (Projects, GitHub) are
                        surfaced inside the dropdown on mobile only (`.nav-extra`).
                        GitHub is index-only: index.html fills the block below, every
                        other page leaves it empty. #}
                     <a class="account-dropdown-item" role="menuitem" href="/status">Status</a>
-                    <a class="account-dropdown-item" role="menuitem" href="/terminal">Terminal</a>
                     {% block nav_account_github %}{% endblock %}
                     <hr class="account-dropdown-sep">
                     <a class="account-dropdown-item account-dropdown-logout" role="menuitem" href="/logout">Log out</a>

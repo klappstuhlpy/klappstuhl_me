@@ -1,18 +1,18 @@
-//! The public `/terminal` page and its streaming `/api/ask` AI endpoint.
+//! The streaming `/api/ask` AI endpoint and its admin public-access toggle.
 //!
-//! `/api/ask` is a thin, server-side proxy in front of the Gemini API: the
+//! `/api/ask` is a thin, server-side proxy in front of the Groq API: the
 //! browser POSTs the conversation, we call the model with the key held here,
-//! and stream the answer back over SSE. It is public, so it is rate-limited
-//! (see `routes()`), token-capped, and bounded in history length below.
+//! and stream the answer back over SSE. It backs the admin-only "Ask the AI"
+//! item in the Spotlight palette. It is rate-limited (see `routes()`),
+//! token-capped, and bounded in history length below.
 
 use std::convert::Infallible;
 
-use askama::Template;
 use axum::{
     extract::State,
     http::StatusCode,
     response::sse::{Event, KeepAlive, Sse},
-    routing::{get, post},
+    routing::post,
     Json, Router,
 };
 use futures_util::stream;
@@ -20,7 +20,6 @@ use tokio::sync::mpsc;
 
 use crate::{
     ai::{self, AskEvent, ChatTurn},
-    flash::Flashes,
     models::Account,
     ratelimit::RateLimit,
     AppState,
@@ -29,37 +28,6 @@ use crate::{
 /// Hard caps on what a single request may carry, to bound cost/abuse.
 const MAX_TURNS: usize = 16;
 const MAX_CHARS_PER_TURN: usize = 4000;
-
-#[derive(Template)]
-#[template(path = "terminal.html")]
-struct TerminalTemplate {
-    account: Option<Account>,
-    flashes: Flashes,
-    url: String,
-    /// An API key is configured server-side (the feature exists at all).
-    configured: bool,
-    /// The viewer is allowed to actually spend tokens (public, or an admin).
-    can_use: bool,
-    /// The viewer is an admin (shows the public-access toggle).
-    is_admin: bool,
-    /// Current state of the public-access toggle (for the admin control).
-    public_enabled: bool,
-}
-
-async fn page(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> TerminalTemplate {
-    let configured = state.config().ai.enabled();
-    let is_admin = account.as_ref().map(|a| a.flags.is_admin()).unwrap_or(false);
-    let public_enabled = ai::public_enabled(&state).await;
-    TerminalTemplate {
-        account,
-        flashes,
-        url: state.config().url_to("/terminal"),
-        configured,
-        can_use: configured && (public_enabled || is_admin),
-        is_admin,
-        public_enabled,
-    }
-}
 
 #[derive(serde::Deserialize)]
 struct AskRequest {
@@ -122,7 +90,7 @@ struct TogglePublic {
     enabled: bool,
 }
 
-/// Admin-only: flip whether anonymous visitors may spend tokens on `/api/ask`.
+/// Admin-only: flip whether non-admin callers may spend tokens on `/api/ask`.
 /// Persisted to the KV store so it survives restarts and overrides the config
 /// default. Returns the new state as JSON.
 async fn toggle_public(
@@ -147,12 +115,9 @@ async fn toggle_public(
 }
 
 pub fn routes() -> Router<AppState> {
-    Router::new()
-        .route("/terminal", get(page))
-        .route("/admin/ai/public", post(toggle_public))
-        .route(
-            "/api/ask",
-            // Public + expensive: 6 asks per minute per IP.
-            post(ask).route_layer(RateLimit::default().quota(6, 60.0).build()),
-        )
+    Router::new().route("/admin/ai/public", post(toggle_public)).route(
+        "/api/ask",
+        // Public-capable + expensive: 6 asks per minute per IP.
+        post(ask).route_layer(RateLimit::default().quota(6, 60.0).build()),
+    )
 }

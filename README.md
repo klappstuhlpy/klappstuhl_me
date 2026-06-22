@@ -327,9 +327,9 @@ Full layout with all optional fields:
 | `chromium_path`                      | string \| null    | Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF render endpoints. Unset = probe common names on `PATH`; if none found those endpoints return an error.                                                                                                                                                 |
 | `ffmpeg_path`                        | string \| null    | Path to an `ffmpeg` binary for the video/HEIC transcode endpoint. Unset = use `ffmpeg` on `PATH`; if absent the endpoint returns an error.                                                                                                                                                                                  |
 | `max_upload_bytes`                   | u64 \| null       | Maximum accepted size of a single uploaded image, in bytes. `0`/unset, defaults to 10 MiB.                                                                                                                                                                                                                                  |
-| `ai.api_key`                         | string \| null    | Groq API key (`gsk_…`, free from [console.groq.com/keys](https://console.groq.com/keys)) enabling the public `/terminal` "ask AI" feature. Held server-side only; the browser talks to the rate-limited `/api/ask` proxy. Unset = feature disabled (`/api/ask` returns 503). See [Ask AI terminal](#ask-ai-terminal).       |
+| `ai.api_key`                         | string \| null    | Groq API key (`gsk_…`, free from [console.groq.com/keys](https://console.groq.com/keys)) enabling the "Ask the AI" feature. Held server-side only; the browser talks to the rate-limited `/api/ask` proxy. Unset = feature disabled (`/api/ask` returns 503). See [Ask AI](#ask-ai).       |
 | `ai.model`                           | string \| null    | Groq model id for `/api/ask`. Unset defaults to `llama-3.3-70b-versatile` (free tier, supports tool-calling).                                                                                                                                                                                                               |
-| `ai.public`                          | bool              | **Default** for "may anyone spend tokens?". `false` (default) restricts `/api/ask` to **admin accounts**; `true` lets any visitor use it (still rate-limited). Only the initial value — admins flip it live from the toggle on `/terminal` (persisted in the `storage` KV table, which then wins).                          |
+| `ai.public`                          | bool              | **Default** for "may non-admins spend tokens?". `false` (default) restricts `/api/ask` to **admin accounts**; `true` lets anyone use it (still rate-limited). Only the initial value — admins flip it live via `POST /admin/ai/public` (persisted in the `storage` KV table, which then wins).                          |
 
 ### Docker services configuration
 
@@ -788,20 +788,18 @@ error rather than failing obscurely; the rest of the API is unaffected. The
 code-render endpoint (`/api/render/code`) needs no external tool — it uses the
 in-process `syntect` highlighter.
 
-### Ask AI terminal
+### Ask AI
 
-`/terminal` is a public, Claude Code-styled faux shell where visitors can ask
-questions about the site and its author. The browser POSTs the conversation to
-`POST /api/ask`, which proxies to the **Groq API server-side** (the key in
-`ai.api_key` never reaches the browser) and streams the answer back over SSE.
-Groq's free tier (available in the EU) means the feature costs nothing to run. A
-small function-calling loop lets the model answer live questions and guide the
-visitor — `get_site_status` reads the health monitors (the same data behind
-`/status`), `list_projects` describes the site's features, and `navigate` can
-redirect the visitor to a page (whitelisted to a fixed set of internal routes,
-so the model can never send anyone to an arbitrary or external URL). The same
-streaming assistant is also available to admins from the Ctrl+K command palette
-(type a question and pick **Ask the AI**).
+Admins can ask the assistant questions about the site from the Ctrl+K command
+palette (type a question and pick **Ask the AI**). The browser POSTs the
+conversation to `POST /api/ask`, which proxies to the **Groq API server-side**
+(the key in `ai.api_key` never reaches the browser) and streams the answer back
+over SSE. Groq's free tier (available in the EU) means the feature costs nothing
+to run. A small function-calling loop lets the model answer live questions and
+guide the visitor — `get_site_status` reads the health monitors (the same data
+behind `/status`), `list_projects` describes the site's features, and `navigate`
+can redirect the visitor to a page (whitelisted to a fixed set of internal
+routes, so the model can never send anyone to an arbitrary or external URL).
 
 To enable it, create a free API key at
 [console.groq.com/keys](https://console.groq.com/keys) and set it as
@@ -810,21 +808,17 @@ in the codebase (`src/integrations/ai.rs`) — only that file's upstream HTTP ca
 is provider-specific, so swapping to a self-hosted Ollama or another provider
 later is a contained change.
 
-The endpoint is public, so it's defensive by default: rate-limited to 6 asks
-per minute per IP, output-token-capped, history-length-bounded, and the model is
-a free default (`llama-3.3-70b-versatile`) unless `ai.model` overrides it. Local
-shell commands (`help`, `whoami`, `projects`, `status`, `clear`, `github`) are
-handled entirely client-side and never hit the API. When `ai.api_key` is unset
-the page still loads with the local commands and `/api/ask` returns 503.
+The endpoint is defensive by default: rate-limited to 6 asks per minute per IP,
+output-token-capped, history-length-bounded, and the model is a free default
+(`llama-3.3-70b-versatile`) unless `ai.model` overrides it. When `ai.api_key` is
+unset the `/api/ask` endpoint returns 503.
 
-**Token-spend control.** Spending tokens for anonymous visitors is **off by
+**Token-spend control.** Spending tokens for non-admin callers is **off by
 default** — out of the box `/api/ask` is admin-only (it returns 403 for everyone
-else, and the terminal silently falls back to local commands). Whether the
-public may use it is governed by a runtime toggle: admins see a **Public AI**
-switch in the `/terminal` title bar and can flip it on/off live (no restart, no
-config edit). The choice is persisted in the `storage` KV table
-(`POST /admin/ai/public`, audited as `ai.public.toggle`) and overrides the
-`ai.public` config default. Admins can always use the assistant regardless of
+else). Whether non-admins may use it is governed by a runtime toggle, flipped
+live via `POST /admin/ai/public` (no restart, no config edit). The choice is
+persisted in the `storage` KV table (audited as `ai.public.toggle`) and overrides
+the `ai.public` config default. Admins can always use the assistant regardless of
 the toggle.
 
 ## Percy Bot Dashboard
@@ -1071,7 +1065,7 @@ src/
         ├── audit.rs · backups.rs · certs.rs · logs.rs · docker.rs · firewall.rs · health.rs
         ├── image.rs · metrics.rs · dbadmin.rs · proxy.rs · sanitizer.rs
         ├── secrets.rs · security.rs · spotlight.rs · ssh.rs · ws.rs
-        ├── terminal.rs   — public /terminal page + streaming /api/ask AI (Groq) proxy
+        ├── ask.rs        — streaming /api/ask AI (Groq) proxy + public-access toggle
         └── api/           — REST API: images, media, scan, code, external (Chromium/ffmpeg), admin, auth/scopes
 
 templates/                — Askama HTML templates (grouped into subfolders)

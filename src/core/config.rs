@@ -273,7 +273,7 @@ impl PercyConfig {
     }
 }
 
-/// AI assistant settings powering the public `/terminal` "ask AI" feature.
+/// AI assistant settings powering the "Ask the AI" feature (admin Spotlight).
 /// Backed by the Groq API (free tier, available in the EU; OpenAI-compatible).
 /// Disabled (the endpoint returns 503) unless `api_key` is set.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -289,9 +289,9 @@ pub struct AiConfig {
     pub model: Option<String>,
     /// Default for "may anyone spend tokens?": `false` restricts `/api/ask` to
     /// admin accounts, `true` lets any visitor use it (still rate-limited).
-    /// This is only the *initial* value — admins can flip it at runtime from
-    /// `/terminal` (persisted in the `storage` KV table), and the stored value
-    /// then takes precedence over this default.
+    /// This is only the *initial* value — admins can flip it at runtime via
+    /// `POST /admin/ai/public` (persisted in the `storage` KV table), and the
+    /// stored value then takes precedence over this default.
     #[serde(default)]
     pub public: bool,
 }
@@ -441,7 +441,7 @@ pub struct Config {
     /// can never be buffered whole in memory.
     #[serde(default)]
     pub max_upload_bytes: Option<u64>,
-    /// AI assistant settings (Groq) for the public `/terminal` ask feature.
+    /// AI assistant settings (Groq) for the "Ask the AI" feature.
     /// Off unless `ai.api_key` is set.
     #[serde(default)]
     pub ai: AiConfig,
