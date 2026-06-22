@@ -74,12 +74,14 @@
 }
 
 .ph-btn-primary {
-    background: var(--branding);
+    /* Darken the coral so white text clears WCAG AA. Mixing with black is
+       theme-independent, unlike --branding-bright (which lightens in dark mode). */
+    background: color-mix(in srgb, var(--branding) 86%, #000);
     color: #fff;
 }
 
 .ph-btn-primary:hover {
-    background: var(--branding-bright);
+    background: color-mix(in srgb, var(--branding) 74%, #000);
 }
 
 .ph-btn-secondary {

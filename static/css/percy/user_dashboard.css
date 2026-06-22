@@ -4,6 +4,18 @@
     max-width: 860px;
 }
 
+/* "← All servers" back link (overview.css isn't loaded on this page). */
+.user-dash-container .overview-back {
+    display: inline-block;
+    margin-bottom: 2rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+}
+.user-dash-container .overview-back:hover {
+    color: var(--branding);
+}
+
 /* ── Profile header ──────────────────────────────────────────────────── */
 .user-dash-header {
     display: flex;
