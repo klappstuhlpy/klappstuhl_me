@@ -6,7 +6,11 @@
 
 {% block css %}
 <style>
-.cmd-page { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+/* Widen the page and let the command-name column auto-size to the longest
+   command. `--cmd-name-width` is computed at load time from the longest name
+   (in monospace `ch` units, so it's exact for JetBrains Mono) — see the script
+   at the bottom of the page. The fallback keeps a sane width before JS runs. */
+.cmd-page { max-width: 1180px; margin: 2rem auto; padding: 0 1.5rem; --cmd-name-width: 14ch; }
 .cmd-search { width: 100%; padding: 0.6rem 1rem; margin-bottom: 2rem; background: var(--form-input-background); border: 1px solid var(--form-input-border); border-radius: 6px; color: var(--foreground); font-size: 0.85rem; }
 .cmd-search:focus { outline: none; border-color: var(--form-input-focus-border); }
 .cmd-category { margin-bottom: 2rem; }
@@ -14,7 +18,7 @@
 .cmd-list { list-style: none; padding: 0; margin: 0; }
 .cmd-item { padding: 0.5rem 0; display: flex; gap: 1rem; align-items: baseline; }
 .cmd-item + .cmd-item { border-top: 1px solid var(--box-border); }
-.cmd-name { font-weight: 600; font-size: 0.85rem; min-width: 180px; flex-shrink: 0; color: var(--branding); }
+.cmd-name { font-weight: 600; font-size: 0.85rem; min-width: var(--cmd-name-width); flex-shrink: 0; color: var(--branding); }
 .cmd-desc { font-size: 0.82rem; color: var(--text-muted); }
 .cmd-usage { font-size: 0.75rem; color: var(--text-muted); opacity: 0.7; margin-left: auto; white-space: nowrap; }
 .cmd-empty { text-align: center; color: var(--text-muted); padding: 3rem 0; }
@@ -81,6 +85,17 @@
 {% block body_end %}
 <script>
 (function() {
+    // Size the name column to the longest command. The font is monospace, so a
+    // character count maps cleanly to `ch` units — no layout measurement needed.
+    const page = document.querySelector('.cmd-page');
+    const names = document.querySelectorAll('.cmd-name');
+    if (page && names.length) {
+        let max = 0;
+        names.forEach(function(n) { max = Math.max(max, n.textContent.trim().length); });
+        // +1 for breathing room; clamp so one pathological name can't dominate.
+        page.style.setProperty('--cmd-name-width', Math.min(max + 1, 48) + 'ch');
+    }
+
     const input = document.getElementById('cmd-search');
     if (!input) return;
     input.addEventListener('input', function() {

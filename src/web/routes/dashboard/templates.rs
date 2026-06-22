@@ -295,6 +295,7 @@ pub(crate) struct GiveawaysTemplate {
     pub(crate) nav_active: &'static str,
     pub(crate) page_title: &'static str,
     pub(crate) giveaways: GiveawaysResponse,
+    pub(crate) channels: Vec<Channel>,
     pub(crate) active_count: usize,
     pub(crate) ended_count: usize,
 }

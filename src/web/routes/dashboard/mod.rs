@@ -491,8 +491,25 @@ pub fn routes() -> Router<AppState> {
         .route("/dashboard/guild/:guild_id/polls/image", post(guild_poll_image_upload))
         .route("/dashboard/guild/:guild_id/polls/:poll_id", post(guild_poll_edit))
         .route("/dashboard/guild/:guild_id/polls/:poll_id/end", post(guild_poll_end))
-        .route("/dashboard/guild/:guild_id/giveaways", get(guild_giveaways))
+        .route(
+            "/dashboard/guild/:guild_id/giveaways",
+            get(guild_giveaways).post(guild_giveaway_create),
+        )
+        .route(
+            "/dashboard/guild/:guild_id/giveaways/:giveaway_id/end",
+            post(guild_giveaway_end),
+        )
+        .route(
+            "/dashboard/guild/:guild_id/giveaways/:giveaway_id",
+            delete(guild_giveaway_delete),
+        )
         .route("/dashboard/guild/:guild_id/tags", get(guild_tags))
+        .route("/dashboard/guild/:guild_id/tags/export.csv", get(guild_tags_export))
+        .route("/dashboard/guild/:guild_id/tags/import", post(guild_tags_import))
+        .route(
+            "/dashboard/guild/:guild_id/tags/:tag_id",
+            get(guild_tag_detail).delete(guild_tag_delete),
+        )
         .route("/dashboard/guild/:guild_id/highlights", get(guild_highlights))
         .route(
             "/dashboard/guild/:guild_id/highlights/:user_id",

@@ -34,6 +34,7 @@
                 <tr>
                     <th>Channel</th>
                     <th>Format</th>
+                    <th>In Use</th>
                     <th></th>
                 </tr>
             </thead>
@@ -43,10 +44,33 @@
                     <td><strong>{{ entry.channel_name }}</strong> <code class="text-muted">{{ entry.channel_id }}</code></td>
                     <td><code>{{ entry.format }}</code></td>
                     <td class="nowrap">
+                        {% if entry.active_channels.is_empty() %}
+                        <span class="text-muted">—</span>
+                        {% else %}
+                        <span class="pill active dot">{{ entry.active_channels.len() }} live</span>
+                        <span class="text-muted fs-xs">{{ entry.total_users }} user{% if entry.total_users != 1 %}s{% endif %}</span>
+                        {% endif %}
+                    </td>
+                    <td class="nowrap">
                         <button class="button small edit-hub-btn inline-block" data-channel-id="{{ entry.channel_id }}" data-format="{{ entry.format }}">Edit</button>
                         <button class="button small danger delete-hub-btn inline-block" data-channel-id="{{ entry.channel_id }}">Delete</button>
                     </td>
                 </tr>
+                {% if !entry.active_channels.is_empty() %}
+                <tr class="temp-active-row">
+                    <td colspan="4">
+                        <div class="temp-active-list">
+                            {% for ch in entry.active_channels %}
+                            <span class="temp-active-chip">
+                                <span class="temp-active-icon" aria-hidden="true">🔊</span>
+                                <span class="temp-active-name">{{ ch.channel_name }}</span>
+                                <span class="temp-active-count">{{ ch.user_count }}</span>
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
                 {% endfor %}
             </tbody>
         </table>

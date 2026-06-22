@@ -1388,7 +1388,11 @@ pub(super) async fn guild_giveaways(
         return Redirect::to("/dashboard").into_response();
     }
 
-    let (guild, giveaways) = tokio::join!(percy.get_guild(guild_id), percy.get_giveaways(guild_id));
+    let (guild, giveaways, channels) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_giveaways(guild_id),
+        cached_channels(&percy, guild_id),
+    );
 
     let guild = match guild {
         Ok(g) => g,
@@ -1399,6 +1403,7 @@ pub(super) async fn guild_giveaways(
         giveaways: Vec::new(),
         total: 0,
     });
+    let channels = channels.unwrap_or_default();
     let active_count = giveaways.giveaways.iter().filter(|g| !g.ended).count();
     let ended_count = giveaways.giveaways.iter().filter(|g| g.ended).count();
 
@@ -1410,10 +1415,75 @@ pub(super) async fn guild_giveaways(
         nav_active: "giveaways",
         page_title: "Giveaways",
         giveaways,
+        channels,
         active_count,
         ended_count,
     }
     .into_response()
+}
+
+pub(super) async fn guild_giveaway_create(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.create_giveaway(guild_id, &body).await {
+        Ok(data) => Json(serde_json::json!({"ok": true, "id": data.get("id")})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_giveaway_end(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, giveaway_id)): Path<(u64, i64)>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.end_giveaway(guild_id, giveaway_id).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_giveaway_delete(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, giveaway_id)): Path<(u64, i64)>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.delete_giveaway(guild_id, giveaway_id).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
 }
 
 pub(super) async fn guild_tags(
@@ -1456,6 +1526,267 @@ pub(super) async fn guild_tags(
         tags,
     }
     .into_response()
+}
+
+pub(super) async fn guild_tag_detail(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, tag_id)): Path<(u64, i64)>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.get_tag_detail(guild_id, tag_id).await {
+        Ok(tag) => Json(serde_json::json!(tag)).into_response(),
+        Err(PercyError::NotFound) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "tag not found"})),
+        )
+            .into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+pub(super) async fn guild_tag_delete(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, tag_id)): Path<(u64, i64)>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.delete_tag(guild_id, tag_id).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+/// `GET /tags/export.csv` — download tags as CSV. With `?names=a,b,c` only those
+/// (case-insensitive) tags are included, backing the "export selected" action.
+pub(super) async fn guild_tags_export(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/dashboard").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Redirect::to("/dashboard").into_response();
+    }
+
+    let export = match percy.export_tags(guild_id).await {
+        Ok(e) => e,
+        Err(_) => return (StatusCode::BAD_GATEWAY, "Could not fetch tags").into_response(),
+    };
+
+    // Optional selection filter (lowercased tag names).
+    let selected: Option<std::collections::HashSet<String>> = params.get("names").map(|s| {
+        s.split(',')
+            .map(|n| n.trim().to_lowercase())
+            .filter(|n| !n.is_empty())
+            .collect()
+    });
+
+    let mut csv = String::from("name,content\n");
+    for row in &export.tags {
+        if let Some(ref set) = selected {
+            if !set.contains(&row.name.to_lowercase()) {
+                continue;
+            }
+        }
+        csv.push_str(&csv_escape_field(&row.name));
+        csv.push(',');
+        csv.push_str(&csv_escape_field(&row.content));
+        csv.push('\n');
+    }
+
+    (
+        StatusCode::OK,
+        [
+            (axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8".to_string()),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{guild_id}_tags.csv\""),
+            ),
+        ],
+        csv,
+    )
+        .into_response()
+}
+
+/// `POST /tags/import` — admin-only bulk import from an uploaded CSV. The file is
+/// malware-scanned (ClamAV) and sanitised here before the parsed rows are handed
+/// to Percy, which validates each one and inserts through parameterised queries.
+pub(super) async fn guild_tags_import(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    mut multipart: axum::extract::Multipart,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    // Admin / Manage-Server only — bulk creation is a raid vector otherwise.
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    // Pull the uploaded file bytes from the first field carrying data.
+    let mut bytes: Option<Vec<u8>> = None;
+    while let Ok(Some(field)) = multipart.next_field().await {
+        match field.bytes().await {
+            Ok(data) if !data.is_empty() => {
+                bytes = Some(data.to_vec());
+                break;
+            }
+            _ => continue,
+        }
+    }
+    let Some(bytes) = bytes else {
+        return Json(serde_json::json!({"error": "no file uploaded"})).into_response();
+    };
+
+    // Cap the upload size (1 MiB is plenty for a tag CSV).
+    if bytes.len() > 1024 * 1024 {
+        return Json(serde_json::json!({"error": "file too large (max 1 MB)"})).into_response();
+    }
+
+    // Malware scan — block only a positive detection (an unconfigured/erroring
+    // scanner yields "unknown", which must not break import everywhere).
+    let report = crate::scan::scan_bytes(&state, &bytes).await;
+    if report.verdict == "infected" {
+        let virus = report.clamav_virus.unwrap_or_else(|| "malware".into());
+        return Json(serde_json::json!({"error": format!("file rejected: failed malware scan ({virus})")}))
+            .into_response();
+    }
+
+    // Reject binary/non-UTF-8 uploads outright.
+    let Ok(text) = String::from_utf8(bytes) else {
+        return Json(serde_json::json!({"error": "file is not valid UTF-8 text"})).into_response();
+    };
+
+    let rows = match parse_tag_csv(&text) {
+        Ok(r) => r,
+        Err(e) => return Json(serde_json::json!({"error": e})).into_response(),
+    };
+    if rows.is_empty() {
+        return Json(serde_json::json!({"error": "no tags found in file"})).into_response();
+    }
+
+    match percy.import_tags(guild_id, &rows, &discord_id).await {
+        Ok(result) => Json(serde_json::json!({
+            "ok": true,
+            "created": result.created,
+            "skipped": result.skipped,
+            "failed": result.failed,
+        }))
+        .into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
+}
+
+/// Quotes a CSV field per RFC 4180 when it contains a comma, quote or newline.
+fn csv_escape_field(value: &str) -> String {
+    if value.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", value.replace('"', "\"\""))
+    } else {
+        value.to_string()
+    }
+}
+
+/// Minimal RFC 4180 CSV parser for the tag import. Takes the first two columns of
+/// each record as `(name, content)`, tolerates quoted fields with embedded
+/// commas/newlines/quotes, skips a leading `name,content` header, strips NUL and
+/// `\r`, and caps the row count. Returns a user-facing error on malformed quoting.
+fn parse_tag_csv(text: &str) -> Result<Vec<TagExportRow>, String> {
+    let text = text.trim_start_matches('\u{feff}'); // drop a UTF-8 BOM
+    let mut records: Vec<Vec<String>> = Vec::new();
+    let mut field = String::new();
+    let mut record: Vec<String> = Vec::new();
+    let mut in_quotes = false;
+    let mut chars = text.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if in_quotes {
+            match c {
+                '"' => {
+                    if chars.peek() == Some(&'"') {
+                        field.push('"');
+                        chars.next();
+                    } else {
+                        in_quotes = false;
+                    }
+                }
+                '\0' => {}
+                _ => field.push(c),
+            }
+        } else {
+            match c {
+                '"' => in_quotes = true,
+                ',' => {
+                    record.push(std::mem::take(&mut field));
+                }
+                '\r' => {}
+                '\n' => {
+                    record.push(std::mem::take(&mut field));
+                    records.push(std::mem::take(&mut record));
+                }
+                '\0' => {}
+                _ => field.push(c),
+            }
+        }
+        if records.len() > 5000 {
+            return Err("too many rows (max 5000)".into());
+        }
+    }
+    if in_quotes {
+        return Err("malformed CSV: unterminated quoted field".into());
+    }
+    // Flush the trailing field/record (file may not end with a newline).
+    if !field.is_empty() || !record.is_empty() {
+        record.push(field);
+        records.push(record);
+    }
+
+    let mut rows = Vec::new();
+    for (i, rec) in records.into_iter().enumerate() {
+        if rec.len() < 2 {
+            continue;
+        }
+        let name = rec[0].trim().to_string();
+        let content = rec[1].clone();
+        if name.is_empty() && content.trim().is_empty() {
+            continue;
+        }
+        // Skip an optional header row.
+        if i == 0 && name.eq_ignore_ascii_case("name") && content.trim().eq_ignore_ascii_case("content") {
+            continue;
+        }
+        rows.push(TagExportRow { name, content });
+    }
+    Ok(rows)
 }
 
 pub(super) async fn guild_commands(

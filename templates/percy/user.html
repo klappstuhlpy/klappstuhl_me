@@ -170,6 +170,22 @@
     {% when None %}
     {% endmatch %}
 
+    {# ─── Tags ───────────────────────────────────────────────────── #}
+    {% if !member.owned_tags.is_empty() %}
+    <section class="config-section">
+        <h2>Tags <span class="section-count">({{ member.owned_tags.len() }})</span></h2>
+        <p class="config-section-description">Tags this member owns in the server.</p>
+        <div class="user-tags-list">
+            {% for tag in member.owned_tags %}
+            <a href="/dashboard/guild/{{ guild_id }}/tags" class="user-tag-chip" title="{{ tag.uses }} uses">
+                <span class="user-tag-name">{{ tag.name }}</span>
+                <span class="user-tag-uses">{{ tag.uses }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
     {# ─── Command Usage ──────────────────────────────────────────── #}
     {% match member.command_stats %}
     {% when Some with (stats) %}

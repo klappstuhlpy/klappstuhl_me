@@ -165,6 +165,22 @@
     {% when None %}
     {% endmatch %}
 
+    {# ─── Your Tags ──────────────────────────────────────────────── #}
+    {% if !profile.owned_tags.is_empty() %}
+    <section class="config-section dash-rise" style="--i:4">
+        <h2>Your Tags <span class="section-count">({{ profile.owned_tags.len() }})</span></h2>
+        <p class="config-section-description">Tags you own in this server.</p>
+        <div class="user-tags-list">
+            {% for tag in profile.owned_tags %}
+            <span class="user-tag-chip" title="{{ tag.uses }} uses">
+                <span class="user-tag-name">{{ tag.name }}</span>
+                <span class="user-tag-uses">{{ tag.uses }}</span>
+            </span>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
     {# ─── Command Usage ──────────────────────────────────────────── #}
     {% match profile.command_stats %}
     {% when Some with (stats) %}

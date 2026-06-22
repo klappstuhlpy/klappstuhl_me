@@ -371,6 +371,8 @@ pub struct MemberDetail {
     pub names: Option<MemberNameHistory>,
     #[serde(default)]
     pub avatar_count: u32,
+    #[serde(default)]
+    pub owned_tags: Vec<OwnedTag>,
 }
 
 impl MemberDetail {
@@ -400,6 +402,8 @@ pub struct MemberSelf {
     pub leveling: Option<MemberLeveling>,
     pub economy: Option<MemberEconomy>,
     pub command_stats: Option<MemberCommandStats>,
+    #[serde(default)]
+    pub owned_tags: Vec<OwnedTag>,
 }
 
 impl MemberSelf {
@@ -555,6 +559,56 @@ pub struct TagsResponse {
     pub total_uses: u64,
     pub tags: Vec<TagInfo>,
     pub top_creators: Vec<TagCreator>,
+}
+
+/// Full content of a single tag, fetched on demand for the markdown preview.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TagDetail {
+    pub id: i64,
+    pub name: String,
+    pub content: String,
+    pub owner_id: Option<String>,
+    pub owner_name: Option<String>,
+    #[serde(default)]
+    pub uses: u32,
+    pub created_at: Option<String>,
+}
+
+/// One `(name, content)` row in a tag export/import payload.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TagExportRow {
+    pub name: String,
+    pub content: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TagExport {
+    pub tags: Vec<TagExportRow>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TagImportFailure {
+    pub name: String,
+    pub error: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TagImportResult {
+    #[serde(default)]
+    pub created: u32,
+    #[serde(default)]
+    pub skipped: u32,
+    #[serde(default)]
+    pub failed: Vec<TagImportFailure>,
+}
+
+/// A tag owned by a user, shown on their profile page.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct OwnedTag {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub uses: u32,
 }
 
 // -- Commands types ----------------------------------------------------------
@@ -982,10 +1036,23 @@ pub struct ComicsResponse {
 // -- Temp Channels types -----------------------------------------------------
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct ActiveTempChannel {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub user_count: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TempChannelEntry {
     pub channel_id: String,
     pub channel_name: String,
     pub format: String,
+    /// Live spawned channels for this hub (resolved by shared category). Empty
+    /// when nobody is using the hub. `#[serde(default)]` keeps it backward-safe.
+    #[serde(default)]
+    pub active_channels: Vec<ActiveTempChannel>,
+    #[serde(default)]
+    pub total_users: u32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

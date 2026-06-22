@@ -495,10 +495,85 @@ impl PercyClient {
         .await
     }
 
+    /// Create a giveaway (posts the announcement + schedules the draw). Surfaces
+    /// Percy's validation error text via [`PercyError::Api`].
+    pub async fn create_giveaway(
+        &self,
+        guild_id: u64,
+        body: &serde_json::Value,
+    ) -> Result<serde_json::Value, PercyError> {
+        self.send_into(
+            self.client
+                .post(self.url(&format!("/api/v1/guilds/{guild_id}/giveaways")))
+                .json(body),
+        )
+        .await
+    }
+
+    /// End a giveaway now (draws winners).
+    pub async fn end_giveaway(&self, guild_id: u64, giveaway_id: i64) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .post(self.url(&format!("/api/v1/guilds/{guild_id}/giveaways/{giveaway_id}/end"))),
+        )
+        .await
+    }
+
+    /// Cancel a giveaway without drawing winners.
+    pub async fn delete_giveaway(&self, guild_id: u64, giveaway_id: i64) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .delete(self.url(&format!("/api/v1/guilds/{guild_id}/giveaways/{giveaway_id}"))),
+        )
+        .await
+    }
+
     /// Fetch tags for a guild.
     pub async fn get_tags(&self, guild_id: u64) -> Result<TagsResponse, PercyError> {
         self.send_into(self.client.get(self.url(&format!("/api/v1/guilds/{guild_id}/tags"))))
             .await
+    }
+
+    /// Fetch a single tag's full content (for the markdown preview).
+    pub async fn get_tag_detail(&self, guild_id: u64, tag_id: i64) -> Result<TagDetail, PercyError> {
+        self.send_into(
+            self.client
+                .get(self.url(&format!("/api/v1/guilds/{guild_id}/tags/{tag_id}"))),
+        )
+        .await
+    }
+
+    /// Delete a tag (and its aliases).
+    pub async fn delete_tag(&self, guild_id: u64, tag_id: i64) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .delete(self.url(&format!("/api/v1/guilds/{guild_id}/tags/{tag_id}"))),
+        )
+        .await
+    }
+
+    /// Fetch every tag's `(name, content)` for export.
+    pub async fn export_tags(&self, guild_id: u64) -> Result<TagExport, PercyError> {
+        self.send_into(
+            self.client
+                .get(self.url(&format!("/api/v1/guilds/{guild_id}/tags/export"))),
+        )
+        .await
+    }
+
+    /// Bulk-create tags from a parsed `(name, content)` list, owned by `owner_id`.
+    pub async fn import_tags(
+        &self,
+        guild_id: u64,
+        tags: &[TagExportRow],
+        owner_id: &str,
+    ) -> Result<TagImportResult, PercyError> {
+        self.send_into(
+            self.client
+                .post(self.url(&format!("/api/v1/guilds/{guild_id}/tags/import")))
+                .json(&serde_json::json!({"tags": tags, "owner_id": owner_id})),
+        )
+        .await
     }
 
     // -- Commands ------------------------------------------------------------
