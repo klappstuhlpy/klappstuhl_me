@@ -95,19 +95,26 @@ fn path_uri(path_and_query: &str) -> Option<Uri> {
 pub async fn percy_host_rewrite(State(state): State<AppState>, mut req: Request, next: Next) -> Response {
     let config = state.config();
 
-    let host = req
+    // Resolve the request host. HTTP/1 carries it in the `Host` header, but
+    // HTTP/2 — which our ACME TLS listener negotiates via ALPN `h2`, so it's what
+    // browsers actually use — has *no* `Host` header: the `:authority` lands in
+    // the request URI instead. Fall back to the URI authority so the dashboard
+    // subdomain is recognised over h2 (otherwise the host comes back empty and
+    // every `percy.<domain>/…` request misses the rewrite). `x-forwarded-host`
+    // covers a reverse proxy that forwards it.
+    let host_raw = req
         .headers()
         .get(HOST)
         .and_then(|h| h.to_str().ok())
         .or_else(|| req.headers().get("x-forwarded-host").and_then(|h| h.to_str().ok()))
-        .unwrap_or("")
-        .split(':')
-        .next()
-        .unwrap_or("")
-        .to_ascii_lowercase();
+        .map(str::to_owned)
+        .or_else(|| req.uri().host().map(str::to_owned))
+        .unwrap_or_default();
+    let host = host_raw.split(':').next().unwrap_or("").to_ascii_lowercase();
 
     let percy_host = config.percy_domain().to_ascii_lowercase();
-    let on_dashboard_host = host == percy_host;
+    let apex = config.domains.first().map(|d| d.to_ascii_lowercase()).unwrap_or_default();
+    let on_dashboard_host = !host.is_empty() && host == percy_host;
     // True for real-domain deployments; false only in pure-localhost dev (where the
     // apex is `localhost` and there's no public subdomain to redirect a browser to).
     let has_real_domain = percy_host != "percy.localhost";
@@ -130,7 +137,11 @@ pub async fn percy_host_rewrite(State(state): State<AppState>, mut req: Request,
         return next.run(req).await;
     }
 
-    if has_real_domain {
+    // Apex → subdomain redirects, fired only when we're certain the request is on
+    // the apex host. Gating on the exact apex (not merely "not the dashboard host")
+    // means an unresolved/empty host can never bounce `/dashboard` to the subdomain
+    // and back in a loop — it just falls through to normal routing.
+    if has_real_domain && host == apex {
         let path = req.uri().path();
         let pq = req.uri().path_and_query().map(|p| p.as_str()).unwrap_or(path);
         // Legacy `/percy/*` (and the bare `/percy`) → subdomain without the prefix.
