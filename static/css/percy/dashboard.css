@@ -28,9 +28,12 @@
    on `main` so guild management can use the full width of the viewport. The
    :has() override keeps every other page (which doesn't render a shell)
    untouched. */
-main.grid-item:has(.dashboard-shell) {
+main.grid-item:has(.dashboard-shell),
+main.percy-main:has(.dashboard-shell) {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
+    max-width: none;
+    padding-top: 3rem;
 }
 
 .dashboard-shell {
@@ -194,6 +197,11 @@ main.grid-item:has(.dashboard-shell) {
     height: 1.1rem;
     border-radius: 0 3px 3px 0;
     background: var(--branding);
+}
+.dash-nav-link-me {
+    margin-top: auto;
+    border-top: 1px solid var(--box-border);
+    padding-top: 0.65rem;
 }
 
 /* ── Page info / help callout (shared by feature pages) ──────────────── */
@@ -547,7 +555,10 @@ a.invite-percy-btn:hover {
 .guild-owner-badge { flex-shrink: 0; }
 
 /* ── Server list sections (Managed / In / Add Percy) ─────────────── */
-.guild-section { margin-top: 1.6rem; }
+.guild-section {
+    margin-top: 1.6rem;
+    padding-bottom: 1.6rem;
+}
 .guild-section:first-of-type { margin-top: 0.5rem; }
 .guild-section-head {
     display: flex;
@@ -2978,4 +2989,17 @@ th.th-sortable[aria-sort="descending"]::after {
     width: 10px;
     height: 10px;
     opacity: 1;
+}
+
+/* -- Version badge -- */
+
+.percy-version-badge {
+    font-size: 0.65em;
+    font-weight: 500;
+    padding: 0.15em 0.5em;
+    border-radius: 4px;
+    background: var(--branding-dim);
+    color: var(--branding);
+    vertical-align: middle;
+    letter-spacing: 0.02em;
 }

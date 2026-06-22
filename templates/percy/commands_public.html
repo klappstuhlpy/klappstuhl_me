@@ -1,0 +1,77 @@
+{% extends "percy/percy_layout.html" %}
+
+{% block nav_commands_active %} active{% endblock %}
+
+{% block title %}Commands — Percy{% endblock %}
+
+{% block css %}
+<style>
+.cmd-page { max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; }
+.cmd-search { width: 100%; padding: 0.6rem 1rem; margin-bottom: 2rem; background: var(--form-input-background); border: 1px solid var(--form-input-border); border-radius: 6px; color: var(--foreground); font-size: 0.85rem; }
+.cmd-search:focus { outline: none; border-color: var(--form-input-focus-border); }
+.cmd-category { margin-bottom: 2rem; }
+.cmd-category h2 { font-size: 1rem; font-weight: 600; margin: 0 0 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--box-border); }
+.cmd-list { list-style: none; padding: 0; margin: 0; }
+.cmd-item { padding: 0.5rem 0; display: flex; gap: 1rem; align-items: baseline; }
+.cmd-item + .cmd-item { border-top: 1px solid var(--box-border); }
+.cmd-name { font-weight: 600; font-size: 0.85rem; min-width: 180px; flex-shrink: 0; color: var(--branding); }
+.cmd-desc { font-size: 0.82rem; color: var(--text-muted); }
+.cmd-usage { font-size: 0.75rem; color: var(--text-muted); opacity: 0.7; margin-left: auto; white-space: nowrap; }
+.cmd-empty { text-align: center; color: var(--text-muted); padding: 3rem 0; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="cmd-page">
+    <h1><span class="spark" aria-hidden="true">✻</span> Commands</h1>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem;">All available Percy commands, grouped by category.</p>
+
+    <input type="search" class="cmd-search" id="cmd-search" placeholder="Search commands..." autocomplete="off">
+
+    {% if categories.is_empty() %}
+    <div class="cmd-empty">
+        <p>Command list is currently unavailable. The bot may be offline.</p>
+    </div>
+    {% else %}
+    {% for cat in categories %}
+    <section class="cmd-category" data-category="{{ cat.name }}">
+        <h2>{{ cat.name }}</h2>
+        <ul class="cmd-list">
+            {% for cmd in cat.commands %}
+            <li class="cmd-item" data-name="{{ cmd.name }}" data-desc="{{ cmd.description }}">
+                <span class="cmd-name">{{ cmd.name }}</span>
+                <span class="cmd-desc">{{ cmd.description }}</span>
+                {% match cmd.usage %}
+                {% when Some with (u) %}
+                <span class="cmd-usage">{{ u }}</span>
+                {% when None %}
+                {% endmatch %}
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block body_end %}
+<script>
+(function() {
+    const input = document.getElementById('cmd-search');
+    if (!input) return;
+    input.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('.cmd-category').forEach(function(cat) {
+            let visible = 0;
+            cat.querySelectorAll('.cmd-item').forEach(function(item) {
+                const match = item.dataset.name.toLowerCase().includes(q) || item.dataset.desc.toLowerCase().includes(q);
+                item.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+            cat.style.display = visible ? '' : 'none';
+        });
+    });
+})();
+</script>
+{% endblock %}

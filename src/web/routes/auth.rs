@@ -49,7 +49,8 @@ async fn login(
     flashes: Flashes,
     Query(query): Query<NextQuery>,
 ) -> Response {
-    let next = crate::utils::safe_next(query.next.as_deref());
+    let trusted = state.config().trusted_domain();
+    let next = crate::utils::safe_next_for_domain(query.next.as_deref(), Some(&trusted));
     if account.is_some() {
         return Redirect::to(next.as_deref().unwrap_or("/")).into_response();
     }
@@ -83,12 +84,22 @@ struct Credentials {
 }
 
 /// Set the session cookie and redirect to `target` (an already-validated path).
+/// Also clears any legacy host-only cookie (no Domain attribute) so the browser
+/// stops sending it alongside the new domain-scoped one.
 fn cookie_redirect(cookie: Cookie<'static>, target: &str) -> Response {
     let mut response = Redirect::to(target).into_response();
     response
         .headers_mut()
         .insert(SET_COOKIE, HeaderValue::from_str(&cookie.to_string()).unwrap());
     response
+}
+
+/// Returns a Set-Cookie header that expires the host-only `token` cookie (no
+/// Domain attribute). This removes stale cookies from before domain-scoping was
+/// introduced, preventing split-brain where the browser sends a host-only cookie
+/// to the apex but not to subdomains.
+pub(super) fn clear_host_only_cookie() -> HeaderValue {
+    HeaderValue::from_static("token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax")
 }
 
 fn cookie_to_response(cookie: Cookie<'static>) -> Response {
@@ -120,7 +131,8 @@ async fn authenticate(
         .map(|a| &a.password)
         .unwrap_or(&state.incorrect_default_password_hash);
 
-    let next = crate::utils::safe_next(credentials.next.as_deref());
+    let trusted = state.config().trusted_domain();
+    let next = crate::utils::safe_next_for_domain(credentials.next.as_deref(), Some(&trusted));
     if validate_password(&credentials.password, hash).is_ok() {
         match account {
             Some(acc) => {
@@ -152,9 +164,9 @@ async fn authenticate(
                 let token = Token::new(acc.id)?;
                 let domain = state.config().cookie_domain();
                 let cookie = if credentials.remember_me.is_some() {
-                    token.to_cookie(key, Some(&domain))
+                    token.to_cookie(key, domain.as_deref())
                 } else {
-                    token.to_session_cookie(key, Some(&domain))
+                    token.to_session_cookie(key, domain.as_deref())
                 };
                 state.save_session(&token, credentials.session_description).await;
                 state.audit("auth.login.success").actor(&acc).ip_opt(client_ip).fire();
@@ -198,7 +210,12 @@ async fn register_failure(state: &AppState, ip: Option<std::net::IpAddr>) {
     }
 }
 
-async fn logout(State(state): State<AppState>, ClientIp(client_ip): ClientIp, token: Token) -> TokenRejection {
+async fn logout(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    Query(query): Query<NextQuery>,
+    token: Token,
+) -> Response {
     state.invalidate_account_cache(token.id);
     state.invalidate_session(&token.base64()).await;
     state
@@ -206,14 +223,27 @@ async fn logout(State(state): State<AppState>, ClientIp(client_ip): ClientIp, to
         .actor_label(format!("id:{}", token.id))
         .ip_opt(client_ip)
         .fire();
-    TokenRejection(Some(state.config().cookie_domain()))
+    let trusted = state.config().trusted_domain();
+    let target = crate::utils::safe_next_for_domain(query.next.as_deref(), Some(&trusted)).unwrap_or_else(|| "/".to_string());
+    let mut builder = Cookie::build(("token", ""))
+        .path("/")
+        .expires(cookie::time::OffsetDateTime::UNIX_EPOCH);
+    if let Some(d) = state.config().cookie_domain() {
+        builder = builder.domain(d);
+    }
+    let cookie = builder.build().to_string();
+    let mut response = Redirect::to(&target).into_response();
+    let headers = response.headers_mut();
+    headers.append(SET_COOKIE, HeaderValue::from_str(&cookie).unwrap());
+    headers.append(SET_COOKIE, clear_host_only_cookie());
+    response
 }
 
 async fn logout_all(State(state): State<AppState>, ClientIp(client_ip): ClientIp, account: Account) -> TokenRejection {
     state.invalidate_account_cache(account.id);
     state.invalidate_account_sessions(account.id).await;
     state.audit("auth.logout_all").actor(&account).ip_opt(client_ip).fire();
-    TokenRejection(Some(state.config().cookie_domain()))
+    TokenRejection(state.config().cookie_domain())
 }
 
 #[derive(Deserialize)]
@@ -285,7 +315,7 @@ async fn change_password(
         Ok(Some(account)) => account,
         Ok(None) => {
             flasher.add("Somehow, this account does not exist.");
-            return TokenRejection(Some(state.config().cookie_domain())).into_response();
+            return TokenRejection(state.config().cookie_domain()).into_response();
         }
         Err(e) => {
             return flasher.add(format!("SQL error: {e}")).bail(&url);
@@ -317,7 +347,7 @@ async fn change_password(
                 return flasher.add("Failed to obtain new token cookie").bail(&url);
             };
             let cfg = state.config();
-            let cookie = token.to_cookie(&cfg.secret_key, Some(&cfg.cookie_domain()));
+            let cookie = token.to_cookie(&cfg.secret_key, cfg.cookie_domain().as_deref());
             state.invalidate_account_sessions(account.id).await;
             state.save_session(&token, form.session_description).await;
             state
@@ -340,7 +370,8 @@ async fn login_form(
 ) -> Response {
     // Preserve the redirect target across a failed attempt so the user stays
     // in the "log in to continue" flow.
-    let bail_url = match crate::utils::safe_next(credentials.next.as_deref()) {
+    let trusted = state.config().trusted_domain();
+    let bail_url = match crate::utils::safe_next_for_domain(credentials.next.as_deref(), Some(&trusted)) {
         Some(n) => format!("/login?next={}", crate::utils::urlencode(&n)),
         None => "/login".to_string(),
     };
@@ -375,7 +406,8 @@ async fn signup_page(
     flashes: Flashes,
     Query(query): Query<NextQuery>,
 ) -> Response {
-    let next = crate::utils::safe_next(query.next.as_deref());
+    let trusted = state.config().trusted_domain();
+    let next = crate::utils::safe_next_for_domain(query.next.as_deref(), Some(&trusted));
     if account.is_some() {
         return Redirect::to(next.as_deref().unwrap_or("/")).into_response();
     }
@@ -409,7 +441,8 @@ async fn signup_submit(
     flasher: Flasher,
     Form(form): Form<SignupForm>,
 ) -> Response {
-    let next = crate::utils::safe_next(form.next.as_deref());
+    let trusted = state.config().trusted_domain();
+    let next = crate::utils::safe_next_for_domain(form.next.as_deref(), Some(&trusted));
     let bail_url = match &next {
         Some(n) => format!("/signup?next={}", crate::utils::urlencode(n)),
         None => "/signup".to_string(),
@@ -460,7 +493,7 @@ async fn signup_submit(
         return flasher.add("Account created — please log in").bail("/login");
     };
     let cfg = state.config();
-    let cookie = token.to_cookie(&cfg.secret_key, Some(&cfg.cookie_domain()));
+    let cookie = token.to_cookie(&cfg.secret_key, cfg.cookie_domain().as_deref());
     state.save_session(&token, form.session_description).await;
     state
         .audit("auth.signup")
@@ -782,9 +815,9 @@ async fn login_totp_verify(
     };
     let domain = state.config().cookie_domain();
     let session_cookie = if pending.remember {
-        token.to_cookie(&key, Some(&domain))
+        token.to_cookie(&key, domain.as_deref())
     } else {
-        token.to_session_cookie(&key, Some(&domain))
+        token.to_session_cookie(&key, domain.as_deref())
     };
     state.save_session(&token, pending.description.clone()).await;
     state
@@ -794,7 +827,8 @@ async fn login_totp_verify(
         .meta(serde_json::json!({ "second_factor": "totp" }))
         .fire();
 
-    let target = crate::utils::safe_next(pending.next.as_deref());
+    let trusted = state.config().trusted_domain();
+    let target = crate::utils::safe_next_for_domain(pending.next.as_deref(), Some(&trusted));
     let mut resp = Redirect::to(target.as_deref().unwrap_or("/")).into_response();
     let headers = resp.headers_mut();
     headers.append(SET_COOKIE, HeaderValue::from_str(&session_cookie.to_string()).unwrap());

@@ -1,8 +1,8 @@
-{% extends "../layout.html" %}
+{% extends "percy/percy_layout.html" %}
 
-{% block nav_section %}{% include "percy/_brand_badge.html" %}{% endblock %}
+{% block nav_dashboard_active %} active{% endblock %}
 
-{% block title %}{{ guild_name }} — Overview | Klappstuhl.me{% endblock %}
+{% block title %}{{ guild_name }} — Overview | Percy{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
@@ -130,7 +130,7 @@
 
     {# ─── Powered by Percy ────────────────────────────────────────── #}
     <section class="config-section overview-bot dash-rise">
-        <h2>Powered by Percy</h2>
+        <h2>Powered by Percy{% match bot_stats.version %}{% when Some with (v) %} <span class="percy-version-badge">v{{ v }}</span>{% when None %}{% endmatch %}</h2>
         <p class="config-section-description">This server runs <strong>Percy</strong>, an all-in-one Discord bot for moderation, leveling, music, economy and more.</p>
         <div class="overview-stat-grid">
             <div class="overview-stat"><span class="overview-stat-val">{{ bot_stats.guild_count }}</span><span class="overview-stat-label">Servers</span></div>

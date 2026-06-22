@@ -108,6 +108,14 @@
         <h2>Bot Stats</h2>
         <p class="config-section-description">Global bot statistics across all servers. Updates live via WebSocket.</p>
         <div class="metric-tiles" id="bot-stats-tiles">
+            {% match bot_stats.version %}
+            {% when Some with (v) %}
+            <div class="metric-tile">
+                <span class="tile-label">Version</span>
+                <span class="tile-value" data-key="version">{{ v }}</span>
+            </div>
+            {% when None %}
+            {% endmatch %}
             <div class="metric-tile">
                 <span class="tile-label">Servers</span>
                 <span class="tile-value" data-key="guild_count">{{ bot_stats.guild_count }}</span>

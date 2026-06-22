@@ -179,6 +179,50 @@ fn render_markdown(markdown: &str) -> String {
     out
 }
 
+/// Cached bot version string (60 s TTL, matching the stats poller interval).
+fn bot_version_cache() -> &'static Cache<(), Timed<String>> {
+    static CACHE: OnceLock<Cache<(), Timed<String>>> = OnceLock::new();
+    CACHE.get_or_init(|| Cache::new(1))
+}
+
+pub(super) async fn cached_bot_version(state: &AppState) -> Option<String> {
+    if let Some((ts, v)) = bot_version_cache().get(&()) {
+        if ts.elapsed() < ACCESS_TTL {
+            return Some(v);
+        }
+    }
+    let percy = get_percy_client(state)?;
+    let stats = percy.get_bot_stats().await.ok()?;
+    let version = stats.version?;
+    bot_version_cache().insert((), (Instant::now(), version.clone()));
+    Some(version)
+}
+
+/// Changelog entries (10 min TTL — git history changes only on deploy).
+const CHANGELOG_TTL: Duration = Duration::from_secs(600);
+
+fn changelog_cache() -> &'static Cache<(), Timed<Arc<Vec<crate::percy::ChangelogEntry>>>> {
+    static CACHE: OnceLock<Cache<(), Timed<Arc<Vec<crate::percy::ChangelogEntry>>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Cache::new(1))
+}
+
+pub(super) async fn cached_changelog(state: &AppState) -> Vec<crate::percy::ChangelogEntry> {
+    if let Some((ts, entries)) = changelog_cache().get(&()) {
+        if ts.elapsed() < CHANGELOG_TTL {
+            return (*entries).clone();
+        }
+    }
+    let Some(percy) = get_percy_client(state) else {
+        return Vec::new();
+    };
+    let Ok(resp) = percy.get_changelog().await else {
+        return Vec::new();
+    };
+    let entries = Arc::new(resp.entries);
+    changelog_cache().insert((), (Instant::now(), entries.clone()));
+    (*entries).clone()
+}
+
 /// Fetches (cached) the user's mutual-guild map (`guild_id -> manageable`).
 /// `None` on a Percy failure, which is deliberately *not* cached so a blip can't
 /// lock a user out for the whole TTL.
@@ -294,6 +338,9 @@ fn json_or_flash(headers: &HeaderMap, flasher: &Flasher, ok: bool, msg: &str, re
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        // Public pages (percy subdomain landing page-linked).
+        .route("/commands", get(percy_commands))
+        .route("/changelog", get(percy_changelog))
         // Public legal docs, rendered live from the canonical GitHub repo.
         .route("/privacy-policy", get(percy_privacy))
         .route("/terms-of-service", get(percy_terms))
@@ -303,7 +350,11 @@ pub fn routes() -> Router<AppState> {
             "/lb/:guild_id/vanity",
             post(public_leaderboard_vanity_claim).delete(public_leaderboard_vanity_delete),
         )
+        .route("/dashboard/bot-version", get(percy_bot_version))
         .route("/dashboard", get(guild_list))
+        // Personal dashboard for non-admin members (own stats/leveling/economy).
+        .route("/dashboard/guild/:guild_id/me", get(guild_user_self))
+        .route("/dashboard/guild/:guild_id/me/settings", post(guild_user_settings_update))
         // Public read-only server overview for members without manage access.
         .route("/dashboard/guild/:guild_id/overview", get(guild_overview))
         .route(

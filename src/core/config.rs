@@ -641,12 +641,34 @@ impl Config {
     /// (covers `percy.localhost`). Dev caveat: accessing the apex via a raw IP
     /// (e.g. `127.0.0.1`) instead of `localhost` makes the browser reject the
     /// `Domain=localhost` cookie — use `localhost` in dev.
-    pub fn cookie_domain(&self) -> String {
+    /// The `Domain` attribute for the auth cookie. `None` in dev (host-only
+    /// cookie — browsers reject cross-subdomain `Domain=localhost`).
+    /// `Some("klappstuhl.me")` in production so the cookie is shared between
+    /// the apex and the percy subdomain.
+    pub fn cookie_domain(&self) -> Option<String> {
+        self.domains.first().map(|x| x.to_string())
+    }
+
+    /// The registrable domain for `safe_next_for_domain` trusted-host checks.
+    /// Returns `"localhost"` in dev, the configured domain in production.
+    pub fn trusted_domain(&self) -> String {
         self.domains
             .first()
             .map(|x| x.as_str())
             .unwrap_or("localhost")
             .to_string()
+    }
+
+    /// The public URL for the Percy subdomain. In production this is
+    /// `https://percy.<domain>`; in dev it's `http://percy.localhost:<port>`.
+    /// Used in templates so links from the main site to Percy are always correct.
+    pub fn percy_url(&self) -> String {
+        let domain = self.domains.first().map(|x| x.as_str()).unwrap_or("localhost");
+        if !self.production || domain == "localhost" {
+            format!("http://percy.localhost:{}", self.server.port)
+        } else {
+            format!("https://percy.{domain}")
+        }
     }
 }
 

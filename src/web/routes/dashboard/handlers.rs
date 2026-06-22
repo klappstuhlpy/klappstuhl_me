@@ -69,6 +69,81 @@ async fn render_legal_doc(
     }
 }
 
+/// `GET /commands` — public commands page listing all bot commands by category.
+pub(super) async fn percy_commands(
+    State(state): State<AppState>,
+    account: Option<Account>,
+    flashes: Flashes,
+) -> Response {
+    let categories = if let Some(percy) = get_percy_client(&state) {
+        // Fetch commands from the bot; if it fails, show an empty page rather than erroring.
+        match percy.get_bot_commands().await {
+            Ok(commands) => group_commands_by_category(commands),
+            Err(_) => Vec::new(),
+        }
+    } else {
+        Vec::new()
+    };
+
+    PercyCommandsTemplate {
+        account,
+        flashes,
+        categories,
+    }
+    .into_response()
+}
+
+/// Groups a flat list of `CommandInfo` into categories for display.
+fn group_commands_by_category(commands: Vec<CommandInfo>) -> Vec<CommandCategory> {
+    let mut map: HashMap<String, Vec<PublicCommand>> = HashMap::new();
+    for cmd in commands {
+        let category = cmd.cog.unwrap_or(cmd.category);
+        map.entry(category).or_default().push(PublicCommand {
+            name: cmd.name,
+            description: cmd.description,
+            usage: cmd.signature,
+        });
+    }
+    let mut categories: Vec<CommandCategory> = map
+        .into_iter()
+        .map(|(name, mut commands)| {
+            commands.sort_by(|a, b| a.name.cmp(&b.name));
+            CommandCategory { name, commands }
+        })
+        .collect();
+    categories.sort_by(|a, b| a.name.cmp(&b.name));
+    categories
+}
+
+/// `GET /changelog` — public changelog page. Reads Percy's git log to show
+/// version history grouped by tags.
+pub(super) async fn percy_changelog(
+    State(state): State<AppState>,
+    account: Option<Account>,
+    flashes: Flashes,
+) -> Response {
+    let raw = super::cached_changelog(&state).await;
+    let entries: Vec<super::templates::ChangelogEntry> = raw
+        .into_iter()
+        .map(|e| super::templates::ChangelogEntry {
+            version: e.version,
+            date: e.date,
+            changes: e.changes,
+        })
+        .collect();
+    PercyChangelogTemplate {
+        account,
+        flashes,
+        entries,
+    }
+    .into_response()
+}
+
+pub(super) async fn percy_bot_version(State(state): State<AppState>) -> Json<serde_json::Value> {
+    let version = super::cached_bot_version(&state).await;
+    Json(serde_json::json!({ "version": version }))
+}
+
 pub(super) async fn guild_list(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
     // Logged-out visitors get a welcome/landing page that introduces the bot
     // and links to login/signup (which redirect back here afterwards).
@@ -202,6 +277,91 @@ pub(super) async fn guild_detail(
     .into_response()
 }
 
+/// `GET /dashboard/guild/:guild_id/me` — personal dashboard for non-admin members.
+/// Shows leveling, economy, and command stats for the logged-in user.
+pub(super) async fn guild_user_self(
+    State(state): State<AppState>,
+    account: Account,
+    flashes: Flashes,
+    Path(guild_id): Path<u64>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/dashboard").into_response();
+    };
+    if !check_guild_membership(&percy, &discord_id, guild_id).await {
+        return Redirect::to("/dashboard").into_response();
+    }
+
+    let (guild, profile, settings) = tokio::join!(
+        percy.get_guild(guild_id),
+        percy.get_member_self(guild_id, &discord_id),
+        percy.get_user_settings(&discord_id),
+    );
+
+    let guild = match guild {
+        Ok(g) => g,
+        Err(_) => return Redirect::to("/dashboard").into_response(),
+    };
+    let profile = match profile {
+        Ok(p) => p,
+        Err(_) => return Redirect::to(&format!("/dashboard/guild/{guild_id}/overview")).into_response(),
+    };
+    let settings = settings.unwrap_or(UserSettings {
+        timezone: None,
+        track_presence: true,
+        track_history: true,
+    });
+
+    UserDashboardTemplate {
+        account: Some(account),
+        flashes,
+        guild_id,
+        guild_name: guild.name,
+        guild_icon: guild.icon_url,
+        profile,
+        settings,
+    }
+    .into_response()
+}
+
+pub(super) async fn guild_user_settings_update(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    if !check_guild_membership(&percy, &discord_id, guild_id).await {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let patch = UserSettingsPatch {
+        timezone: if body.get("timezone").is_some() {
+            Some(body["timezone"].as_str().map(|s| s.to_string()))
+        } else {
+            None
+        },
+        track_presence: body.get("track_presence").and_then(|v| v.as_bool()),
+        track_history: body.get("track_history").and_then(|v| v.as_bool()),
+    };
+
+    match percy.patch_user_settings(&discord_id, &patch).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": msg}))).into_response()
+        }
+    }
+}
+
 /// `GET /dashboard/guild/:guild_id/overview` — read-only public overview
 /// for members who can't manage the guild. Access requires only that the viewer
 /// shares the guild with Percy; everything shown is already visible to members
@@ -243,6 +403,7 @@ pub(super) async fn guild_overview(
     };
 
     let bot_stats = bot_stats.unwrap_or(BotStats {
+        version: None,
         guild_count: 0,
         user_count: 0,
         channel_count: 0,
@@ -436,40 +597,48 @@ pub(super) async fn guild_config_update(
     let patch = build_patch(&form.section, &form.fields);
     let redirect_url = format!("/dashboard/guild/{guild_id}");
 
-    match percy.patch_guild_config(guild_id, &patch).await {
-        Ok(()) => {
-            if form.section == "flags" {
-                // Auto-enable/disable sentinel when its flag is toggled
-                let gk_enabled = form.fields.contains_key("sentinel");
-                if let Err(e) = percy.toggle_sentinel(guild_id, gk_enabled).await {
-                    tracing::warn!(error = %e, "Sentinel toggle after flag change");
-                }
+    if form.section == "flags" {
+        // Batch: config + sentinel toggle + clear in one round-trip.
+        let gk_enabled = form.fields.contains_key("sentinel");
+        let mut ops = vec![
+            BatchOperation { op_type: "config".into(), data: patch },
+            BatchOperation {
+                op_type: "sentinel_toggle".into(),
+                data: serde_json::json!({"enabled": gk_enabled}),
+            },
+        ];
 
-                // Clear associated config fields when flags are turned off
-                let mut clear = serde_json::Map::new();
-                if !form.fields.contains_key("audit_log") {
-                    clear.insert("audit_log_channel_id".into(), serde_json::Value::Null);
-                }
-                if !form.fields.contains_key("alerts") {
-                    clear.insert("alert_channel_id".into(), serde_json::Value::Null);
-                }
-                if !form.fields.contains_key("mentions") {
-                    clear.insert("mention_count".into(), serde_json::Value::Null);
-                }
-                if !clear.is_empty() {
-                    if let Err(e) = percy
-                        .patch_guild_config(guild_id, &serde_json::Value::Object(clear))
-                        .await
-                    {
-                        tracing::warn!(error = %e, "Failed to clear config fields on flag disable");
-                    }
-                }
-            }
-            json_or_flash(&headers, &flasher, true, "Settings saved.", &redirect_url)
+        let mut clear = serde_json::Map::new();
+        if !form.fields.contains_key("audit_log") {
+            clear.insert("audit_log_channel_id".into(), serde_json::Value::Null);
         }
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to update guild config");
-            json_or_flash(&headers, &flasher, false, "Failed to save settings.", &redirect_url)
+        if !form.fields.contains_key("alerts") {
+            clear.insert("alert_channel_id".into(), serde_json::Value::Null);
+        }
+        if !form.fields.contains_key("mentions") {
+            clear.insert("mention_count".into(), serde_json::Value::Null);
+        }
+        if !clear.is_empty() {
+            ops.push(BatchOperation {
+                op_type: "config".into(),
+                data: serde_json::Value::Object(clear),
+            });
+        }
+
+        match percy.batch_guild_config(guild_id, &ops).await {
+            Ok(_) => json_or_flash(&headers, &flasher, true, "Settings saved.", &redirect_url),
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to batch-update guild config");
+                json_or_flash(&headers, &flasher, false, "Failed to save settings.", &redirect_url)
+            }
+        }
+    } else {
+        match percy.patch_guild_config(guild_id, &patch).await {
+            Ok(()) => json_or_flash(&headers, &flasher, true, "Settings saved.", &redirect_url),
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to update guild config");
+                json_or_flash(&headers, &flasher, false, "Failed to save settings.", &redirect_url)
+            }
         }
     }
 }
@@ -558,9 +727,9 @@ pub(super) async fn guild_members(
         return Redirect::to("/dashboard").into_response();
     }
 
-    let (guild, members, roles) = tokio::join!(
+    let (guild, members_resp, roles) = tokio::join!(
         percy.get_guild(guild_id),
-        percy.get_guild_members(guild_id, 100, 0),
+        percy.get_guild_members(guild_id, 100, 0, None),
         cached_roles(&percy, guild_id),
     );
 
@@ -569,7 +738,7 @@ pub(super) async fn guild_members(
         Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
-    let members = members.unwrap_or_default();
+    let members = members_resp.map(|r| r.members).unwrap_or_default();
     let roles = roles.unwrap_or_default();
 
     MembersTemplate {
@@ -591,6 +760,8 @@ pub(super) struct MembersQuery {
     limit: u32,
     #[serde(default)]
     after: u64,
+    #[serde(default)]
+    search: Option<String>,
 }
 
 fn default_limit() -> u32 {
@@ -615,12 +786,14 @@ pub(super) async fn guild_members_json(
         return Json(serde_json::json!({"error": "access denied"})).into_response();
     }
 
-    let members = percy
-        .get_guild_members(guild_id, query.limit.min(100), query.after)
-        .await
-        .unwrap_or_default();
+    let resp = percy
+        .get_guild_members(guild_id, query.limit.min(100), query.after, query.search.as_deref())
+        .await;
 
-    Json(serde_json::json!({"members": members})).into_response()
+    match resp {
+        Ok(r) => Json(serde_json::json!({"members": r.members, "total": r.total})).into_response(),
+        Err(_) => Json(serde_json::json!({"members": [], "total": 0})).into_response(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -969,7 +1142,7 @@ pub(super) async fn guild_polls(
     let channels = channels.unwrap_or_default();
     let roles = roles.unwrap_or_default();
 
-    let polls = polls.unwrap_or(PollsResponse { polls: Vec::new() });
+    let polls = polls.unwrap_or(PollsResponse { polls: Vec::new(), total: 0 });
     let active_count = polls.polls.iter().filter(|p| !p.ended).count();
     let ended_count = polls.polls.iter().filter(|p| p.ended).count();
 
@@ -1120,7 +1293,7 @@ pub(super) async fn guild_giveaways(
         Err(_) => return Redirect::to("/dashboard").into_response(),
     };
 
-    let giveaways = giveaways.unwrap_or(GiveawaysResponse { giveaways: Vec::new() });
+    let giveaways = giveaways.unwrap_or(GiveawaysResponse { giveaways: Vec::new(), total: 0 });
     let active_count = giveaways.giveaways.iter().filter(|g| !g.ended).count();
     let ended_count = giveaways.giveaways.iter().filter(|g| g.ended).count();
 
@@ -1398,6 +1571,7 @@ pub(super) async fn guild_stats(
     };
 
     let bot_stats = bot_stats.unwrap_or(BotStats {
+        version: None,
         guild_count: 0,
         user_count: 0,
         channel_count: 0,
@@ -1763,7 +1937,7 @@ pub(super) async fn guild_economy(
         items: Vec::new(),
         lottery: None,
     });
-    let balances = balances.unwrap_or(BalancesResponse { entries: Vec::new() });
+    let balances = balances.unwrap_or(BalancesResponse { entries: Vec::new(), total: 0 });
     let channels = channels.unwrap_or_default();
     let roles = roles.unwrap_or_default();
     EconomyTemplate {
@@ -2154,7 +2328,7 @@ pub(super) async fn guild_highlights(
         Ok(g) => g,
         Err(_) => return Redirect::to("/dashboard").into_response(),
     };
-    let data = data.unwrap_or(HighlightsResponse { entries: Vec::new() });
+    let data = data.unwrap_or(HighlightsResponse { entries: Vec::new(), total: 0 });
     HighlightsTemplate {
         account: Some(account),
         flashes,
@@ -2192,6 +2366,7 @@ pub(super) async fn guild_emoji_stats(
         total_uses: 0,
         distinct_emojis: 0,
         entries: Vec::new(),
+        total: 0,
     });
     EmojiStatsTemplate {
         account: Some(account),
@@ -3021,7 +3196,7 @@ pub(super) async fn public_leaderboard(
         entries: Vec::new(),
         total: 0,
     });
-    let balances = balances.unwrap_or(BalancesResponse { entries: Vec::new() });
+    let balances = balances.unwrap_or(BalancesResponse { entries: Vec::new(), total: 0 });
     let vanity = get_vanity_for_guild(&state, guild_id).await;
 
     let can_manage = if let Some(ref acc) = account {

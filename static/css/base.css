@@ -560,10 +560,9 @@ header.grid-item {
     grid-area: h;
     border-bottom: 1px solid var(--box-border);
     margin-bottom: 1.5rem;
-    /* Reserve the status-bar inset in standalone PWA mode so the nav drops
-       below the phone clock / battery instead of hiding under them. The
-       env() value is 0 in normal browser tabs, leaving the layout intact. */
-    padding-top: calc(0.75rem + env(safe-area-inset-top));
+    /* Match the percy subdomain topbar height (0.65rem vertical padding). The
+       safe-area-inset-top is for standalone PWA mode (phone clock / battery). */
+    padding: calc(0.65rem + env(safe-area-inset-top)) 1.5rem 0.65rem 1.5rem;
 }
 
 main.grid-item { grid-area: c; }

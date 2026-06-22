@@ -126,6 +126,12 @@ pub struct Member {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct MembersResponse {
+    pub members: Vec<Member>,
+    pub total: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SentinelInfo {
     pub channel: Option<ChannelRef>,
     pub role: Option<RoleRef>,
@@ -373,6 +379,68 @@ impl MemberDetail {
     }
 }
 
+/// Personal profile for a non-admin member (leveling + economy + command stats).
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MemberSelf {
+    pub id: String,
+    pub name: String,
+    pub display_name: String,
+    pub avatar_url: String,
+    pub joined_at: Option<String>,
+    pub created_at: String,
+    #[serde(default)]
+    pub roles: Vec<MemberRoleBadge>,
+    pub top_role: Option<String>,
+    #[serde(default)]
+    pub top_role_color: u32,
+    pub join_position: Option<u32>,
+    #[serde(default)]
+    pub member_count: u32,
+    pub boosting_since: Option<String>,
+    pub leveling: Option<MemberLeveling>,
+    pub economy: Option<MemberEconomy>,
+    pub command_stats: Option<MemberCommandStats>,
+}
+
+impl MemberSelf {
+    pub fn top_role_color_hex(&self) -> String {
+        format!("#{:06x}", self.top_role_color)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MemberEconomy {
+    #[serde(default)]
+    pub cash: i64,
+    #[serde(default)]
+    pub bank: i64,
+    #[serde(default)]
+    pub total: i64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserSettings {
+    pub timezone: Option<String>,
+    #[serde(default = "default_true")]
+    pub track_presence: bool,
+    #[serde(default = "default_true")]
+    pub track_history: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Serialize)]
+pub struct UserSettingsPatch {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub track_presence: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub track_history: Option<bool>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AvatarEntry {
     pub image: String,
@@ -413,6 +481,8 @@ pub struct PollInfo {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PollsResponse {
     pub polls: Vec<PollInfo>,
+    #[serde(default)]
+    pub total: u32,
 }
 
 // -- Giveaways types ---------------------------------------------------------
@@ -435,6 +505,8 @@ pub struct GiveawayInfo {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GiveawaysResponse {
     pub giveaways: Vec<GiveawayInfo>,
+    #[serde(default)]
+    pub total: u32,
 }
 
 // -- Tags types --------------------------------------------------------------
@@ -469,11 +541,23 @@ pub struct TagsResponse {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CommandInfo {
     pub name: String,
+    #[serde(default)]
     pub category: String,
+    #[serde(default)]
+    pub cog: Option<String>,
+    #[serde(default)]
     pub description: String,
     #[serde(default)]
+    pub signature: Option<String>,
+    #[serde(default)]
     pub disabled_in: Vec<String>,
+    #[serde(default)]
     pub globally_disabled: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PublicCommandsResponse {
+    pub commands: Vec<CommandInfo>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -518,6 +602,8 @@ pub struct GuildStats {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BotStats {
+    #[serde(default)]
+    pub version: Option<String>,
     pub guild_count: u32,
     pub user_count: u32,
     pub channel_count: u32,
@@ -527,6 +613,102 @@ pub struct BotStats {
     pub latency_ms: f64,
     #[serde(default)]
     pub uptime_seconds: f64,
+}
+
+// -- Batch operations --------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct BatchOperation {
+    #[serde(rename = "type")]
+    pub op_type: String,
+    pub data: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchResponse {
+    pub ok: bool,
+    pub results: Vec<BatchResult>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchResult {
+    #[serde(rename = "type")]
+    pub op_type: String,
+    pub ok: bool,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+// -- Changelog ---------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ChangelogResponse {
+    pub entries: Vec<ChangelogEntry>,
+    #[serde(default)]
+    pub current_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChangelogEntry {
+    pub version: String,
+    pub date: String,
+    pub changes: Vec<String>,
+}
+
+// -- Composite endpoint types ------------------------------------------------
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GuildOverviewGuild {
+    pub id: u64,
+    pub name: String,
+    pub icon_url: Option<String>,
+    pub member_count: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GuildOverviewStats {
+    pub online_count: u32,
+    pub bot_count: u32,
+    pub channel_count: u32,
+    pub role_count: u32,
+    pub emoji_count: u32,
+    pub boost_count: u32,
+    pub boost_tier: u32,
+    pub total_commands: u64,
+    #[serde(default)]
+    pub recent_cases: u32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GuildOverviewBot {
+    #[serde(default)]
+    pub version: Option<String>,
+    pub guild_count: u32,
+    pub user_count: u32,
+    pub command_count: u32,
+    pub latency_ms: f64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GuildOverviewFeatures {
+    #[serde(default)]
+    pub leveling: bool,
+    #[serde(default)]
+    pub economy: bool,
+    #[serde(default)]
+    pub music: bool,
+    #[serde(default)]
+    pub sentinel: bool,
+    #[serde(default)]
+    pub audit_log: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GuildOverview {
+    pub guild: GuildOverviewGuild,
+    pub stats: GuildOverviewStats,
+    pub bot: GuildOverviewBot,
+    pub features: GuildOverviewFeatures,
 }
 
 // -- Autoresponders types ----------------------------------------------------
@@ -592,6 +774,8 @@ pub struct BalanceEntry {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BalancesResponse {
     pub entries: Vec<BalanceEntry>,
+    #[serde(default)]
+    pub total: u32,
 }
 
 // -- Music types -------------------------------------------------------------
@@ -822,6 +1006,8 @@ pub struct HighlightEntry {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct HighlightsResponse {
     pub entries: Vec<HighlightEntry>,
+    #[serde(default)]
+    pub total: u32,
 }
 
 // -- Emoji Stats types -------------------------------------------------------
@@ -839,6 +1025,8 @@ pub struct EmojiStatsResponse {
     pub total_uses: u64,
     pub distinct_emojis: u64,
     pub entries: Vec<EmojiStatEntry>,
+    #[serde(default)]
+    pub total: u32,
 }
 
 // -- Audit log (cases) types -------------------------------------------------

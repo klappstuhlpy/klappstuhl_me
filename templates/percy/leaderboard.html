@@ -1,8 +1,8 @@
-{% extends "../layout.html" %}
+{% extends "percy/percy_layout.html" %}
 
-{% block nav_section %}{% include "percy/_brand_badge.html" %}{% endblock %}
+{% block nav_dashboard_active %} active{% endblock %}
 
-{% block title %}{{ guild_name }} — Leaderboard | Klappstuhl.me{% endblock %}
+{% block title %}{{ guild_name }} — Leaderboard | Percy{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>

@@ -1,8 +1,8 @@
-{% extends "../layout.html" %}
+{% extends "percy/percy_layout.html" %}
+
+{% block nav_dashboard_active %} active{% endblock %}
 
 {% block title %}{{ page_title }} — {{ guild_name }} | Dashboard{% endblock %}
-
-{% block nav_section %}{% include "percy/_brand_badge.html" %}{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
@@ -11,11 +11,6 @@
 
 {% block body %}
 <div class="dashboard-shell">
-    {# ─── Dashboard sidebar ──────────────────────────────────────────
-       Inlined (not a shared partial) so each dashboard template owns its own
-       navigation markup. `nav_active` is the per-page key passed by the Rust
-       handlers; the two templates that extend layout.html directly
-       (guild.html, user.html) carry their own copy with a literal active key. #}
     <aside class="dash-sidebar" id="dash-sidebar">
         <div class="dash-sidebar-top">
             <a href="/dashboard" class="dash-sidebar-back">&larr; All servers</a>
@@ -52,6 +47,9 @@
                 <a href="/dashboard/guild/{{ guild_id }}/tags" class="dash-nav-link{% if nav_active == "tags" %} active{% endif %}">Tags</a>
                 <a href="/dashboard/guild/{{ guild_id }}/highlights" class="dash-nav-link{% if nav_active == "highlights" %} active{% endif %}">Highlights</a>
                 <a href="/dashboard/guild/{{ guild_id }}/emoji-stats" class="dash-nav-link{% if nav_active == "emoji-stats" %} active{% endif %}">Emoji Stats</a>
+            </div>
+            <div class="dash-nav-group">
+                <a href="/dashboard/guild/{{ guild_id }}/me" class="dash-nav-link dash-nav-link-me{% if nav_active == "me" %} active{% endif %}">My Profile</a>
             </div>
         </nav>
     </aside>

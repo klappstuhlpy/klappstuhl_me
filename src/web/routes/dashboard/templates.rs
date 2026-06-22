@@ -81,6 +81,46 @@ pub(crate) struct PercyLegalTemplate {
     pub(crate) content: String,
 }
 
+/// Public commands page: lists all bot commands with categories and descriptions.
+#[allow(dead_code)]
+#[derive(Template)]
+#[template(path = "percy/commands_public.html")]
+pub(crate) struct PercyCommandsTemplate {
+    pub(crate) account: Option<Account>,
+    pub(crate) flashes: Flashes,
+    pub(crate) categories: Vec<CommandCategory>,
+}
+
+/// A command category for the public commands page.
+pub(crate) struct CommandCategory {
+    pub(crate) name: String,
+    pub(crate) commands: Vec<PublicCommand>,
+}
+
+/// A single command entry for the public commands page.
+pub(crate) struct PublicCommand {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) usage: Option<String>,
+}
+
+/// Public changelog page showing recent version history.
+#[allow(dead_code)]
+#[derive(Template)]
+#[template(path = "percy/changelog.html")]
+pub(crate) struct PercyChangelogTemplate {
+    pub(crate) account: Option<Account>,
+    pub(crate) flashes: Flashes,
+    pub(crate) entries: Vec<ChangelogEntry>,
+}
+
+/// A changelog entry representing a version release or group of commits.
+pub(crate) struct ChangelogEntry {
+    pub(crate) version: String,
+    pub(crate) date: String,
+    pub(crate) changes: Vec<String>,
+}
+
 #[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "percy/guild_not_found.html")]
@@ -89,6 +129,19 @@ pub(crate) struct GuildNotFoundTemplate {
     pub(crate) flashes: Flashes,
     pub(crate) guild_id: u64,
     pub(crate) invite_url: String,
+}
+
+#[allow(dead_code)]
+#[derive(Template)]
+#[template(path = "percy/user_dashboard.html")]
+pub(crate) struct UserDashboardTemplate {
+    pub(crate) account: Option<Account>,
+    pub(crate) flashes: Flashes,
+    pub(crate) guild_id: u64,
+    pub(crate) guild_name: String,
+    pub(crate) guild_icon: Option<String>,
+    pub(crate) profile: MemberSelf,
+    pub(crate) settings: UserSettings,
 }
 
 #[allow(dead_code)]

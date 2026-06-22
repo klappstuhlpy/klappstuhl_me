@@ -102,7 +102,7 @@
                     <a class="account-dropdown-item" role="menuitem" href="/account">Account</a>
                     <a class="account-dropdown-item" role="menuitem" href="/images">Images</a>
                     <a class="account-dropdown-item" role="menuitem" href="/links">Short Links</a>
-                    <a class="account-dropdown-item" role="menuitem" href="/dashboard">Dashboard</a>
+                    <a class="account-dropdown-item" role="menuitem" href="/percy">Percy</a>
                     <hr class="account-dropdown-sep">
                     {# Status / Terminal group. The site links (Projects, GitHub) are
                        surfaced inside the dropdown on mobile only (`.nav-extra`).
@@ -116,7 +116,7 @@
                 </div>
             </div>
             {% when None %}
-            <a class="nav-item not-mobile" href="/dashboard">Dashboard</a>
+            <a class="nav-item not-mobile" href="/percy">Percy</a>
             {# Logged-out: a compact menu dropdown carrying the site links on
                mobile (where the inline links are hidden), including the Login button #}
             <div class="nav-item account-menu" id="nav-menu">
@@ -125,7 +125,7 @@
                     <span class="account-caret" aria-hidden="true"></span>
                 </button>
                 <div class="account-dropdown" role="menu">
-                    <a class="account-dropdown-item" role="menuitem" href="/dashboard">Dashboard</a>
+                    <a class="account-dropdown-item" role="menuitem" href="/percy">Percy</a>
                     <hr class="account-dropdown-sep">
                     <a class="account-dropdown-item" role="menuitem" href="/login">Login</a>
                 </div>

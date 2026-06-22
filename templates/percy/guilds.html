@@ -1,8 +1,8 @@
-{% extends "../layout.html" %}
+{% extends "percy/percy_layout.html" %}
 
-{% block nav_section %}{% include "percy/_brand_badge.html" %}{% endblock %}
+{% block nav_dashboard_active %} active{% endblock %}
 
-{% block title %}Dashboard | Klappstuhl.me{% endblock %}
+{% block title %}Dashboard | Percy{% endblock %}
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
@@ -74,10 +74,10 @@
             <h2>Servers You're In</h2>
             <span class="guilds-count">{{ public.len() }}</span>
         </div>
-        <p class="guild-section-sub">Percy is here, but you don't manage it — open a read-only overview.</p>
+        <p class="guild-section-sub">Percy is here, but you don't manage it — view your profile or the public overview.</p>
         <div class="guild-grid">
             {% for guild in public %}
-            <a href="/dashboard/guild/{{ guild.id }}/overview" class="guild-card button-card" style="--i:{{ loop.index0 }}">
+            <a href="/dashboard/guild/{{ guild.id }}/me" class="guild-card button-card" style="--i:{{ loop.index0 }}">
                 {% match guild.icon_url %}
                 {% when Some with (url) %}
                 <img class="guild-icon" src="{{ url }}?size=128" alt="" width="56" height="56">
@@ -90,10 +90,10 @@
                     {% when Some with (count) %}
                     <span class="guild-members">{{ count }} members</span>
                     {% when None %}
-                    <span class="guild-members">View overview</span>
+                    <span class="guild-members">Your profile</span>
                     {% endmatch %}
                 </div>
-                <span class="badge guild-overview-badge">Overview</span>
+                <span class="badge guild-overview-badge">My Profile</span>
                 <span class="guild-card-arrow" aria-hidden="true">→</span>
             </a>
             {% endfor %}

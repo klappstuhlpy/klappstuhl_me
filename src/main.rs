@@ -212,13 +212,17 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
             state.clone(),
             klappstuhl_me::copy_api_token,
         ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            klappstuhl_me::routes::enforce_subdomain,
+        ))
         .layer(klappstuhl_me::logging::HttpTrace::new(state.requests.clone()))
         .layer(middleware::from_fn(klappstuhl_me::flash::process_flash_messages))
         .layer(middleware::from_fn(klappstuhl_me::parse_cookies))
         .layer(Extension(secret_key))
         // Scope the auth cookie to the registrable domain so a login on the apex
         // is also presented to the `percy.<domain>` dashboard subdomain.
-        .layer(Extension(klappstuhl_me::token::CookieDomain(Some(cookie_domain))))
+        .layer(Extension(klappstuhl_me::token::CookieDomain(cookie_domain)))
         .layer(Extension(klappstuhl_me::cached::BodyCache::new(Duration::from_secs(
             120,
         ))))

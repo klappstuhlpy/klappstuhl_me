@@ -121,9 +121,10 @@ async fn discord_login(
     }
 
     let key = &state.config().secret_key;
+    let trusted = state.config().trusted_domain();
     let oauth_state = OAuthState {
         account_id: account.map(|a| a.id),
-        next: crate::utils::safe_next(query.next.as_deref()),
+        next: crate::utils::safe_next_for_domain(query.next.as_deref(), Some(&trusted)),
         exp: (OffsetDateTime::now_utc() + time::Duration::minutes(10)).unix_timestamp(),
     };
     let signed = match key.sign(&oauth_state) {
@@ -259,7 +260,9 @@ async fn discord_callback(
     if let Some(account_id) = oauth_state.account_id {
         link_discord(&state, &flasher, client_ip, account_id, &discord_user).await
     } else {
-        let target = crate::utils::safe_next(oauth_state.next.as_deref()).unwrap_or_else(|| "/".to_string());
+        let trusted = state.config().trusted_domain();
+        let target = crate::utils::safe_next_for_domain(oauth_state.next.as_deref(), Some(&trusted))
+            .unwrap_or_else(|| "/".to_string());
         login_or_create(&state, &flasher, client_ip, &discord_user, &target).await
     }
 }
@@ -572,7 +575,7 @@ async fn create_session_response(
         return Redirect::to("/login").into_response();
     };
     let cfg = state.config();
-    let cookie = token.to_cookie(&cfg.secret_key, Some(&cfg.cookie_domain()));
+    let cookie = token.to_cookie(&cfg.secret_key, cfg.cookie_domain().as_deref());
     state.save_session(&token, Some("Discord OAuth".to_string())).await;
     state.audit(audit_action).actor(account).ip_opt(client_ip).fire();
 
