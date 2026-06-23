@@ -62,14 +62,14 @@
                     <tr>
                         <th>Name</th>
                         <th>Type</th>
-                        <th class="col-actions">Actions</th>
+                        <th class="col-actions"></th>
                     </tr>
                 </thead>
                 <tbody id="plonks-tbody">
                     {% for plonk in commands.plonks %}
                     <tr data-entity-id="{{ plonk.entity_id }}">
-                        <td><strong>{{ plonk.name }}</strong></td>
-                        <td><span class="pill pending">{{ plonk.entity_type }}</span></td>
+                        <td data-label="Name"><strong>{{ plonk.name }}</strong></td>
+                        <td data-label="Type"><span class="pill pending">{{ plonk.entity_type }}</span></td>
                         <td class="col-actions">
                             <button class="button small danger" onclick="removePlonk('{{ plonk.entity_id }}')">Unplonk</button>
                         </td>

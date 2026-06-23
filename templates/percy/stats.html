@@ -72,9 +72,9 @@
                 <tbody>
                     {% for cmd in stats.top_commands %}
                     <tr>
-                        <td><span class="leaderboard-rank{% if loop.index == 1 %} gold{% else if loop.index == 2 %} silver{% else if loop.index == 3 %} bronze{% endif %}">{{ loop.index }}</span></td>
-                        <td><strong>{{ cmd.command }}</strong></td>
-                        <td class="numeric">{{ cmd.uses }}</td>
+                        <td data-label="Rank"><span class="leaderboard-rank{% if loop.index == 1 %} gold{% else if loop.index == 2 %} silver{% else if loop.index == 3 %} bronze{% endif %}">{{ loop.index }}</span></td>
+                        <td data-label="Command"><strong>{{ cmd.command }}</strong></td>
+                        <td class="numeric" data-label="Uses">{{ cmd.uses }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

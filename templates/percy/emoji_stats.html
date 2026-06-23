@@ -43,7 +43,7 @@
             <tbody>
                 {% for entry in data.entries %}
                 <tr>
-                    <td>
+                    <td data-label="Emoji">
                         {% match entry.emoji_url %}
                         {% when Some with (url) %}
                         <img src="{{ url }}" alt="{{ entry.emoji_name }}" class="emoji-icon">
@@ -51,8 +51,8 @@
                         <code>:{{ entry.emoji_name }}:</code>
                         {% endmatch %}
                     </td>
-                    <td><code>{{ entry.emoji_name }}</code></td>
-                    <td>{{ entry.total }}</td>
+                    <td data-label="Name"><code>{{ entry.emoji_name }}</code></td>
+                    <td data-label="Uses">{{ entry.total }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

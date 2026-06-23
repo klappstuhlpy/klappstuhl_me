@@ -51,11 +51,11 @@
             <tbody>
                 {% for entry in data.entries %}
                 <tr>
-                    <td><code>{{ entry.trigger }}</code></td>
-                    <td class="text-truncate" title="{{ entry.response }}">{{ entry.response }}</td>
-                    <td><span class="badge badge-muted">{{ entry.match_type }}</span></td>
-                    <td>{{ entry.uses }}</td>
-                    <td>
+                    <td data-label="Trigger"><code>{{ entry.trigger }}</code></td>
+                    <td class="text-truncate" data-label="Response" title="{{ entry.response }}">{{ entry.response }}</td>
+                    <td data-label="Type"><span class="badge badge-muted">{{ entry.match_type }}</span></td>
+                    <td data-label="Uses">{{ entry.uses }}</td>
+                    <td data-label="Status">
                         <button class="toggle-btn {% if entry.enabled %}active{% endif %}" data-trigger="{{ entry.trigger }}" data-enabled="{{ entry.enabled }}">
                             {% if entry.enabled %}ON{% else %}OFF{% endif %}
                         </button>

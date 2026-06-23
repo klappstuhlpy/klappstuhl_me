@@ -32,9 +32,9 @@
             <tbody>
                 {% for entry in data.entries %}
                 <tr>
-                    <td><strong>{{ entry.username }}</strong> <code class="text-muted">{{ entry.user_id }}</code></td>
-                    <td>{{ entry.triggers.join(", ") }}</td>
-                    <td>{{ entry.blocked_count }}</td>
+                    <td data-label="User"><strong>{{ entry.username }}</strong> <code class="text-muted">{{ entry.user_id }}</code></td>
+                    <td data-label="Triggers">{{ entry.triggers.join(", ") }}</td>
+                    <td data-label="Blocked">{{ entry.blocked_count }}</td>
                     <td>
                         <button class="button small danger delete-highlight-btn" data-user-id="{{ entry.user_id }}" data-username="{{ entry.username }}">Delete</button>
                     </td>

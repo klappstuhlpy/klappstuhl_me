@@ -1876,7 +1876,7 @@ th.th-sortable[aria-sort="descending"]::after {
     font-variant-numeric: tabular-nums;
     text-align: right;
 }
-.data-table .col-actions {
+.data-table td.col-actions {
     display: flex;
     text-align: right;
     white-space: nowrap;
@@ -1898,6 +1898,43 @@ th.th-sortable[aria-sort="descending"]::after {
     gap: 0.35rem;
     white-space: nowrap;
     text-align: right;
+}
+
+/* -- Data table: responsive card layout on mobile -- */
+@media (max-width: 768px) {
+    .data-table thead { display: none; }
+    .data-table,
+    .data-table tbody,
+    .data-table tr,
+    .data-table td { display: block; }
+    .data-table tbody tr {
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid var(--box-border);
+    }
+    .data-table tbody tr:last-child { border-bottom: none; }
+    .data-table td {
+        padding: 0.2rem 0;
+        text-align: left;
+    }
+    .data-table td[data-label]::before {
+        content: attr(data-label) ":\00a0";
+        color: var(--text-muted);
+        font-size: 0.68rem;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .data-table td.col-actions,
+    .data-table tbody td:has(> .button) {
+        display: flex;
+        justify-content: center;
+        padding-top: 0.4rem;
+    }
+    .data-table .numeric { text-align: left; }
+    .data-table .empty-row td { padding: 0.6rem 0; }
+    .data-table .empty-row td::before { display: none; }
+    .data-table .temp-active-row td { padding: 0.4rem 0; }
+    .data-table .tags-check-col { display: none; }
 }
 
 /* -- Status pills -- */

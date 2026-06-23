@@ -69,10 +69,10 @@
                     {% for tag in tags.tags %}
                     <tr data-name="{{ tag.name }}">
                         <td class="tags-check-col"><input type="checkbox" class="tag-check" value="{{ tag.name }}"></td>
-                        <td><strong>{{ tag.name }}</strong></td>
-                        <td>{{ tag.owner_name.as_deref().unwrap_or("Unknown") }}</td>
-                        <td class="numeric">{{ tag.uses }}</td>
-                        <td class="member-joined"><time class="js-ts">{{ tag.created_at.as_deref().unwrap_or("—") }}</time></td>
+                        <td data-label="Name"><strong>{{ tag.name }}</strong></td>
+                        <td data-label="Owner">{{ tag.owner_name.as_deref().unwrap_or("Unknown") }}</td>
+                        <td class="numeric" data-label="Uses">{{ tag.uses }}</td>
+                        <td class="member-joined" data-label="Created"><time class="js-ts">{{ tag.created_at.as_deref().unwrap_or("—") }}</time></td>
                         <td class="nowrap">
                             <button class="button small tag-view-btn inline-block" data-id="{{ tag.id }}" data-name="{{ tag.name }}">View</button>
                             <button class="button small danger tag-delete-btn inline-block" data-id="{{ tag.id }}" data-name="{{ tag.name }}">Delete</button>
@@ -102,9 +102,9 @@
                 <tbody>
                     {% for creator in tags.top_creators %}
                     <tr>
-                        <td><span class="leaderboard-rank{% if loop.index == 1 %} gold{% else if loop.index == 2 %} silver{% else if loop.index == 3 %} bronze{% endif %}">{{ loop.index }}</span></td>
-                        <td>{{ creator.username }}</td>
-                        <td class="numeric">{{ creator.count }}</td>
+                        <td data-label="Rank"><span class="leaderboard-rank{% if loop.index == 1 %} gold{% else if loop.index == 2 %} silver{% else if loop.index == 3 %} bronze{% endif %}">{{ loop.index }}</span></td>
+                        <td data-label="Member">{{ creator.username }}</td>
+                        <td class="numeric" data-label="Tags Created">{{ creator.count }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -134,9 +134,9 @@ function renderTopIps(rows) {
         const country = r.country ? `${flagEmoji(r.country_code)} ${escapeHtml(r.country)}` : "—";
         const city = r.city ? `<div class="muted" style="font-size:0.75rem">${escapeHtml(r.city)}</div>` : "";
         return `<tr>
-            <td><code>${escapeHtml(r.ip)}</code></td>
-            ${FLAGS.geoipEnabled ? `<td>${country}${city}</td>` : ""}
-            <td class="numeric">${fmtNumber(r.count)}</td>
+            <td data-label="IP"><code>${escapeHtml(r.ip)}</code></td>
+            ${FLAGS.geoipEnabled ? `<td data-label="Country">${country}${city}</td>` : ""}
+            <td data-label="4xx" class="numeric">${fmtNumber(r.count)}</td>
         </tr>`;
     }).join("");
 }
@@ -190,15 +190,15 @@ function renderRecent(rows) {
         return;
     }
     tbody.innerHTML = rows.map(r => {
-        const cc = r.country_code ? `<td>${flagEmoji(r.country_code)}</td>` : (FLAGS.geoipEnabled ? "<td></td>" : "");
+        const cc = r.country_code ? `<td data-label="Country">${flagEmoji(r.country_code)}</td>` : (FLAGS.geoipEnabled ? `<td data-label="Country"></td>` : "");
         const statusCls = r.status_code >= 500 ? "s5xx" : "s4xx";
         return `<tr>
-            <td>${window.tsHtml(new Date(r.ts * 1000).toISOString())}</td>
-            <td><code>${escapeHtml(r.ip || "—")}</code></td>
+            <td data-label="When">${window.tsHtml(new Date(r.ts * 1000).toISOString())}</td>
+            <td data-label="IP"><code>${escapeHtml(r.ip || "—")}</code></td>
             ${cc}
-            <td><span class="status-pill ${statusCls}">${r.status_code}</span></td>
-            <td><span class="reason-pill ${reasonPillClass(r.reason)}">${escapeHtml(r.reason)}</span></td>
-            <td><code class="muted" style="font-size:0.78rem">${escapeHtml(r.path)}</code></td>
+            <td data-label="Status"><span class="status-pill ${statusCls}">${r.status_code}</span></td>
+            <td data-label="Reason"><span class="reason-pill ${reasonPillClass(r.reason)}">${escapeHtml(r.reason)}</span></td>
+            <td data-label="Path"><code class="muted" style="font-size:0.78rem">${escapeHtml(r.path)}</code></td>
         </tr>`;
     }).join("");
 }
@@ -265,12 +265,12 @@ function renderCfEvents(events) {
     }
     tbody.innerHTML = events.map(e => `
         <tr>
-            <td>${window.tsHtml(new Date(e.ts * 1000).toISOString())}</td>
-            <td><span class="reason-pill ${e.action === "block" ? "failed-login" : ""}">${escapeHtml(e.action)}</span></td>
-            <td>${escapeHtml(e.source)}</td>
-            <td>${escapeHtml(e.country)}</td>
-            <td><code>${escapeHtml(e.client_ip)}</code></td>
-            <td><code class="muted" style="font-size:0.78rem">${escapeHtml(e.uri)}</code></td>
+            <td data-label="When">${window.tsHtml(new Date(e.ts * 1000).toISOString())}</td>
+            <td data-label="Action"><span class="reason-pill ${e.action === "block" ? "failed-login" : ""}">${escapeHtml(e.action)}</span></td>
+            <td data-label="Source">${escapeHtml(e.source)}</td>
+            <td data-label="Country">${escapeHtml(e.country)}</td>
+            <td data-label="IP"><code>${escapeHtml(e.client_ip)}</code></td>
+            <td data-label="Path"><code class="muted" style="font-size:0.78rem">${escapeHtml(e.uri)}</code></td>
         </tr>`).join("");
 }
 

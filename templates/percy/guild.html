@@ -403,12 +403,12 @@
 
             <div class="data-table-wrap" id="ignore-table-wrap" {% if guild.ignored_entities.is_empty() %}hidden{% endif %}>
                 <table class="data-table">
-                    <thead><tr><th>Name</th><th>Type</th><th class="col-actions">Actions</th></tr></thead>
+                    <thead><tr><th>Name</th><th>Type</th><th class="col-actions"></th></tr></thead>
                     <tbody id="ignore-tbody">
                         {% for ent in guild.ignored_entities %}
                         <tr data-entity-id="{{ ent.id }}">
-                            <td><strong>{{ ent.name }}</strong></td>
-                            <td><span class="pill pending">{{ ent.entity_type }}</span></td>
+                            <td data-label="Name"><strong>{{ ent.name }}</strong></td>
+                            <td data-label="Type"><span class="pill pending">{{ ent.entity_type }}</span></td>
                             <td class="col-actions"><button type="button" class="button small danger ignore-remove-btn" data-entity-id="{{ ent.id }}">Remove</button></td>
                         </tr>
                         {% endfor %}
@@ -436,11 +436,11 @@
 
             <div class="data-table-wrap" id="lockdown-table-wrap" {% if lockdowns.entries.is_empty() %}hidden{% endif %}>
                 <table class="data-table">
-                    <thead><tr><th>Locked Channel</th><th class="col-actions">Actions</th></tr></thead>
+                    <thead><tr><th>Locked Channel</th><th class="col-actions"></th></tr></thead>
                     <tbody id="lockdown-tbody">
                         {% for entry in lockdowns.entries %}
                         <tr data-channel-id="{{ entry.channel_id }}">
-                            <td><strong>#{{ entry.channel_name }}</strong></td>
+                            <td data-label="Channel"><strong>#{{ entry.channel_name }}</strong></td>
                             <td class="col-actions"><button type="button" class="button small lockdown-unlock-btn" data-channel-id="{{ entry.channel_id }}">Unlock</button></td>
                         </tr>
                         {% endfor %}

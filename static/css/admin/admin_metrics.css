@@ -243,3 +243,40 @@
     gap: 0.6rem;
     /*justify-content: flex-end;*/
 }
+
+/* -- Container table: responsive card layout on mobile -- */
+@media (max-width: 768px) {
+    .container-table thead { display: none; }
+    .container-table,
+    .container-table tbody,
+    .container-table tr,
+    .container-table td { display: block; }
+    .container-table tbody tr {
+        padding: 0.6rem 0.75rem;
+        border-top: 1px solid var(--box-border);
+    }
+    .container-table tbody tr:first-child { border-top: none; }
+    .container-table tbody tr + tr td { border-top: none; }
+    .container-table td {
+        padding: 0.2rem 0;
+        text-align: left;
+    }
+    .container-table td[data-label]::before {
+        content: attr(data-label) ":\00a0";
+        color: var(--text-muted);
+        font-size: 0.68rem;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .container-table td.col-actions,
+    .container-table td .row-actions,
+    .container-table tbody td:has(> .button) {
+        display: flex;
+        justify-content: center;
+        padding-top: 0.4rem;
+    }
+    .container-table .numeric { text-align: left; }
+    .container-table .table-empty { padding: 0.6rem 0; }
+    .container-table .table-empty::before { display: none; }
+}

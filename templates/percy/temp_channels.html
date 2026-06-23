@@ -41,9 +41,9 @@
             <tbody>
                 {% for entry in data.entries %}
                 <tr>
-                    <td><strong>{{ entry.channel_name }}</strong> <code class="text-muted">{{ entry.channel_id }}</code></td>
-                    <td><code>{{ entry.format }}</code></td>
-                    <td class="nowrap">
+                    <td data-label="Channel"><strong>{{ entry.channel_name }}</strong> <code class="text-muted">{{ entry.channel_id }}</code></td>
+                    <td data-label="Format"><code>{{ entry.format }}</code></td>
+                    <td class="nowrap" data-label="In Use">
                         {% if entry.active_channels.is_empty() %}
                         <span class="text-muted">—</span>
                         {% else %}

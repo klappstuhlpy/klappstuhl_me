@@ -108,28 +108,28 @@
                     <th class="numeric" data-sort="number">Votes</th>
                     <th data-sort="number">Options</th>
                     <th data-sort="date">Published</th>
-                    <th class="col-actions">Actions</th>
+                    <th class="col-actions"></th>
                 </tr>
             </thead>
             <tbody>
                 {% for poll in polls.polls %}
                 <tr>
-                    <td>
+                    <td data-label="Question">
                         <strong>{{ poll.question }}</strong>
                         {% if !poll.description.is_empty() %}
                         <br><span class="text-muted poll-desc">{{ poll.description }}</span>
                         {% endif %}
                     </td>
-                    <td>
+                    <td data-label="Status">
                         {% if poll.ended %}
                         <span class="pill ended dot">Ended</span>
                         {% else %}
                         <span class="pill active dot">Active</span>
                         {% endif %}
                     </td>
-                    <td class="numeric">{{ poll.total_votes }}</td>
-                    <td>{{ poll.options.len() }} options</td>
-                    <td class="member-joined"><time class="js-ts">{{ poll.published.as_deref().unwrap_or("—") }}</time></td>
+                    <td class="numeric" data-label="Votes">{{ poll.total_votes }}</td>
+                    <td data-label="Options">{{ poll.options.len() }} options</td>
+                    <td class="member-joined" data-label="Published"><time class="js-ts">{{ poll.published.as_deref().unwrap_or("—") }}</time></td>
                     <td class="col-actions">
                         {% if !poll.ended %}
                         <button class="button small" onclick='openEditPoll({{ poll.id }}, this)'>Edit</button>

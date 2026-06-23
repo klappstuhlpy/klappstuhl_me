@@ -29,9 +29,9 @@
             <tbody>
                 {% for item in economy.items %}
                 <tr>
-                    <td><strong>{{ item.name }}</strong></td>
-                    <td>{{ item.price }}</td>
-                    <td>
+                    <td data-label="Name"><strong>{{ item.name }}</strong></td>
+                    <td data-label="Price">{{ item.price }}</td>
+                    <td data-label="Effect">
                         {% match item.effect.as_deref() %}
                         {% when Some with ("cash") %}
                             <span class="badge badge-info">Cash {{ item.effect_value.unwrap_or(0) }}</span>
@@ -47,7 +47,7 @@
                             <span class="text-muted">None</span>
                         {% endmatch %}
                     </td>
-                    <td class="text-muted">{{ item.description.as_deref().unwrap_or("-") }}</td>
+                    <td class="text-muted" data-label="Description">{{ item.description.as_deref().unwrap_or("-") }}</td>
                     <td><button class="button small danger delete-item-btn" data-name="{{ item.name }}">Delete</button></td>
                 </tr>
                 {% endfor %}
@@ -83,10 +83,10 @@
             <tbody>
                 {% for b in balances.entries %}
                 <tr>
-                    <td>{{ b.username }}</td>
-                    <td>{{ b.cash }}</td>
-                    <td>{{ b.bank }}</td>
-                    <td><strong>{{ b.total }}</strong></td>
+                    <td data-label="Member">{{ b.username }}</td>
+                    <td data-label="Cash">{{ b.cash }}</td>
+                    <td data-label="Bank">{{ b.bank }}</td>
+                    <td data-label="Total"><strong>{{ b.total }}</strong></td>
                     <td>
                         <button class="button small edit-balance-btn"
                                 data-user-id="{{ b.user_id }}"

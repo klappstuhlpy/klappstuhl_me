@@ -58,7 +58,7 @@
             <tbody>
                 {% for giveaway in giveaways.giveaways %}
                 <tr>
-                    <td>
+                    <td data-label="Title">
                         <strong>{{ giveaway.title }}</strong>
                         {% match giveaway.description %}
                         {% when Some with (desc) %}
@@ -66,16 +66,16 @@
                         {% when None %}
                         {% endmatch %}
                     </td>
-                    <td>
+                    <td data-label="Status">
                         {% if giveaway.ended %}
                         <span class="pill ended dot">Ended</span>
                         {% else %}
                         <span class="pill active dot">Active</span>
                         {% endif %}
                     </td>
-                    <td class="numeric">{{ giveaway.entries }}</td>
-                    <td class="numeric">{{ giveaway.winners_count }}</td>
-                    <td class="member-joined"><time class="js-ts">{{ giveaway.ends_at.as_deref().unwrap_or("—") }}</time></td>
+                    <td class="numeric" data-label="Entries">{{ giveaway.entries }}</td>
+                    <td class="numeric" data-label="Winners">{{ giveaway.winners_count }}</td>
+                    <td class="member-joined" data-label="Ends At"><time class="js-ts">{{ giveaway.ends_at.as_deref().unwrap_or("—") }}</time></td>
                     <td class="nowrap">
                         {% if !giveaway.ended %}
                         <button class="button small giveaway-end-btn inline-block" data-id="{{ giveaway.id }}" data-title="{{ giveaway.title }}">End</button>

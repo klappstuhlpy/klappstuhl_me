@@ -143,16 +143,16 @@
         <div class="data-table-wrap">
             <table class="data-table" id="level-roles-table">
                 <thead>
-                    <tr><th>Role</th><th class="numeric">Level</th><th class="col-actions">Actions</th></tr>
+                    <tr><th>Role</th><th class="numeric">Level</th><th class="col-actions"></th></tr>
                 </thead>
                 <tbody>
                     {% for row in level_roles %}
                     <tr data-level="{{ row.level }}" data-role-id="{{ row.role_id }}">
-                        <td>
+                        <td data-label="Role">
                             <span class="role-swatch" style="background: {{ row.color_hex }}"></span>
                             <span class="role-name" style="color: {{ row.color_hex }}">{{ row.role_name }}</span>
                         </td>
-                        <td class="numeric">{{ row.level }}</td>
+                        <td class="numeric" data-label="Level">{{ row.level }}</td>
                         <td class="col-actions"><button class="button small danger lvl-role-remove" data-level="{{ row.level }}">Remove</button></td>
                     </tr>
                     {% endfor %}
@@ -186,11 +186,11 @@
         <div class="data-table-wrap">
             <table class="data-table" id="mult-roles-table">
                 <thead>
-                    <tr><th>Role</th><th class="numeric">Multiplier</th><th class="col-actions">Actions</th></tr>
+                    <tr><th>Role</th><th class="numeric">Multiplier</th><th class="col-actions"></th></tr>
                 </thead>
                 <tbody>
                     {% for row in multiplier_roles %}
-                    <tr><td>{{ row.name }}</td><td class="numeric">{{ row.multiplier }}x</td>
+                    <tr><td data-label="Role">{{ row.name }}</td><td class="numeric" data-label="Multiplier">{{ row.multiplier }}x</td>
                         <td class="col-actions"><button class="button small danger mult-remove" data-type="role" data-id="{{ row.id }}">Remove</button></td></tr>
                     {% endfor %}
                     {% if multiplier_roles.is_empty() %}
@@ -213,11 +213,11 @@
         <div class="data-table-wrap">
             <table class="data-table" id="mult-channels-table">
                 <thead>
-                    <tr><th>Channel</th><th class="numeric">Multiplier</th><th class="col-actions">Actions</th></tr>
+                    <tr><th>Channel</th><th class="numeric">Multiplier</th><th class="col-actions"></th></tr>
                 </thead>
                 <tbody>
                     {% for row in multiplier_channels %}
-                    <tr><td>{{ row.name }}</td><td class="numeric">{{ row.multiplier }}x</td>
+                    <tr><td data-label="Channel">{{ row.name }}</td><td class="numeric" data-label="Multiplier">{{ row.multiplier }}x</td>
                         <td class="col-actions"><button class="button small danger mult-remove" data-type="channel" data-id="{{ row.id }}">Remove</button></td></tr>
                     {% endfor %}
                     {% if multiplier_channels.is_empty() %}
@@ -247,7 +247,7 @@
             <table class="data-table">
                 <tbody>
                     {% for row in blacklisted_roles %}
-                    <tr><td>{{ row.name }}</td><td class="col-actions"><button class="button small danger bl-remove" data-type="role" data-id="{{ row.id }}">Remove</button></td></tr>
+                    <tr><td data-label="Role">{{ row.name }}</td><td class="col-actions"><button class="button small danger bl-remove" data-type="role" data-id="{{ row.id }}">Remove</button></td></tr>
                     {% endfor %}
                     {% if blacklisted_roles.is_empty() %}
                     <tr class="empty-row"><td class="text-muted">No blacklisted roles.</td></tr>
@@ -269,7 +269,7 @@
             <table class="data-table">
                 <tbody>
                     {% for row in blacklisted_channels %}
-                    <tr><td>{{ row.name }}</td><td class="col-actions"><button class="button small danger bl-remove" data-type="channel" data-id="{{ row.id }}">Remove</button></td></tr>
+                    <tr><td data-label="Channel">{{ row.name }}</td><td class="col-actions"><button class="button small danger bl-remove" data-type="channel" data-id="{{ row.id }}">Remove</button></td></tr>
                     {% endfor %}
                     {% if blacklisted_channels.is_empty() %}
                     <tr class="empty-row"><td class="text-muted">No blacklisted channels.</td></tr>
@@ -291,7 +291,7 @@
             <table class="data-table">
                 <tbody>
                     {% for row in blacklisted_users %}
-                    <tr><td>{{ row.name }}</td><td class="col-actions"><button class="button small danger bl-remove" data-type="user" data-id="{{ row.id }}">Remove</button></td></tr>
+                    <tr><td data-label="User">{{ row.name }}</td><td class="col-actions"><button class="button small danger bl-remove" data-type="user" data-id="{{ row.id }}">Remove</button></td></tr>
                     {% endfor %}
                     {% if blacklisted_users.is_empty() %}
                     <tr class="empty-row"><td class="text-muted">No blacklisted users.</td></tr>
@@ -312,13 +312,13 @@
         <div class="data-table-wrap">
             <table class="data-table" id="special-msg-table">
                 <thead>
-                    <tr><th class="numeric">Level</th><th>Message</th><th class="col-actions">Actions</th></tr>
+                    <tr><th class="numeric">Level</th><th>Message</th><th class="col-actions"></th></tr>
                 </thead>
                 <tbody>
                     {% for row in special_messages %}
                     <tr data-level="{{ row.level }}" data-message="{{ row.message }}">
-                        <td class="numeric">{{ row.level }}</td>
-                        <td>{{ row.message }}</td>
+                        <td class="numeric" data-label="Level">{{ row.level }}</td>
+                        <td data-label="Message">{{ row.message }}</td>
                         <td class="col-actions"><button class="button small danger special-remove" data-level="{{ row.level }}">Remove</button></td>
                     </tr>
                     {% endfor %}
@@ -364,16 +364,16 @@
                         <th class="numeric">Level</th>
                         <th class="numeric">XP</th>
                         <th class="numeric">Total XP</th>
-                        <th class="col-actions">Actions</th>
+                        <th class="col-actions"></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for entry in leaderboard.entries %}
                     <tr data-user-id="{{ entry.user_id }}">
-                        <td>
+                        <td data-label="Rank">
                             <span class="leaderboard-rank{% if loop.index == 1 %} gold{% else if loop.index == 2 %} silver{% else if loop.index == 3 %} bronze{% endif %}">{{ loop.index }}</span>
                         </td>
-                        <td>
+                        <td data-label="Member">
                             <div class="member-cell">
                                 {% match entry.avatar_url %}
                                 {% when Some with (url) %}
@@ -383,9 +383,9 @@
                                 <span class="member-name">{{ entry.username }}</span>
                             </div>
                         </td>
-                        <td class="numeric">{{ entry.level }}</td>
-                        <td class="numeric">{{ entry.xp }}</td>
-                        <td class="numeric">{{ entry.total_xp }}</td>
+                        <td class="numeric" data-label="Level">{{ entry.level }}</td>
+                        <td class="numeric" data-label="XP">{{ entry.xp }}</td>
+                        <td class="numeric" data-label="Total XP">{{ entry.total_xp }}</td>
                         <td class="col-actions">
                             <button class="button small" onclick="editLevel('{{ entry.user_id }}', '{{ entry.username }}', {{ entry.level }}, {{ entry.xp }})">Edit</button>
                         </td>
