@@ -124,7 +124,7 @@
             {% if member.permissions != 0 %}
             <div class="metric-tile">
                 <span class="tile-label">Permissions</span>
-                <span class="tile-value tile-value-small">{{ member.permissions }}</span>
+                <a href="https://discordapi.com/permissions.html#{{ member.permissions }}" class="tile-value tile-value-small">{{ member.permissions }}</a>
             </div>
             {% endif %}
         </div>
