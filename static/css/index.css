@@ -1,148 +1,94 @@
 /* ── Homepage ────────────────────────────────────────────────────────────
-   A boot-sequence terminal hero that sits centered on load, then — a couple
-   seconds in — glides upward and types in more lines, opening the page up to
-   a scroll-revealed about / projects / stack story. Layered over an ambient
-   drifting-code field with a cursor-following spotlight.
-
-   Motion is JS-driven (static/js/index.js). The markup already contains the
-   final text, so with no JS (or reduced-motion) the page renders fully
-   expanded and usable — the `.js-index` class (set in the <head>) is what
-   opts into the collapsed pre-boot state. */
+   Minimal profile card hero, then scroll-revealed projects / stack.
+   Ambient drifting-code field + cursor spotlight from index.js. */
 
 /* ── Hero ──────────────────────────────────────────────────────────────── */
 
 .hero {
     position: relative;
     z-index: 1;
-    min-height: calc(100svh - 7rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    perspective: 1200px;
+    margin-top: 5rem;
+}
+
+/* ── Profile card ──────────────────────────────────────────────────────── */
+
+.profile-card {
+    width: min(480px, 92vw);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
+    gap: 1.1rem;
+    padding: 2.2rem 2rem 2rem;
     text-align: center;
-    /* Depth for the cursor-driven 3D tilt on the terminal window. */
-    perspective: 1200px;
-    /* Vertically centres the short phase-1 window; the transition to a small
-       value is the "rise up" morph once booted. */
-    padding-top: clamp(2rem, calc(50svh - 9rem), 26rem);
-    transition: padding-top 1s cubic-bezier(0.65, 0, 0.2, 1),
-                min-height 1s cubic-bezier(0.65, 0, 0.2, 1);
 }
 
-/* Centered terminal window holding the boot-sequence hero. */
-.term-window {
-    width: min(640px, 94vw);
-    text-align: left;
-    /* Tiny entrance + a transform hook the cursor-tilt JS writes into. */
-    transform: translateY(var(--tilt-y, 0)) rotateX(var(--rx, 0)) rotateY(var(--ry, 0));
-    transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.4s ease;
-    transform-style: preserve-3d;
-    will-change: transform;
+.profile-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid var(--box-border);
+    object-fit: cover;
+    display: block;
 }
 
-.term-hero {
+.profile-info {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    padding: 1.25rem 1.4rem 1.5rem;
 }
 
-/* The prompt lines sit tight above their "output". */
-.term-hero .tui-prompt { margin: 0; font-size: 0.95rem; }
-.term-hero .tui-prompt:not(:first-child) { margin-top: 0.6rem; }
-
-.hero-name {
-    margin: 0.1rem 0 0;
-    font-size: clamp(1.9rem, 7vw, 3.4rem);
+.profile-name {
+    margin: 0;
+    font-size: clamp(1.5rem, 5vw, 2rem);
     font-weight: 500;
     letter-spacing: -0.02em;
-    line-height: 1.05;
     color: var(--branding-bright);
-    white-space: nowrap;
 }
 
-.hero-tag {
-    margin: 0.1rem 0 0;
-    font-size: clamp(0.85rem, 2.6vw, 1.05rem);
-    color: var(--foreground);
-    letter-spacing: 0.02em;
-    min-height: 1.4em; /* avoid layout shift while it scrambles in */
-}
-
-.hero-out {
-    margin: 0.1rem 0 0;
-    font-size: clamp(0.78rem, 2.3vw, 0.95rem);
+.profile-desc {
+    margin: 0;
+    font-size: 0.9rem;
     color: var(--text-muted);
-    overflow-wrap: anywhere;
-}
-.hero-projects-line { color: var(--branding); opacity: 0.9; }
-
-/* Extra boot lines — present in the fallback, collapsed in the JS path until
-   the window has risen (phase 2). */
-.boot-extra { display: contents; }
-.js-index .boot-extra {
-    display: block;
-    overflow: hidden;
-    max-height: 0;
-    opacity: 0;
-    transform: translateY(-4px);
-    transition: max-height 0.7s ease, opacity 0.5s ease 0.2s, transform 0.5s ease 0.2s;
-}
-.js-index .boot-extra > p { margin-top: 0.6rem; }
-.js-index .boot-extra > p:first-child { margin-top: 0.6rem; }
-body.booted .boot-extra {
-    max-height: 16rem;
-    opacity: 1;
-    transform: none;
+    letter-spacing: 0.01em;
 }
 
-/* Phase 1 → 2 layout morph (JS-path only). Pre-boot: tall + centred. */
-.js-index .hero { /* defaults above already centre it */ }
-body.booted .hero {
-    padding-top: clamp(1.5rem, 7vh, 5rem);
-    min-height: calc(100svh - 7rem);
-}
-
-/* Random glyphs shown mid-decrypt — coral, slightly translucent, so the
-   word resolves from "brand colour noise" into clean text. */
-.scramble .glitch {
-    color: var(--branding);
-    opacity: 0.85;
-}
-
-/* ── Scroll cue ─────────────────────────────────────────────────────────── */
-
-.scroll-cue {
-    position: absolute;
-    bottom: 1.5rem;
-    left: 50%;
-    transform: translateX(-50%);
+.profile-links {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.2rem;
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    text-decoration: none;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.6s ease, color 0.2s ease;
-}
-.scroll-cue:hover { color: var(--branding); }
-body.booted .scroll-cue { opacity: 1; pointer-events: auto; }
-body.scrolled .scroll-cue { opacity: 0; pointer-events: none; }
-.scroll-cue-arrow {
-    font-size: 1rem;
-    animation: cue-bounce 1.8s ease-in-out infinite;
-}
-@keyframes cue-bounce {
-    0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(4px); }
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
-/* ── Page content (revealed below the hero) ─────────────────────────────── */
+.profile-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 1rem;
+    border: 1px solid var(--box-border);
+    border-radius: 9999px;
+    background: var(--box);
+    color: var(--foreground);
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: border-color 180ms ease, color 180ms ease, background-color 180ms ease;
+}
+.profile-link:hover {
+    border-color: var(--branding);
+    color: var(--branding-bright);
+    background: var(--box-shade);
+}
+
+.link-icon {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
+/* ── Page content ────────────────────────────────────────────────────────── */
 
 .page-content {
     position: relative;
@@ -173,16 +119,7 @@ body.scrolled .scroll-cue { opacity: 0; pointer-events: none; }
     color: var(--foreground);
 }
 
-.section-lead {
-    margin: 0;
-    max-width: 60ch;
-    color: var(--text-muted);
-    line-height: 1.7;
-    font-size: 1rem;
-}
-.prompt-inline { color: var(--prompt); font-weight: 700; margin-right: 0.35rem; }
-
-/* ── Project grid (folded in from the old /projects page) ───────────────── */
+/* ── Project grid ───────────────────────────────────────────────────────── */
 
 .project-grid {
     display: grid;
@@ -206,13 +143,12 @@ body.scrolled .scroll-cue { opacity: 0; pointer-events: none; }
     transition: border-color 200ms ease, background-color 200ms ease, transform 200ms ease;
 }
 
-/* A coral sheen that sweeps across on hover. */
 .project-card::after {
     content: "";
     position: absolute;
     inset: 0;
     background: radial-gradient(140px 140px at var(--mx, 50%) var(--my, 0%),
-        color-mix(in srgb, var(--branding) 22%, transparent), transparent 70%);
+    color-mix(in srgb, var(--branding) 22%, transparent), transparent 70%);
     opacity: 0;
     transition: opacity 220ms ease;
     pointer-events: none;
@@ -263,117 +199,11 @@ body.scrolled .scroll-cue { opacity: 0; pointer-events: none; }
     margin-top: auto;
 }
 
-/* ── Stack chips + CTA ──────────────────────────────────────────────────── */
-
-.stack-grid {
-    list-style: none;
-    margin: 1.75rem 0 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-}
-
-.stack-chip {
-    padding: 0.4rem 0.85rem;
-    border: 1px solid var(--box-border);
-    border-radius: 9999px;
-    background: var(--box);
-    color: var(--foreground);
-    font-size: 0.85rem;
-    transition: border-color 180ms ease, color 180ms ease, transform 180ms ease;
-}
-.stack-chip:hover {
-    border-color: var(--branding);
-    color: var(--branding-bright);
-    transform: translateY(-2px);
-}
-
-.cta { margin-top: 2.5rem; }
-.cta-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-/* ── Scroll-reveal ──────────────────────────────────────────────────────── */
-
-.js-index .reveal {
-    opacity: 0;
-    transform: translateY(24px);
-    transition: opacity 0.6s cubic-bezier(0.2, 0.7, 0.2, 1),
-                transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
-    /* staggered children (cards, chips) use --i for a cascade */
-    transition-delay: calc(var(--i, 0) * 60ms);
-}
-.js-index .reveal.in {
-    opacity: 1;
-    transform: none;
-}
-
-/* ── Ambient drifting-code field ────────────────────────────────────────── */
-
-.ambient {
-    position: fixed;
-    inset: 0;
-    overflow: hidden;
-    z-index: 0;
-    pointer-events: none;
-    /* Smooths the subtle mouse-parallax nudge applied in JS. */
-    transition: transform 0.35s ease-out;
-}
-
-.code-bit {
-    position: absolute;
-    bottom: -12%;
-    color: var(--branding);
-    opacity: 0;
-    white-space: nowrap;
-    font-family: inherit;
-    user-select: none;
-    will-change: transform, opacity;
-    animation-name: code-drift;
-    animation-timing-function: linear;
-    animation-iteration-count: infinite;
-}
-
-@keyframes code-drift {
-    0%   { transform: translateY(0) translateX(0); opacity: 0; }
-    12%  { opacity: 0.09; }
-    88%  { opacity: 0.09; }
-    100% { transform: translateY(-118vh) translateX(var(--drift, 0)); opacity: 0; }
-}
-
-/* ── Cursor spotlight ───────────────────────────────────────────────────── */
-
-.cursor-glow {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 480px;
-    height: 480px;
-    border-radius: 50%;
-    z-index: 0;
-    pointer-events: none;
-    opacity: 0;
-    /* Centred on the pointer via translate written by JS. */
-    transform: translate(-50%, -50%);
-    background: radial-gradient(circle,
-        color-mix(in srgb, var(--branding) 16%, transparent) 0%,
-        transparent 62%);
-    transition: opacity 0.4s ease;
-    will-change: left, top;
-}
-.cursor-glow.on { opacity: 1; }
-
-/* ── Reduced motion: everything settles to a clean static state ─────────── */
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-    .hero, .term-window, .boot-extra,
-    .js-index .reveal { transition: none; }
+    .js-index .reveal { transition: none; opacity: 1; transform: none; }
     .ambient, .cursor-glow { display: none; }
-    .scroll-cue-arrow { animation: none; }
-    .js-index .reveal { opacity: 1; transform: none; }
 }
 
 @media (min-width: 480px) {
