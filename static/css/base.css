@@ -838,8 +838,7 @@ a.nav-item.active { font-weight: bold; }
     background: var(--box);
     color: var(--nav-link-hover);
 }
-.account-dropdown-logout { color: var(--link-text); }
-.account-dropdown-logout:hover { color: var(--error-text); }
+.account-dropdown-logout { color: var(--error-text); }
 
 .account-dropdown-sep {
     margin: 0.35rem 0.25rem;

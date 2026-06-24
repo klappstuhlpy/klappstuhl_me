@@ -205,7 +205,7 @@
     background: var(--box-shade);
 }
 
-.percy-dropdown-logout:hover {
+.percy-dropdown-logout {
     color: var(--error-text);
 }
 
