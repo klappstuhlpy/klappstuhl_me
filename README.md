@@ -8,15 +8,14 @@ management, security analytics, virus scanning, and a user account system.
 
 ## Documentation
 
-The **public Klappstuhl.me API** (images, media, render, scan, admin) and the **Percy
-internal dashboard API** are documented in the [Mintlify](https://mintlify.com) site:
+The **public Klappstuhl.me API** (images, media, render, scan, admin) is documented by its
+live, interactive **Scalar** reference at [`/api/docs`](https://klappstuhl.me/api/docs),
+generated from `api/mod.rs`'s OpenAPI schema. When you add or change an endpoint, the
+Scalar page updates automatically.
 
-- **Read it:** https://percy.klappstuhl.me/docs/ (API Reference tab)
-- **Edit it:** [`klappstuhlpy/percy-docs`](https://github.com/klappstuhlpy/percy-docs)
-
-The reference mirrors `api/mod.rs`'s OpenAPI schema and the internal API route table —
-when you add or change an endpoint, update `percy-docs` to match. An interactive Scalar
-reference is still served live at `/api/docs`.
+> A dedicated page for this API in the [Mintlify docs site](https://percy.klappstuhl.me/docs/)
+> (repo: [`klappstuhlpy/percy-docs`](https://github.com/klappstuhlpy/percy-docs)) is planned —
+> that site currently covers Percy itself and Percy's internal dashboard API.
 
 ## Highlights
 
