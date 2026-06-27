@@ -3167,3 +3167,27 @@ a.user-tag-chip:hover { border-color: var(--branding); }
     font-weight: 600;
     font-size: 0.72rem;
 }
+
+/* AI tab — per-channel override summary badges. */
+.ai-badge {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    margin: 0.1rem 0.15rem 0.1rem 0;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ai-badge-on {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: var(--success-border);
+}
+
+.ai-badge-off {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-color: var(--error-border);
+}

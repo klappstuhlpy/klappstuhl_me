@@ -1,5 +1,17 @@
 //! Request handlers for the Percy dashboard routes.
 
+use super::templates::*;
+use super::{
+    build_general_invite_url, build_invite_url, cached_channels, cached_legal_doc, cached_roles, check_guild_access,
+    check_guild_membership, get_admin_guilds, get_discord_id, get_percy_client, json_or_flash,
+};
+use crate::routes::dashboard::cached_md_file;
+use crate::{
+    flash::{Flasher, Flashes},
+    models::Account,
+    percy::*,
+    AppState,
+};
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -8,18 +20,6 @@ use axum::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
-use crate::{
-    flash::{Flasher, Flashes},
-    models::Account,
-    percy::*,
-    AppState,
-};
-use crate::routes::dashboard::cached_md_file;
-use super::templates::*;
-use super::{
-    build_general_invite_url, build_invite_url, cached_channels, cached_legal_doc, cached_roles, check_guild_access,
-    check_guild_membership, get_admin_guilds, get_discord_id, get_percy_client, json_or_flash,
-};
 
 /// Canonical sources for Percy's public legal docs, fetched live and rendered.
 const PRIVACY_POLICY_URL: &str = "https://raw.githubusercontent.com/klappstuhlpy/Percy/master/PRIVACY_POLICY.md";
@@ -746,6 +746,111 @@ pub(super) async fn guild_config_update(
                 json_or_flash(&headers, &flasher, false, "Failed to save settings.", &redirect_url)
             }
         }
+    }
+}
+
+/// The AI feature flag names — must match Percy's `GuildConfig.AIFlags` / the internal API.
+const AI_FLAG_NAMES: [&str; 9] = [
+    "assistant",
+    "router",
+    "moderation",
+    "sentinel",
+    "music",
+    "polls",
+    "giveaways",
+    "tags",
+    "reminders",
+];
+
+/// `POST /dashboard/guild/:guild_id/ai` — toggle the server-wide AI feature flags (form).
+pub(super) async fn guild_ai_flags_update(
+    State(state): State<AppState>,
+    account: Account,
+    flasher: Flasher,
+    headers: HeaderMap,
+    Path(guild_id): Path<u64>,
+    Form(fields): Form<HashMap<String, String>>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return json_or_flash(&headers, &flasher, false, "Access denied.", "/dashboard");
+    }
+
+    let mut flags = serde_json::Map::new();
+    for name in AI_FLAG_NAMES {
+        flags.insert(name.to_string(), serde_json::Value::Bool(fields.contains_key(name)));
+    }
+    let patch = serde_json::json!({ "flags": flags });
+    let redirect_url = format!("/dashboard/guild/{guild_id}");
+
+    match percy.patch_ai_flags(guild_id, &patch).await {
+        Ok(()) => json_or_flash(&headers, &flasher, true, "AI settings saved.", &redirect_url),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to update AI flags");
+            json_or_flash(&headers, &flasher, false, "Failed to save AI settings.", &redirect_url)
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub(super) struct AiOverrideBody {
+    channel_id: String,
+    #[serde(default)]
+    controlled: HashMap<String, bool>,
+    #[serde(default)]
+    enabled: HashMap<String, bool>,
+}
+
+/// `POST /dashboard/guild/:guild_id/ai/override` — create/replace a per-channel AI override (JSON).
+pub(super) async fn guild_ai_override_update(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<AiOverrideBody>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false, "error": "Not authenticated"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    let Ok(channel_id) = body.channel_id.parse::<u64>() else {
+        return Json(serde_json::json!({"ok": false, "error": "Invalid channel id"})).into_response();
+    };
+
+    let payload = serde_json::json!({ "controlled": body.controlled, "enabled": body.enabled });
+    match percy.put_ai_override(guild_id, channel_id, &payload).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+/// `POST /dashboard/guild/:guild_id/ai/override/:channel_id/delete` — remove a per-channel override.
+pub(super) async fn guild_ai_override_delete(
+    State(state): State<AppState>,
+    account: Account,
+    Path((guild_id, channel_id)): Path<(u64, u64)>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false, "error": "Not authenticated"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.delete_ai_override(guild_id, channel_id).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
     }
 }
 
