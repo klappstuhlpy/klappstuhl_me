@@ -6,6 +6,17 @@ What started as a small image host has grown into a single binary that also runs
 the admin tooling for the machine it sits on: live system metrics, container
 management, security analytics, virus scanning, and a user account system.
 
+## Documentation
+
+The **public Klappstuhl.me API** (images, media, render, scan, admin) is documented by its
+live, interactive **Scalar** reference at [`/api/docs`](https://klappstuhl.me/api/docs),
+generated from `api/mod.rs`'s OpenAPI schema. When you add or change an endpoint, the
+Scalar page updates automatically.
+
+> A dedicated page for this API in the [Mintlify docs site](https://percy.klappstuhl.me/docs/)
+> (repo: [`klappstuhlpy/percy-docs`](https://github.com/klappstuhlpy/percy-docs)) is planned —
+> that site currently covers Percy itself and Percy's internal dashboard API.
+
 ## Highlights
 
 - **Public site** — landing page, projects page, image gallery.

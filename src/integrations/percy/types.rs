@@ -71,6 +71,88 @@ pub struct GuildInfo {
     pub prefixes: Vec<String>,
     #[serde(default)]
     pub is_new_config: bool,
+    #[serde(default)]
+    pub ai: AiConfig,
+}
+
+/// Per-guild AI feature flags plus per-channel overrides (the AI-native rewrite).
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct AiConfig {
+    #[serde(default)]
+    pub flags: AiFlags,
+    #[serde(default)]
+    pub overrides: Vec<AiChannelOverride>,
+}
+
+/// The AI feature toggles. Mirrors Percy's `GuildConfig.AIFlags`; each field defaults off.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct AiFlags {
+    #[serde(default)]
+    pub assistant: bool,
+    #[serde(default)]
+    pub router: bool,
+    #[serde(default)]
+    pub moderation: bool,
+    #[serde(default)]
+    pub sentinel: bool,
+    #[serde(default)]
+    pub music: bool,
+    #[serde(default)]
+    pub polls: bool,
+    #[serde(default)]
+    pub giveaways: bool,
+    #[serde(default)]
+    pub tags: bool,
+    #[serde(default)]
+    pub reminders: bool,
+}
+
+/// A per-channel override: `controlled` marks which features the channel overrides,
+/// and `enabled` holds their on/off value for those controlled features.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AiChannelOverride {
+    #[serde(default)]
+    pub channel: Option<ChannelRef>,
+    pub channel_id: String,
+    #[serde(default)]
+    pub controlled: AiFlags,
+    #[serde(default)]
+    pub enabled: AiFlags,
+}
+
+/// One controlled feature in an override's summary (for the dashboard table).
+pub struct AiFeatureState {
+    pub label: &'static str,
+    pub on: bool,
+}
+
+impl AiChannelOverride {
+    /// The features this channel actually overrides, with their on/off value, for display.
+    pub fn summary(&self) -> Vec<AiFeatureState> {
+        let pairs = [
+            ("Assistant", self.controlled.assistant, self.enabled.assistant),
+            ("Router", self.controlled.router, self.enabled.router),
+            ("Moderation", self.controlled.moderation, self.enabled.moderation),
+            ("Sentinel", self.controlled.sentinel, self.enabled.sentinel),
+            ("Music", self.controlled.music, self.enabled.music),
+            ("Polls", self.controlled.polls, self.enabled.polls),
+            ("Giveaways", self.controlled.giveaways, self.enabled.giveaways),
+            ("Tags", self.controlled.tags, self.enabled.tags),
+            ("Reminders", self.controlled.reminders, self.enabled.reminders),
+        ];
+        pairs
+            .into_iter()
+            .filter(|&(_, controlled, _)| controlled)
+            .map(|(label, _, on)| AiFeatureState { label, on })
+            .collect()
+    }
+}
+
+impl AiConfig {
+    /// The per-channel overrides serialized as JSON, for the editor's `window.AI_OVERRIDES`.
+    pub fn overrides_json(&self) -> String {
+        serde_json::to_string(&self.overrides).unwrap_or_else(|_| "[]".to_string())
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

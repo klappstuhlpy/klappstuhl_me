@@ -401,6 +401,12 @@ pub fn routes() -> Router<AppState> {
         )
         .route("/dashboard/guild/:guild_id", get(guild_detail))
         .route("/dashboard/guild/:guild_id/config", post(guild_config_update))
+        .route("/dashboard/guild/:guild_id/ai", post(guild_ai_flags_update))
+        .route("/dashboard/guild/:guild_id/ai/override", post(guild_ai_override_update))
+        .route(
+            "/dashboard/guild/:guild_id/ai/override/:channel_id/delete",
+            post(guild_ai_override_delete),
+        )
         .route("/dashboard/guild/:guild_id/sentinel", post(guild_sentinel_update))
         .route("/dashboard/guild/:guild_id/members", get(guild_members))
         .route("/dashboard/guild/:guild_id/members.json", get(guild_members_json))

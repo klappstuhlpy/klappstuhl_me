@@ -91,6 +91,7 @@
         <button role="tab" aria-selected="true" data-tab="general">General</button>
         <button role="tab" data-tab="moderation">Moderation</button>
         <button role="tab" data-tab="sentinel">Sentinel</button>
+        <button role="tab" data-tab="ai">AI</button>
         <button role="tab" data-tab="custom-bot">Custom Bot</button>
     </nav>
 
@@ -249,6 +250,102 @@
             <div class="config-actions">
                 <button type="button" class="button small danger" id="status-feed-unsub"{% if !status_feed.subscribed %} hidden{% endif %}>Unsubscribe</button>
                 <button type="button" class="button primary small" id="status-feed-sub">{% if status_feed.subscribed %}Move Channel{% else %}Subscribe{% endif %}</button>
+            </div>
+        </section>
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════════ #}
+    {# TAB: AI                                                         #}
+    {# ═══════════════════════════════════════════════════════════════ #}
+    <div class="config-tab-panel" id="tab-ai" role="tabpanel" hidden>
+
+        {# ─── Server-wide AI features ─────────────────────────────────── #}
+        <section class="config-section">
+            <h2>AI Features</h2>
+            <p class="config-section-description">Percy's AI runs on a self-hosted model. Choose which AI-assisted features are active for this server — all are off by default and opt-in. If the AI engine is unreachable, these features degrade gracefully to their non-AI behaviour.</p>
+            <form method="POST" action="/dashboard/guild/{{ guild.id }}/ai">
+                <div class="config-grid">
+                    <label class="config-toggle">
+                        <div><span class="config-label">Assistant</span><span class="config-description">The conversational <code>?ask</code> command</span></div>
+                        <input type="checkbox" name="assistant" value="true" {% if guild.ai.flags.assistant %}checked{% endif %}>
+                    </label>
+                    <label class="config-toggle">
+                        <div><span class="config-label">Command Router</span><span class="config-description">Route natural-language messages to the right command</span></div>
+                        <input type="checkbox" name="router" value="true" {% if guild.ai.flags.router %}checked{% endif %}>
+                    </label>
+                    <label class="config-toggle">
+                        <div><span class="config-label">Moderation</span><span class="config-description">AI-assisted spam/abuse signals for moderation</span></div>
+                        <input type="checkbox" name="moderation" value="true" {% if guild.ai.flags.moderation %}checked{% endif %}>
+                    </label>
+                    <label class="config-toggle">
+                        <div><span class="config-label">Sentinel Screening</span><span class="config-description">AI risk signal for the captcha gatekeeper</span></div>
+                        <input type="checkbox" name="sentinel" value="true" {% if guild.ai.flags.sentinel %}checked{% endif %}>
+                    </label>
+                    <label class="config-toggle">
+                        <div><span class="config-label">Music</span><span class="config-description">Natural-language music requests &amp; filters</span></div>
+                        <input type="checkbox" name="music" value="true" {% if guild.ai.flags.music %}checked{% endif %}>
+                    </label>
+                    <label class="config-toggle">
+                        <div><span class="config-label">Polls</span><span class="config-description">Build polls from a plain-language description</span></div>
+                        <input type="checkbox" name="polls" value="true" {% if guild.ai.flags.polls %}checked{% endif %}>
+                    </label>
+                    <label class="config-toggle">
+                        <div><span class="config-label">Giveaways</span><span class="config-description">Extract giveaway details from a sentence</span></div>
+                        <input type="checkbox" name="giveaways" value="true" {% if guild.ai.flags.giveaways %}checked{% endif %}>
+                    </label>
+                    <label class="config-toggle">
+                        <div><span class="config-label">Tags</span><span class="config-description">Semantic tag search and drafting</span></div>
+                        <input type="checkbox" name="tags" value="true" {% if guild.ai.flags.tags %}checked{% endif %}>
+                    </label>
+                    <label class="config-toggle">
+                        <div><span class="config-label">Reminders</span><span class="config-description">Natural-language time parsing for reminders</span></div>
+                        <input type="checkbox" name="reminders" value="true" {% if guild.ai.flags.reminders %}checked{% endif %}>
+                    </label>
+                </div>
+                <div class="config-actions">
+                    <button type="button" class="button small cancel-btn">Cancel</button>
+                    <button type="submit" class="button primary small">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        {# ─── Per-channel overrides ───────────────────────────────────── #}
+        <section class="config-section">
+            <h2>Per-channel Overrides</h2>
+            <p class="config-section-description">Override the server-wide AI settings in specific channels. For each feature choose <strong>Inherit</strong> (use the server setting), <strong>On</strong>, or <strong>Off</strong>. Saving a channel that already has an override replaces it.</p>
+
+            <div class="config-grid-single">
+                <div class="config-field">
+                    <label class="config-label" for="ai-override-channel">Channel</label>
+                    <select id="ai-override-channel" class="config-select">
+                        <option value="">Select a channel…</option>
+                        {% for ch in channels %}{% if ch.channel_type == "text" || ch.channel_type == "news" %}
+                        <option value="{{ ch.id }}">#{{ ch.name }}</option>
+                        {% endif %}{% endfor %}
+                    </select>
+                </div>
+                <div id="ai-override-grid" class="config-grid"></div>
+                <div class="config-actions">
+                    <button type="button" class="button primary small" id="ai-override-save" disabled>Save Override</button>
+                </div>
+            </div>
+
+            <p class="text-muted" id="ai-override-empty" {% if !guild.ai.overrides.is_empty() %}hidden{% endif %}>No per-channel overrides configured.</p>
+            <div class="config-table-wrap" id="ai-override-table-wrap" {% if guild.ai.overrides.is_empty() %}hidden{% endif %}>
+                <table class="config-table">
+                    <thead><tr><th>Channel</th><th>Overrides</th><th></th></tr></thead>
+                    <tbody id="ai-override-tbody">
+                    {% for ov in guild.ai.overrides %}
+                        <tr data-channel-id="{{ ov.channel_id }}">
+                            <td>{% match ov.channel %}{% when Some with (c) %}#{{ c.name }}{% when None %}{{ ov.channel_id }}{% endmatch %}</td>
+                            <td>
+                                {% for f in ov.summary() %}<span class="ai-badge ai-badge-{% if f.on %}on{% else %}off{% endif %}">{{ f.label }}: {% if f.on %}On{% else %}Off{% endif %}</span> {% endfor %}
+                            </td>
+                            <td><button type="button" class="button small danger ai-override-remove" data-channel-id="{{ ov.channel_id }}">Remove</button></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </section>
     </div>
@@ -722,8 +819,10 @@
 
 {% block body_end %}
 <script>const GUILD_ID = '{{ guild.id }}';</script>
+<script>window.AI_OVERRIDES = {{ guild.ai.overrides_json()|safe }};</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" crossorigin="anonymous"></script>
 <script src="/static/js/percy/percy_common.js"></script>
 <script src="/static/js/percy/percy_dashboard.js"></script>
 <script src="/static/js/percy/percy_guild.js"></script>
+<script src="/static/js/percy/percy_ai.js"></script>
 {% endblock %}

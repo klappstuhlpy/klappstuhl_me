@@ -65,6 +65,7 @@
             {% block nav_section %}{% endblock %}
             {# Inline site links — desktop only. On mobile they move into the
                account / menu dropdown (see the `.nav-extra` items below). #}
+            <a class="nav-item not-mobile" href="https://percy.klappstuhl.me/docs/">Docs</a>
             <span class="nav-item spacer"></span>
             {# Colour-theme toggle: the sun and moon cross-fade when clicked. #}
             <button type="button" class="theme-toggle nav-item" id="theme-toggle" aria-label="Toggle colour theme" title="Toggle light / dark theme">
@@ -103,6 +104,7 @@
                     <a class="account-dropdown-item" role="menuitem" href="/images">Images</a>
                     <a class="account-dropdown-item" role="menuitem" href="/links">Short Links</a>
                     <a class="account-dropdown-item" role="menuitem" href="/percy">Percy</a>
+                    <a class="account-dropdown-item" role="menuitem" href="https://percy.klappstuhl.me/docs/">Docs</a>
                     <hr class="account-dropdown-sep">
                     {# Status group. The site links (Projects, GitHub) are
                        surfaced inside the dropdown on mobile only (`.nav-extra`).
@@ -125,6 +127,7 @@
                 </button>
                 <div class="account-dropdown" role="menu">
                     <a class="account-dropdown-item" role="menuitem" href="/percy">Percy</a>
+                    <a class="account-dropdown-item" role="menuitem" href="https://percy.klappstuhl.me/docs/">Docs</a>
                     <hr class="account-dropdown-sep">
                     <a class="account-dropdown-item" role="menuitem" href="/login">Login</a>
                 </div>

@@ -107,6 +107,40 @@ impl PercyClient {
         .await
     }
 
+    /// Toggle the server-wide AI feature flags. `patch` is `{ "flags": { name: bool, … } }`.
+    pub async fn patch_ai_flags(&self, guild_id: u64, patch: &serde_json::Value) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .patch(self.url(&format!("/api/v1/guilds/{guild_id}/ai")))
+                .json(patch),
+        )
+        .await
+    }
+
+    /// Create or replace a per-channel AI override. An override controlling nothing is removed.
+    pub async fn put_ai_override(
+        &self,
+        guild_id: u64,
+        channel_id: u64,
+        body: &serde_json::Value,
+    ) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .put(self.url(&format!("/api/v1/guilds/{guild_id}/ai/overrides/{channel_id}")))
+                .json(body),
+        )
+        .await
+    }
+
+    /// Remove a per-channel AI override.
+    pub async fn delete_ai_override(&self, guild_id: u64, channel_id: u64) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .delete(self.url(&format!("/api/v1/guilds/{guild_id}/ai/overrides/{channel_id}"))),
+        )
+        .await
+    }
+
     /// Update audit log event flags.
     pub async fn patch_audit_log_flags(
         &self,
