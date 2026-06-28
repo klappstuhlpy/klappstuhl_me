@@ -152,6 +152,10 @@ pub(super) async fn percy_bot_version(State(state): State<AppState>) -> Json<ser
     Json(serde_json::json!({ "version": version }))
 }
 
+pub(super) async fn percy_support_server() -> Response {
+    Redirect::to("https://discord.gg/3jSYQ9VNbA").into_response()
+}
+
 pub(super) async fn guild_list(State(state): State<AppState>, account: Option<Account>, flashes: Flashes) -> Response {
     // Logged-out visitors get a welcome/landing page that introduces the bot
     // and links to login/signup (which redirect back here afterwards).

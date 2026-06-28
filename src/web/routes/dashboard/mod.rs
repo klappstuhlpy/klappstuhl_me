@@ -25,6 +25,7 @@ use axum::{
     routing::{delete, get, patch, post},
     Json, Router,
 };
+use axum::response::Redirect;
 use quick_cache::sync::Cache;
 
 use crate::{
@@ -362,6 +363,7 @@ pub fn routes() -> Router<AppState> {
         // Public pages (percy subdomain landing page-linked).
         .route("/commands", get(percy_commands))
         .route("/changelog", get(percy_changelog))
+        .route("/support", get(percy_support_server))
         // Public legal docs, rendered live from the canonical GitHub repo.
         .route("/privacy-policy", get(percy_privacy))
         .route("/terms-of-service", get(percy_terms))
