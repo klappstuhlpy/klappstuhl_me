@@ -786,6 +786,7 @@ a.invite-percy-btn:hover {
     border-radius: 0.375rem;
     background: var(--box-shade);
     border: 1px solid var(--box-border);
+    margin-bottom: 1rem;
 }
 
 .config-toggle > div,
