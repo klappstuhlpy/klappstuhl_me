@@ -1054,7 +1054,10 @@ pub fn routes() -> Router<AppState> {
             "/account/api_key",
             post(generate_api_key).layer(RateLimit::default().quota(1, 600.0).build()),
         )
-        .route("/account/change_password", post(change_password))
+        .route(
+            "/account/change_password",
+            post(change_password).layer(RateLimit::default().quota(5, 60.0).build()),
+        )
         .route("/account/sharex.sxcu", get(sharex_config))
         .route("/user/:name", get(show_other_account_info))
         .route(
