@@ -25,7 +25,6 @@ use axum::{
     routing::{delete, get, patch, post},
     Json, Router,
 };
-use axum::response::Redirect;
 use quick_cache::sync::Cache;
 
 use crate::{
