@@ -57,6 +57,7 @@ const RESERVED_CODES: &[&str] = &[
     "sw.js",
     "robots.txt",
     "favicon.ico",
+    "percy_favicon.ico",
     "site.webmanifest",
 ];
 
