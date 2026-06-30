@@ -6,6 +6,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+<link rel="stylesheet" href="/static/css/percy/command_palette.css" type="text/css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" crossorigin="anonymous"/>
 {% endblock %}
 
@@ -819,10 +820,12 @@
 
 {% block body_end %}
 <script>const GUILD_ID = '{{ guild.id }}';</script>
+<script>window.PERCY_DASH = { guildId: '{{ guild.id }}', guildName: {{ guild.name|json|safe }} };</script>
 <script>window.AI_OVERRIDES = {{ guild.ai.overrides_json()|safe }};</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" crossorigin="anonymous"></script>
 <script src="/static/js/percy/percy_common.js"></script>
 <script src="/static/js/percy/percy_dashboard.js"></script>
 <script src="/static/js/percy/percy_guild.js"></script>
 <script src="/static/js/percy/percy_ai.js"></script>
+<script src="/static/js/percy/percy_command_palette.js"></script>
 {% endblock %}

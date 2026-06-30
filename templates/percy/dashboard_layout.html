@@ -6,6 +6,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/percy/dashboard.css" type="text/css"/>
+<link rel="stylesheet" href="/static/css/percy/command_palette.css" type="text/css"/>
 {% block page_css %}{% endblock %}
 {% endblock %}
 
@@ -73,4 +74,6 @@
 {% block body_end %}
 <script src="/static/js/percy/percy_common.js"></script>
 {% block page_js %}{% endblock %}
+<script>window.PERCY_DASH = { guildId: '{{ guild_id }}', guildName: {{ guild_name|json|safe }} };</script>
+<script src="/static/js/percy/percy_command_palette.js"></script>
 {% endblock %}

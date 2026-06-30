@@ -35,6 +35,30 @@ pub struct ChannelRef {
     pub channel_type: String,
 }
 
+/// A real command the AI assistant named in its answer, surfaced as a chip in the
+/// command palette. `command` is the bare qualified name; `label` includes the prefix.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AiSuggestion {
+    pub label: String,
+    pub command: String,
+}
+
+/// Answer from Percy's dashboard AI assistant (`POST /guilds/{id}/ai/ask`).
+///
+/// `available` is `false` whenever the guild has the AI assistant disabled or the engine is
+/// unreachable/timed out — in that case `answer` is `None` and `reason` carries a short, user-safe
+/// explanation. The palette degrades to its navigation/action results and shows `reason`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AiAskResponse {
+    pub available: bool,
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub answer: Option<String>,
+    #[serde(default)]
+    pub suggestions: Vec<AiSuggestion>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RoleRef {
     pub id: String,

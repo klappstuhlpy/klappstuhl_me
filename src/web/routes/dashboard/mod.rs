@@ -403,6 +403,7 @@ pub fn routes() -> Router<AppState> {
         .route("/dashboard/guild/:guild_id", get(guild_detail))
         .route("/dashboard/guild/:guild_id/config", post(guild_config_update))
         .route("/dashboard/guild/:guild_id/ai", post(guild_ai_flags_update))
+        .route("/dashboard/guild/:guild_id/ai/ask", post(guild_ai_ask))
         .route("/dashboard/guild/:guild_id/ai/override", post(guild_ai_override_update))
         .route(
             "/dashboard/guild/:guild_id/ai/override/:channel_id/delete",

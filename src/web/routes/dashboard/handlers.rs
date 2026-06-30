@@ -837,6 +837,52 @@ pub(super) async fn guild_ai_override_update(
     }
 }
 
+#[derive(Deserialize)]
+pub(super) struct AiAskBody {
+    question: String,
+}
+
+/// `POST /dashboard/guild/:guild_id/ai/ask` — ask the command-palette AI assistant a question (JSON).
+///
+/// Proxies to Percy, which gates the assistant on the guild's `assistant` AI flag and the engine's
+/// health. A disabled/unreachable assistant is *not* an error: Percy returns `available: false` with
+/// a reason, which we pass straight through so the palette can degrade gracefully.
+pub(super) async fn guild_ai_ask(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<AiAskBody>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"ok": false, "error": "Not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"ok": false, "error": "Not authenticated"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    let question = body.question.trim();
+    if question.is_empty() {
+        return Json(serde_json::json!({"ok": false, "error": "Ask a question first."})).into_response();
+    }
+
+    match percy.ai_ask(guild_id, question).await {
+        Ok(resp) => Json(serde_json::json!({
+            "ok": true,
+            "available": resp.available,
+            "reason": resp.reason,
+            "answer": resp.answer,
+            "suggestions": resp.suggestions,
+        }))
+        .into_response(),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to query AI assistant");
+            Json(serde_json::json!({"ok": false, "error": "The AI assistant could not be reached."})).into_response()
+        }
+    }
+}
+
 /// `POST /dashboard/guild/:guild_id/ai/override/:channel_id/delete` — remove a per-channel override.
 pub(super) async fn guild_ai_override_delete(
     State(state): State<AppState>,

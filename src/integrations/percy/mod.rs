@@ -141,6 +141,18 @@ impl PercyClient {
         .await
     }
 
+    /// Ask the dashboard AI assistant a natural-language question (command palette).
+    /// Percy gates this on the guild's `assistant` AI flag + engine health and never errors on
+    /// an unavailable assistant — it returns `available: false` with a reason instead.
+    pub async fn ai_ask(&self, guild_id: u64, question: &str) -> Result<AiAskResponse, PercyError> {
+        self.send_into(
+            self.client
+                .post(self.url(&format!("/api/v1/guilds/{guild_id}/ai/ask")))
+                .json(&serde_json::json!({ "question": question })),
+        )
+        .await
+    }
+
     /// Update audit log event flags.
     pub async fn patch_audit_log_flags(
         &self,
