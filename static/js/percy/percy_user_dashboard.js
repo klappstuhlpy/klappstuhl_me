@@ -79,7 +79,9 @@
     }
 
     // Presence statuses mapped to a numeric lane for the stepped timeline.
-    const PRESENCE_LANES = { offline: 0, invisible: 0, dnd: 1, idle: 2, online: 3 };
+    // Keys must match the exact strings Percy records ("Online", "Idle",
+    // "Do Not Disturb", "Offline"); lower-cased on lookup so casing can't miss.
+    const PRESENCE_LANES = { offline: 0, invisible: 0, 'do not disturb': 1, dnd: 1, idle: 2, online: 3 };
     const PRESENCE_LABELS = ['Offline', 'DND', 'Idle', 'Online'];
 
     function renderPresence(el, presence) {
@@ -90,7 +92,7 @@
         // Percy returns newest-first; the chart needs oldest-first.
         const rows = presence
             .filter((p) => p.changed_at)
-            .map((p) => ({ t: Math.floor(Date.parse(p.changed_at) / 1000), lane: PRESENCE_LANES[p.status] ?? 0 }))
+            .map((p) => ({ t: Math.floor(Date.parse(p.changed_at) / 1000), lane: PRESENCE_LANES[(p.status || '').toLowerCase()] ?? 0 }))
             .filter((p) => Number.isFinite(p.t))
             .sort((a, b) => a.t - b.t);
 
