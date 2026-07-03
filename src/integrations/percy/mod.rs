@@ -771,6 +771,22 @@ impl PercyClient {
         .await
     }
 
+    /// Update the guild's economy settings (payout multiplier, rob toggle, daily base, max bet).
+    pub async fn patch_economy_settings(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .patch(self.url(&format!("/api/v1/guilds/{guild_id}/economy/settings")))
+                .json(body),
+        )
+        .await
+    }
+
+    /// Guild-wide game statistics (per-game totals + top players).
+    pub async fn get_games_stats(&self, guild_id: u64) -> Result<GamesStats, PercyError> {
+        self.send_into(self.client.get(self.url(&format!("/api/v1/guilds/{guild_id}/games"))))
+            .await
+    }
+
     /// Patch a user's economy balance.
     pub async fn patch_economy_balance(
         &self,

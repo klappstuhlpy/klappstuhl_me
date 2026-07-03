@@ -490,7 +490,7 @@ pub(super) async fn guild_overview(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let (guild, stats, bot_stats, music, leaderboard, polls, giveaways, economy) = tokio::join!(
+    let (guild, stats, bot_stats, music, leaderboard, polls, giveaways, economy, games, balances) = tokio::join!(
         percy.get_guild(guild_id),
         percy.get_guild_stats(guild_id),
         percy.get_bot_stats(),
@@ -499,6 +499,8 @@ pub(super) async fn guild_overview(
         percy.get_polls(guild_id),
         percy.get_giveaways(guild_id),
         percy.get_economy(guild_id),
+        percy.get_games_stats(guild_id),
+        percy.get_economy_balances(guild_id, 5),
     );
 
     let guild = match guild {
@@ -553,6 +555,12 @@ pub(super) async fn guild_overview(
     let economy = economy.unwrap_or(EconomyInfo {
         items: Vec::new(),
         lottery: None,
+        settings: None,
+    });
+    let games = games.unwrap_or_default();
+    let balances = balances.unwrap_or(BalancesResponse {
+        entries: Vec::new(),
+        total: 0,
     });
 
     Ok(OverviewTemplate {
@@ -570,6 +578,8 @@ pub(super) async fn guild_overview(
         active_polls,
         active_giveaways,
         economy,
+        games,
+        balances,
     })
 }
 
@@ -2534,6 +2544,7 @@ pub(super) async fn guild_economy(
     let economy = economy.unwrap_or(EconomyInfo {
         items: Vec::new(),
         lottery: None,
+        settings: None,
     });
     let balances = balances.unwrap_or(BalancesResponse {
         entries: Vec::new(),
@@ -2541,6 +2552,7 @@ pub(super) async fn guild_economy(
     });
     let channels = channels.unwrap_or_default();
     let roles = roles.unwrap_or_default();
+    let eco_settings = economy.settings.clone().unwrap_or_default();
     EconomyTemplate {
         account: Some(account),
         flashes,
@@ -2549,6 +2561,7 @@ pub(super) async fn guild_economy(
         nav_active: "economy",
         page_title: "Economy",
         economy,
+        eco_settings,
         balances,
         channels,
         roles,
@@ -3089,6 +3102,30 @@ pub(super) async fn guild_economy_items_create(
         return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
     }
     match percy.create_economy_item(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
+    }
+}
+
+/// Update the guild's economy settings (payout multiplier, rob toggle, daily
+/// base, max bet — `max_bet: 0` clears the cap). Forwarded as-is to Percy,
+/// which validates ranges and answers 400 with a reason on bad input.
+pub(super) async fn guild_economy_settings_update(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Redirect::to("/").into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Redirect::to("/dashboard").into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"ok": false, "error": "Access denied"})).into_response();
+    }
+    match percy.patch_economy_settings(guild_id, &body).await {
         Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})).into_response(),
     }

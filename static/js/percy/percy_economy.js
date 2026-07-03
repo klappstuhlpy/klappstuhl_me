@@ -5,6 +5,26 @@
     const guildId = GUILD_ID;
     const base = `/dashboard/guild/${guildId}/economy`;
 
+    // Guild economy settings
+    const settingsSaveBtn = document.getElementById('eco-settings-save');
+    if (settingsSaveBtn) {
+        settingsSaveBtn.addEventListener('click', async () => {
+            const payout_multiplier = parseFloat(document.getElementById('eco_payout_multiplier').value);
+            const daily_base = parseInt(document.getElementById('eco_daily_base').value);
+            const max_bet = parseInt(document.getElementById('eco_max_bet').value);
+            const rob_enabled = document.getElementById('eco_rob_enabled').checked;
+            if (!payout_multiplier || payout_multiplier < 0.1 || payout_multiplier > 10) { showToast('error', 'Payout multiplier must be between 0.1 and 10.'); return; }
+            if (!daily_base || daily_base < 10 || daily_base > 100000) { showToast('error', 'Daily base must be between 10 and 100,000.'); return; }
+            if (isNaN(max_bet) || max_bet < 0) { showToast('error', 'Max bet must be 0 (uncapped) or positive.'); return; }
+            try {
+                const r = await fetch(`${base}/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ payout_multiplier, daily_base, max_bet, rob_enabled }) });
+                const d = await r.json();
+                if (d.ok) { showToast('success', 'Economy settings saved.'); }
+                else { showToast('error', d.error || 'Failed.'); }
+            } catch { showToast('error', 'Network error.'); }
+        });
+    }
+
     // Add item
     const addItemBtn = document.getElementById('add-item-btn');
     const addItemModal = document.getElementById('add-item-modal');

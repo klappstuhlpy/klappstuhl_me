@@ -16,6 +16,40 @@
         </div>
     </div>
 
+    {# ─── Guild Settings ─────────────────────────────────────────── #}
+    <section class="config-section">
+        <h2>Economy Settings</h2>
+        <p class="config-section-description">Server-wide tuning: scale every payout, cap casino stakes, and toggle robbing.</p>
+        <div class="config-grid">
+            <div class="config-field">
+                <label class="config-label" for="eco_payout_multiplier">Payout Multiplier (0.1–10)</label>
+                <input type="number" id="eco_payout_multiplier" class="config-input" min="0.1" max="10" step="0.05"
+                       value="{{ eco_settings.payout_multiplier }}">
+                <p class="config-hint">Scales every earning activity — work, fish, hunt, beg, dig, search and timed claims.</p>
+            </div>
+            <div class="config-field">
+                <label class="config-label" for="eco_daily_base">Daily Base Reward (10–100,000)</label>
+                <input type="number" id="eco_daily_base" class="config-input" min="10" max="100000"
+                       value="{{ eco_settings.daily_base }}">
+                <p class="config-hint">The base <code>daily</code> payout before streak bonuses.</p>
+            </div>
+            <div class="config-field">
+                <label class="config-label" for="eco_max_bet">Max Casino Bet (0 = uncapped)</label>
+                <input type="number" id="eco_max_bet" class="config-input" min="0" max="100000000"
+                       value="{{ eco_settings.max_bet.unwrap_or(0) }}">
+                <p class="config-hint">Caps stakes across blackjack, slots, roulette, poker, coinflip and the other casino games.</p>
+            </div>
+            <div class="config-field">
+                <label class="config-label" for="eco_rob_enabled">
+                    <input type="checkbox" id="eco_rob_enabled" {% if eco_settings.rob_enabled %}checked{% endif %}>
+                    Allow <code>rob</code>
+                </label>
+                <p class="config-hint">When off, members cannot rob each other's cash at all.</p>
+            </div>
+        </div>
+        <button class="button primary small" id="eco-settings-save">Save Settings</button>
+    </section>
+
     {# ─── Shop Items ─────────────────────────────────────────────── #}
     <section class="config-section">
         <h2>Shop Items</h2>

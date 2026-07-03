@@ -220,6 +220,9 @@ pub(crate) struct OverviewTemplate {
     pub(crate) active_polls: Vec<PollInfo>,
     pub(crate) active_giveaways: Vec<GiveawayInfo>,
     pub(crate) economy: EconomyInfo,
+    pub(crate) games: GamesStats,
+    /// Top 5 wallets for the "Richest Members" card.
+    pub(crate) balances: BalancesResponse,
 }
 
 /// Public leaderboard page — accessible by anyone, no login required.
@@ -368,6 +371,8 @@ pub(crate) struct EconomyTemplate {
     pub(crate) nav_active: &'static str,
     pub(crate) page_title: &'static str,
     pub(crate) economy: EconomyInfo,
+    /// The guild's tuning knobs, materialized with defaults when Percy has no row.
+    pub(crate) eco_settings: EconomySettings,
     pub(crate) balances: BalancesResponse,
     pub(crate) channels: Vec<Channel>,
     pub(crate) roles: Vec<Role>,

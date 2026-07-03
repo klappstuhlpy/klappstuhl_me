@@ -458,6 +458,10 @@ pub fn routes() -> Router<AppState> {
             delete(guild_economy_item_delete),
         )
         .route(
+            "/dashboard/guild/:guild_id/economy/settings",
+            post(guild_economy_settings_update),
+        )
+        .route(
             "/dashboard/guild/:guild_id/economy/lottery",
             post(guild_economy_lottery_create).delete(guild_economy_lottery_delete),
         )

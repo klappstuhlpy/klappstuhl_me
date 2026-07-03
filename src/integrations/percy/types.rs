@@ -936,10 +936,35 @@ pub struct LotteryInfo {
     pub ends_at: Option<String>,
 }
 
+/// Per-guild economy tuning; Percy answers defaults when never configured.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EconomySettings {
+    pub payout_multiplier: f64,
+    pub rob_enabled: bool,
+    pub daily_base: i64,
+    /// `None` = uncapped.
+    pub max_bet: Option<i64>,
+}
+
+impl Default for EconomySettings {
+    /// Mirrors Percy's server-side defaults for guilds that never configured anything.
+    fn default() -> Self {
+        Self {
+            payout_multiplier: 1.0,
+            rob_enabled: true,
+            daily_base: 250,
+            max_bet: None,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EconomyInfo {
     pub items: Vec<ShopItem>,
     pub lottery: Option<LotteryInfo>,
+    /// Absent on Percy versions predating the economy expansion.
+    #[serde(default)]
+    pub settings: Option<EconomySettings>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -950,6 +975,41 @@ pub struct BalanceEntry {
     pub cash: i64,
     pub bank: i64,
     pub total: i64,
+}
+
+/// One game's guild-wide totals from `GET /guilds/{id}/games`.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GameOverviewEntry {
+    pub game: String,
+    pub label: String,
+    #[serde(default)]
+    pub icon: Option<String>,
+    pub played: i64,
+    pub won: i64,
+    pub players: i64,
+    pub profit: i64,
+}
+
+/// One member on the guild's games leaderboard.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GamePlayerEntry {
+    pub user_id: String,
+    pub username: String,
+    #[serde(default)]
+    pub avatar_url: Option<String>,
+    pub played: i64,
+    pub won: i64,
+    pub winrate: f64,
+    pub profit: i64,
+}
+
+/// Guild-wide game statistics (per-game totals + top players).
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct GamesStats {
+    #[serde(default)]
+    pub games: Vec<GameOverviewEntry>,
+    #[serde(default)]
+    pub top_players: Vec<GamePlayerEntry>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

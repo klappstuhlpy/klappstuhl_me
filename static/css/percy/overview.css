@@ -87,6 +87,7 @@
 .overview-music-hint { margin: 0.8rem 0 0; color: var(--text-muted); font-size: 0.82rem; }
 
 /* ── Leaderboard ─────────────────────────────────────────────────── */
+.overview-subheading { margin: 1.1rem 0 0.4rem; font-size: 0.95rem; color: var(--text-muted); }
 .overview-lb { list-style: none; margin: 0; padding: 0; }
 .overview-lb-row {
     display: flex;

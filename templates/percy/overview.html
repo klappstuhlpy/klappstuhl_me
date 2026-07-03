@@ -78,6 +78,61 @@
     </section>
     {% endif %}
 
+    {# ─── Games Arcade ────────────────────────────────────────────── #}
+    {% if !games.games.is_empty() %}
+    <section class="config-section dash-rise">
+        <h2>Games Arcade</h2>
+        <table class="data-table">
+            <thead><tr><th>Game</th><th>Rounds</th><th>Players</th><th>Coins won</th></tr></thead>
+            <tbody>
+                {% for g in games.games %}
+                <tr>
+                    <td data-label="Game">{% match g.icon %}{% when Some with (icon) %}{{ icon }} {% when None %}{% endmatch %}<strong>{{ g.label }}</strong></td>
+                    <td data-label="Rounds">{{ g.played }}</td>
+                    <td data-label="Players">{{ g.players }}</td>
+                    <td data-label="Coins won">{{ g.profit }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if !games.top_players.is_empty() %}
+        <h3 class="overview-subheading">Top Players</h3>
+        <ol class="overview-lb">
+            {% for p in games.top_players %}
+            <li class="overview-lb-row">
+                <span class="overview-lb-rank">#{{ loop.index }}</span>
+                {% match p.avatar_url %}
+                {% when Some with (url) %}<img class="overview-lb-avatar" src="{{ url }}" alt="" width="32" height="32">
+                {% when None %}<span class="overview-lb-avatar overview-lb-avatar-ph"></span>{% endmatch %}
+                <span class="overview-lb-name">{{ p.username }}</span>
+                <span class="overview-lb-level">{{ p.won }} wins</span>
+                <span class="overview-lb-xp">{{ p.played }} rounds</span>
+            </li>
+            {% endfor %}
+        </ol>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {# ─── Richest Members ─────────────────────────────────────────── #}
+    {% if !balances.entries.is_empty() %}
+    <section class="config-section dash-rise">
+        <h2>Richest Members</h2>
+        <ol class="overview-lb">
+            {% for b in balances.entries %}
+            <li class="overview-lb-row">
+                <span class="overview-lb-rank">#{{ loop.index }}</span>
+                {% match b.avatar_url %}
+                {% when Some with (url) %}<img class="overview-lb-avatar" src="{{ url }}" alt="" width="32" height="32">
+                {% when None %}<span class="overview-lb-avatar overview-lb-avatar-ph"></span>{% endmatch %}
+                <span class="overview-lb-name">{{ b.username }}</span>
+                <span class="overview-lb-xp">{{ b.total }} coins</span>
+            </li>
+            {% endfor %}
+        </ol>
+    </section>
+    {% endif %}
+
     {# ─── Active Polls ────────────────────────────────────────────── #}
     {% if !active_polls.is_empty() %}
     <section class="config-section dash-rise">
