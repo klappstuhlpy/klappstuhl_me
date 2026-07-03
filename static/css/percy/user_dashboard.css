@@ -242,10 +242,107 @@
     color: var(--text-muted);
 }
 
-/* ── Presence chart ──────────────────────────────────────────────────── */
+/* ── Presence timeline ───────────────────────────────────────────────── */
 .presence-chart {
     width: 100%;
-    min-height: 220px;
+}
+
+.presence-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Legend: colored status swatches with their share of tracked time. */
+.pt-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.1rem;
+}
+.pt-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.pt-legend-item strong {
+    color: var(--foreground);
+    font-variant-numeric: tabular-nums;
+}
+.pt-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* Rows: one day each. Date label column + 24h track column. */
+.pt-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+.pt-day,
+.pt-axis {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.pt-date {
+    flex: 0 0 88px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-align: right;
+}
+.pt-track {
+    position: relative;
+    flex: 1;
+    height: 18px;
+    border-radius: 4px;
+    background: var(--background);
+    border: 1px solid var(--box-border);
+    overflow: hidden;
+    /* Faint 6-hour gridlines behind the segments. */
+    background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(25% - 1px),
+        rgba(127, 127, 127, 0.16) calc(25% - 1px),
+        rgba(127, 127, 127, 0.16) 25%
+    );
+}
+.pt-seg {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    min-width: 1px;
+    opacity: 0.9;
+    transition: opacity 0.12s;
+}
+.pt-seg:hover { opacity: 1; }
+
+/* Hour axis under the rows, aligned to the track column. */
+.pt-axis {
+    padding-top: 0.15rem;
+}
+.pt-hours {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+    .pt-date { flex-basis: 64px; font-size: 0.68rem; }
+    .pt-day, .pt-axis { gap: 0.5rem; }
 }
 
 .chart-message {

@@ -1,5 +1,5 @@
 /* Percy personal dashboard — settings form, consent-tracked history
-   (names, avatars, presence-over-time uPlot chart) and the data
+   (names, avatars, per-day presence activity timeline) and the data
    download/delete controls. GUILD_ID is injected by the template. */
 
 (function () {
@@ -78,68 +78,110 @@
         ).join('');
     }
 
-    // Presence statuses mapped to a numeric lane for the stepped timeline.
-    // Keys must match the exact strings Percy records ("Online", "Idle",
-    // "Do Not Disturb", "Offline"); lower-cased on lookup so casing can't miss.
-    const PRESENCE_LANES = { offline: 0, invisible: 0, 'do not disturb': 1, dnd: 1, idle: 2, online: 3 };
-    const PRESENCE_LABELS = ['Offline', 'DND', 'Idle', 'Online'];
+    // Presence status → canonical key + display metadata. Percy records
+    // "Online" / "Idle" / "Do Not Disturb" / "Offline"; we lower-case on lookup
+    // so casing can't miss. Colors match Discord's familiar status palette.
+    const PRESENCE_META = {
+        online:  { label: 'Online',          color: '#3ba55d' },
+        idle:    { label: 'Idle',            color: '#faa81a' },
+        dnd:     { label: 'Do Not Disturb',  color: '#ed4245' },
+        offline: { label: 'Offline',         color: '#747f8d' },
+    };
+    const PRESENCE_ORDER = ['online', 'idle', 'dnd', 'offline'];
+    const DAY_MS = 86400000;
 
+    function statusKey(s) {
+        s = (s || '').toLowerCase().trim();
+        if (s === 'online') return 'online';
+        if (s === 'idle') return 'idle';
+        if (s === 'dnd' || s === 'do not disturb') return 'dnd';
+        return 'offline'; // offline, invisible, unknown
+    }
+
+    const fmtClock = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Renders a per-day activity timeline: one row per day (newest first), each a
+    // 24-hour track of colored status segments, above a legend showing the share
+    // of time spent in each status. Far more readable than a stepped line chart
+    // and needs no charting library.
     function renderPresence(el, presence) {
         if (!el) return;
         const message = (msg) => { el.innerHTML = `<div class="chart-message">${esc(msg)}</div>`; };
 
-        if (!window.uPlot) { message('Chart library failed to load (CDN blocked?).'); return; }
-        // Percy returns newest-first; the chart needs oldest-first.
-        const rows = presence
+        // Change events → sorted ascending [{ t, key }] (Percy returns newest-first).
+        const evts = presence
             .filter((p) => p.changed_at)
-            .map((p) => ({ t: Math.floor(Date.parse(p.changed_at) / 1000), lane: PRESENCE_LANES[(p.status || '').toLowerCase()] ?? 0 }))
+            .map((p) => ({ t: Date.parse(p.changed_at), key: statusKey(p.status) }))
             .filter((p) => Number.isFinite(p.t))
             .sort((a, b) => a.t - b.t);
 
-        if (rows.length < 2) { message('Not enough presence history yet — it builds up over time while tracking is on.'); return; }
+        if (evts.length < 2) { message('Not enough presence history yet — it builds up over time while tracking is on.'); return; }
 
-        const xs = rows.map((r) => r.t);
-        const ys = rows.map((r) => r.lane);
-        // Extend the last known status to "now" so the final segment is visible.
-        const now = Math.floor(Date.now() / 1000);
-        if (now > xs[xs.length - 1]) { xs.push(now); ys.push(ys[ys.length - 1]); }
+        const now = Date.now();
+        // Look back at most 30 days, and no earlier than the first record.
+        const windowStart = Math.max(now - 30 * DAY_MS, evts[0].t);
 
-        const accent = getComputedStyle(document.documentElement).getPropertyValue('--branding').trim() || '#d97757';
-        const size = () => ({ width: Math.max(220, el.clientWidth - 4), height: 220 });
+        // Build [start, end, key] segments; each status persists until the next
+        // change, and the final one runs to "now".
+        const segments = [];
+        for (let i = 0; i < evts.length; i++) {
+            const start = evts[i].t;
+            const end = i + 1 < evts.length ? evts[i + 1].t : now;
+            if (end <= windowStart) continue;
+            segments.push({ start: Math.max(start, windowStart), end, key: evts[i].key });
+        }
+        if (!segments.length) { message('Not enough presence history yet — it builds up over time while tracking is on.'); return; }
 
-        el.innerHTML = '';
-        const chart = new uPlot({
-            ...size(),
-            cursor: { drag: { setScale: false } },
-            legend: { show: false },
-            scales: { x: { time: true }, y: { range: [-0.4, 3.4] } },
-            series: [
-                {},
-                {
-                    label: 'Status',
-                    stroke: accent,
-                    width: 2,
-                    paths: uPlot.paths.stepped({ align: 1 }),
-                    points: { show: false },
-                    value: (_, v) => (v == null ? '—' : PRESENCE_LABELS[v] || v),
-                },
-            ],
-            axes: [
-                { stroke: '#71717a' },
-                {
-                    stroke: '#71717a',
-                    grid: { stroke: 'rgba(127,127,127,0.15)' },
-                    splits: () => [0, 1, 2, 3],
-                    values: () => PRESENCE_LABELS,
-                },
-            ],
-        }, [xs, ys], el);
+        // Totals per status across the visible window (for the legend %).
+        const totals = { online: 0, idle: 0, dnd: 0, offline: 0 };
+        let grandTotal = 0;
+        for (const seg of segments) {
+            const dur = seg.end - seg.start;
+            totals[seg.key] += dur;
+            grandTotal += dur;
+        }
 
-        let resizeTimer;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(() => chart.setSize(size()), 150);
-        });
+        // One row per day, newest at the top.
+        const startOfDay = (ms) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
+        const firstDay = startOfDay(windowStart);
+        const lastDay = startOfDay(now);
+        const days = [];
+        for (let d = lastDay; d >= firstDay; d -= DAY_MS) days.push(d);
+
+        const rowFor = (dayStart) => {
+            const dayEnd = dayStart + DAY_MS;
+            const label = new Date(dayStart).toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short' });
+            let bars = '';
+            for (const seg of segments) {
+                const s = Math.max(seg.start, dayStart);
+                const e = Math.min(seg.end, dayEnd);
+                if (e <= s) continue;
+                const left = ((s - dayStart) / DAY_MS) * 100;
+                const width = ((e - s) / DAY_MS) * 100;
+                const meta = PRESENCE_META[seg.key];
+                const title = `${meta.label} · ${fmtClock(s)}–${fmtClock(e)}`;
+                bars += `<span class="pt-seg" style="left:${left}%;width:${width}%;background:${meta.color}" title="${esc(title)}"></span>`;
+            }
+            return `<div class="pt-day"><span class="pt-date">${esc(label)}</span><div class="pt-track">${bars}</div></div>`;
+        };
+
+        // Legend chips with percentage of time per status.
+        const legend = PRESENCE_ORDER
+            .filter((k) => totals[k] > 0)
+            .map((k) => {
+                const raw = grandTotal ? (totals[k] / grandTotal) * 100 : 0;
+                const pct = raw > 0 && raw < 1 ? '<1%' : `${Math.round(raw)}%`;
+                const meta = PRESENCE_META[k];
+                return `<span class="pt-legend-item"><span class="pt-swatch" style="background:${meta.color}"></span>${esc(meta.label)} <strong>${pct}</strong></span>`;
+            })
+            .join('');
+
+        el.innerHTML = `
+            <div class="presence-timeline">
+                <div class="pt-legend">${legend}</div>
+                <div class="pt-rows">${days.map(rowFor).join('')}</div>
+                <div class="pt-axis"><span class="pt-date"></span><div class="pt-hours"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div></div>
+            </div>`;
     }
 
     async function loadHistory() {

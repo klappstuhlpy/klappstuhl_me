@@ -2,6 +2,10 @@
 
 {% block page_subtitle %}<p>Manage shop items, member balances, and lottery.</p>{% endblock %}
 
+{% block page_css %}
+<link rel="stylesheet" href="/static/css/percy/economy.css" type="text/css"/>
+{% endblock %}
+
 {% block content %}
 
     <div class="dash-pageinfo">
@@ -20,34 +24,39 @@
     <section class="config-section">
         <h2>Economy Settings</h2>
         <p class="config-section-description">Server-wide tuning: scale every payout, cap casino stakes, and toggle robbing.</p>
-        <div class="config-grid">
+        <div class="config-grid eco-settings-grid">
             <div class="config-field">
-                <label class="config-label" for="eco_payout_multiplier">Payout Multiplier (0.1–10)</label>
-                <input type="number" id="eco_payout_multiplier" class="config-input" min="0.1" max="10" step="0.05"
-                       value="{{ eco_settings.payout_multiplier }}">
-                <p class="config-hint">Scales every earning activity — work, fish, hunt, beg, dig, search and timed claims.</p>
+                <label class="config-label" for="eco_payout_multiplier">Payout Multiplier</label>
+                <div class="eco-input-wrap">
+                    <input type="number" id="eco_payout_multiplier" class="config-input" min="0.1" max="10" step="0.05"
+                           value="{{ eco_settings.payout_multiplier }}">
+                    <span class="eco-input-suffix">×</span>
+                </div>
+                <span class="config-description">Scales every earning activity — work, fish, hunt, beg, dig, search and timed claims. Range 0.1–10.</span>
             </div>
             <div class="config-field">
-                <label class="config-label" for="eco_daily_base">Daily Base Reward (10–100,000)</label>
+                <label class="config-label" for="eco_daily_base">Daily Base Reward</label>
                 <input type="number" id="eco_daily_base" class="config-input" min="10" max="100000"
                        value="{{ eco_settings.daily_base }}">
-                <p class="config-hint">The base <code>daily</code> payout before streak bonuses.</p>
+                <span class="config-description">The base <code>daily</code> payout before streak bonuses. Range 10–100,000.</span>
             </div>
             <div class="config-field">
-                <label class="config-label" for="eco_max_bet">Max Casino Bet (0 = uncapped)</label>
+                <label class="config-label" for="eco_max_bet">Max Casino Bet</label>
                 <input type="number" id="eco_max_bet" class="config-input" min="0" max="100000000"
-                       value="{{ eco_settings.max_bet.unwrap_or(0) }}">
-                <p class="config-hint">Caps stakes across blackjack, slots, roulette, poker, coinflip and the other casino games.</p>
-            </div>
-            <div class="config-field">
-                <label class="config-label" for="eco_rob_enabled">
-                    <input type="checkbox" id="eco_rob_enabled" {% if eco_settings.rob_enabled %}checked{% endif %}>
-                    Allow <code>rob</code>
-                </label>
-                <p class="config-hint">When off, members cannot rob each other's cash at all.</p>
+                       value="{{ eco_settings.max_bet.unwrap_or(0) }}" placeholder="0">
+                <span class="config-description">Caps stakes across blackjack, slots, roulette, poker, coinflip and the other casino games. <code>0</code> = uncapped.</span>
             </div>
         </div>
-        <button class="button primary small" id="eco-settings-save">Save Settings</button>
+        <label class="config-toggle eco-rob-toggle">
+            <div>
+                <span class="config-label">Allow <code>rob</code></span>
+                <span class="config-description">When off, members cannot rob each other's cash at all.</span>
+            </div>
+            <input type="checkbox" id="eco_rob_enabled" {% if eco_settings.rob_enabled %}checked{% endif %}>
+        </label>
+        <div class="config-actions">
+            <button class="button primary small" id="eco-settings-save">Save Settings</button>
+        </div>
     </section>
 
     {# ─── Shop Items ─────────────────────────────────────────────── #}

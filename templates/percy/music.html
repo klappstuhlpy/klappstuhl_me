@@ -129,7 +129,7 @@
             <button class="filter-toggle{% if music.filters.nightcore %} active{% endif %}" data-action="nightcore">Nightcore</button>
             <button class="filter-toggle{% if music.filters.eight_d %} active{% endif %}" data-action="8d">8D Audio</button>
             <button class="filter-toggle" data-action="reset">Reset All</button>
-            <span class="flex-center">
+            <span class="filter-lowpass">
                 <button class="filter-toggle{% if music.filters.lowpass.is_some() %} active{% endif %}" data-action="lowpass" id="lowpass-btn">Lowpass</button>
                 <input type="number" class="config-input lowpass-input" id="lowpass-val" min="2.5" max="50" step="0.5" value="{{ music.filters.lowpass.unwrap_or(20.0) }}">
             </span>
