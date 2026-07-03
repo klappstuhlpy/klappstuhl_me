@@ -53,7 +53,7 @@
             <div class="overview-stat"><span class="overview-stat-val">{{ stats.boost_count }}</span><span class="overview-stat-label">Boosts · T{{ stats.boost_tier }}</span></div>
         </div>
         <div class="overview-meta">
-            <time class="stats-time js-ts" datetime="{{ stats.created_at }}">{{ stats.created_at }}</time>
+            <span>Created <time class="stats-time js-ts" datetime="{{ stats.created_at }}">{{ stats.created_at }}</time></span>
             {% match stats.owner_name %}{% when Some with (name) %}<span>Owner <strong>{{ name }}</strong></span>{% when None %}{% endmatch %}
         </div>
     </section>
