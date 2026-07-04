@@ -1,7 +1,15 @@
 services:
   klappstuhl_me:
     container_name: klappstuhl_me
-    build: .
+    build:
+      context: .
+      # Forward the host SSH agent into the build so cargo can fetch the private
+      # klappstuhl_me-shared git dependency over SSH. The invoking shell's agent
+      # must hold a key with read access to klappstuhlpy/klappstuhl_me-shared.
+      # Requires BuildKit: `DOCKER_BUILDKIT=1 docker compose build` (default on
+      # modern Docker). The Dockerfile consumes this via `--mount=type=ssh`.
+      ssh:
+        - default
     image: klappstuhl_me:latest
     restart: unless-stopped
 
