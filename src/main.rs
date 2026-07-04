@@ -208,6 +208,10 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         .nest_service("/sw.js", ServeFile::new("static/sw.js"))
         .nest_service("/robots.txt", ServeFile::new("static/robots.txt"))
         .nest_service("/static", ServeDir::new("static"))
+        // Shared design system (base.css + shared JS), served from the kls-ui
+        // crate's embedded assets at /kls/* — one source of truth for both the
+        // main site and the Percy dashboard. See DASHBOARD_DECOUPLING_PLAN.md.
+        .nest("/kls", kls_ui::routes())
         .layer(middleware::from_fn_with_state(
             state.clone(),
             klappstuhl_me::copy_api_token,

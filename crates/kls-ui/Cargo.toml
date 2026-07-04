@@ -1,0 +1,12 @@
+[package]
+name = "kls-ui"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-v3"
+description = "Shared klappstuhl.me design system (base CSS + shared JS utilities), embedded and served, for klappstuhl_me and the Percy dashboard."
+
+[dependencies]
+# Only axum, to expose a mountable Router. The design assets themselves are
+# embedded at compile time via include_str!, so the crate has no runtime asset
+# path dependency — it works identically compiled into any binary.
+axum = { version = "0.7.4" }

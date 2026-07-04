@@ -64,6 +64,7 @@ fn is_percy_path(path: &str) -> bool {
 /// Paths that should work on ANY host (auth, static, api, ws, media).
 fn is_shared_path(path: &str) -> bool {
     path.starts_with("/static")
+        || path.starts_with("/kls")
         || path.starts_with("/api")
         || path.starts_with("/ws")
         || path.starts_with("/login")
