@@ -1,0 +1,23 @@
+[package]
+name = "dashboard"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-v3"
+description = "Percy dashboard — standalone web binary (skeleton) built on the shared klappstuhl.me kernel."
+
+# Skeleton binary for the dashboard split (see DASHBOARD_DECOUPLING_PLAN.md,
+# Phase 4c). It exists to *prove* the three shared crates — kls-web-core (SQLite
+# + crypto kernel), kls-ui (design system), percy-client (Percy API) — link and
+# boot into a running server with NO dependency on the klappstuhl_me app crate.
+# It graduates into the standalone `dashboard` repo at Phase 5.
+[dependencies]
+anyhow = "1.0.80"
+axum = "0.7.4"
+kls-ui = { path = "../crates/kls-ui" }
+kls-web-core = { path = "../crates/kls-web-core" }
+percy-client = { path = "../crates/percy-client" }
+reqwest = { version = "0.12.3", default-features = false, features = ["json", "rustls-tls"] }
+serde_json = "1.0.114"
+tokio = { version = "1.36.0", features = ["rt-multi-thread", "net", "macros", "signal"] }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"

@@ -10,7 +10,7 @@ description = "A custom information website about Klappstuhl and API support."
 # `klappstuhl-shared` repo (tag-pinned git deps) at Phase 5; until then they live
 # here as path-dependency members so iteration stays fast and revertible.
 [workspace]
-members = ["crates/percy-client", "crates/kls-ui", "crates/kls-web-core"]
+members = ["crates/percy-client", "crates/kls-ui", "crates/kls-web-core", "dashboard"]
 
 [dependencies]
 percy-client = { path = "crates/percy-client" }
