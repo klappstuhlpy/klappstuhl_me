@@ -8,5 +8,11 @@
 //! Modules:
 //! - [`key`] — HMAC-SHA256 signing/verification over a 32-byte [`key::SecretKey`],
 //!   plus hex helpers. Backs signed cookies, tokens, and TOTP secrets.
+//! - [`database`] — the async SQLite wrapper (thread-pool over blocking
+//!   `rusqlite` connections), the [`database::Table`] row-mapping trait, and the
+//!   [`boxed_params`] helper macro.
 
+pub mod database;
 pub mod key;
+
+pub use database::Database;

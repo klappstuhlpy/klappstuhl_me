@@ -28,6 +28,9 @@ pub use core::config::{Config, CONFIG};
 pub use core::database::Database;
 pub use core::state::AppState;
 pub use core::utils::{MAX_BODY_SIZE, MAX_UPLOAD_SIZE};
+// The `boxed_params!` macro moved into kls-web-core; re-export it at the crate
+// root so existing `crate::boxed_params` call sites keep resolving.
+pub use kls_web_core::boxed_params;
 pub use web::routes::{copy_api_token, ApiToken};
 
 /// A middleware responsible for parsing cookies into a Vec<Cookie> extension for use
