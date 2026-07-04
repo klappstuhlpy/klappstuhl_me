@@ -5,17 +5,15 @@ edition = "2021"
 license = "AGPL-v3"
 description = "A custom information website about Klappstuhl and API support."
 
-# Local staging workspace for the crates being extracted for the dashboard split
-# (see DASHBOARD_DECOUPLING_PLAN.md, Phase 1). These graduate into the standalone
-# `klappstuhl-shared` repo (tag-pinned git deps) at Phase 5; until then they live
-# here as path-dependency members so iteration stays fast and revertible.
-[workspace]
-members = ["crates/percy-client", "crates/kls-ui", "crates/kls-web-core", "dashboard"]
-
+# The shared design/auth/API-client kernel now lives in its own repo,
+# klappstuhlpy/klappstuhl_me-shared, consumed as a tag-pinned git dependency (see
+# DASHBOARD_DECOUPLING_PLAN.md, Phase 5). Bump the tag in lock-step across this
+# repo and percy-dashboard when cutting a new shared release; never move a
+# published tag, since both consumers pin to it.
 [dependencies]
-percy-client = { path = "crates/percy-client" }
-kls-ui = { path = "crates/kls-ui" }
-kls-web-core = { path = "crates/kls-web-core" }
+percy-client = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.0" }
+kls-ui = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.0" }
+kls-web-core = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.0" }
 anyhow = "1.0.80"
 argon2 = { version = "0.5.3", features = ["std"] }
 async-trait = "0.1.77"
