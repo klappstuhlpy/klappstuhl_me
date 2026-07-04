@@ -38,7 +38,7 @@ use handlers::*;
 // -- Helpers -----------------------------------------------------------------
 
 fn get_percy_client(state: &AppState) -> Option<PercyClient> {
-    PercyClient::new(state.percy_client.clone(), &state.config().percy)
+    state.config().percy.build_client(state.percy_client.clone())
 }
 
 /// How long a resolved Discord-account link / manageable-guild set stays cached.

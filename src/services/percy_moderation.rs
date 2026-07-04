@@ -6,15 +6,12 @@
 //! WebSocket or webhook support, this module will poll/receive events and
 //! publish them on the "moderation" topic via `state.live_publish`.
 
-use crate::{percy::PercyClient, AppState};
+use crate::AppState;
 
 /// No-op when Percy config is absent.  Reserves the background task slot for
 /// future server-push integration.
 pub fn spawn_poller(state: AppState) {
-    let percy = {
-        let config = state.config();
-        PercyClient::new(state.percy_client.clone(), &config.percy)
-    };
+    let percy = state.config().percy.build_client(state.percy_client.clone());
     if percy.is_none() {
         return;
     }

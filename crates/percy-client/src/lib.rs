@@ -2,7 +2,7 @@
 //!
 //! Proxies dashboard requests to Percy's aiohttp internal API, which owns all
 //! guild config mutations and cache invalidation. The client authenticates with
-//! a pre-shared bearer token configured in [`PercyConfig`].
+//! a pre-shared bearer token supplied by the caller at construction.
 //!
 //! Response models live in [`types`].
 //!
@@ -14,8 +14,6 @@
 
 use reqwest::{Client, RequestBuilder, Response};
 use serde::de::DeserializeOwned;
-
-use crate::config::PercyConfig;
 
 mod types;
 pub use types::*;
@@ -29,17 +27,16 @@ pub struct PercyClient {
 }
 
 impl PercyClient {
-    /// Creates a new client from the Percy config block. Returns `None` if the
-    /// config is not fully set.
-    pub fn new(client: Client, config: &PercyConfig) -> Option<Self> {
-        if !config.enabled() {
-            return None;
-        }
-        Some(Self {
+    /// Creates a new client from a base URL and bearer token. The base URL has
+    /// any trailing slash trimmed so path joins stay canonical. Callers that
+    /// hold an optional/partial config should gate construction themselves (see
+    /// `PercyConfig::build_client` on the klappstuhl_me side).
+    pub fn new(client: Client, base_url: impl Into<String>, token: impl Into<String>) -> Self {
+        Self {
             client,
-            base_url: config.api_url.clone().unwrap().trim_end_matches('/').to_string(),
-            token: config.api_token.clone().unwrap(),
-        })
+            base_url: base_url.into().trim_end_matches('/').to_string(),
+            token: token.into(),
+        }
     }
 
     fn url(&self, path: &str) -> String {

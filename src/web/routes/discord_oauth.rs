@@ -7,7 +7,6 @@ use crate::{
     flash::Flasher,
     headers::ClientIp,
     models::{is_valid_username, Account},
-    percy::PercyClient,
     ratelimit::RateLimit,
     token::Token,
     AppState,
@@ -662,7 +661,7 @@ async fn discord_avatar(State(state): State<AppState>, account: Account) -> Resp
         }
     }
 
-    if let Some(percy) = PercyClient::new(state.percy_client.clone(), &state.config().percy) {
+    if let Some(percy) = state.config().percy.build_client(state.percy_client.clone()) {
         if let Ok(avatar) = percy.get_user_avatar(&discord_id).await {
             avatar_cache().insert(discord_id, (Instant::now(), avatar.avatar_url.clone()));
             return avatar_redirect(&avatar.avatar_url);

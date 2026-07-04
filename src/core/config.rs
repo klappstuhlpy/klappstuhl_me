@@ -271,6 +271,21 @@ impl PercyConfig {
         self.api_url.as_deref().is_some_and(|s| !s.is_empty())
             && self.api_token.as_deref().is_some_and(|s| !s.is_empty())
     }
+
+    /// Builds a [`PercyClient`](crate::percy::PercyClient) from this config block,
+    /// returning `None` when the integration is not fully configured. Keeps the
+    /// `enabled()` gate on the app side so the extracted `percy-client` crate
+    /// stays free of the app's config schema.
+    pub fn build_client(&self, client: reqwest::Client) -> Option<crate::percy::PercyClient> {
+        if !self.enabled() {
+            return None;
+        }
+        Some(crate::percy::PercyClient::new(
+            client,
+            self.api_url.clone().unwrap(),
+            self.api_token.clone().unwrap(),
+        ))
+    }
 }
 
 /// AI assistant settings powering the "Ask the AI" feature (admin Spotlight).

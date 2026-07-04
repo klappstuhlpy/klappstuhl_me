@@ -6,16 +6,12 @@ use std::time::Duration;
 
 use tracing::{debug, warn};
 
-use crate::{percy::PercyClient, AppState};
+use crate::AppState;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(60);
 
 pub fn spawn_poller(state: AppState) {
-    let percy = {
-        let config = state.config();
-        PercyClient::new(state.percy_client.clone(), &config.percy)
-    };
-    let Some(percy) = percy else {
+    let Some(percy) = state.config().percy.build_client(state.percy_client.clone()) else {
         return;
     };
 
