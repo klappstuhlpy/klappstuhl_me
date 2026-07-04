@@ -17,8 +17,11 @@
 //! - [`token`] — the signed auth-cookie wire format ([`token::Token`]) both apps
 //!   mint and verify (the basis for cross-app SSO). Resolving a token to a
 //!   concrete account stays app-side.
+//! - [`flash`] — signed, redirect-surviving flash messages ([`flash::Flasher`] /
+//!   [`flash::Flashes`] + the `process_flash_messages` middleware).
 
 pub mod database;
+pub mod flash;
 pub mod key;
 pub mod migrations;
 pub mod token;
