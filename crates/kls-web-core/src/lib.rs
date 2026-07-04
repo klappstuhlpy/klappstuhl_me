@@ -14,9 +14,13 @@
 //! - [`migrations`] — the generic gapless-from-0 SQLite migration runner
 //!   ([`migrations::run`]) plus [`migrations::EmbeddedMigration`]. The build-time
 //!   discovery of a specific app's migration set stays in that app.
+//! - [`token`] — the signed auth-cookie wire format ([`token::Token`]) both apps
+//!   mint and verify (the basis for cross-app SSO). Resolving a token to a
+//!   concrete account stays app-side.
 
 pub mod database;
 pub mod key;
 pub mod migrations;
+pub mod token;
 
 pub use database::Database;
