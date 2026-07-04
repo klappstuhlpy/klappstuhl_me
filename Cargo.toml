@@ -10,11 +10,12 @@ description = "A custom information website about Klappstuhl and API support."
 # `klappstuhl-shared` repo (tag-pinned git deps) at Phase 5; until then they live
 # here as path-dependency members so iteration stays fast and revertible.
 [workspace]
-members = ["crates/percy-client", "crates/kls-ui"]
+members = ["crates/percy-client", "crates/kls-ui", "crates/kls-web-core"]
 
 [dependencies]
 percy-client = { path = "crates/percy-client" }
 kls-ui = { path = "crates/kls-ui" }
+kls-web-core = { path = "crates/kls-web-core" }
 anyhow = "1.0.80"
 argon2 = { version = "0.5.3", features = ["std"] }
 async-trait = "0.1.77"

@@ -1,7 +1,8 @@
-//! Account authentication: password hashing plus the TOTP, key, and token
-//! submodules that back two-factor auth and API/session credentials.
+//! Account authentication: password hashing plus the TOTP and token
+//! submodules that back two-factor auth and API/session credentials. The
+//! HMAC signing primitives (`key`) live in the shared `kls-web-core` crate
+//! and are re-exported at `crate::key` from `lib.rs`.
 
-pub mod key;
 pub mod token;
 pub mod totp;
 

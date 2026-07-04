@@ -9,9 +9,12 @@ pub mod services;
 pub mod web;
 
 // Flat aliases: keep every `crate::<module>` path working after the regrouping.
-pub use auth::{key, token, totp};
+// `key` is re-exported from the shared kls-web-core crate so `crate::key::…`
+// call sites are unchanged.
+pub use auth::{token, totp};
 pub use core::{cli, config, database, error, filters, logging, migrations, models, state, utils};
 pub use integrations::{ai, cf_tunnel, cloudflare, discord, exttools, geoip, percy};
+pub use kls_web_core::key;
 pub use media::{codeimage, metadata, scan, thumbnail};
 pub use services::{
     alerts, audit, backup, cron, dbadmin, docker, firewall, health, metrics, percy_moderation, percy_stats, proxy,

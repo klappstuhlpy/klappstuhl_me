@@ -1817,6 +1817,7 @@ dependencies = [
  "hyper-util",
  "image",
  "kls-ui",
+ "kls-web-core",
  "maxminddb",
  "nanoid",
  "percy-client",
@@ -1861,6 +1862,19 @@ name = "kls-ui"
 version = "0.1.0"
 dependencies = [
  "axum",
+]
+
+[[package]]
+name = "kls-web-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "getrandom 0.2.15",
+ "hmac",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
