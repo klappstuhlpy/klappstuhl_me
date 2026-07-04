@@ -734,6 +734,24 @@ pub struct CommandInfo {
     pub disabled_in: Vec<String>,
     #[serde(default)]
     pub globally_disabled: bool,
+    /// Canonical Discord permission flag names the command requires out of the box
+    /// (its built-in `PermissionTemplate` gate). Empty for ungated / owner-only commands.
+    #[serde(default)]
+    pub default_permissions: Vec<String>,
+    /// The per-guild permission override, if an admin has set one.
+    #[serde(default)]
+    pub permission_override: Option<PermissionOverride>,
+}
+
+/// A per-guild override of a command's permission gate. `permissions` is a Discord
+/// permission bitmask that *replaces* the required user permissions (`None` keeps the
+/// command's default gate); members holding any `allowed_roles` may always run it.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PermissionOverride {
+    #[serde(default)]
+    pub permissions: Option<i64>,
+    #[serde(default)]
+    pub allowed_roles: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -653,6 +653,17 @@ impl PercyClient {
         .await
     }
 
+    /// Create, replace, or clear a command's per-guild permission override.
+    /// A body with `permissions: null` and no `allowed_roles` removes the override.
+    pub async fn set_command_permissions(&self, guild_id: u64, body: &serde_json::Value) -> Result<(), PercyError> {
+        self.send_unit(
+            self.client
+                .post(self.url(&format!("/api/v1/guilds/{guild_id}/commands/permissions")))
+                .json(body),
+        )
+        .await
+    }
+
     // -- Stats ---------------------------------------------------------------
 
     /// Fetch guild stats.

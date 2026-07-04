@@ -1977,10 +1977,11 @@ pub(super) async fn guild_commands(
         return Redirect::to("/dashboard").into_response();
     }
 
-    let (guild, commands, channels) = tokio::join!(
+    let (guild, commands, channels, roles) = tokio::join!(
         percy.get_guild(guild_id),
         percy.get_commands(guild_id),
         cached_channels(&percy, guild_id),
+        cached_roles(&percy, guild_id),
     );
 
     let guild = match guild {
@@ -1993,11 +1994,22 @@ pub(super) async fn guild_commands(
         plonks: Vec::new(),
     });
     let channels = channels.unwrap_or_default();
+    // Drop the @everyone role and managed (bot/integration) roles — they can't be
+    // granted, so they'd only clutter the allow-list picker.
+    let mut roles = roles.unwrap_or_default();
+    roles.retain(|r| r.id != guild_id.to_string() && !r.managed);
+    roles.sort_by_key(|r| std::cmp::Reverse(r.position));
+
     let disabled_count = commands.commands.iter().filter(|c| c.globally_disabled).count();
     let partial_count = commands
         .commands
         .iter()
         .filter(|c| !c.globally_disabled && !c.disabled_in.is_empty())
+        .count();
+    let override_count = commands
+        .commands
+        .iter()
+        .filter(|c| c.permission_override.is_some())
         .count();
 
     CommandsTemplate {
@@ -2009,10 +2021,34 @@ pub(super) async fn guild_commands(
         page_title: "Commands",
         commands,
         channels,
+        roles,
         disabled_count,
         partial_count,
+        override_count,
     }
     .into_response()
+}
+
+pub(super) async fn guild_command_permissions(
+    State(state): State<AppState>,
+    account: Account,
+    Path(guild_id): Path<u64>,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
+    let Some(percy) = get_percy_client(&state) else {
+        return Json(serde_json::json!({"error": "not configured"})).into_response();
+    };
+    let Some(discord_id) = get_discord_id(&state, account.id).await else {
+        return Json(serde_json::json!({"error": "no discord link"})).into_response();
+    };
+    if !check_guild_access(&percy, &discord_id, guild_id).await {
+        return Json(serde_json::json!({"error": "access denied"})).into_response();
+    }
+
+    match percy.set_command_permissions(guild_id, &body).await {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => Json(serde_json::json!({"error": e.to_string()})).into_response(),
+    }
 }
 
 pub(super) async fn guild_command_toggle(

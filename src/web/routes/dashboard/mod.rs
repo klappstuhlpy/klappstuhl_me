@@ -551,6 +551,10 @@ pub fn routes() -> Router<AppState> {
         .route("/dashboard/guild/:guild_id/emoji-stats", get(guild_emoji_stats))
         .route("/dashboard/guild/:guild_id/commands", get(guild_commands))
         .route("/dashboard/guild/:guild_id/commands/toggle", post(guild_command_toggle))
+        .route(
+            "/dashboard/guild/:guild_id/commands/permissions",
+            post(guild_command_permissions),
+        )
         .route("/dashboard/guild/:guild_id/plonks", post(guild_plonk_manage))
         .route("/dashboard/guild/:guild_id/lockdowns/lock", post(guild_lockdown_lock))
         .route(

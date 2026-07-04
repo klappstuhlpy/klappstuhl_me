@@ -329,8 +329,10 @@ pub(crate) struct CommandsTemplate {
     pub(crate) page_title: &'static str,
     pub(crate) commands: CommandsResponse,
     pub(crate) channels: Vec<Channel>,
+    pub(crate) roles: Vec<Role>,
     pub(crate) disabled_count: usize,
     pub(crate) partial_count: usize,
+    pub(crate) override_count: usize,
 }
 
 #[allow(dead_code)]
