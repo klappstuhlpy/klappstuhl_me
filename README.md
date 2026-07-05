@@ -832,13 +832,11 @@ persisted in the `storage` KV table (audited as `ai.public.toggle`) and override
 the `ai.public` config default. Admins can always use the assistant regardless of
 the toggle.
 
-## Percy Bot Dashboard
+## Discord login & the Percy dashboard
 
-The Percy bot dashboard is served from its own subdomain — `percy.<your-domain>` (e.g. `percy.klappstuhl.me`) — and is a full-featured web management interface for the Percy Discord bot. Server administrators can configure the bot, moderate members, manage economy/leveling/autoresponders/comics/temp-channels, browse polls/giveaways/tags/highlights/emoji-stats, control command availability, and view server/bot statistics — all through a terminal-aesthetic UI that connects to Percy's internal API. The server picker also lists servers you're in but don't manage (each opens a **read-only public overview** — stats, leaderboard, active polls/giveaways, shop, and a live music panel that's only controllable when you share the bot's voice channel) and "Add Percy" cards for servers you administrate that Percy isn't in yet (sourced from your Discord OAuth guild list, since Percy's API can only see guilds it's already in).
+### Discord login (this app)
 
-### Requirements
-
-Add two config blocks to `config.json`:
+klappstuhl.me lets users **log in / sign up with Discord** and link a Discord account to an existing login. Configure the OAuth2 app in `config.json`:
 
 ```json
 {
@@ -846,147 +844,26 @@ Add two config blocks to `config.json`:
     "client_id": "<Discord OAuth2 application ID>",
     "client_secret": "<client secret>",
     "redirect_uri": "https://<your-domain>/auth/discord/callback"
-  },
-  "percy": {
-    "api_url": "http://127.0.0.1:8090",
-    "api_token": "<shared secret matching Percy's INTERNAL_API_TOKEN>",
-    "bot_client_id": "<Discord application ID for bot invite links>"
   }
 }
 ```
 
-Register the redirect URI in the [Discord Developer Portal](https://discord.com/developers/applications) under OAuth2. The OAuth flow requests `identify` and `guilds` scopes.
+Register the redirect URI in the [Discord Developer Portal](https://discord.com/developers/applications) under OAuth2. The flow requests only the `identify` scope.
 
-The dashboard lives on the `percy.<domain>` subdomain (e.g. `percy.klappstuhl.me/dashboard`). Its routes are registered at their bare paths (`/dashboard`, `/lb`, `/privacy-policy`, `/terms-of-service`) and are served on whatever host reaches the binary — point the `percy.` subdomain's DNS/proxy at the same app. Two deployment notes:
+### Percy dashboard (a separate app)
+
+The Percy bot dashboard is now its **own application** — [`klappstuhlpy/percy-dashboard`](https://github.com/klappstuhlpy/percy-dashboard) — served on the `percy.<your-domain>` subdomain. It was split out of this monolith (see `DASHBOARD_DECOUPLING_PLAN.md`); this app no longer serves any dashboard pages, it only links to it via the `/percy` redirect. Both apps share their design system, signed-cookie crypto, and Percy API client through the [`klappstuhl_me-shared`](https://github.com/klappstuhlpy/klappstuhl_me-shared) crates.
+
+### Optional: single sign-on with the dashboard
+
+Set **`sso_secret`** (a hex HMAC key) to the **same** value in this app's `config.json` and the dashboard's, and a user logged in here with a linked Discord account is signed straight into the dashboard when they follow the `/percy` link — via a short-lived signed handoff (`kls_web_core::sso::Handoff`), with no shared database or session store. Leave it unset and `/percy` is a plain redirect (the dashboard does its own Discord login). The dashboard's README documents the full flow.
+
+### Deployment notes (the `percy.` subdomain)
 
 - **TLS:** add `percy.<domain>` to the `domains` list in `config.json` so the ACME cert covers it (keep the primary apex first — it's used for `canonical_url`, the cookie `Domain`, and to derive the `r.` short-link subdomain).
-- **Auth cookie:** the session cookie is scoped to the registrable domain (`Domain=<apex>`) so a login on the apex is also presented to `percy.<domain>`. Existing sessions issued before this was added are host-only — log out and back in once to get a domain-scoped cookie. In local dev the cookie is scoped to `localhost`; access the app via `localhost`, not a raw `127.0.0.1`, or the browser rejects the shared cookie.
-
-### Features
-
-- **Tabbed configuration** — General (feature flags, music, prefixes, Discord status feed subscription), Moderation (audit/alert/mute/mention + mod/message/voice log channels, active lockdowns with unlock), and Sentinel (verification channel, roles, starter message modal, bypass action, rate limit, auto-enable/disable) tabs. REQUIRED tags appear when a flag is enabled but its associated config is missing. Cancel/Save Changes buttons with form-state tracking.
-- **Member management** — searchable, paginated member directory with kick/ban actions and role mutations. Confirmation modals gather moderation reasons.
-- **Leveling** — Full configuration form (enable/disable, voice XP, stack roles, clear-XP-on-leave, XP curve factor, base XP, min/max gain per message, XP cooldown, level-up announcement destination — same channel / DM / off / a specific channel — and level-up message template). Collection editors with add/remove and Discord role/channel pickers for **level rewards** (roles granted at a level, shown with their color swatch, plus a one-click "Generate preset roles" button that creates 12 themed milestone roles for levels 5–100 behind an "Are you sure?" confirm), **XP multipliers** (per role and per channel), **blacklists** (roles/channels/users excluded from XP), and **special level-up messages** (custom text per level). XP leaderboard with rank medals (gold/silver/bronze) and in-place level/XP editing per member via modal.
-- **Economy** — Shop item management (create/delete) with effect display (cash voucher, lootbox, role grant, XP/loot boosts with duration), top balance leaderboard, and lottery control (start/cancel active lotteries).
-- **Music** — Live player status with channel and now-playing info (auto-refreshes every 10 seconds), persistent music panel configuration (enable/channel), interactive 15-band equalizer with cubic spline visualization and drag-to-adjust nodes, preset buttons (flat/bassboost/treble/vocal), audio filter toggles (nightcore, 8D, lowpass), and a dynamic status indicator showing apply progress.
-- **Autoresponders** — Full CRUD table: create triggers with match type (contains/exact/starts/ends/regex), toggle enable/disable, view usage counts, delete. Add modal with response template and ignore-case option.
-- **Comic Feeds** — Card-based view per subscribed brand (Marvel/DC/Manga) showing delivery channel, format, schedule day, next pull time, and pin status. Subscribe/edit/delete feeds and manually push the current week's releases.
-- **Temporary Voice Channels** — Manage hub channels that spawn temp voice channels. Table with format string editing and placeholder reference (%name, %display_name, %guild, %channel).
-- **Highlights** — Admin view of all member highlight configurations (trigger words, blocked count) with the ability to remove a user's highlights.
-- **Emoji Stats** — Read-only usage statistics: total uses, distinct emojis, and a ranked table of top custom emojis with images and counts.
-- **Polls** — Browse all guild polls with status pills (Active/Ended), total vote counts, option counts, and publish/expiry dates. **Poll settings** (poll/reason channels and ping role — moved here from the config tab) and a **Create Poll** modal live on this page: pick a channel, run duration, 2–8 options, optional description/colour/discussion-thread question, and a banner image supplied either by URL or by file upload (mutually exclusive — uploads are stored in the image host and the resulting raw URL is handed to Percy). Edit running polls inline. End active polls with a confirmation dialog (archives thread, updates Discord message, removes timer).
-- **Giveaways** — Track active and completed giveaways with entry counts, winner counts, and end times.
-- **Tags** — View most-used tags ranked by usage, top creators leaderboard, total tag count and total usage statistics.
-- **Command management** — Three-state system: Enabled/Partial/Disabled. Click any command to configure per-channel state. Plonk management to ignore specific users or channels.
-- **XP over-time chart** — Daily XP gain trend chart (uPlot) on the leveling page, fed by Percy's `xp_history` daily snapshots. Shows as a filled line chart once two or more days of data are recorded; graceful empty states for zero or one snapshot.
-- **User lookup** — click a member to see a full profile: avatar, display name, username, account/join dates, badges (BOT, not-in-guild), role chips with Discord colors, leveling stats (level, XP, messages, rank), a moderation timeline showing each case (action type color-coded, reason, moderator, timestamp), and a GitHub-style **activity heatmap** showing daily command usage over the past year.
-- **Audit log** — browse all moderation cases with filters (action type, moderator ID, date range), paginated table with color-coded action pills, live polling every 15 seconds for new cases, and CSV export.
-- **Bulk moderation** — select multiple members via checkboxes on the members page for batch kick/ban actions with per-user success/failure reporting.
-- **CSV export** — download leaderboard data and moderation case history as CSV files.
-- **Live bot stats** — the Stats page's "Bot Stats" tiles update in real time over WebSocket (topic `percy`). A background poller fetches Percy's global stats every 60 seconds and publishes them to the broadcast hub; the browser subscribes on page load and patches tiles as new data arrives, with automatic reconnection. The `moderation` WS topic is also available to dashboard users for future live moderation event push.
-- **Server & bot stats** — Real-time server metrics and bot-wide statistics.
-- **Bot invite flow** — if Percy is not in a guild, displays an invite link instead of an error.
-- **Setup wizard** — a first-time configuration banner for guilds with a fresh config.
-- **Grouped dropdown navigation** — Pages organized into Core (Configuration, Members, Stats, Commands), Features (Leveling, Economy, Music, Autoresponders, Comics, Temp Channels), and Browse (Polls, Giveaways, Tags, Highlights, Emoji Stats) groups. Mobile-friendly with tap-to-toggle dropdowns and 44px minimum touch targets.
-- **Async forms** — all config saves submit via JavaScript `fetch` with toast notifications; no-JS fallback via standard form POST with redirect.
-
-### Routes
-
-| Path | Method | Description |
-|------|--------|-------------|
-| `/auth/discord` | GET | Initiate Discord OAuth2 link |
-| `/auth/discord/callback` | GET | OAuth2 callback |
-| `/account/discord/unlink` | POST | Remove Discord link |
-| `/dashboard` | GET | Server selection: managed servers, read-only servers you're in, and "Add Percy" cards for servers you manage Percy isn't in yet |
-| `/dashboard/guild/:id/overview` | GET | Read-only public overview for members without manage access (stats, leaderboard, polls/giveaways, shop, live music) |
-| `/dashboard/guild/:id/overview/music` | GET | Live now-playing state + queue for the overview player (JSON, polled) |
-| `/dashboard/guild/:id/overview/music/control` | POST | Drive the live player (play/pause/skip/back/seek/volume/loop/shuffle/jump/stop) — only if the viewer shares the bot's voice channel |
-| `/dashboard/guild/:id/overview/music/lyrics` | GET | Time-synced lyrics for the overview player's current track (JSON) |
-| `/dashboard/guild/:id/me` | GET | Personal member dashboard: own profile, roles, leveling, economy, command stats, settings, and consent-tracked history |
-| `/dashboard/guild/:id/me/settings` | POST | Update personal bot settings (timezone, presence/history tracking) |
-| `/dashboard/guild/:id/me/history` | GET | Own name/nickname/avatar history + presence timeline (JSON; presence is rendered as a uPlot chart) |
-| `/dashboard/guild/:id/me/data-export` | GET | Download a full GDPR-style export of stored personal data (JSON file attachment) |
-| `/dashboard/guild/:id/me/delete-data` | POST | Permanently delete stored presence/avatar/name-history data |
-| `/dashboard/guild/:id` | GET | Per-guild config editor (tabbed: General, Moderation, Sentinel) |
-| `/dashboard/guild/:id/config` | POST | Save config changes (flags/moderation/polls/music/prefixes) |
-| `/dashboard/guild/:id/sentinel` | POST | Save sentinel settings |
-| `/dashboard/guild/:id/members` | GET | Member management page |
-| `/dashboard/guild/:id/members.json` | GET | Paginated member list (JSON API) |
-| `/dashboard/guild/:id/members/:uid` | GET | User lookup page (profile, leveling, moderation cases incl. opening new ones, activity heatmap) |
-| `/dashboard/guild/:id/members/:uid/action` | POST | Execute moderation action (kick/ban/unban) |
-| `/dashboard/guild/:id/members/:uid/roles` | POST | Add/remove member roles |
-| `/dashboard/guild/:id/members/:uid/activity` | GET | Daily activity data for heatmap (JSON) |
-| `/dashboard/guild/:id/members/bulk-action` | POST | Batch moderation action on multiple members |
-| `/dashboard/guild/:id/leveling` | GET | Leveling config + leaderboard + collection editors |
-| `/dashboard/guild/:id/leveling/config` | POST | Update leveling configuration |
-| `/dashboard/guild/:id/leveling/users/:uid` | POST | Update user level/XP |
-| `/dashboard/guild/:id/leveling/roles` | POST | Add/remove a level reward role |
-| `/dashboard/guild/:id/leveling/roles/preset` | POST | Generate the milestone reward-role preset (levels 5–100) |
-| `/dashboard/guild/:id/leveling/multipliers` | POST | Set/clear a role or channel XP multiplier |
-| `/dashboard/guild/:id/leveling/blacklist` | POST | Add/remove a leveling blacklist entry |
-| `/dashboard/guild/:id/economy` | GET | Economy management (shop, balances, lottery) |
-| `/dashboard/guild/:id/music` | GET | Music page (Apple-Music-style live player, equalizer, filters, panel config) |
-| `/dashboard/guild/:id/music/status` | GET | Live music status + now-playing + queue (JSON, polled) |
-| `/dashboard/guild/:id/music/equalizer` | POST | Apply equalizer bands or preset |
-| `/dashboard/guild/:id/music/filters` | POST | Toggle audio filters (nightcore, 8D, lowpass) |
-| `/dashboard/guild/:id/music/247` | POST | Enable/disable the 24/7 always-on player (radio/playlist/autoplay) |
-| `/dashboard/guild/:id/music/control` | POST | Drive the live player: play/pause/skip/back/seek/volume/loop/shuffle/jump/stop (voice-presence + DJ-mode gated) |
-| `/dashboard/guild/:id/music/lyrics` | GET | Time-synced lyrics for the current track (JSON) |
-| `/dashboard/guild/:id/economy/items` | POST | Create a shop item |
-| `/dashboard/guild/:id/economy/items/:name` | DELETE | Delete a shop item |
-| `/dashboard/guild/:id/economy/lottery` | POST/DELETE | Start / cancel the lottery |
-| `/dashboard/guild/:id/autoresponders` | GET/POST | List / create autoresponders |
-| `/dashboard/guild/:id/autoresponders/:trigger` | PATCH/DELETE | Toggle / delete an autoresponder |
-| `/dashboard/guild/:id/comics` | GET/POST | List / subscribe to a comic feed |
-| `/dashboard/guild/:id/comics/:brand` | PATCH/DELETE | Edit / unsubscribe a feed |
-| `/dashboard/guild/:id/comics/:brand/push` | POST | Manually push a comic feed |
-| `/dashboard/guild/:id/temp-channels` | GET/POST | List / create temp voice channel hubs |
-| `/dashboard/guild/:id/temp-channels/:cid` | PATCH/DELETE | Edit / remove a hub |
-| `/dashboard/guild/:id/highlights` | GET | Highlights admin view |
-| `/dashboard/guild/:id/highlights/:uid` | DELETE | Remove a user's highlights |
-| `/dashboard/guild/:id/emoji-stats` | GET | Emoji usage statistics |
-| `/dashboard/guild/:id/polls` | GET | Polls overview + settings + create-poll UI |
-| `/dashboard/guild/:id/polls` | POST | Create and publish a new poll (multipart: accept inline file as banner, or JSON for URL-only) |
-| `/dashboard/guild/:id/polls/:poll_id` | POST | Edit a running poll |
-| `/dashboard/guild/:id/polls/:poll_id/end` | POST | End a running poll |
-| `/dashboard/guild/:id/giveaways` | GET | Giveaways overview |
-| `/dashboard/guild/:id/tags` | GET | Tags and usage stats |
-| `/dashboard/guild/:id/commands` | GET | Command management |
-| `/dashboard/guild/:id/commands/toggle` | POST | Enable/disable a command |
-| `/dashboard/guild/:id/plonks` | POST | Add/remove plonked entities |
-| `/dashboard/guild/:id/audit-log` | GET | Moderation audit log with filters, inline reason editing and case closing |
-| `/dashboard/guild/:id/audit-log.json` | GET | Filtered cases (JSON API) |
-| `/dashboard/guild/:id/audit-log/recent` | GET | Recent cases since timestamp (live polling) |
-| `/dashboard/guild/:id/cases` | POST | Open a moderation case manually (action, target, reason) |
-| `/dashboard/guild/:id/cases/:case_index` | PATCH/DELETE | Edit a case's reason / close (delete) a case |
-| `/dashboard/guild/:id/export/leaderboard` | GET | CSV export of XP leaderboard |
-| `/dashboard/guild/:id/export/cases` | GET | CSV export of moderation cases |
-| `/dashboard/guild/:id/stats` | GET | Server and bot statistics |
-
-### Source layout
-
-The dashboard code is grouped under a `percy` namespace per file type:
-
-- `src/web/routes/dashboard/` — `mod.rs` (router + shared helpers), `templates.rs` (Askama view structs), `handlers.rs` (request handlers).
-- `src/integrations/percy/` — `mod.rs` (the typed `PercyClient` + `PercyError`) and `types.rs` (response models).
-- `src/services/percy_stats.rs` — background poller that fetches bot stats every 60s and publishes to the `"percy"` WebSocket topic.
-- `src/services/percy_moderation.rs` — placeholder for future server-push moderation notifications via the `"moderation"` WS topic.
-- `templates/percy/*.html` — one Askama template per page (including `user.html` for the member detail/lookup view). All guild sub-pages extend `dashboard_layout.html` which provides the shared container, navigation, and mobile-friendly dropdown toggle.
-- `static/css/percy/dashboard.css` — the shared base: layout, components, and reusable primitives (spacing/width utilities, `.modal-card`/`.modal-form`, status-colour helpers, shared `pulse`/`spin` keyframes). Page-specific styling lives in `static/css/percy/pages/<page>.css` and is pulled in per template via the `page_css` block; templates carry no inline `<style>` blocks (only genuinely dynamic, template-computed colours remain inline). `static/js/percy/percy_dashboard.js`, `static/js/percy/percy_members.js` — page behavior.
-
-### How it works
-
-1. User links their Discord account via OAuth2 (`/auth/discord`)
-2. The dashboard queries Percy's internal API for guilds the user can manage (Manage Server or Administrator permission)
-3. If the bot is not in the guild (Percy returns 404), an invite page is shown
-4. The config editor loads channels and roles from Percy's gateway cache for dropdown selects
-5. Form submissions are proxied through the Rust BFF to Percy's internal API, which writes to PostgreSQL and invalidates the cache
-6. Member actions (kick/ban/role changes) call Discord's API through Percy — the BFF never touches Discord directly
-7. Stats, leaderboards, and browsing pages (polls/tags/giveaways) read data from Percy's repositories and format them for display
-8. Feature flags auto-enable/disable associated systems (sentinel toggle, clearing channels on flag disable) and show REQUIRED warnings when setup is incomplete
+- **Auth cookie:** the session cookie is scoped to the registrable domain (`Domain=<apex>`) so a login on the apex is also presented to `percy.<domain>` — which is what makes the SSO handoff seamless. In local dev the cookie is scoped to `localhost`; access the app via `localhost`, not a raw `127.0.0.1`.
 
 ---
-
 ## Metric alert thresholds
 
 Hard-coded (`src/services/metrics/alerts.rs`). On the `OK → ALERT` transition, an alert fans out to every configured
@@ -1055,7 +932,6 @@ src/
 ├── media/                — image manipulation/conversion, metadata, code-to-image, shared SSRF-guarded fetch (scan.rs)
 ├── services/             — background/admin domains:
 │   ├── docker.rs         — bollard client wrapper + event watcher
-│   ├── percy_stats.rs    — background poller: fetches Percy bot stats every 60s → "percy" WS topic
 │   ├── backup/           — VACUUM INTO backups + scheduler (mod.rs) and S3 off-site upload (s3.rs)
 │   ├── updates.rs        — container image-update detection (registry digest checks)
 │   ├── cron.rs           — 5-field cron parser + scheduler for spotlight scripts

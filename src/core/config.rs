@@ -425,6 +425,12 @@ pub struct Config {
     /// Off unless all three fields (`client_id`, `client_secret`, `redirect_uri`) are set.
     #[serde(default)]
     pub discord: DiscordConfig,
+    /// Optional shared key for the cross-app SSO handoff to the Percy dashboard.
+    /// Set to the **same** value as the dashboard's `sso_secret` to make the
+    /// `/percy` link log a linked-Discord user straight into the dashboard.
+    /// Unset → `/percy` is a plain redirect (the dashboard does its own login).
+    #[serde(default)]
+    pub sso_secret: Option<SecretKey>,
 }
 
 /// Default per-file upload ceiling (10 MiB) used when `max_upload_bytes` is
@@ -457,6 +463,7 @@ impl Config {
             max_upload_bytes: None,
             ai: AiConfig::default(),
             discord: DiscordConfig::default(),
+            sso_secret: None,
         })
     }
 
