@@ -298,7 +298,8 @@ Full layout with all optional fields:
     "api_key": null,
     "model": null,
     "public": false
-  }
+  },
+  "sso_secret": null
 }
 ```
 
@@ -341,6 +342,7 @@ Full layout with all optional fields:
 | `ai.api_key`                         | string \| null    | Groq API key (`gsk_…`, free from [console.groq.com/keys](https://console.groq.com/keys)) enabling the "Ask the AI" feature. Held server-side only; the browser talks to the rate-limited `/api/ask` proxy. Unset = feature disabled (`/api/ask` returns 503). See [Ask AI](#ask-ai).       |
 | `ai.model`                           | string \| null    | Groq model id for `/api/ask`. Unset defaults to `llama-3.3-70b-versatile` (free tier, supports tool-calling).                                                                                                                                                                                                               |
 | `ai.public`                          | bool              | **Default** for "may non-admins spend tokens?". `false` (default) restricts `/api/ask` to **admin accounts**; `true` lets anyone use it (still rate-limited). Only the initial value — admins flip it live via `POST /admin/ai/public` (persisted in the `storage` KV table, which then wins).                          |
+| `sso_secret`                         | string \| null    | Optional shared HMAC key (hex) enabling single sign-on with the Percy dashboard. Set to the **same** value here and in the dashboard's `sso_secret`, and a logged-in user with a linked Discord is signed straight into the dashboard via the `/percy` link (short-lived signed handoff — no shared DB or session store). Unset ⇒ `/percy` is a plain redirect. See [Discord login & the Percy dashboard](#discord-login--the-percy-dashboard). |
 
 ### Docker services configuration
 
