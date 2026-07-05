@@ -104,9 +104,10 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     let _ = klappstuhl_me::CONFIG.set(config.clone());
     let addr = config.server.address();
     let secret_key = config.secret_key;
-    // The `Domain` to scope the auth cookie to, so a login on the apex is also
-    // presented to the Percy dashboard subdomain. Captured before `config.domains`
-    // is consumed by the ACME setup below.
+    // The `Domain` to scope the auth cookie to the registrable domain, so a login
+    // on the apex is also presented to sibling subdomains (e.g. the standalone
+    // Percy dashboard). Captured before `config.domains` is consumed by the ACME
+    // setup below.
     let cookie_domain = config.cookie_domain();
 
     let request_logger = state.requests.clone();
@@ -188,12 +189,6 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // none do).
     klappstuhl_me::cron::spawn_scheduler(state.clone());
 
-    // Percy bot stats poller → "percy" WS topic (no-op without Percy config).
-    klappstuhl_me::percy_stats::spawn_poller(state.clone());
-
-    // Percy moderation events poller → "moderation" WS topic.
-    klappstuhl_me::percy_moderation::spawn_poller(state.clone());
-
     // Reap expired image uploads (TTL) hourly.
     klappstuhl_me::routes::spawn_expiry_reaper(state.clone());
 
@@ -209,23 +204,19 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         .nest_service("/robots.txt", ServeFile::new("static/robots.txt"))
         .nest_service("/static", ServeDir::new("static"))
         // Shared design system (base.css + shared JS), served from the kls-ui
-        // crate's embedded assets at /kls/* — one source of truth for both the
-        // main site and the Percy dashboard. See DASHBOARD_DECOUPLING_PLAN.md.
+        // crate's embedded assets at /kls/* — one source of truth shared with the
+        // standalone Percy dashboard. See DASHBOARD_DECOUPLING_PLAN.md.
         .nest("/kls", kls_ui::routes())
         .layer(middleware::from_fn_with_state(
             state.clone(),
             klappstuhl_me::copy_api_token,
-        ))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            klappstuhl_me::routes::enforce_subdomain,
         ))
         .layer(klappstuhl_me::logging::HttpTrace::new(state.requests.clone()))
         .layer(middleware::from_fn(klappstuhl_me::flash::process_flash_messages))
         .layer(middleware::from_fn(klappstuhl_me::parse_cookies))
         .layer(Extension(secret_key))
         // Scope the auth cookie to the registrable domain so a login on the apex
-        // is also presented to the `percy.<domain>` dashboard subdomain.
+        // is also presented to sibling subdomains (e.g. the standalone dashboard).
         .layer(Extension(klappstuhl_me::token::CookieDomain(cookie_domain)))
         .layer(Extension(klappstuhl_me::cached::BodyCache::new(Duration::from_secs(
             120,

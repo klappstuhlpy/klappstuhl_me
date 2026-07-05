@@ -11,8 +11,6 @@ pub mod docker;
 pub mod firewall;
 pub mod health;
 pub mod metrics;
-pub mod percy_moderation;
-pub mod percy_stats;
 pub mod proxy;
 pub mod secrets;
 pub mod ssh;

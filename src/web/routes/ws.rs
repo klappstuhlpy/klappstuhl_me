@@ -45,11 +45,10 @@ enum ClientMessage {
 
 /// Topics non-admin clients are allowed to subscribe to.  Empty set means
 /// admins-only (which is the current default for every defined topic).
-fn topic_allowed(topic: &str, is_admin: bool) -> bool {
-    if is_admin {
-        return true;
-    }
-    matches!(topic, "percy" | "moderation")
+fn topic_allowed(_topic: &str, is_admin: bool) -> bool {
+    // Every live topic is admin-only now that the public Percy dashboard (the
+    // only consumer of non-admin topics) is a separate app.
+    is_admin
 }
 
 async fn ws_upgrade(State(state): State<AppState>, account: Account, ws: WebSocketUpgrade) -> Response {

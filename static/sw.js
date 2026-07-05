@@ -34,7 +34,6 @@ const SHELL_ASSETS = [
   "/static/js/live.js",
   "/static/img/logo.jpg",
   "/static/img/favicon.ico",
-  "/static/img/percy_favicon.ico",
   "/static/img/discord.svg",
   "/static/img/visibility.svg",
   "/static/img/visibility_off.svg",

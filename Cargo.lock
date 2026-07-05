@@ -1820,7 +1820,6 @@ dependencies = [
  "kls-web-core",
  "maxminddb",
  "nanoid",
- "percy-client",
  "pin-project-lite",
  "pulldown-cmark",
  "qrcode",
@@ -1860,7 +1859,7 @@ dependencies = [
 [[package]]
 name = "kls-ui"
 version = "0.1.0"
-source = "git+ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared?tag=v0.1.1#bd0edf3b3078b6dc7a03d91e141779027a59e848"
+source = "git+ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared?tag=v0.1.2#bd0edf3b3078b6dc7a03d91e141779027a59e848"
 dependencies = [
  "axum",
 ]
@@ -1868,7 +1867,7 @@ dependencies = [
 [[package]]
 name = "kls-web-core"
 version = "0.1.0"
-source = "git+ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared?tag=v0.1.1#bd0edf3b3078b6dc7a03d91e141779027a59e848"
+source = "git+ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared?tag=v0.1.2#bd0edf3b3078b6dc7a03d91e141779027a59e848"
 dependencies = [
  "anyhow",
  "askama",
@@ -2289,17 +2288,6 @@ name = "percent-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
-
-[[package]]
-name = "percy-client"
-version = "0.1.0"
-source = "git+ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared?tag=v0.1.1#bd0edf3b3078b6dc7a03d91e141779027a59e848"
-dependencies = [
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
 
 [[package]]
 name = "petgraph"

@@ -136,10 +136,10 @@ Scalar page updates automatically.
   `images:read · images:write · admin:read · admin:write`, and every API endpoint enforces the scope it needs (image
   processing / render / scan all require `images:read`; upload/delete require `images:write`; `GET /api/admin/updates`
   requires `admin:read`). Legacy keys (created without selecting scopes) keep full access for back-compat.
-- **Live updates over WebSocket** — `/ws` push topic events to dashboards. Metrics tiles refresh on every scrape,
-  audit-log entries appear instantly, Docker graph updates on container events, and Percy bot stats update live on the
-  dashboard stats page (topic `percy`, available to non-admin authenticated users); polling is the automatic fallback
-  when the socket is closed.
+- **Live updates over WebSocket** — `/ws` push topic events to the admin console. Metrics tiles refresh on every
+  scrape, audit-log entries appear instantly, and the Docker graph updates on container events; polling is the
+  automatic fallback when the socket is closed. (All live topics are admin-only; the Percy bot dashboard is now a
+  separate app — see [`klappstuhlpy/percy-dashboard`](https://github.com/klappstuhlpy/percy-dashboard).)
 - **Installable PWA** — `site.webmanifest` + service worker shell-cache the static assets. iOS standalone-mode meta
   tags + a black theme colour so the app looks native when installed to the home screen. Network-only for everything
   dynamic; offline access is intentionally **not** a goal for a homelab admin tool.
@@ -946,8 +946,7 @@ The dashboard lives on the `percy.<domain>` subdomain (e.g. `percy.klappstuhl.me
 | `/dashboard/guild/:id/highlights/:uid` | DELETE | Remove a user's highlights |
 | `/dashboard/guild/:id/emoji-stats` | GET | Emoji usage statistics |
 | `/dashboard/guild/:id/polls` | GET | Polls overview + settings + create-poll UI |
-| `/dashboard/guild/:id/polls` | POST | Create and publish a new poll |
-| `/dashboard/guild/:id/polls/image` | POST | Upload a poll banner image (stored in the image host), returns its public URL |
+| `/dashboard/guild/:id/polls` | POST | Create and publish a new poll (multipart: accept inline file as banner, or JSON for URL-only) |
 | `/dashboard/guild/:id/polls/:poll_id` | POST | Edit a running poll |
 | `/dashboard/guild/:id/polls/:poll_id/end` | POST | End a running poll |
 | `/dashboard/guild/:id/giveaways` | GET | Giveaways overview |

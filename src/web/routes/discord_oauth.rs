@@ -1,8 +1,3 @@
-use std::{
-    sync::OnceLock,
-    time::{Duration, Instant},
-};
-
 use crate::{
     flash::Flasher,
     headers::ClientIp,
@@ -21,7 +16,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use quick_cache::sync::Cache;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
@@ -71,40 +65,6 @@ struct CallbackQuery {
     error: Option<String>,
 }
 
-/// One entry of Discord's `/users/@me/guilds` response (only the fields we keep).
-#[derive(Deserialize)]
-struct DiscordPartialGuild {
-    id: String,
-    name: String,
-    #[serde(default)]
-    icon: Option<String>,
-    #[serde(default)]
-    owner: bool,
-    /// The user's permission bitfield in the guild. Discord returns this as a
-    /// *string* on modern API versions but a *number* on older/unversioned ones,
-    /// so we accept either — a type mismatch here would otherwise fail the whole
-    /// array and silently store no guilds.
-    #[serde(default, deserialize_with = "de_permissions")]
-    permissions: u64,
-}
-
-/// Deserialize a permission bitfield from either a JSON string or number.
-fn de_permissions<'de, D>(deserializer: D) -> Result<u64, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de::Error;
-    match serde_json::Value::deserialize(deserializer)? {
-        serde_json::Value::String(s) => s.parse::<u64>().map_err(Error::custom),
-        serde_json::Value::Number(n) => Ok(n.as_u64().unwrap_or(0)),
-        _ => Ok(0),
-    }
-}
-
-/// Discord permission bits we treat as "can manage this server".
-const PERM_ADMINISTRATOR: u64 = 1 << 3;
-const PERM_MANAGE_GUILD: u64 = 1 << 5;
-
 // -- Handlers ----------------------------------------------------------------
 
 /// `GET /auth/discord` — Initiate Discord OAuth2 flow.
@@ -152,7 +112,7 @@ async fn discord_login(
          ?client_id={client_id}\
          &redirect_uri={encoded_redirect}\
          &response_type=code\
-         &scope=identify%20guilds\
+         &scope=identify\
          &state={signed}",
     );
     Redirect::to(&url).into_response()
@@ -249,11 +209,6 @@ async fn discord_callback(
             return flasher.add("Failed to fetch Discord identity.").bail("/login");
         }
     };
-
-    // Capture the user's manageable guilds (scope `guilds` is always requested)
-    // so the dashboard can offer to add Percy to servers it isn't in yet. Best
-    // effort — a failure here must not block login.
-    store_admin_guilds(&state, &token_resp.access_token, &discord_user.id).await;
 
     // Dispatch based on whether the user was logged in when they started the flow.
     if let Some(account_id) = oauth_state.account_id {
@@ -497,70 +452,6 @@ async fn discord_unlink(
     }
 }
 
-/// Fetches the user's guild list from Discord and replaces their stored set of
-/// *manageable* guilds (admin or Manage Server). Drives the dashboard's "Add
-/// Percy" section, which lists servers the user administrates that Percy is not
-/// in yet. Entirely best-effort: any failure is logged and swallowed so it can
-/// never block the login/link flow.
-async fn store_admin_guilds(state: &AppState, access_token: &str, discord_id: &str) {
-    let res = state
-        .client
-        .get("https://discord.com/api/v10/users/@me/guilds")
-        .header("Authorization", format!("Bearer {access_token}"))
-        .send()
-        .await;
-
-    let guilds: Vec<DiscordPartialGuild> = match res {
-        Ok(resp) if resp.status().is_success() => match resp.json().await {
-            Ok(g) => g,
-            Err(e) => {
-                tracing::warn!(error = %e, "Failed to parse Discord guilds response");
-                return;
-            }
-        },
-        Ok(resp) => {
-            tracing::warn!(status = %resp.status(), "Discord guilds fetch returned non-success");
-            return;
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, "Discord guilds fetch failed");
-            return;
-        }
-    };
-
-    // Keep only guilds the user can manage; that's all the "Add Percy" flow needs.
-    let manageable: Vec<DiscordPartialGuild> = guilds
-        .into_iter()
-        .filter(|g| g.owner || g.permissions & (PERM_ADMINISTRATOR | PERM_MANAGE_GUILD) != 0)
-        .collect();
-
-    let discord_id = discord_id.to_string();
-    let result: rusqlite::Result<()> = state
-        .database()
-        .call(move |conn| {
-            let tx = conn.transaction()?;
-            tx.execute(
-                "DELETE FROM user_discord_admin_guilds WHERE discord_user_id = ?",
-                [&discord_id],
-            )?;
-            {
-                let mut stmt = tx.prepare_cached(
-                    "INSERT INTO user_discord_admin_guilds (discord_user_id, guild_id, name, icon, owner) \
-                     VALUES (?, ?, ?, ?, ?)",
-                )?;
-                for g in &manageable {
-                    stmt.execute(rusqlite::params![discord_id, g.id, g.name, g.icon, g.owner as i64])?;
-                }
-            }
-            tx.commit()
-        })
-        .await;
-
-    if let Err(e) = result {
-        tracing::warn!(error = %e, "Failed to store user admin guilds");
-    }
-}
-
 // -- Helpers -----------------------------------------------------------------
 
 async fn create_session_response(
@@ -619,21 +510,10 @@ fn append_random_suffix(base: &str) -> String {
     candidate[..candidate.len().min(32)].to_string()
 }
 
-// -- Live Discord avatar -----------------------------------------------------
+// -- Discord avatar ----------------------------------------------------------
 
-/// How long a resolved avatar URL is reused before re-checking the bot. Short
-/// enough that a profile-picture change shows up quickly; long enough that the
-/// header doesn't hit Percy on every page load.
-const AVATAR_TTL: Duration = Duration::from_secs(600);
-
-/// `discord_user_id -> (resolved_at, avatar_url)`.
-fn avatar_cache() -> &'static Cache<String, (Instant, String)> {
-    static CACHE: OnceLock<Cache<String, (Instant, String)>> = OnceLock::new();
-    CACHE.get_or_init(|| Cache::new(2000))
-}
-
-/// Discord's default embed avatar for a user id, used when the bot can't be
-/// reached or the user is unknown so the header always renders something.
+/// Discord's default embed avatar for a user id, so the header always renders
+/// something for a Discord-linked account.
 fn default_discord_avatar(discord_id: &str) -> String {
     let idx = discord_id.parse::<u64>().map(|n| (n >> 22) % 6).unwrap_or(0);
     format!("https://cdn.discordapp.com/embed/avatars/{idx}.png")
@@ -641,35 +521,17 @@ fn default_discord_avatar(discord_id: &str) -> String {
 
 fn avatar_redirect(url: &str) -> Response {
     let mut resp = Redirect::temporary(url).into_response();
-    // Let the browser cache the image briefly too, matching the server-side TTL.
     resp.headers_mut()
         .insert(CACHE_CONTROL, HeaderValue::from_static("private, max-age=600"));
     resp
 }
 
-/// `GET /account/discord/avatar` — 302-redirects to the linked user's *current*
-/// Discord avatar, resolved live from the bot and never persisted (so it can't go
-/// stale). The site header points its `<img>` here.
-async fn discord_avatar(State(state): State<AppState>, account: Account) -> Response {
+/// `GET /account/discord/avatar` — 302-redirects to the linked user's Discord
+/// avatar. The site header points its `<img>` here.
+async fn discord_avatar(account: Account) -> Response {
     let Some(discord_id) = account.discord_id.clone() else {
         return StatusCode::NOT_FOUND.into_response();
     };
-
-    if let Some((ts, url)) = avatar_cache().get(&discord_id) {
-        if ts.elapsed() < AVATAR_TTL {
-            return avatar_redirect(&url);
-        }
-    }
-
-    if let Some(percy) = state.config().percy.build_client(state.percy_client.clone()) {
-        if let Ok(avatar) = percy.get_user_avatar(&discord_id).await {
-            avatar_cache().insert(discord_id, (Instant::now(), avatar.avatar_url.clone()));
-            return avatar_redirect(&avatar.avatar_url);
-        }
-    }
-
-    // Bot unreachable or unconfigured — fall back to the default avatar. Not
-    // cached, so the next request retries the bot.
     avatar_redirect(&default_discord_avatar(&discord_id))
 }
 

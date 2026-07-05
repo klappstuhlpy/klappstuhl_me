@@ -113,10 +113,6 @@ struct InnerState {
 pub struct AppState {
     inner: Arc<InnerState>,
     pub client: reqwest::Client,
-    /// Dedicated HTTP client for Percy's internal API. Carries a short timeout
-    /// (the shared `client` uses a 600 s timeout for streaming/uploads, which
-    /// would let a hung Percy stall an Axum worker for 10 minutes).
-    pub percy_client: reqwest::Client,
     pub requests: RequestLogger,
     pub incorrect_default_password_hash: String,
 }
@@ -129,15 +125,6 @@ impl AppState {
             .timeout(Duration::from_secs(600))
             .build()
             .expect("could not build HTTP client");
-
-        // Percy's internal API is local and fast; cap its calls aggressively so a
-        // hung or slow bot can never tie up a request worker on the shared client's
-        // 600 s timeout. Connection pooling is preserved (one client, cloned cheaply).
-        let percy_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(8))
-            .connect_timeout(Duration::from_secs(3))
-            .build()
-            .expect("could not build Percy HTTP client");
 
         let requests = RequestLogger::new().expect("could not build request logger");
 
@@ -246,7 +233,6 @@ impl AppState {
                 image_updates: std::sync::Mutex::new(std::collections::HashMap::new()),
             }),
             client,
-            percy_client,
             requests,
             incorrect_default_password_hash,
         }

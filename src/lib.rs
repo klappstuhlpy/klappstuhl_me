@@ -13,12 +13,11 @@ pub mod web;
 // call sites are unchanged.
 pub use auth::{token, totp};
 pub use core::{cli, config, database, error, filters, logging, migrations, models, state, utils};
-pub use integrations::{ai, cf_tunnel, cloudflare, discord, exttools, geoip, percy};
+pub use integrations::{ai, cf_tunnel, cloudflare, discord, exttools, geoip};
 pub use kls_web_core::key;
 pub use media::{codeimage, metadata, scan, thumbnail};
 pub use services::{
-    alerts, audit, backup, cron, dbadmin, docker, firewall, health, metrics, percy_moderation, percy_stats, proxy,
-    secrets, ssh, updates,
+    alerts, audit, backup, cron, dbadmin, docker, firewall, health, metrics, proxy, secrets, ssh, updates,
 };
 pub use web::{cached, flash, headers, ratelimit, routes, scope};
 

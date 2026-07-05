@@ -249,45 +249,6 @@ impl DiscordConfig {
     }
 }
 
-/// Percy bot integration settings. Connects to Percy's internal aiohttp API
-/// to fetch guild data and proxy config mutations from the dashboard.
-/// Disabled unless both `api_url` and `api_token` are set.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct PercyConfig {
-    /// Base URL of Percy's internal API (e.g. `"http://127.0.0.1:8090"`).
-    #[serde(default)]
-    pub api_url: Option<String>,
-    /// Pre-shared bearer token matching Percy's `INTERNAL_API_TOKEN`.
-    #[serde(default)]
-    pub api_token: Option<String>,
-    /// Discord application (bot) client ID for constructing invite links.
-    #[serde(default)]
-    pub bot_client_id: Option<String>,
-}
-
-impl PercyConfig {
-    /// Whether the Percy integration is fully configured.
-    pub fn enabled(&self) -> bool {
-        self.api_url.as_deref().is_some_and(|s| !s.is_empty())
-            && self.api_token.as_deref().is_some_and(|s| !s.is_empty())
-    }
-
-    /// Builds a [`PercyClient`](crate::percy::PercyClient) from this config block,
-    /// returning `None` when the integration is not fully configured. Keeps the
-    /// `enabled()` gate on the app side so the extracted `percy-client` crate
-    /// stays free of the app's config schema.
-    pub fn build_client(&self, client: reqwest::Client) -> Option<crate::percy::PercyClient> {
-        if !self.enabled() {
-            return None;
-        }
-        Some(crate::percy::PercyClient::new(
-            client,
-            self.api_url.clone().unwrap(),
-            self.api_token.clone().unwrap(),
-        ))
-    }
-}
-
 /// AI assistant settings powering the "Ask the AI" feature (admin Spotlight).
 /// Backed by the Groq API (free tier, available in the EU; OpenAI-compatible).
 /// Disabled (the endpoint returns 503) unless `api_key` is set.
@@ -464,10 +425,6 @@ pub struct Config {
     /// Off unless all three fields (`client_id`, `client_secret`, `redirect_uri`) are set.
     #[serde(default)]
     pub discord: DiscordConfig,
-    /// Percy bot internal API settings for the dashboard BFF.
-    /// Off unless both `api_url` and `api_token` are set.
-    #[serde(default)]
-    pub percy: PercyConfig,
 }
 
 /// Default per-file upload ceiling (10 MiB) used when `max_upload_bytes` is
@@ -500,7 +457,6 @@ impl Config {
             max_upload_bytes: None,
             ai: AiConfig::default(),
             discord: DiscordConfig::default(),
-            percy: PercyConfig::default(),
         })
     }
 

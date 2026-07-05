@@ -49,6 +49,7 @@ const RESERVED_CODES: &[&str] = &[
     "account",
     "percy",
     "status",
+    // NOTE: "percy" stays reserved — `/percy` still redirects to the dashboard app.
     "projects",
     "static",
     "m",
@@ -57,7 +58,6 @@ const RESERVED_CODES: &[&str] = &[
     "sw.js",
     "robots.txt",
     "favicon.ico",
-    "percy_favicon.ico",
     "site.webmanifest",
 ];
 
