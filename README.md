@@ -63,6 +63,28 @@ Scalar page updates automatically.
 The repo ships a multi-stage `Dockerfile` and `docker-compose.yml` configured for a production deployment with
 host-metric visibility.
 
+#### Build prerequisite — SSH access to the private shared crate
+
+The image build fetches the private [`klappstuhl_me-shared`](https://github.com/klappstuhlpy/klappstuhl_me-shared)
+dependency over SSH, so the first `docker compose up` (which builds) needs an SSH key with **read access to that repo**
+forwarded into the build. BuildKit forwards an **ssh-agent socket** — a key sitting in `~/.ssh` is not enough on its
+own; without an agent you get `invalid empty ssh agent socket: make sure SSH_AUTH_SOCK is set`.
+
+```bash
+# Confirm your key can reach the private repo (uses your normal ~/.ssh key):
+git ls-remote git@github.com:klappstuhlpy/klappstuhl_me-shared.git >/dev/null && echo OK
+
+# Option A — load the key into an agent, then run the compose steps in the SAME shell:
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519          # your key with read access to klappstuhl_me-shared
+
+# Option B — no agent; hand BuildKit the key file directly:
+#   docker compose build --ssh default=$HOME/.ssh/id_ed25519
+```
+
+Building with `sudo`? Use `sudo -E …` so `SSH_AUTH_SOCK` survives, or run as a `docker`-group user. A passphrase-protected
+key must use Option A.
+
 ```bash
 # 1. Start the container once so it writes a default config:
 docker compose up -d
