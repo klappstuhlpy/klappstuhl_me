@@ -168,6 +168,8 @@ pub struct UploadResult {
     pub infected: usize,
     /// Canonical URLs of the successfully uploaded files.
     pub links: Vec<String>,
+    /// Canonical raw URLs of the successfully uploaded files.
+    pub raw_links: Vec<String>,
 }
 
 impl UploadResult {
@@ -226,6 +228,7 @@ pub async fn raw_upload_file(
     let mut errors = 0usize;
     let mut infected = 0usize;
     let mut links = Vec::with_capacity(total);
+    let mut raw_links = Vec::with_capacity(total);
 
     // Only pay the scanning cost when a backend is actually configured.
     let scan_enabled = state.config().clamav_addr.is_some() || state.config().virustotal_api_key.is_some();
@@ -302,6 +305,11 @@ pub async fn raw_upload_file(
             .unwrap_or_default()
             .to_string();
         links.push(link);
+
+        let raw_link = canonical_url(format!("/gallery/raw/{}.{}", file.id, file.ext))
+            .unwrap_or_default()
+            .to_string();
+        links.push(raw_link);
     }
 
     state.invalidate_image_caches().await;
@@ -316,12 +324,13 @@ pub async fn raw_upload_file(
         .target(format!("{total} image{}", if total == 1 { "" } else { "s" }))
         .ip_opt(client_ip)
         .meta(serde_json::json!({
-            "total":    total,
-            "errors":   errors,
-            "skipped":  skipped,
-            "infected": infected,
-            "via_api":  api,
-            "links":    links,
+            "total":     total,
+            "errors":    errors,
+            "skipped":   skipped,
+            "infected":  infected,
+            "via_api":   api,
+            "links":     links,
+            "raw_links": raw_links,
         }))
         .fire();
 
@@ -331,6 +340,7 @@ pub async fn raw_upload_file(
         skipped,
         infected,
         links,
+        raw_links
     })
 }
 
