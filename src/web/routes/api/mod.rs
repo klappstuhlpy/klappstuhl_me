@@ -165,7 +165,7 @@ pub fn routes() -> Router<AppState> {
         .route_layer(RateLimit::default().quota(25, 60.0).build())
         .route_layer(
             CorsLayer::new()
-                .allow_methods([Method::GET, Method::POST])
+                .allow_methods([Method::GET, Method::POST, Method::DELETE])
                 .allow_credentials(true)
                 .allow_origin(AllowOrigin::mirror_request())
                 .allow_headers([AUTHORIZATION, USER_AGENT]),
