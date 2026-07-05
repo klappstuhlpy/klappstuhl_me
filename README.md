@@ -19,150 +19,21 @@ Scalar page updates automatically.
 
 ## Highlights
 
-- **Public site** — landing page, projects page, image gallery.
-- **Image host** — drag-and-drop upload, public direct links, per-user library. Optional **expiring uploads** (pick a
-  TTL — 1 hour … 30 days — and a background reaper deletes them, also enforced at serve time), **OpenGraph embeds** on
-  the `/gallery/:id` landing page so links unfurl with the picture, and a downloadable **ShareX uploader config** (
-  `/account/sharex.sxcu`) pre-filled with your API token for screenshot-to-gallery uploads.
-- **Admin shell at `/admin`** — sidebar layout with the following pages:
-    - **Dashboard** — request analytics, popular routes, referring sites, API consumers.
-    - **Docker** — combined services dashboard and dependency graph.
-        - Per-service cards for every entry in `config.services`: live running/offline badge, uptime, image name, short
-          container ID, restart count, live CPU % and RAM bar (auto-refreshed every 15 s). Start / Stop / Restart / Pull
-          image / Recreate actions.
-        - Per-service live log console streamed over Server-Sent Events with syntax highlighting (timestamps, log
-          levels, HTTP methods, status codes, IPs, durations, strings).
-        - Interactive Cytoscape.js dependency graph showing containers, networks, and volumes with edges for network
-          membership, volume mounts, and `depends_on` links. Click any node for an inline side-panel with full inspect
-          data. Filter by kind, re-layout, fit-to-screen. Graph updates softly (no layout re-run) when a WS Docker event
-          arrives.
-        - Live Events strip at the bottom of the graph — WebSocket feed of Docker daemon events (start / stop / die /
-          create / destroy / …).
-        - Quick link to the Snapshots page.
-    - **Snapshots** — point-in-time container image snapshots via `docker commit`. Capture any running container from
-      the graph side-panel, give it an optional description; later restore it as a new named container in one click.
-      Stored in SQLite; the committed image tag is a nanoid-generated string. Deletion removes both the DB row and the
-      image (`docker rmi`).
-    - **Metrics** — live host stats (CPU, RAM, disk usage, disk I/O, network throughput) plus per-container Docker
-      stats. uPlot charts with selectable ranges (1h / 6h / 24h / 7d / 30d). Threshold alerts fire a Discord webhook on
-      `OK → ALERT` transitions with a 30-minute cooldown.
-    - **Health** — internal uptime monitoring (a self-hosted Uptime-Kuma). Define targets of four kinds — **HTTP** (
-      status-code / keyword assertions, redirect following), **TCP** (port reachability), **keyword** (substring
-      present/absent in an HTTP body), and **SSL** (certificate expiry, with a configurable "warn N days before"
-      threshold). A background monitor probes each target on its own interval, records latency, classifies each sample
-      as up / degraded (slower than the per-target `degraded_ms` threshold) / down, and opens/closes incidents
-      automatically. Per-target uptime %s (24h / 7d / 30d), average + p95 latency, an incident timeline, and a sample
-      history sparkline. Run a probe on demand, and get a Discord webhook on down→up / up→down transitions. Old samples
-      are pruned after 30 days.
-    - **Security** — failed logins, top offending IPs (with GeoIP country/city), reason breakdown, country distribution,
-      recent activity feed. Optional Cloudflare panels (zone analytics + WAF events) when an API token + zone ID are
-      configured.
-    - **Firewall** — visual frontend for **nftables**, **ufw**, or **iptables** (auto-detected at startup, overridable
-      via `firewall_backend`). Create allow / deny / rate-limit / geo-block rules (source CIDR, port, protocol, country,
-      requests-per-second); each rule is mirrored in SQLite and applied to the kernel by shelling out to the detected
-      backend. On ufw hosts the dashboard also **imports the live ruleset** — `ufw status` is parsed and reconciled into
-      the mirror on each load, so rules created out-of-band (`ufw allow OpenSSH` from a shell) appear automatically.
-      Manual IP lockouts with optional expiry, plus **automatic lockout** — after 8 failed logins from an IP within 10
-      minutes the address is blocked for an hour (driven off the existing audit log) and the block is pushed to the
-      backend. A background reaper releases expired lockouts. "Re-apply all" re-pushes every enabled rule. When no
-      backend binary is present the page still manages rules in the DB (handy in dev / without `NET_ADMIN`).
-    - **Proxy** — reverse-proxy / domain manager. Map a subdomain (`jellyfin.klappstuhl.me`) to an upstream container or
-      `host:port`, pick the scheme, and toggle managed TLS, Cloudflare-proxied real-IP handling, HTTP basic auth (
-      password hashed with bcrypt), a requests-per-second rate limit, and JSON allow/deny access rules. From the route
-      list the server renders an nginx `server { … }` block (or a Caddyfile fragment, per `proxy.kind`) per enabled
-      route, writes it to `proxy.config_dir/<subdomain>.conf` (plus an htpasswd sidecar for nginx auth), prunes stale
-      managed files, and runs `proxy.reload_command`. With `proxy.kind` set to `"cloudflared"` the same routes drive a *
-      *Cloudflare Tunnel** instead: for a remotely-managed (dashboard) tunnel — which has no local credentials file —
-      the dashboard manages the tunnel's public-hostname **ingress over the Cloudflare API**, with an **Import from
-      Cloudflare** button that pulls existing hostnames into the route table, a push that writes routes back as ingress
-      and upserts the proxied `CNAME → <tunnel>.cfargotunnel.com` DNS records, and no reload/`config.yml`/systemd
-      needed (Cloudflare propagates to the running `cloudflared` automatically); for a locally-managed tunnel it falls
-      back to writing a single combined `config.yml`. Preview the generated config before saving. Container targets are
-      populated from `config.services`. With no `proxy.config_dir` set (and not in tunnel-API mode), routes are still
-      tracked in the DB as a record of which subdomain points where. Every apply is logged and audited (`proxy.apply`,
-      `proxy.import`).
-    - **Certs** — read-only domain overview that joins every managed proxy route with its matching `SSL` health monitor,
-      so each domain the box serves is listed in one place with its certificate expiry (green / amber / red by days
-      remaining), TLS-managed and Cloudflare flags, and upstream. Cloudflared-backed or Cloudflare-proxied routes are
-      shown as **Cloudflare edge** TLS (no local certificate to track). SSL monitors that don't correspond to a proxy
-      route are listed separately. Pure aggregation — add an `SSL` monitor on `/admin/health` for a domain and it
-      appears here.
-    - **Secrets** — periodic + on-demand filesystem scanner with 18 built-in rules (AWS / GitHub / Stripe / OpenAI /
-      Anthropic / Discord / Slack tokens, PEM private keys, JWTs, DB URLs). Findings stored deduplicated with
-      first/last-seen tracking; dismiss / resolve / reopen workflow. Discord webhook on new criticals.
-    - **Audit log** — every state-changing action records actor, action, target, IP, and a JSON `meta` blob. Auth
-      events (login success/fail, 2FA challenge/fail, signup, password change, logout),
-      service/snapshot/script actions, secret status changes, backup create/delete, and admin cache invalidation are all
-      tracked. Filterable by action prefix and actor.
-    - **Logs** — interactive viewer over the rolling tracing log files. Parses the JSON application log (one object per
-      line) and the compact bad-request log best-effort, with level/text filtering and tailing. (Separate from the
-      dashboard's request-log panels.)
-    - **Database** — browse databases, tables, and (for Postgres) roles behind one picker: the app's own internal SQLite
-      databases (`main`, `requests`) are always available, and an external PostgreSQL server is added when`postgres_url`
-      is configured. Safe-mode query runner enforces read-only execution at the engine level —
-      `BEGIN TRANSACTION READ ONLY` for Postgres, `PRAGMA query_only` for SQLite — so even a superuser credential can't
-      accidentally mutate state; explicit danger-mode toggle for `INSERT` / `UPDATE` / `DELETE` / DDL when needed. Every
-      query writes an audit entry (including blocked-by-safe-mode attempts).
-    - **SSH Keys** — manage authorized SSH public keys stored in the database. Add keys with an optional label;
-      optionally sync them to a real `authorized_keys` file on the host and populate each key's "Last used" timestamp by
-      tailing the sshd auth log (see [SSH key sync](#ssh-key-sync-and-last-used-tracking)). Token audit (active API
-      tokens across accounts) and session audit (active login sessions with IP + user-agent) sub-pages. Revoke
-      individual keys, tokens, or sessions.
-    - **File Sanitizer** — drag-and-drop file scanning with two optional backends.
-        - **ClamAV** — streams the uploaded file to a local `clamd` daemon over TCP (INSTREAM protocol). Reports virus
-          name on detection.
-        - **VirusTotal** — looks up the file's SHA-256 against the VT v3 API (no file upload; hash-only). Shows
-          `N/M engines detected` with a link to the VT report.
-        - Scan history table (SQLite) with per-row deletion. Both backends are independent; results combine into a
-          single clean/infected/unknown verdict.
-    - **Backups** — on-disk SQLite backups via `VACUUM INTO` (a consistent, fully-checkpointed copy taken without an
-      exclusive lock, safe while serving). A background scheduler takes one every `backup.interval_hours` and prunes to
-      the most recent `backup.keep`. Take a backup on demand, download any backup file, or delete one. Restore is
-      intentionally a manual, offline operation (stop the server, swap `main.db`) — under WAL it's unsafe to replace the
-      live DB in place.
-- **Two-factor auth (TOTP)** — opt-in RFC 6238 2FA managed from `/account`. Enroll by scanning a QR / entering the
-  secret, confirm with a code, and download one-time recovery codes. On login, accounts with 2FA are bounced to
-  `/login/2fa` (a short-lived signed pending cookie carries the challenge — never persisted) and must supply a TOTP code
-  or a recovery code. The shared secret is encrypted at rest with ChaCha20-Poly1305 keyed by the app secret, so a leaked
-  database (or a downloaded backup) doesn't expose usable 2FA secrets; recovery codes are stored only as SHA-256 hashes.
-  Disabling 2FA requires a password-confirmation modal.
-- **Public status page (`/status`)** — unauthenticated, derived from the Health monitors. Shows an overall banner (all
-  operational / degraded / major outage), per-service up/degraded/down status, 24h uptime %, and last-check time.
-- **Spotlight palette (Ctrl+K)** — macOS-style command palette available on every admin page. Opens with `Ctrl+K` (or
-  the Search button in the sidebar footer). Fuzzy-searches across all admin nav items, configured scripts, audit log
-  entries, file scan history, SSH keys, and live Docker containers. Keyboard-navigable (↑/↓/Enter/Esc). Scripts run
-  inline and show their stdout/stderr output in the palette without leaving the page.
-- **API tokens with scopes** — generated from `/account`, each token can be restricted to a subset of
-  `images:read · images:write · admin:read · admin:write`, and every API endpoint enforces the scope it needs (image
-  processing / render / scan all require `images:read`; upload/delete require `images:write`; `GET /api/admin/updates`
-  requires `admin:read`). Legacy keys (created without selecting scopes) keep full access for back-compat.
-- **Live updates over WebSocket** — `/ws` push topic events to the admin console. Metrics tiles refresh on every
-  scrape, audit-log entries appear instantly, and the Docker graph updates on container events; polling is the
-  automatic fallback when the socket is closed. (All live topics are admin-only; the Percy bot dashboard is now a
-  separate app — see [`klappstuhlpy/percy-dashboard`](https://github.com/klappstuhlpy/percy-dashboard).)
-- **Installable PWA** — `site.webmanifest` + service worker shell-cache the static assets. iOS standalone-mode meta
-  tags + a black theme colour so the app looks native when installed to the home screen. Network-only for everything
-  dynamic; offline access is intentionally **not** a goal for a homelab admin tool.
-- **REST API** — OpenAPI 3.0 documented at `/api/docs` via utoipa + Scalar. All endpoints enforce token scopes (see
-  below). Beyond image upload/download/delete:
-    - **Media processing** — `POST /api/image/:op` (blur, pixelate, deepfry, invert, grayscale → PNG),
-      `POST /api/convert` (transcode between raster formats), `POST /api/metadata` (image info). Each accepts a
-      multipart `file` **or** a public `url`; URL fetches are SSRF-guarded (private/reserved addresses refused,
-      redirects disabled, size-capped).
-    - **Render** — `POST /api/render/code` renders syntax-highlighted code to an image (syntect; pick `language` +
-      `theme`). `POST /api/render/screenshot` and `POST /api/render/markdown-pdf` drive a headless Chromium;
-      `POST /api/convert/transcode` shells out to ffmpeg (video / HEIC). These three are config-gated and return an
-      error when the backing binary isn't available.
-    - **Scan** — `POST /api/scan` runs an uploaded file through ClamAV + VirusTotal and returns a combined report.
-    - **Upload TTL** — `POST /api/images/upload?expires_in=<seconds>` auto-deletes the upload after the given
-      time-to-live (capped at 365 days); omit for a permanent upload.
-    - **Admin** — `GET /api/admin/updates` returns the per-service container image-update status (requires`admin:read`).
-    - **Shareable links** — media/render endpoints accept `share=true` to store the result and return a JSON
-      `ShareResult` with a short `/m/:id` link instead of raw bytes; `GET /m/:id` serves it back.
-- **Alert fan-out** — metric, health, and secret alerts deliver to any of a Discord webhook, an [ntfy](https://ntfy.sh)
-  topic, and a generic JSON webhook (`{title, level, body, fields}`), depending on which of
-  `alerts.discord_webhook_url` / `alerts.ntfy_url` / `alerts.webhook_url` are configured.
-- **Automatic TLS** — Let's Encrypt via rustls-acme (TLS-ALPN-01) in production mode.
+- **Public site & image host** — landing + projects pages; drag-and-drop image upload with direct links, a per-user library, optional expiring uploads (TTL + background reaper), OpenGraph embeds, and a ShareX config pre-filled with your API token.
+- **Admin shell at `/admin`** — a self-hosting console with pages for:
+    - **Dashboard / Metrics** — request analytics; live host + per-container stats (uPlot charts) with threshold alerts.
+    - **Docker / Snapshots** — per-service cards (start/stop/restart/pull/recreate), SSE log consoles, an interactive dependency graph with a live events feed, and container capture/restore via `docker commit`.
+    - **Health / Status** — internal uptime monitoring (HTTP/TCP/keyword/SSL checks, incidents, latency, webhooks), surfaced on a public `/status` page.
+    - **Security / Firewall** — failed-login + GeoIP analytics (optional Cloudflare panels); an nftables/ufw/iptables frontend with allow/deny/rate-limit/geo rules and manual + automatic IP lockouts.
+    - **Proxy / Certs** — reverse-proxy & domain manager (nginx, Caddy, or Cloudflare Tunnel) with managed TLS, plus a read-only certificate-expiry overview.
+    - **Secrets / Sanitizer** — a filesystem secret scanner (18 rules) and drag-and-drop file scanning via ClamAV + VirusTotal.
+    - **Database / Logs / Audit** — a safe-mode (read-only) SQLite/Postgres query runner, a tracing-log viewer, and a full audit log of every state-changing action.
+    - **SSH Keys / Backups** — authorized-key management with `authorized_keys` sync, and `VACUUM INTO` backups with scheduling + retention.
+- **Auth** — accounts with optional **TOTP 2FA** (secrets encrypted at rest, hashed recovery codes), **Discord login/linking**, and **API tokens** scoped to `images:read · images:write · admin:read · admin:write`.
+- **Spotlight palette (Ctrl+K)** — fuzzy command palette across nav, scripts, audit log, scans, SSH keys, and live containers; scripts run inline.
+- **REST API** — OpenAPI 3.0 at `/api/docs`: image processing/convert/metadata, code/screenshot/markdown-PDF render, ClamAV+VT scan, TTL uploads, and shareable `/m/:id` links — all scope-enforced.
+- **Live updates over WebSocket** — `/ws` pushes metrics/audit/Docker events to the console (admin-only; the Percy bot dashboard is now a [separate app](https://github.com/klappstuhlpy/percy-dashboard)).
+- **Ops niceties** — installable PWA, alert fan-out (Discord / ntfy / JSON webhook), and automatic Let's Encrypt TLS (rustls-acme).
 
 ## Tech stack
 
