@@ -38,7 +38,7 @@ struct UploadedFiles {
 /// (capped at 365 days). Omit it for a permanent upload.
 #[utoipa::path(
     post,
-    path = "/api/images/upload",
+    path = "/images/upload",
     params(
         ("expires_in" = Option<i64>, Query, description = "Optional time-to-live in seconds; the upload is auto-deleted afterwards (max 365 days)."),
     ),
@@ -85,7 +85,7 @@ pub async fn upload_files(
 /// Note: To delete an image, you must be the uploader of the image.
 #[utoipa::path(
     delete,
-    path = "/api/images/{id}",
+    path = "/images/{id}",
     responses(
         (status = 200, description = "Successfully deleted image", body = DeleteResult),
         (status = 400, description = "Invalid ID given", body = ApiError),
@@ -137,7 +137,7 @@ pub async fn delete_image_by_id(
 /// `Content-Disposition: attachment` header.
 #[utoipa::path(
     post,
-    path = "/api/images/download",
+    path = "/images/download",
     request_body(
         content = inline(BulkFilesPayload),
         content_type = "application/json",

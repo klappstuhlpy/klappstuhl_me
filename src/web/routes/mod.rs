@@ -73,8 +73,11 @@ async fn percy_redirect(State(state): State<AppState>, account: Option<Account>)
 
     if let (Some(account), Some(secret)) = (account.as_ref(), config.sso_secret.as_ref()) {
         if let Some(discord_id) = account.discord_id.as_ref() {
-            let handoff =
-                kls_web_core::sso::Handoff::new(discord_id.clone(), account.name.clone(), kls_web_core::sso::DEFAULT_TTL_SECS);
+            let handoff = kls_web_core::sso::Handoff::new(
+                discord_id.clone(),
+                account.name.clone(),
+                kls_web_core::sso::DEFAULT_TTL_SECS,
+            );
             if let Some(token) = handoff.sign(secret) {
                 return Redirect::to(&format!("{percy_url}/auth/handoff?t={token}")).into_response();
             }

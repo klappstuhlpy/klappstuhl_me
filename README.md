@@ -673,7 +673,7 @@ badge on the `/admin/docker` service cards; a **Check updates** button there
 runs the check on demand. A freshly-discovered update (one that wasn't available
 on the previous run) fans out an alert. Set `update_check_interval_hours` to
 tune the cadence (default 12; `0` disables). The status is also exposed at
-`GET /api/admin/updates` for external dashboards — the first endpoint to require
+`GET /api/v1/admin/updates` for external dashboards — the first endpoint to require
 the `admin:read` token scope.
 
 Images built locally (no registry digest) and private registries that need
@@ -681,8 +681,8 @@ credentials degrade gracefully to an `unknown` state rather than erroring.
 
 ### External render tools (Chromium / ffmpeg)
 
-The `/api/render/screenshot`, `/api/render/markdown-pdf`, and
-`/api/convert/transcode` endpoints shell out to external binaries:
+The `/api/v1/render/screenshot`, `/api/v1/render/markdown-pdf`, and
+`/api/v1/convert/transcode` endpoints shell out to external binaries:
 
 - **Chromium** (screenshots + Markdown→PDF) — set `chromium_path` to a
   Chromium/Chrome binary, or leave it unset to probe common names on `PATH`.
@@ -691,7 +691,7 @@ The `/api/render/screenshot`, `/api/render/markdown-pdf`, and
 
 When the required binary can't be found the corresponding endpoint returns an
 error rather than failing obscurely; the rest of the API is unaffected. The
-code-render endpoint (`/api/render/code`) needs no external tool — it uses the
+code-render endpoint (`/api/v1/render/code`) needs no external tool — it uses the
 in-process `syntect` highlighter.
 
 ### Ask AI

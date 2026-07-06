@@ -340,7 +340,7 @@ pub async fn raw_upload_file(
         skipped,
         infected,
         links,
-        raw_links
+        raw_links,
     })
 }
 

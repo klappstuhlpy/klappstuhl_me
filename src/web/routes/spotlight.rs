@@ -118,29 +118,32 @@ fn static_pages() -> Vec<SpotlightItem> {
 // ─── API endpoints (all documented at /api/docs) ──────────────────────────────
 
 fn static_api() -> Vec<SpotlightItem> {
+    // Derive the version prefix from the single source of truth so these palette
+    // entries track a version bump automatically.
+    let base = super::api::api_base_path();
     vec![
         SpotlightItem::result(
             "api",
             "File Scan API",
-            "POST /api/scan · malware scan via ClamAV + VirusTotal",
+            format!("POST {base}/scan · malware scan via ClamAV + VirusTotal"),
             "/api/docs",
         ),
         SpotlightItem::result(
             "api",
             "Image Effects API",
-            "POST /api/image/:op · blur, pixelate, deepfry, invert, grayscale",
+            format!("POST {base}/image/:op · blur, pixelate, deepfry, invert, grayscale"),
             "/api/docs",
         ),
         SpotlightItem::result(
             "api",
             "Image Convert API",
-            "POST /api/convert · PNG→WebP, JPEG, GIF, BMP, TIFF",
+            format!("POST {base}/convert · PNG→WebP, JPEG, GIF, BMP, TIFF"),
             "/api/docs",
         ),
         SpotlightItem::result(
             "api",
             "Image Upload / Download API",
-            "POST /api/images/upload · /api/images/download · DELETE /api/images/:id",
+            format!("POST {base}/images/upload · {base}/images/download · DELETE {base}/images/:id"),
             "/api/docs",
         ),
     ]

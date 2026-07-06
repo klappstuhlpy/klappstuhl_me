@@ -34,7 +34,7 @@ struct ScanUpload {
 /// is stateless.
 #[utoipa::path(
     post,
-    path = "/api/scan",
+    path = "/scan",
     request_body(
         content = inline(ScanUpload),
         content_type = "multipart/form-data",

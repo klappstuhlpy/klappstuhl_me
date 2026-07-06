@@ -1,8 +1,8 @@
 //! Public image-processing endpoints.
 //!
-//! - `POST /api/image/{op}` — apply a visual effect (blur, pixelate, deepfry,
+//! - `POST /api/v1/image/{op}` — apply a visual effect (blur, pixelate, deepfry,
 //!   invert, grayscale) and return a PNG.
-//! - `POST /api/convert` — transcode an image between raster formats
+//! - `POST /api/v1/convert` — transcode an image between raster formats
 //!   (PNG → WebP, and friends).
 //!
 //! Both accept the source image either as a multipart `file` upload or as a
@@ -353,7 +353,7 @@ pub struct ShareResult {
 /// `ShareResult` carrying a short `/m/:id` link to the stored image.
 #[utoipa::path(
     post,
-    path = "/api/image/{op}",
+    path = "/image/{op}",
     request_body(
         content = inline(ImageInput),
         content_type = "multipart/form-data",
@@ -433,7 +433,7 @@ pub async fn manipulate_image(
 /// `/m/:id` link to the converted image.
 #[utoipa::path(
     post,
-    path = "/api/convert",
+    path = "/convert",
     request_body(
         content = inline(ImageInput),
         content_type = "multipart/form-data",
@@ -535,7 +535,7 @@ fn format_name(fmt: Option<ImageFormat>) -> String {
 /// Supply the source as a multipart `file` upload or a `url` form field.
 #[utoipa::path(
     post,
-    path = "/api/metadata",
+    path = "/metadata",
     request_body(
         content = inline(ImageInput),
         content_type = "multipart/form-data",

@@ -1001,7 +1001,9 @@ async fn sharex_config(State(state): State<AppState>, account: Account) -> Respo
             .into_response();
     };
 
-    let upload_url = state.config().url_to("/api/images/upload");
+    let upload_url = state
+        .config()
+        .url_to(format!("{}/images/upload", super::api::api_base_path()));
     let config = serde_json::json!({
         "Version": "15.0.0",
         "Name": "klappstuhl.me",

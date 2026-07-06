@@ -41,7 +41,7 @@ pub(crate) struct CodeQuery {
 /// `{id, url, content_type}` carrying a short `/m/:id` link to the stored SVG.
 #[utoipa::path(
     post,
-    path = "/api/render/code",
+    path = "/render/code",
     request_body = CodeImageRequest,
     responses(
         (status = 200, description = "The rendered SVG", content_type = "image/svg+xml", body = String),

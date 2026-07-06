@@ -70,7 +70,7 @@ pub(crate) struct ShareQuery {
 /// on `PATH`); otherwise returns 503.
 #[utoipa::path(
     post,
-    path = "/api/render/screenshot",
+    path = "/render/screenshot",
     request_body = ScreenshotRequest,
     responses(
         (status = 200, description = "PNG screenshot", content_type = "image/png", body = Vec<u8>),
@@ -151,7 +151,7 @@ blockquote {{ border-left: 3px solid #ddd; margin: 0; padding-left: 1rem; color:
 /// Requires Chromium on the server; otherwise returns 503.
 #[utoipa::path(
     post,
-    path = "/api/render/markdown-pdf",
+    path = "/render/markdown-pdf",
     request_body = MarkdownRequest,
     responses(
         (status = 200, description = "PDF document", content_type = "application/pdf", body = Vec<u8>),
@@ -223,7 +223,7 @@ struct TranscodeUpload {
 /// Requires an `ffmpeg` binary on the server; otherwise returns 503.
 #[utoipa::path(
     post,
-    path = "/api/convert/transcode",
+    path = "/convert/transcode",
     params(("to" = String, Query, description = "Target format: mp4 or jpg")),
     request_body(content = inline(TranscodeUpload), content_type = "multipart/form-data"),
     responses(

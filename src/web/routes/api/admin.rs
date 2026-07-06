@@ -14,7 +14,7 @@ use crate::{error::ApiError, models::Scope, updates::ImageUpdate, ApiToken, AppS
 /// every configured Docker service. Requires the `admin:read` scope.
 #[utoipa::path(
     get,
-    path = "/api/admin/updates",
+    path = "/admin/updates",
     tag = "admin",
     security(("api_key" = ["admin:read"])),
     responses(

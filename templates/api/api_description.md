@@ -8,21 +8,33 @@ Klappstuhl.me uses API keys to allow access to the API. Authentication is done u
 
 If you have not generated an API key yet, you can do so on your [account page](/account).
 
+### Versioning
+
+The API is versioned by path prefix. All endpoints live under `{base}` — this
+is the version new integrations should target, and every response carries an
+`X-API-Version` header naming the version that served it. `GET /api` returns a
+discovery document listing the available versions.
+
+The bare, unversioned paths (`/api/scan`, `/api/convert`, …) still work as a
+**deprecated alias** of the current version so existing keys and tools keep
+functioning, but they respond with a `Deprecation` header and a `Link` pointing
+at the successor. Please migrate to the `{base}` prefix.
+
 ### Endpoint groups
 
 - **Images** — upload, delete, and bulk-download your hosted images.
-- **Media** — apply visual effects (`/api/image/{op}`), transcode between
-  raster formats (`/api/convert`), or inspect an image (`/api/metadata`).
+- **Media** — apply visual effects (`{base}/image/{op}`), transcode between
+  raster formats (`{base}/convert`), or inspect an image (`{base}/metadata`).
   Each accepts either a multipart `file` upload or a public image `url` that
   the server fetches on your behalf (private/reserved addresses are refused).
 - **Render** — turn content into images/documents: a syntax-highlighted code
-  screenshot (`/api/render/code`, pure Rust), a web-page screenshot
-  (`/api/render/screenshot`), or Markdown → PDF (`/api/render/markdown-pdf`).
+  screenshot (`{base}/render/code`, pure Rust), a web-page screenshot
+  (`{base}/render/screenshot`), or Markdown → PDF (`{base}/render/markdown-pdf`).
   The latter two need a Chromium binary on the server and return `500
-  (not available)` until one is installed. `/api/convert/transcode` converts
+  (not available)` until one is installed. `{base}/convert/transcode` converts
   MOV→MP4 / HEIC→JPG via `ffmpeg` under the same arrangement.
 - **Scan** — check an uploaded file for malware via ClamAV and VirusTotal
-  (`/api/scan`).
+  (`{base}/scan`).
 
 ### Rate Limits
 

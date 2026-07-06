@@ -1,5 +1,5 @@
 //! Reusable file-scanning backend shared by the admin sanitizer page and the
-//! public `/api/scan` endpoint.
+//! public `/api/v1/scan` endpoint.
 //!
 //! Talks to a ClamAV daemon (`clamav_addr`) over the INSTREAM protocol and
 //! looks up the file's SHA-256 on VirusTotal (`virustotal_api_key`). Both are
