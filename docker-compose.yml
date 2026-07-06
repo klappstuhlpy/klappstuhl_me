@@ -9,7 +9,7 @@ services:
       # Requires BuildKit: `DOCKER_BUILDKIT=1 docker compose build` (default on
       # modern Docker). The Dockerfile consumes this via `--mount=type=ssh`.
       ssh:
-        - default
+        - default=$HOME/.ssh/id_ed25519
     image: klappstuhl_me:latest
     restart: unless-stopped
 
