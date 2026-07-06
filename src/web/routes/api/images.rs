@@ -72,7 +72,7 @@ pub async fn upload_files(
     };
 
     let expires_at = crate::routes::image::expiry_from_params(&params);
-    let result = raw_upload_file(state, account, client_ip, multipart, true, expires_at).await?;
+    let result = raw_upload_file(state, account, client_ip, multipart, true, expires_at, None).await?;
     if result.is_error() {
         return Err(ApiError::new("Upload failed"));
     }

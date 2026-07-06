@@ -475,6 +475,10 @@ pub enum Scope {
     ImagesRead,
     /// Upload + delete images via the API.
     ImagesWrite,
+    /// Upload / list / delete images in a Discord guild's shared gallery via the
+    /// `/guilds/:id/images` endpoints. Held by trusted service keys (Percy);
+    /// the caller is responsible for authorising the acting guild.
+    GuildImages,
     /// Read-only access to admin dashboard JSON endpoints
     /// (metrics, security, secrets, audit).
     AdminRead,
@@ -487,6 +491,7 @@ impl Scope {
         match self {
             Scope::ImagesRead => "images:read",
             Scope::ImagesWrite => "images:write",
+            Scope::GuildImages => "images:guild",
             Scope::AdminRead => "admin:read",
             Scope::AdminWrite => "admin:write",
         }
@@ -496,6 +501,7 @@ impl Scope {
         match s {
             "images:read" => Some(Scope::ImagesRead),
             "images:write" => Some(Scope::ImagesWrite),
+            "images:guild" => Some(Scope::GuildImages),
             "admin:read" => Some(Scope::AdminRead),
             "admin:write" => Some(Scope::AdminWrite),
             _ => None,
@@ -507,6 +513,7 @@ impl Scope {
         &[
             Scope::ImagesRead,
             Scope::ImagesWrite,
+            Scope::GuildImages,
             Scope::AdminRead,
             Scope::AdminWrite,
         ]
@@ -543,5 +550,23 @@ impl Session {
             return true; // legacy API key, pre-scopes
         }
         self.scope_set().contains(&needed)
+    }
+}
+
+#[cfg(test)]
+mod scope_tests {
+    use super::Scope;
+
+    #[test]
+    fn every_scope_round_trips_through_its_wire_string() {
+        for scope in Scope::all() {
+            assert_eq!(Scope::from_str(scope.as_str()), Some(*scope));
+        }
+    }
+
+    #[test]
+    fn guild_images_scope_has_stable_wire_name() {
+        assert_eq!(Scope::GuildImages.as_str(), "images:guild");
+        assert_eq!(Scope::from_str("images:guild"), Some(Scope::GuildImages));
     }
 }

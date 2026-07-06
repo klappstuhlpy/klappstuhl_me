@@ -216,6 +216,7 @@ pub async fn raw_upload_file(
     multipart: Multipart,
     api: bool,
     expires_at: Option<OffsetDateTime>,
+    guild_id: Option<String>,
 ) -> Result<UploadResult, ApiError> {
     let max_bytes = state.config().effective_max_upload_bytes();
     let (files, skipped) = collect_fields(multipart, max_bytes).await;
@@ -274,8 +275,8 @@ pub async fn raw_upload_file(
         let insert_result = state
             .database()
             .execute(
-                "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at, original_name) VALUES (?, ?, ?, ?, ?, ?)",
-                (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at, file.original_name.clone()),
+                "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at, original_name, guild_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at, file.original_name.clone(), guild_id.clone()),
             )
             .await;
 
@@ -286,8 +287,8 @@ pub async fn raw_upload_file(
                 let retry = state
                     .database()
                     .execute(
-                        "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at, original_name) VALUES (?, ?, ?, ?, ?, ?)",
-                        (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at, file.original_name.clone()),
+                        "INSERT INTO images (id, mimetype, uploader_id, image_data, expires_at, original_name, guild_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (file.id.clone(), file.mimetype.clone(), account.id, file.bytes.to_vec(), expires_at, file.original_name.clone(), guild_id.clone()),
                     )
                     .await;
 
@@ -309,7 +310,7 @@ pub async fn raw_upload_file(
         let raw_link = canonical_url(format!("/gallery/raw/{}.{}", file.id, file.ext))
             .unwrap_or_default()
             .to_string();
-        links.push(raw_link);
+        raw_links.push(raw_link);
     }
 
     state.invalidate_image_caches().await;
@@ -329,6 +330,7 @@ pub async fn raw_upload_file(
             "skipped":   skipped,
             "infected":  infected,
             "via_api":   api,
+            "guild_id":  guild_id,
             "links":     links,
             "raw_links": raw_links,
         }))
@@ -405,7 +407,7 @@ async fn upload_file(
 ) -> Response {
     let url = referrer.map(|r| r.0).unwrap_or_else(|| "/images".to_string());
     let expires_at = expiry_from(params.expires_in);
-    match raw_upload_file(state, account, client_ip, multipart, false, expires_at).await {
+    match raw_upload_file(state, account, client_ip, multipart, false, expires_at, None).await {
         Err(msg) => flasher.add(msg.error.as_ref()).bail(&url),
         Ok(result) => {
             let message = if result.is_success() {

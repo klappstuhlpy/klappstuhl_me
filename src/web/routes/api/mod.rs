@@ -2,6 +2,7 @@ mod admin;
 mod auth;
 mod code;
 mod external;
+mod guild_images;
 mod images;
 mod media;
 mod scan;
@@ -44,6 +45,9 @@ pub use media::serve_media;
         images::upload_files,
         images::delete_image_by_id,
         images::download_images,
+        guild_images::upload_guild_images,
+        guild_images::list_guild_images,
+        guild_images::delete_guild_image,
         media::manipulate_image,
         media::convert_file,
         media::image_info,
@@ -63,6 +67,8 @@ pub use media::serve_media;
             crate::routes::image::UploadResult,
             crate::routes::image::DeleteResult,
             crate::routes::image::BulkFilesPayload,
+            guild_images::GuildImageInfo,
+            guild_images::GuildImagesResult,
             crate::scan::ScanReport,
             media::ImageInfo,
             media::ShareResult,
@@ -268,6 +274,12 @@ fn v1() -> Router<AppState> {
         .route("/images/upload", post(images::upload_files))
         .route("/images/download", post(images::download_images))
         .route("/images/:id", delete(images::delete_image_by_id))
+        .route(
+            "/guilds/:guild_id/images/upload",
+            post(guild_images::upload_guild_images),
+        )
+        .route("/guilds/:guild_id/images", get(guild_images::list_guild_images))
+        .route("/guilds/:guild_id/images/:id", delete(guild_images::delete_guild_image))
         .route("/scan", post(scan::scan_file))
         .route("/metadata", post(media::image_info))
         .route("/image/:op", post(media::manipulate_image))

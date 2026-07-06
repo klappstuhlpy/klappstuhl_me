@@ -123,6 +123,12 @@
                     <span class="scope-desc">Upload and delete images</span>
                 </label>
                 <label class="scope-row">
+                    <input type="checkbox" name="scope" value="images:guild"
+                        {% if api_key_scopes.contains("images:guild") %}checked{% endif %}>
+                    <span class="scope-name">images:guild</span>
+                    <span class="scope-desc">Manage per-guild image galleries (Percy poll banners + dashboard)</span>
+                </label>
+                <label class="scope-row">
                     <input type="checkbox" name="scope" value="admin:read"
                         {% if api_key_scopes.contains("admin:read") %}checked{% endif %}>
                     <span class="scope-name">admin:read</span>
