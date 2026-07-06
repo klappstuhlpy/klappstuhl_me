@@ -2,8 +2,10 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/links.css" type="text/css">
-<meta property="og:url" content="{{ crate::CONFIG.get().unwrap().canonical_url() }}/links">
 {% endblock %}
+
+{% block og_title %}Your Short Links | Klappstuhl.me{% endblock %}
+{% block og_url %}{{ crate::CONFIG.get().unwrap().canonical_url() }}/links{% endblock %}
 
 {% block title %}Your Short Links | Klappstuhl.me{% endblock %}
 

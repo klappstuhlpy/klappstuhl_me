@@ -2,10 +2,9 @@
 
 {% block css %}
 <link href="/static/css/index.css" rel="stylesheet">
-
-<meta property="og:url" content="{{ url }}">
-<meta property="og:title" content="Home | Klappstuhl.me">
 {% endblock %}
+
+{% block og_url %}{{ url }}{% endblock %}
 
 {% block body %}
 {% for flash in flashes %}

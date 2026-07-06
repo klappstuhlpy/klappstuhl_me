@@ -4,8 +4,11 @@
 
 {% block css %}
 <link href="/static/css/status.css" rel="stylesheet">
-<meta property="og:title" content="Status | Klappstuhl.me">
 {% endblock %}
+
+{% block og_title %}Status | Klappstuhl.me{% endblock %}
+{% block og_description %}Live operational status of Klappstuhl.me services.{% endblock %}
+{% block meta_description %}Live operational status of Klappstuhl.me services.{% endblock %}
 
 {% block body %}
 <section class="status">
