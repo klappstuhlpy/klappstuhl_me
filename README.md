@@ -192,7 +192,8 @@ Full layout with all optional fields:
     "model": null,
     "public": false
   },
-  "sso_secret": null
+  "sso_secret": null,
+  "gallery_provision_token": null
 }
 ```
 
@@ -236,6 +237,7 @@ Full layout with all optional fields:
 | `ai.model`                           | string \| null    | Groq model id for `/api/ask`. Unset defaults to `llama-3.3-70b-versatile` (free tier, supports tool-calling).                                                                                                                                                                                                               |
 | `ai.public`                          | bool              | **Default** for "may non-admins spend tokens?". `false` (default) restricts `/api/ask` to **admin accounts**; `true` lets anyone use it (still rate-limited). Only the initial value — admins flip it live via `POST /admin/ai/public` (persisted in the `storage` KV table, which then wins).                          |
 | `sso_secret`                         | string \| null    | Optional shared HMAC key (hex) enabling single sign-on with the Percy dashboard. Set to the **same** value here and in the dashboard's `sso_secret`, and a logged-in user with a linked Discord is signed straight into the dashboard via the `/percy` link (short-lived signed handoff — no shared DB or session store). Unset ⇒ `/percy` is a plain redirect. See [Discord login & the Percy dashboard](#discord-login--the-percy-dashboard). |
+| `gallery_provision_token`            | string \| null    | Optional shared service token letting the bot (Percy) provision **per-guild** `images:guild` keys via `POST /api/v1/guilds/{id}/provision-key`. Set to the **same** high-entropy value here and in Percy's `KLAPPSTUHL_ME_PROVISION_TOKEN`. Each guild gets its own key, minted on demand under a dedicated non-personal `percy-service` account and stored in `guild_api_key`, so the bot never needs a personal/all-access key. Unset ⇒ the endpoint returns `401` (feature off). |
 
 ### Docker services configuration
 
@@ -678,6 +680,15 @@ the `admin:read` token scope.
 
 Images built locally (no registry digest) and private registries that need
 credentials degrade gracefully to an `unknown` state rather than erroring.
+
+> **Internal endpoints (not for public use).** A few documented routes exist only
+> for the operator's own services and appear in the API docs purely for reference:
+> the **guild galleries** (`/api/v1/guilds/{id}/images…`, scope `images:guild`,
+> used by Percy) and the **admin** routes (`/api/v1/admin/…`, scopes
+> `admin:read` / `admin:write`). Their scopes are never granted to a normal
+> personal API key — `Scope::requires_admin` filters them out at key-generation
+> time and the account page hides them from non-admins — so a key you create
+> cannot call them. Don't build against these.
 
 ### External render tools (Chromium / ffmpeg)
 

@@ -122,6 +122,11 @@
                     <span class="scope-name">images:write</span>
                     <span class="scope-desc">Upload and delete images</span>
                 </label>
+                {% if is_admin %}
+                {# Privileged scopes — only ever shown to admin accounts. `images:guild`
+                   is minted automatically as a per-guild service key (never a personal
+                   key); the `admin:*` scopes are operator-only. The server also drops
+                   these from a non-admin request, so hiding them here is defence-in-depth. #}
                 <label class="scope-row">
                     <input type="checkbox" name="scope" value="images:guild"
                         {% if api_key_scopes.contains("images:guild") %}checked{% endif %}>
@@ -140,6 +145,7 @@
                     <span class="scope-name">admin:write</span>
                     <span class="scope-desc">Mutate admin state (services, secrets)</span>
                 </label>
+                {% endif %}
             </div>
         </fieldset>
 

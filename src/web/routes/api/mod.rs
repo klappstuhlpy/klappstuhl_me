@@ -39,7 +39,7 @@ pub use media::serve_media;
     info(
         title = "Klappstuhl.me",
         description = include_str!("../../../../templates/api/api_description.md"),
-        version = "1.0.0"
+        version = "1.1.0"
     ),
     paths(
         images::upload_files,
@@ -280,6 +280,13 @@ fn v1() -> Router<AppState> {
         )
         .route("/guilds/:guild_id/images", get(guild_images::list_guild_images))
         .route("/guilds/:guild_id/images/:id", delete(guild_images::delete_guild_image))
+        // Internal: the bot provisions a per-guild images:guild key here (bearer =
+        // gallery_provision_token). Undocumented on purpose — not part of the
+        // public API surface.
+        .route(
+            "/guilds/:guild_id/provision-key",
+            post(guild_images::provision_guild_key),
+        )
         .route("/scan", post(scan::scan_file))
         .route("/metadata", post(media::image_info))
         .route("/image/:op", post(media::manipulate_image))

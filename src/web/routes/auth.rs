@@ -530,6 +530,10 @@ struct AccountInfoTemplate {
     /// so the change-password dialog hides the "current password" field and shows
     /// a hint that setting one is optional.
     has_password: bool,
+    /// Whether the authenticated account is an admin. Gates the privileged
+    /// scope checkboxes (`admin:*`, `images:guild`) in the API-key UI so normal
+    /// users never see — or can request — them.
+    is_admin: bool,
 }
 
 impl AccountInfoTemplate {
@@ -582,6 +586,9 @@ impl AccountInfoTemplate {
             .unwrap_or_default();
         let discord_enabled = state.config().discord.enabled();
         let has_password = user.has_password();
+        // Key generation always acts on the authenticated caller (`account`),
+        // so gate the privileged scope UI on *their* admin flag.
+        let is_admin = account.flags.is_admin();
 
         Self {
             account: Some(account),
@@ -596,6 +603,7 @@ impl AccountInfoTemplate {
             discord_username,
             discord_enabled,
             has_password,
+            is_admin,
         }
     }
 }
@@ -647,8 +655,16 @@ async fn generate_api_key(
     }
     // Map the string list from the form into typed Scopes, dropping any
     // we don't recognise (a stale client shouldn't be able to inject a
-    // spurious permission name into the DB).
-    let scopes: Vec<Scope> = payload.scopes.iter().filter_map(|s| Scope::from_str(s)).collect();
+    // spurious permission name into the DB). Privileged scopes (`admin:*`,
+    // `images:guild`) are operator/internal-only: silently drop them unless
+    // the caller is an admin, so a hand-crafted POST can't self-grant them.
+    let is_admin = account.flags.is_admin();
+    let scopes: Vec<Scope> = payload
+        .scopes
+        .iter()
+        .filter_map(|s| Scope::from_str(s))
+        .filter(|s| is_admin || !s.requires_admin())
+        .collect();
     let scopes_str = scopes.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(",");
     let token = state.generate_api_key(account.id, &scopes).await?;
     state

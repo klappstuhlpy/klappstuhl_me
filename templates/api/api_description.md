@@ -36,6 +36,20 @@ at the successor. Please migrate to the `{base}` prefix.
 - **Scan** — check an uploaded file for malware via ClamAV and VirusTotal
   (`{base}/scan`).
 
+### Internal endpoints (not for public use)
+
+Some documented endpoints are **internal** and exist only for the operator's own
+services (Percy's Discord bot and its dashboard). They are listed here purely for
+reference — they are gated by scopes that are **never** granted to a normal
+personal API key, so a key you generate on your account page cannot call them.
+Please do not build against them:
+
+- **Guild galleries** (`{base}/guilds/{guild_id}/images…`) — require the
+  `images:guild` scope, used by Percy to manage per-Discord-guild image
+  galleries. Keys are minted per guild by the service, not issued to users.
+- **Admin** (`{base}/admin/…`) — require the `admin:read` / `admin:write` scopes
+  and expose the operator's homelab state.
+
 ### Rate Limits
 
 Rate limits are enforced at an IP level to prevent abuse and spam on the service. When a rate limit is hit, an HTTP 429 status code is returned with some header information telling you how to proceed.

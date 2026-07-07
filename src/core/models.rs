@@ -518,6 +518,15 @@ impl Scope {
             Scope::AdminWrite,
         ]
     }
+
+    /// Scopes a normal (non-admin) account may **not** attach to a personal API
+    /// key. The `admin:*` scopes are operator-only; `images:guild` is minted
+    /// exclusively for per-guild service keys (see the dashboard integration)
+    /// and is never handed to end users. Enforced in `generate_api_key` and
+    /// hidden from the personal-key UI unless the account is an admin.
+    pub fn requires_admin(self) -> bool {
+        matches!(self, Scope::GuildImages | Scope::AdminRead | Scope::AdminWrite)
+    }
 }
 
 impl Session {
@@ -568,5 +577,16 @@ mod scope_tests {
     fn guild_images_scope_has_stable_wire_name() {
         assert_eq!(Scope::GuildImages.as_str(), "images:guild");
         assert_eq!(Scope::from_str("images:guild"), Some(Scope::GuildImages));
+    }
+
+    #[test]
+    fn privileged_scopes_require_admin() {
+        // Operator/internal-only scopes a normal user must never self-grant.
+        assert!(Scope::AdminRead.requires_admin());
+        assert!(Scope::AdminWrite.requires_admin());
+        assert!(Scope::GuildImages.requires_admin());
+        // The everyday image scopes stay available to everyone.
+        assert!(!Scope::ImagesRead.requires_admin());
+        assert!(!Scope::ImagesWrite.requires_admin());
     }
 }

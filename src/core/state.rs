@@ -37,6 +37,11 @@ pub struct ProcessedMedia {
     pub content_type: String,
 }
 
+/// Username of the dedicated, non-personal account that owns every per-guild
+/// image-gallery key. Auto-created on first provision (see
+/// [`AppState::ensure_gallery_service_account`]); it has no usable password.
+const GALLERY_SERVICE_ACCOUNT: &str = "percy-service";
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct SessionInfo {
     pub id: i64,
@@ -597,6 +602,91 @@ impl AppState {
             )
             .await
             .ok()
+    }
+
+    /// Get-or-create the dedicated, non-personal service account that owns every
+    /// per-guild image-gallery key, returning its id.
+    ///
+    /// The account has a sentinel password that can never verify against Argon2,
+    /// so it can't be logged into — it exists solely to be the uploader/audit
+    /// actor for guild gallery keys. This keeps the bot from ever needing a
+    /// personal/all-access key.
+    pub async fn ensure_gallery_service_account(&self) -> anyhow::Result<i64> {
+        if let Ok(id) = self
+            .database()
+            .get_row(
+                "SELECT id FROM account WHERE name = ?",
+                (GALLERY_SERVICE_ACCOUNT,),
+                |row| row.get::<_, i64>(0),
+            )
+            .await
+        {
+            return Ok(id);
+        }
+
+        let id = self
+            .database()
+            .call(|conn| {
+                // ON CONFLICT DO NOTHING makes this safe under a race (two guilds
+                // provisioning at once); we re-select the id unconditionally after.
+                conn.execute(
+                    "INSERT INTO account(name, password) VALUES (?, ?) ON CONFLICT(name) DO NOTHING",
+                    rusqlite::params![GALLERY_SERVICE_ACCOUNT, "!percy-service:no-login!"],
+                )?;
+                conn.query_row(
+                    "SELECT id FROM account WHERE name = ?",
+                    rusqlite::params![GALLERY_SERVICE_ACCOUNT],
+                    |row| row.get::<_, i64>(0),
+                )
+            })
+            .await?;
+        Ok(id)
+    }
+
+    /// Get-or-create the `images:guild`-scoped API key for a Discord guild.
+    ///
+    /// Returns the stored key when it's still a live session (so a revoked key —
+    /// its `session` row deleted — is transparently replaced), otherwise mints a
+    /// fresh one under the service account and persists the guild → key mapping in
+    /// `guild_api_key`. This is what lets the bot provision a narrow, per-guild
+    /// key on demand instead of holding a personal key.
+    pub async fn ensure_guild_api_key(&self, guild_id: &str) -> anyhow::Result<String> {
+        let gid = guild_id.to_string();
+
+        if let Ok(token) = self
+            .database()
+            .get_row(
+                "SELECT gak.token FROM guild_api_key gak \
+                 JOIN session s ON s.id = gak.token \
+                 WHERE gak.guild_id = ?",
+                (gid.clone(),),
+                |row| row.get::<_, String>(0),
+            )
+            .await
+        {
+            return Ok(token);
+        }
+
+        let account_id = self.ensure_gallery_service_account().await?;
+        let token = self
+            .generate_api_key(account_id, &[crate::models::Scope::GuildImages])
+            .await?;
+
+        let stored = token.clone();
+        self.database()
+            .call(move |conn| {
+                conn.execute(
+                    "INSERT INTO guild_api_key(guild_id, token, account_id) VALUES (?, ?, ?) \
+                     ON CONFLICT(guild_id) DO UPDATE SET \
+                         token = excluded.token, account_id = excluded.account_id, \
+                         created_at = CURRENT_TIMESTAMP",
+                    rusqlite::params![gid, stored, account_id],
+                )?;
+                Ok::<_, rusqlite::Error>(())
+            })
+            .await?;
+
+        Ok(token)
     }
 
     /// Invalidate all sessions used by the account.

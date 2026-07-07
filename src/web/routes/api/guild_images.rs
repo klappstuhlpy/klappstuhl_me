@@ -1,12 +1,18 @@
 //! Guild-scoped image galleries.
 //!
-//! These endpoints let a trusted service key (Percy's bot) manage a shared
-//! per-Discord-guild image gallery: images uploaded here are tagged with the
-//! guild's snowflake so the bot (poll banners) and the dashboard see one
-//! coherent set. They are gated by the dedicated [`Scope::GuildImages`]
-//! (`images:guild`) scope; the caller is responsible for authorising the acting
-//! guild (Percy checks command permissions; the dashboard checks the OAuth
-//! manage-permission before proxying here).
+//! **⚠️ Internal — not for public use.** These endpoints exist for Percy's bot
+//! and its dashboard, and are documented here only for reference. They are gated
+//! by the dedicated [`Scope::GuildImages`] (`images:guild`) scope, which is never
+//! granted to a normal personal API key (see [`Scope::requires_admin`]); the
+//! keys that use them are minted per guild by [`AppState::ensure_guild_api_key`]
+//! and are not issued to end users. Do not build against these.
+//!
+//! They let a trusted service key (Percy's bot) manage a shared per-Discord-guild
+//! image gallery: images uploaded here are tagged with the guild's snowflake so
+//! the bot (poll banners) and the dashboard see one coherent set. The caller is
+//! responsible for authorising the acting guild (Percy checks command
+//! permissions; the dashboard checks the OAuth manage-permission before proxying
+//! here).
 
 use axum::extract::{Multipart, Path, Query, State};
 use serde::Serialize;
@@ -67,6 +73,9 @@ struct UploadedFiles {
 
 /// Upload to a guild gallery
 ///
+/// > **⚠️ Internal — not for public use.** Documented for reference only; served
+/// > to Percy's per-guild service keys, not to public API keys.
+///
 /// Upload one or more images into a Discord guild's shared gallery. Identical to
 /// the personal `/images/upload` endpoint, but every uploaded row is tagged with
 /// `guild_id` so it appears in the guild's gallery on the dashboard.
@@ -114,6 +123,9 @@ pub async fn upload_guild_images(
 }
 
 /// List a guild gallery
+///
+/// > **⚠️ Internal — not for public use.** Documented for reference only; served
+/// > to Percy's per-guild service keys, not to public API keys.
 ///
 /// List the images in a Discord guild's shared gallery, newest first. Expired
 /// uploads are omitted.
@@ -182,6 +194,9 @@ pub async fn list_guild_images(
 
 /// Delete from a guild gallery
 ///
+/// > **⚠️ Internal — not for public use.** Documented for reference only; served
+/// > to Percy's per-guild service keys, not to public API keys.
+///
 /// Delete an image from a Discord guild's shared gallery. Scoped by `guild_id`,
 /// so a key may only remove images that belong to the guild it was asked to act
 /// for.
@@ -245,4 +260,69 @@ pub async fn delete_guild_image(
         file: bare,
         failed: false,
     }))
+}
+
+/// Response of the guild-key provisioning endpoint.
+#[derive(Debug, Serialize)]
+pub struct GuildKeyResponse {
+    /// The guild's `images:guild` API key (get-or-created).
+    pub token: String,
+}
+
+/// Provision (get-or-create) a guild's `images:guild` API key.
+///
+/// Internal, undocumented endpoint the bot uses so it never needs a personal
+/// key: it presents the shared `gallery_provision_token` (matched constant-time)
+/// and receives the narrow, per-guild key. The host mints that key under a
+/// dedicated non-personal service account and stores the guild → key mapping in
+/// `guild_api_key`; repeat calls return the same key until it is revoked. When
+/// the feature is unconfigured we answer `401` (indistinguishable from a bad
+/// credential) rather than reveal that.
+pub async fn provision_guild_key(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<GuildKeyResponse>, ApiError> {
+    let Some(expected) = state.config().gallery_provision_token.clone().filter(|t| !t.is_empty()) else {
+        return Err(ApiError::unauthorized());
+    };
+    let provided = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.strip_prefix("Bearer ").unwrap_or(s).trim())
+        .unwrap_or_default();
+    if !ct_eq(provided.as_bytes(), expected.as_bytes()) {
+        return Err(ApiError::unauthorized());
+    }
+
+    let token = state
+        .ensure_guild_api_key(&guild_id)
+        .await
+        .map_err(|_| ApiError::new("failed to provision guild key"))?;
+    Ok(Json(GuildKeyResponse { token }))
+}
+
+/// Constant-time byte comparison for the provisioning bearer, so a mismatch
+/// can't be recovered from response timing. The length check is a negligible
+/// side channel for a high-entropy token.
+fn ct_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ct_eq;
+
+    #[test]
+    fn ct_eq_matches_exact_and_rejects_everything_else() {
+        assert!(ct_eq(b"secret-token", b"secret-token"));
+        assert!(!ct_eq(b"secret-token", b"secret-toke")); // shorter
+        assert!(!ct_eq(b"secret-token", b"secret-token!")); // longer
+        assert!(!ct_eq(b"secret-token", b"Secret-token")); // one byte off
+        assert!(!ct_eq(b"", b"x"));
+        assert!(ct_eq(b"", b"")); // both empty compare equal (caller rejects empty separately)
+    }
 }

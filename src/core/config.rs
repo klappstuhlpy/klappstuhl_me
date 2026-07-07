@@ -431,6 +431,15 @@ pub struct Config {
     /// Unset → `/percy` is a plain redirect (the dashboard does its own login).
     #[serde(default)]
     pub sso_secret: Option<SecretKey>,
+    /// Shared service token that authorises the bot (Percy) to provision
+    /// per-guild image-gallery keys via `POST /api/v1/guilds/:id/provision-key`.
+    /// Set to the same high-entropy value as Percy's `KLAPPSTUHL_ME_PROVISION_TOKEN`.
+    /// This is a narrow, single-purpose credential — its only power is
+    /// get-or-create of a guild's `images:guild` key — so the bot never needs a
+    /// personal/all-access API key. Unset → the provision endpoint returns 503
+    /// (the feature is off).
+    #[serde(default)]
+    pub gallery_provision_token: Option<String>,
 }
 
 /// Default per-file upload ceiling (10 MiB) used when `max_upload_bytes` is
@@ -464,6 +473,7 @@ impl Config {
             ai: AiConfig::default(),
             discord: DiscordConfig::default(),
             sso_secret: None,
+            gallery_provision_token: None,
         })
     }
 
