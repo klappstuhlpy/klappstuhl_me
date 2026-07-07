@@ -7,6 +7,7 @@
 //! Rules are stored in `firewall_rule` (our mirror) and applied by
 //! shelling out to the matching backend. Audit logging happens at the
 //! HTTP route layer.
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 pub mod backend;
 pub mod lockout;

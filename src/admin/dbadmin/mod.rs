@@ -20,6 +20,7 @@
 //!   `PRAGMA query_only = ON`.
 //! - Danger mode skips both layers and is only reachable through an
 //!   admin-only checkbox plus an explicit confirmation in the UI.
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 pub mod postgres;
 mod safety;

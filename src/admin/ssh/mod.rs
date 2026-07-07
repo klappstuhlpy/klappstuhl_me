@@ -2,6 +2,7 @@
 //!
 //! Fingerprint format matches OpenSSH's default (`SHA256:<base64url-no-pad>`),
 //! so the value displayed in the UI is identical to `ssh-keygen -lf`.
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 use crate::database::Table;
 use base64::{prelude::BASE64_STANDARD_NO_PAD, prelude::BASE64_URL_SAFE_NO_PAD, Engine};

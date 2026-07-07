@@ -10,6 +10,7 @@
 //! `proxy_config_dir` is configured the routes are still managed in the UI
 //! (handy as a record of "which subdomain points where") but nothing is
 //! written to disk.
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 pub mod cloudflared;
 pub mod render;

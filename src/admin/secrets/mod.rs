@@ -7,6 +7,7 @@
 //!     `spawn_blocking`)
 //!   * `storage` — persistence and dashboard queries
 //!   * this file — public API: `spawn_scheduler`, `run_scan`.
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 pub mod rules;
 pub mod scanner;

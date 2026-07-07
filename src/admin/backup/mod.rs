@@ -9,6 +9,7 @@
 //! database file while the process holds WAL connections is unsafe, so the
 //! admin UI offers download (and the operator restores by stopping the server
 //! and replacing `main.db`).
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 use std::path::PathBuf;
 use std::time::Duration;

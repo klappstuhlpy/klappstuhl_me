@@ -27,7 +27,7 @@ use crate::{
     filters::canonical_url,
     headers::ClientIp,
     models::Scope,
-    routes::image::{expiry_from_params, raw_upload_file, DeleteResult, UploadParams, UploadResult},
+    site::image::{expiry_from_params, raw_upload_file, DeleteResult, UploadParams, UploadResult},
     AppState,
 };
 

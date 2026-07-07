@@ -16,6 +16,7 @@
 //! `fire()` is non-blocking — it spawns the insert as a fire-and-forget
 //! task so audit logging never delays the HTTP response.  Failures are
 //! logged to tracing at `warn` level; the request always succeeds.
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 use crate::{models::Account, AppState};
 use serde::Serialize;

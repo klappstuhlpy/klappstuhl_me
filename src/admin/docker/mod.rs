@@ -8,6 +8,7 @@
 //! the Docker socket is unavailable (e.g. dev machine without Docker, or the
 //! socket path doesn't exist).  Routes that need Docker gracefully degrade
 //! to an empty graph rather than 500-ing.
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 use std::{
     collections::{HashMap, HashSet},

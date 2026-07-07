@@ -1,40 +1,27 @@
+//! The public website surface at klappstuhl.me: the homepage, the image hoster,
+//! short links, the code screenshot / spotlight tools, the AI `ask` endpoint,
+//! account/login pages, and the documented public JSON API (`site::api`). Each
+//! feature owns its handlers here; [`routes`] assembles them into the public
+//! sub-router that `crate::routes::all` merges with the admin shell.
+
 use crate::AppState;
 use crate::{flash::Flashes, models::Account};
 use askama::Template;
 use axum::{
     extract::State,
-    response::IntoResponse,
-    response::{Redirect, Response},
+    response::{IntoResponse, Redirect, Response},
     routing::get,
     Router,
 };
 
-mod admin;
-mod api;
-mod ask;
-mod audit;
-mod auth;
-mod backups;
-mod certs;
-mod dbadmin;
-mod discord_oauth;
-mod docker;
-mod firewall;
-mod health;
-mod image;
-mod links;
-mod logs;
-mod metrics;
-mod proxy;
-mod sanitizer;
-mod secrets;
-mod security;
-mod spotlight;
-mod ssh;
-mod ws;
-
-pub use api::{copy_api_token, ApiToken};
-pub use image::spawn_expiry_reaper;
+pub mod account;
+pub mod api;
+pub mod ask;
+pub mod discord_oauth;
+pub mod image;
+pub mod links;
+pub mod media;
+pub mod spotlight;
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -87,47 +74,19 @@ async fn percy_redirect(State(state): State<AppState>, account: Option<Account>)
     Redirect::to(&percy_url).into_response()
 }
 
-pub fn all() -> Router<AppState> {
+/// The public website sub-router. The short-link fallback is attached at the top
+/// level in [`crate::routes::all`] so it applies after admin routes too.
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(index))
         .route("/projects", get(projects))
         .route("/percy", get(percy_redirect))
         .route("/m/:id", get(api::serve_media))
-        .merge(auth::routes())
+        .merge(account::routes())
         .merge(discord_oauth::routes())
         .merge(image::routes())
         .merge(links::routes())
-        .merge(admin::routes())
-        .merge(audit::routes())
-        .merge(metrics::routes())
-        .merge(dbadmin::routes())
-        .merge(secrets::routes())
-        .merge(security::routes())
-        .merge(ssh::routes())
-        .merge(docker::routes())
-        .merge(firewall::routes())
-        .merge(health::routes())
-        .merge(proxy::routes())
-        .merge(sanitizer::routes())
-        .merge(certs::routes())
-        .merge(backups::routes())
-        .merge(logs::routes())
         .merge(spotlight::routes())
         .merge(ask::routes())
-        .merge(ws::routes())
         .nest("/api", api::routes())
-        // Resolves bare `r.<domain>/<code>` short links; 404s everything else.
-        .fallback(links::short_link_fallback)
-}
-
-#[cfg(test)]
-mod tests {
-    /// Building the whole router exercises matchit's route registration,
-    /// which panics on conflicting paths (e.g. a static segment overlapping a
-    /// `:param` on axum 0.7). This catches such conflicts as a test failure
-    /// rather than at server start-up.
-    #[test]
-    fn full_router_builds() {
-        let _ = super::all();
-    }
 }

@@ -38,7 +38,7 @@ pub use media::serve_media;
 #[openapi(
     info(
         title = "Klappstuhl.me",
-        description = include_str!("../../../../templates/api/api_description.md"),
+        description = include_str!("../../../templates/api/api_description.md"),
         version = "1.1.0"
     ),
     paths(
@@ -64,9 +64,9 @@ pub use media::serve_media;
             crate::updates::ImageUpdate,
             crate::updates::UpdateState,
             crate::models::ImageEntry,
-            crate::routes::image::UploadResult,
-            crate::routes::image::DeleteResult,
-            crate::routes::image::BulkFilesPayload,
+            crate::site::image::UploadResult,
+            crate::site::image::DeleteResult,
+            crate::site::image::BulkFilesPayload,
             guild_images::GuildImageInfo,
             guild_images::GuildImagesResult,
             crate::scan::ScanReport,

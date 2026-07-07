@@ -8,6 +8,7 @@
 //!   * this file — orchestration: `spawn_monitor` schedules per-target
 //!     probe loops; `run_check_now` performs a one-off probe and records
 //!     the result.
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 pub mod checker;
 pub mod storage;

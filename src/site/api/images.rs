@@ -7,12 +7,12 @@ use super::{
     auth::ApiToken,
     utils::{ApiJson as Json, RateLimitResponse},
 };
-use crate::routes::image::{delete_image, raw_upload_file};
+use crate::site::image::{delete_image, raw_upload_file};
 use crate::{
     error::ApiError,
     headers::ClientIp,
     models::Scope,
-    routes::image::{build_images_zip, BulkFilesPayload, DeleteResult, UploadParams, UploadResult},
+    site::image::{build_images_zip, BulkFilesPayload, DeleteResult, UploadParams, UploadResult},
     AppState,
 };
 
@@ -71,7 +71,7 @@ pub async fn upload_files(
         return Err(ApiError::unauthorized());
     };
 
-    let expires_at = crate::routes::image::expiry_from_params(&params);
+    let expires_at = crate::site::image::expiry_from_params(&params);
     let result = raw_upload_file(state, account, client_ip, multipart, true, expires_at, None).await?;
     if result.is_error() {
         return Err(ApiError::new("Upload failed"));

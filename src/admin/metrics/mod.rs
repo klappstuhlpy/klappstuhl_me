@@ -19,6 +19,7 @@
 //! A single background task (`spawn_collector`) ties these together, scraping
 //! every 30 seconds and running the alert check after each insert.  A second
 //! task (`spawn_pruner`) trims samples older than 30 days hourly.
+pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
 mod alerts;
 pub mod docker;
