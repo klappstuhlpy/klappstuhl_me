@@ -33,8 +33,8 @@ is documented by its live, interactive **Scalar** reference at
 raw schema is at [`/api/openapi.json`](https://klappstuhl.me/api/openapi.json).
 
 Keys are **scoped** (`images:*`, `links:*`, `pastes:*`) and minted on your
-[account page](https://klappstuhl.me/account). Errors follow Discord's shape
-(`{ message, code, errors }`); rate limits send `Retry-After` + `X-RateLimit-*`.
+[account page](https://klappstuhl.me/account). Errors follow the 
+(`{ message, code, errors }`) shape; rate limits send `Retry-After` + `X-RateLimit-*`.
 
 ## Tech stack
 
