@@ -21,6 +21,7 @@ pub mod discord_oauth;
 pub mod image;
 pub mod links;
 pub mod media;
+pub mod paste;
 pub mod spotlight;
 
 #[derive(Template)]
@@ -86,6 +87,7 @@ pub fn routes() -> Router<AppState> {
         .merge(discord_oauth::routes())
         .merge(image::routes())
         .merge(links::routes())
+        .merge(paste::routes())
         .merge(spotlight::routes())
         .merge(ask::routes())
         .nest("/api", api::routes())

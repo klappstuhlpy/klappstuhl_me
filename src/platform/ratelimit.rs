@@ -2,11 +2,13 @@
 
 use axum::{
     extract::Request,
-    http::{HeaderName, HeaderValue},
+    http::{header::RETRY_AFTER, HeaderName, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use futures_util::future::Either;
 use quick_cache::sync::Cache;
+use serde::Serialize;
 
 use std::{
     future::{ready, Future, Ready},
@@ -18,12 +20,29 @@ use std::{
 };
 use tower::{Layer, Service};
 
-use crate::error::ApiError;
+use crate::error::ApiErrorCode;
 
 const X_RATELIMIT_LIMIT: HeaderName = HeaderName::from_static("x-ratelimit-limit");
 const X_RATELIMIT_REMAINING: HeaderName = HeaderName::from_static("x-ratelimit-remaining");
 const X_RATELIMIT_RESET: HeaderName = HeaderName::from_static("x-ratelimit-reset");
 const X_RATELIMIT_RESET_AFTER: HeaderName = HeaderName::from_static("x-ratelimit-reset-after");
+const X_RATELIMIT_SCOPE: HeaderName = HeaderName::from_static("x-ratelimit-scope");
+const X_RATELIMIT_BUCKET: HeaderName = HeaderName::from_static("x-ratelimit-bucket");
+
+/// The JSON body returned on a 429, shaped after Discord's rate-limit response
+/// so client libraries can read a precise `retry_after` (fractional seconds)
+/// alongside the RFC 7231 `Retry-After` header.
+#[derive(Serialize)]
+struct RateLimitedBody {
+    message: &'static str,
+    /// Seconds to wait before retrying (fractional).
+    retry_after: f32,
+    /// Whether this is a global limit (vs. a per-bucket one). Always `false`
+    /// here — every klappstuhl limit is scoped to a key (IP/global-route).
+    global: bool,
+    /// Machine-readable error code, matching [`crate::error::ApiErrorCode`].
+    code: u8,
+}
 
 fn diff_seconds(a: SystemTime, b: SystemTime) -> f32 {
     let a = a.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs_f64();
@@ -40,6 +59,9 @@ pub struct RateLimitLayer<T: KeyExtractor> {
     rate: u16,
     per: f32,
     extractor: T,
+    /// Optional bucket label surfaced as the `X-RateLimit-Bucket` header, so a
+    /// client can tell which limit it hit when several are layered.
+    bucket: Option<&'static str>,
 }
 
 /// A trait that describes the rate limit policy
@@ -51,6 +73,12 @@ pub trait KeyExtractor: Clone {
     ///
     /// If no key is found for this request then `None` should be returned.
     fn extract(&self, req: &Request) -> Option<Self::Key>;
+
+    /// A short label describing what the limit is keyed on, surfaced as the
+    /// `X-RateLimit-Scope` header (Discord-style: `user`, `global`, …).
+    fn scope_label(&self) -> &'static str {
+        "ip"
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -60,6 +88,8 @@ struct RateLimitInfo {
     ratelimited: bool,
     reset_time: SystemTime,
     retry_after: f32,
+    scope: &'static str,
+    bucket: Option<&'static str>,
 }
 
 impl<T: KeyExtractor> RateLimitLayer<T> {
@@ -72,8 +102,10 @@ impl<T: KeyExtractor> RateLimitLayer<T> {
         let limit = self.rate;
         let delay_variation_tolerance = self.per;
         let now = SystemTime::now();
+        let scope = self.extractor.scope_label();
+        let bucket = self.bucket;
         let Some(key) = self.extractor.extract(request) else {
-            return RateLimitInfo::banned();
+            return RateLimitInfo::banned(scope, bucket);
         };
 
         let tat = self.lookup.get(&key).unwrap_or(now);
@@ -100,6 +132,8 @@ impl<T: KeyExtractor> RateLimitLayer<T> {
             ratelimited,
             reset_time: now + Duration::from_secs_f32(retry_after),
             retry_after,
+            scope,
+            bucket,
         }
     }
 }
@@ -109,44 +143,61 @@ impl RateLimitInfo {
         self.ratelimited
     }
 
-    fn banned() -> Self {
+    fn banned(scope: &'static str, bucket: Option<&'static str>) -> Self {
         Self {
             limit: 0,
             ratelimited: true,
             remaining: 0,
             reset_time: UNIX_EPOCH,
             retry_after: 0.0,
+            scope,
+            bucket,
         }
     }
 
     fn modify_headers(&self, resp: &mut Response) {
-        resp.headers_mut().insert(
+        let headers = resp.headers_mut();
+        headers.insert(
             X_RATELIMIT_LIMIT,
             HeaderValue::from_str(&self.limit.to_string()).unwrap(),
         );
-        resp.headers_mut().insert(
+        headers.insert(
             X_RATELIMIT_REMAINING,
             HeaderValue::from_str(&self.remaining.to_string()).unwrap(),
         );
+        headers.insert(X_RATELIMIT_SCOPE, HeaderValue::from_static(self.scope));
+        if let Some(bucket) = self.bucket {
+            headers.insert(X_RATELIMIT_BUCKET, HeaderValue::from_static(bucket));
+        }
         if let Ok(epoch) = self.reset_time.duration_since(UNIX_EPOCH) {
-            resp.headers_mut().insert(
+            headers.insert(
                 X_RATELIMIT_RESET,
                 HeaderValue::from_str(&epoch.as_secs_f32().to_string()).unwrap(),
             );
         }
 
         if self.remaining == 0 {
-            resp.headers_mut().insert(
+            headers.insert(
                 X_RATELIMIT_RESET_AFTER,
                 HeaderValue::from_str(&self.retry_after.to_string()).unwrap(),
             );
+            // RFC 7231 `Retry-After` is integer seconds — round up so a client
+            // that honours it never retries too early.
+            let secs = self.retry_after.ceil().max(0.0) as u64;
+            headers.insert(RETRY_AFTER, HeaderValue::from_str(&secs.to_string()).unwrap());
         }
     }
 }
 
 impl IntoResponse for RateLimitInfo {
     fn into_response(self) -> Response {
-        let mut resp = ApiError::rate_limited().into_response();
+        let body = RateLimitedBody {
+            message: "You are being rate limited.",
+            retry_after: self.retry_after,
+            global: false,
+            code: ApiErrorCode::RateLimited as u8,
+        };
+        let mut resp = (StatusCode::TOO_MANY_REQUESTS, Json(body)).into_response();
         self.modify_headers(&mut resp);
         resp
     }
@@ -236,6 +287,10 @@ impl KeyExtractor for GlobalKeyExtractor {
     fn extract(&self, _req: &Request) -> Option<Self::Key> {
         Some(())
     }
+
+    fn scope_label(&self) -> &'static str {
+        "global"
+    }
 }
 
 /// A key extractor based on IPs
@@ -258,6 +313,7 @@ pub struct RateLimit<T: KeyExtractor> {
     rate: u16,
     per: f32,
     extractor: T,
+    bucket: Option<&'static str>,
 }
 
 impl Default for RateLimit<IpKeyExtractor> {
@@ -269,6 +325,7 @@ impl Default for RateLimit<IpKeyExtractor> {
             rate: 5,
             per: 5.0,
             extractor: IpKeyExtractor,
+            bucket: None,
         }
     }
 }
@@ -281,6 +338,7 @@ impl<T: KeyExtractor> RateLimit<T> {
             rate: self.rate,
             per: self.per,
             extractor: key,
+            bucket: self.bucket,
         }
     }
 
@@ -297,6 +355,13 @@ impl<T: KeyExtractor> RateLimit<T> {
         self
     }
 
+    /// Labels this limit's bucket, surfaced as `X-RateLimit-Bucket` so clients
+    /// can distinguish which of several layered limits they hit.
+    pub fn bucket(mut self, bucket: &'static str) -> Self {
+        self.bucket = Some(bucket);
+        self
+    }
+
     /// Builds the [`RateLimitLayer`] ready to be used as a tower middleware.
     pub fn build(self) -> RateLimitLayer<T> {
         RateLimitLayer {
@@ -304,6 +369,7 @@ impl<T: KeyExtractor> RateLimit<T> {
             rate: self.rate,
             per: self.per,
             extractor: self.extractor,
+            bucket: self.bucket,
         }
     }
 }

@@ -4,9 +4,16 @@ Welcome to the Klappstuhl.me API. You can use this API to access the contents of
 
 ### Authentication
 
-Klappstuhl.me uses API keys to allow access to the API. Authentication is done using the `Authorization` header. Note that in order to use this API, an account is required. Please [register](/login) if you have not done so already.
+Klappstuhl.me uses API keys to allow access to the API. Authentication is done using the `Authorization` header. The key may be sent bare, or with a scheme prefix (`Bearer <key>`, `Key <key>`, or `Token <key>`) — all are accepted. Note that in order to use this API, an account is required. Please [register](/login) if you have not done so already.
 
-If you have not generated an API key yet, you can do so on your [account page](/account).
+If you have not generated an API key yet, you can do so on your [account page](/account). Keys are **scoped**: tick only the scopes an integration needs (`images:read`, `images:write`, `links:read`, `links:write`, `pastes:read`, `pastes:write`). A key with no scopes ticked has legacy full access.
+
+### Errors
+
+Errors are returned as JSON shaped after Discord's model: a human-readable
+`message`, a machine-readable numeric `code`, and — for validation failures — an
+`errors` object keyed by field (`{ "url": { "_errors": ["…"] } }`). The legacy
+`error` field is still present as an alias of `message`.
 
 ### Versioning
 
@@ -23,18 +30,37 @@ at the successor. Please migrate to the `{base}` prefix.
 ### Endpoint groups
 
 - **Images** — upload, delete, and bulk-download your hosted images.
+- **Links** — a URL shortener: create (`POST {base}/links`), list
+  (`GET {base}/links`), fetch (`GET {base}/links/{code}`), and delete
+  (`DELETE {base}/links/{code}`) your short links. Requires `links:read` /
+  `links:write`.
+- **Pastes** — a text/code paste host: create (`POST {base}/pastes`), list
+  (`GET {base}/pastes`), fetch (`GET {base}/pastes/{id}`), and delete
+  (`DELETE {base}/pastes/{id}`). Bodies are also viewable, without auth, at
+  `/p/{id}` (syntax-highlighted) and `/p/{id}.txt` (raw). Requires
+  `pastes:read` / `pastes:write`.
 - **Media** — apply visual effects (`{base}/image/{op}`), transcode between
   raster formats (`{base}/convert`), or inspect an image (`{base}/metadata`).
   Each accepts either a multipart `file` upload or a public image `url` that
   the server fetches on your behalf (private/reserved addresses are refused).
 - **Render** — turn content into images/documents: a syntax-highlighted code
-  screenshot (`{base}/render/code`, pure Rust), a web-page screenshot
+  screenshot (`{base}/render/code`, pure Rust), a QR code
+  (`{base}/render/qr`, SVG or PNG), a web-page screenshot
   (`{base}/render/screenshot`), or Markdown → PDF (`{base}/render/markdown-pdf`).
   The latter two need a Chromium binary on the server and return `500
   (not available)` until one is installed. `{base}/convert/transcode` converts
   MOV→MP4 / HEIC→JPG via `ffmpeg` under the same arrangement.
+- **Web** — unfurl a URL into Open Graph / link-preview metadata
+  (`GET {base}/unfurl?url=`); the target is fetched SSRF-guarded.
 - **Scan** — check an uploaded file for malware via ClamAV and VirusTotal
   (`{base}/scan`).
+
+### Pagination
+
+List endpoints (short links, pastes, guild galleries) use Discord-style cursor
+pagination: pass `?limit=` (1–200, default 50) with `?before=`/`?after=` set to a
+resource id. Results are newest-first, so `after` walks towards older items and
+`before` towards newer ones.
 
 ### Internal endpoints (not for public use)
 
@@ -52,7 +78,7 @@ Please do not build against them:
 
 ### Rate Limits
 
-Rate limits are enforced at an IP level to prevent abuse and spam on the service. When a rate limit is hit, an HTTP 429 status code is returned with some header information telling you how to proceed.
+Rate limits are enforced at an IP level to prevent abuse and spam on the service. When a rate limit is hit, an HTTP 429 status code is returned with a Discord-shaped JSON body (`{ message, retry_after, global, code }`) and header information telling you how to proceed. A standard RFC 7231 `Retry-After` header (integer seconds) is sent alongside the `x-ratelimit-*` headers, plus `x-ratelimit-scope` (what the limit is keyed on) and `x-ratelimit-bucket` (which bucket, when several are layered).
 
 #### Header Format
 

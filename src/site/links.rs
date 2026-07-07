@@ -25,7 +25,7 @@ use crate::utils::get_new_image_id;
 use crate::AppState;
 
 /// Maximum short links a non-admin account may own.
-const FREE_LINK_LIMIT: usize = 10;
+pub(crate) const FREE_LINK_LIMIT: usize = 10;
 /// Maximum length of a custom alias.
 const MAX_CODE_LEN: usize = 64;
 /// Maximum length of a destination URL.
@@ -53,6 +53,7 @@ const RESERVED_CODES: &[&str] = &[
     "projects",
     "static",
     "m",
+    "p",
     "ws",
     "auth",
     "sw.js",
@@ -68,7 +69,7 @@ const RESERVED_CODES: &[&str] = &[
 /// Normalises a user-supplied destination into a stored URL. Forgiving about a
 /// missing scheme (defaults to `https://`) but rejects anything that isn't a
 /// plain http/https URL with a host.
-fn normalize_target(raw: &str) -> Result<String, &'static str> {
+pub(crate) fn normalize_target(raw: &str) -> Result<String, &'static str> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Err("Destination URL is required.");
@@ -93,7 +94,7 @@ fn normalize_target(raw: &str) -> Result<String, &'static str> {
 }
 
 /// Validates a custom alias: `[A-Za-z0-9_-]`, length-bounded, not reserved.
-fn validate_code(raw: &str) -> Result<String, &'static str> {
+pub(crate) fn validate_code(raw: &str) -> Result<String, &'static str> {
     let code = raw.trim();
     if code.is_empty() {
         return Err("Alias cannot be empty.");
@@ -213,7 +214,7 @@ async fn create_link(
     };
 
     match insert_link(&state, code, &target, account.id, custom_alias).await {
-        Ok(()) => flasher.add(FlashMessage::success("Short link created.")).bail("/links"),
+        Ok(_code) => flasher.add(FlashMessage::success("Short link created.")).bail("/links"),
         Err(InsertError::Taken) => flasher
             .add(FlashMessage::error(
                 "That alias is already taken — please pick another.",
@@ -227,7 +228,7 @@ async fn create_link(
     }
 }
 
-enum InsertError {
+pub(crate) enum InsertError {
     /// The code/alias is already in use.
     Taken,
     /// An unexpected database error occurred.
@@ -236,13 +237,15 @@ enum InsertError {
 
 /// Inserts a link. Custom aliases get a single attempt (collision → `Taken`);
 /// auto-generated codes are retried with fresh codes on the (rare) collision.
-async fn insert_link(
+/// Returns the final stored code on success (which may differ from the input for
+/// auto-generated codes that hit a collision).
+pub(crate) async fn insert_link(
     state: &AppState,
     mut code: String,
     target: &str,
     account_id: i64,
     custom_alias: bool,
-) -> Result<(), InsertError> {
+) -> Result<String, InsertError> {
     let attempts = if custom_alias { 1 } else { AUTO_CODE_ATTEMPTS };
     for _ in 0..attempts {
         let result = state
@@ -253,7 +256,7 @@ async fn insert_link(
             )
             .await;
         match result {
-            Ok(_) => return Ok(()),
+            Ok(_) => return Ok(code),
             Err(e) if is_unique_constraint_violation(&e) => {
                 if custom_alias {
                     return Err(InsertError::Taken);
@@ -269,7 +272,7 @@ async fn insert_link(
     Err(InsertError::Taken)
 }
 
-async fn count_links(state: &AppState, account_id: i64) -> usize {
+pub(crate) async fn count_links(state: &AppState, account_id: i64) -> usize {
     state
         .database()
         .get_row(

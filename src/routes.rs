@@ -9,6 +9,7 @@ use axum::Router;
 
 pub use crate::site::api::{copy_api_token, ApiToken};
 pub use crate::site::image::spawn_expiry_reaper;
+pub use crate::site::paste::spawn_paste_reaper;
 
 /// Builds the complete application router: every public and admin route, plus
 /// the short-link fallback that resolves bare `r.<domain>/<code>` links.

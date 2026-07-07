@@ -1,143 +1,93 @@
+<div align="center">
+
 # Klappstuhl.me
 
-Personal website, image-hosting service, and homelab admin platform built with Rust.
+Personal website, image host, and homelab admin platform — built in Rust.
 
-What started as a small image host has grown into a single binary that also runs
-the admin tooling for the machine it sits on: live system metrics, container
-management, security analytics, virus scanning, and a user account system.
+[![Rust](https://img.shields.io/badge/Rust-1.74%2B-CE422B?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Axum](https://img.shields.io/badge/Axum-web-000000?logo=rust&logoColor=white)](https://github.com/tokio-rs/axum)
+[![SQLite](https://img.shields.io/badge/SQLite-bundled-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![API docs](https://img.shields.io/badge/API-Scalar%20reference-3178C6?logo=openapiinitiative&logoColor=white)](https://klappstuhl.me/api/docs)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+
+</div>
+
+## Table of Contents
+
+- [Documentation](#documentation)
+- [Tech stack](#tech-stack)
+- [Quick start (Docker)](#quick-start-docker)
+- [Configuration](#configuration)
+- [Admin dashboard](#admin-dashboard)
+- [Discord login & the Percy dashboard](#discord-login--the-percy-dashboard)
+- [Data & log paths](#data--log-paths)
+- [Building from source](#building-from-source)
+- [License](#license)
 
 ## Documentation
 
-The **public Klappstuhl.me API** (images, media, render, scan, admin) is documented by its
-live, interactive **Scalar** reference at [`/api/docs`](https://klappstuhl.me/api/docs),
-generated from `api/mod.rs`'s OpenAPI schema. When you add or change an endpoint, the
-Scalar page updates automatically.
+The **public API** (images, links, pastes, media, render, web/unfurl, scan, admin)
+is documented by its live, interactive **Scalar** reference at
+[`/api/docs`](https://klappstuhl.me/api/docs), generated from the OpenAPI schema in
+`src/site/api/`. Add or change an endpoint and the page updates automatically; the
+raw schema is at [`/api/openapi.json`](https://klappstuhl.me/api/openapi.json).
 
-> A dedicated page for this API in the [Mintlify docs site](https://percy.klappstuhl.me/docs/)
-> (repo: [`klappstuhlpy/percy-docs`](https://github.com/klappstuhlpy/percy-docs)) is planned —
-> that site currently covers Percy itself and Percy's internal dashboard API.
-
-## Highlights
-
-- **Public site & image host** — landing + projects pages; drag-and-drop image upload with direct links, a per-user library, optional expiring uploads (TTL + background reaper), OpenGraph embeds, and a ShareX config pre-filled with your API token.
-- **Admin shell at `/admin`** — a self-hosting console with pages for:
-    - **Dashboard / Metrics** — request analytics; live host + per-container stats (uPlot charts) with threshold alerts.
-    - **Docker / Snapshots** — per-service cards (start/stop/restart/pull/recreate), SSE log consoles, an interactive dependency graph with a live events feed, and container capture/restore via `docker commit`.
-    - **Health / Status** — internal uptime monitoring (HTTP/TCP/keyword/SSL checks, incidents, latency, webhooks), surfaced on a public `/status` page.
-    - **Security / Firewall** — failed-login + GeoIP analytics (optional Cloudflare panels); an nftables/ufw/iptables frontend with allow/deny/rate-limit/geo rules and manual + automatic IP lockouts.
-    - **Proxy / Certs** — reverse-proxy & domain manager (nginx, Caddy, or Cloudflare Tunnel) with managed TLS, plus a read-only certificate-expiry overview.
-    - **Secrets / Sanitizer** — a filesystem secret scanner (18 rules) and drag-and-drop file scanning via ClamAV + VirusTotal.
-    - **Database / Logs / Audit** — a safe-mode (read-only) SQLite/Postgres query runner, a tracing-log viewer, and a full audit log of every state-changing action.
-    - **SSH Keys / Backups** — authorized-key management with `authorized_keys` sync, and `VACUUM INTO` backups with scheduling + retention.
-- **Auth** — accounts with optional **TOTP 2FA** (secrets encrypted at rest, hashed recovery codes), **Discord login/linking**, and **API tokens** scoped to `images:read · images:write · admin:read · admin:write`.
-- **Spotlight palette (Ctrl+K)** — fuzzy command palette across nav, scripts, audit log, scans, SSH keys, and live containers; scripts run inline.
-- **REST API** — OpenAPI 3.0 at `/api/docs`: image processing/convert/metadata, code/screenshot/markdown-PDF render, ClamAV+VT scan, TTL uploads, and shareable `/m/:id` links — all scope-enforced.
-- **Live updates over WebSocket** — `/ws` pushes metrics/audit/Docker events to the console (admin-only; the Percy bot dashboard is now a [separate app](https://github.com/klappstuhlpy/percy-dashboard)).
-- **Ops niceties** — installable PWA, alert fan-out (Discord / ntfy / JSON webhook), and automatic Let's Encrypt TLS (rustls-acme).
+Keys are **scoped** (`images:*`, `links:*`, `pastes:*`) and minted on your
+[account page](https://klappstuhl.me/account). Errors follow Discord's shape
+(`{ message, code, errors }`); rate limits send `Retry-After` + `X-RateLimit-*`.
 
 ## Tech stack
 
-- **Backend** — Rust, [Axum](https://github.com/tokio-rs/axum) 0.7, Tokio, SQLite (rusqlite, bundled).
+- **Backend** — Rust, [Axum](https://github.com/tokio-rs/axum), Tokio, SQLite (rusqlite, bundled).
 - **Templates** — [Askama](https://github.com/djc/askama) (compile-time server-side rendering).
-- **Storage** — two SQLite files in the data dir: `main.db` (accounts, sessions, images, metrics, snapshots,
-  SSH keys, file scans, health monitors, firewall rules, proxy routes, TOTP secrets/recovery codes), `requests.db` (HTTP
-  access log). Periodic `VACUUM INTO` backups land in `<data>/backups/`.
-- **Auth** — HMAC-signed session tokens, Argon2 password hashing, optional TOTP 2FA (RFC 6238; secret encrypted at rest
-  with ChaCha20-Poly1305).
-- **TLS** — Automatic Let's Encrypt via rustls-acme.
-- **Metrics** — Native `/proc` and `/sys` parsing, `df` for disk usage, `docker stats` for containers. uPlot for charts.
-- **GeoIP** — Offline [MaxMind GeoLite2-City](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) database via
-  the `maxminddb` crate.
-- **Cloudflare** — GraphQL Analytics API (zone traffic + firewall events) for the security panels, plus the REST
-  `cfd_tunnel` configurations + DNS APIs for managing a remotely-managed Cloudflare Tunnel's ingress — all via`reqwest`.
-- **Docker** — [bollard](https://github.com/fussybeaver/bollard) crate for the Docker daemon API (container list,
-  inspect, events stream, `docker commit`). [Cytoscape.js](https://js.cytoscape.org/) for the dependency graph.
-- **Virus scanning** — inline ClamAV INSTREAM TCP client; VirusTotal v3 REST API via `reqwest`. SHA-256 via the `sha2`
-  crate.
-- **Media** — the `image` crate for raster manipulation/conversion; [syntect](https://github.com/trishume/syntect) for
-  code-to-image rendering; optional headless **Chromium** (screenshots, Markdown→PDF) and **ffmpeg** (video / HEIC
-  transcode) invoked as external binaries.
+- **Storage** — two SQLite files in the data dir: `main.db` (accounts, images, links, pastes,
+  metrics, admin state) and `requests.db` (HTTP access log). Periodic `VACUUM INTO` backups land in `<data>/backups/`.
 
-## Quick start (Docker — recommended)
+## Quick start (Docker)
 
-The repo ships a multi-stage `Dockerfile` and `docker-compose.yml` configured for a production deployment with
-host-metric visibility.
-
-#### Build prerequisite — SSH access to the private shared crate
-
-The image build fetches the private [`klappstuhl_me-shared`](https://github.com/klappstuhlpy/klappstuhl_me-shared)
-dependency over SSH, so the first `docker compose up` (which builds) needs an SSH key with **read access to that repo**
-forwarded into the build. BuildKit forwards an **ssh-agent socket** — a key sitting in `~/.ssh` is not enough on its
-own; without an agent you get `invalid empty ssh agent socket: make sure SSH_AUTH_SOCK is set`.
+The repo ships a multi-stage `Dockerfile` and `docker-compose.yml` for a production deployment.
 
 ```bash
-# Confirm your key can reach the private repo (uses your normal ~/.ssh key):
-git ls-remote git@github.com:klappstuhlpy/klappstuhl_me-shared.git >/dev/null && echo OK
+# 1. Start once so it writes a default config, then stop:
+docker compose up -d && docker compose down
 
-# Option A — load the key into an agent, then run the compose steps in the SAME shell:
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/id_ed25519          # your key with read access to klappstuhl_me-shared
+# 2. Edit ./data/config/klappstuhl_me/config.json (see "Configuration").
 
-# Option B — no agent; hand BuildKit the key file directly:
-#   docker compose build --ssh default=$HOME/.ssh/id_ed25519
-```
-
-Building with `sudo`? Use `sudo -E …` so `SSH_AUTH_SOCK` survives, or run as a `docker`-group user. A passphrase-protected
-key must use Option A.
-
-```bash
-# 1. Start the container once so it writes a default config:
-docker compose up -d
-docker compose down
-
-# 2. Edit ./data/config/klappstuhl_me/config.json (see "Configuration" below).
-
-# 3. Create the first admin account (interactive prompt):
+# 3. Create the first admin account (interactive):
 docker compose run --rm klappstuhl_me ./klappstuhl_me admin
 
 # 4. Start permanently:
 docker compose up -d
 ```
 
-After that, log in at `https://yourdomain.com/login`, then visit `/admin` to access the dashboard.
-
-### What the compose file mounts
-
-| Mount                                     | Why                                                                                    |
-|-------------------------------------------|----------------------------------------------------------------------------------------|
-| `./data:/data`                            | Persistent config, database, logs, ACME cert cache.                                    |
-| `/var/run/docker.sock`                    | So `/admin/docker` can run `docker ps` / `docker compose up -d`.                       |
-| `/proc:/host/proc:ro`                     | So `/admin/metrics` reports the **host's** CPU/RAM/network.                            |
-| `/sys:/host/sys:ro`                       | Same — for `/sys/block/*` (disk I/O counters).                                         |
-| `/etc/ufw:/etc/ufw`                       | So the firewall dashboard reads and writes the **host's** ufw rule database.           |
-| `/var/lib/ufw:/var/lib/ufw`               | ufw runtime state (required alongside `/etc/ufw` for `ufw status` to show host rules). |
-| `/home:/host-home`, `/root:/host-root`    | (Optional) Host home roots, so the SSH admin page can write `authorized_keys` files.   |
-| `/var/log/auth.log:/host-log/auth.log:ro` | (Optional) Host sshd log, so the SSH admin page can populate `last_used_at`.           |
-
-`HOST_PROC=/host/proc` and `HOST_SYS=/host/sys` are pre-set in the compose file so the metrics collector picks up the
-host filesystem.
-
-The compose file uses **`network_mode: host`** so the container shares the host's network namespace. This is required
-for the firewall backend (`ufw`/`iptables`/`nftables`) to see and modify the real host packet-filter rules. As a side
-effect, port mappings are not used — the app binds directly to the host's ports (`:9510` in dev, `:443` in production).
-Services on `localhost` (e.g. ClamAV at `127.0.0.1:3310`) are reachable directly without the `host.docker.internal`
-alias.
-
-Additionally, `/etc/ufw` and `/var/lib/ufw` are bind-mounted from the host. Host networking shares the kernel's iptables
-tables but `ufw status` reads its rule list from the filesystem (`/etc/ufw/user.rules`, `/etc/ufw/user6.rules`). Without
-these mounts the container would see its own empty ufw install instead of the host's configured rules. The mounts are
-read-write so that rules created through the UI are persisted back to the host's ufw database.
+Then log in at `https://yourdomain.com/login` and visit `/admin`.
 
 ## Configuration
 
-A default `config.json` is written on first start. Related settings are grouped
-into sub-objects (`alerts`, `cloudflare`, `proxy`, `backup`). On every start-up
-the file is **re-normalised to the canonical key order shown below** — so if you
-hand-edit it (or upgrade from the older flat layout, whose keys like
-`cloudflare_api_token` / `proxy_kind` are migrated into their groups
-automatically), it's tidied back into this shape with no settings lost.
+A default `config.json` is written on first start and **re-normalised to canonical
+key order** on every boot (older flat layouts are migrated automatically, nothing
+lost). Related settings are grouped into sub-objects (`alerts`, `cloudflare`,
+`proxy`, `backup`, `ai`, `discord`).
 
-Full layout with all optional fields:
+The keys you almost always need:
+
+| Key                         | Type           | Notes                                                                  |
+|-----------------------------|----------------|------------------------------------------------------------------------|
+| `production`                | bool           | `true` serves TLS via Let's Encrypt on port 443.                       |
+| `domains`                   | string[]       | Hostnames ACME requests certificates for (apex first).                 |
+| `server.ip` / `server.port` | string / u16   | Listen address (`0.0.0.0` / `443` in prod).                            |
+| `secret_key`                | string         | Auto-generated HMAC key for session/flash cookies — leave it alone.    |
+| `max_upload_bytes`          | u64 \| null    | Max single-image upload size. Unset ⇒ 10 MiB.                          |
+| `discord`                   | object \| null | OAuth2 `{ client_id, client_secret, redirect_uri }` for Discord login. |
+| `gallery_provision_token`   | string \| null | Shared token letting Percy provision per-guild `images:guild` keys.    |
+| `sso_secret`                | string \| null | Shared HMAC key for single sign-on with the Percy dashboard.           |
+
+Everything else is optional and drives an **admin integration** — each field is
+documented inline in the generated default and only activates the matching
+dashboard panel when set:
+
+<details>
+<summary>Full <code>config.json</code> skeleton (all optional fields)</summary>
 
 ```json
 {
@@ -174,6 +124,11 @@ Full layout with all optional fields:
     "keep": null,
     "remote": null
   },
+  "discord": {
+    "client_id": null,
+    "client_secret": null,
+    "redirect_uri": null
+  },
   "services": [],
   "geoip_db_path": null,
   "secret_scan_paths": [],
@@ -197,594 +152,55 @@ Full layout with all optional fields:
 }
 ```
 
-| Key                                  | Type              | Notes                                                                                                                                                                                                                                                                                                                       |
-|--------------------------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `production`                         | bool              | `true` switches the server to TLS via Let's Encrypt on port 443.                                                                                                                                                                                                                                                            |
-| `domains`                            | string[]          | Hostnames that ACME will request certificates for.                                                                                                                                                                                                                                                                          |
-| `server.port`                        | u16               | Listen port (`443` in production, anything else for dev).                                                                                                                                                                                                                                                                   |
-| `server.ip`                          | string            | The IP the server listens on (default `0.0.0.0`).                                                                                                                                                                                                                                                                           |
-| `secret_key`                         | string            | Auto-generated; used for HMAC signing of session tokens and flash cookies.                                                                                                                                                                                                                                                  |
-| `alerts.discord_webhook_url`         | string \| null    | Discord incoming webhook URL for metric / health / secret / backup alerts.                                                                                                                                                                                                                                                  |
-| `alerts.webhook_url`                 | string \| null    | Generic webhook URL. When set, alerts are also POSTed here as JSON `{title, level, body, fields}`.                                                                                                                                                                                                                          |
-| `alerts.ntfy_url`                    | string \| null    | [ntfy](https://ntfy.sh) topic URL (e.g. `https://ntfy.sh/my-topic`). When set, alerts are also pushed here as plain text.                                                                                                                                                                                                   |
-| `alerts.email`                       | object \| null    | SMTP email sink. Object: `{host, port=587, username, password, from, to[]}`. TLS is mandatory — port `465` uses implicit TLS, any other port (`587`/`25`) upgrades via STARTTLS. `username`/`password` drive AUTH LOGIN (omit both for an open relay). When set, alerts are also emailed as plain text.                     |
-| `cloudflare.tunnel_name`             | string \| null    | (Local-file mode only) Tunnel id/name written as `tunnel:` into a generated `config.yml`. Used when `proxy.kind` is `"cloudflared"` **and** the API isn't configured.                                                                                                                                                       |
-| `cloudflare.zone_id`                 | string \| null    | The zone ID matching `cloudflare.api_token`. Both must be set to enable the Cloudflare panels (and DNS upserts for tunnel hostnames).                                                                                                                                                                                       |
-| `cloudflare.tunnel_id`               | string \| null    | UUID of the Cloudflare Tunnel to manage over the API (the right model for a dashboard-created tunnel with no local credentials file). See below.                                                                                                                                                                            |
-| `cloudflare.api_token`               | string \| null    | Cloudflare API token. `Zone.Analytics:Read` for the security panels; for tunnel management (see below) it also needs **Account › Cloudflare Tunnel › Edit** and **Zone › DNS › Edit**.                                                                                                                                      |
-| `cloudflare.account_id`              | string \| null    | Cloudflare account ID. With `cloudflare.api_token` + `cloudflare.tunnel_id`, enables managing a remotely-managed Cloudflare Tunnel's ingress through the API from `/admin/proxy`. See below.                                                                                                                                |
-| `cloudflare.tunnel_credentials_file` | string \| null    | (Local-file mode only) Path written as `credentials-file:` into the generated `config.yml`. Used only when the tunnel API isn't configured.                                                                                                                                                                                 |
-| `proxy.config_dir`                   | string \| null    | Directory the `/admin/proxy` page writes generated config into (`<subdomain>.conf` for nginx, `<subdomain>.caddy` for Caddy, `config.yml` for local-file cloudflared). Unused in tunnel-API mode. Unset = DB-only, nothing written to disk. See below.                                                                      |
-| `proxy.kind`                         | string \| null    | Config syntax to emit: `"nginx"` (default), `"caddy"`, or `"cloudflared"` (a single Cloudflare Tunnel `config.yml`). See below.                                                                                                                                                                                             |
-| `proxy.reload_command`               | string \| null    | Shell command run after config is regenerated, e.g. `"nginx -s reload"` or `"docker restart cloudflared"`. Skipped when unset / in tunnel-API mode.                                                                                                                                                                         |
-| `backup.interval_hours`              | u64 \| null       | Hours between automatic `VACUUM INTO` SQLite backups. `0` disables the scheduler; unset defaults to `24`. See below.                                                                                                                                                                                                        |
-| `backup.keep`                        | usize \| null     | Number of automatic backups to retain (older ones pruned). Unset defaults to `14`.                                                                                                                                                                                                                                          |
-| `backup.remote`                      | object \| null    | Off-site backup target. When set, each new backup is also uploaded to an S3-compatible store (B2 / R2 / AWS / MinIO). See [Off-site backups](#off-site-backups).                                                                                                                                                            |
-| `services`                           | ServiceConfig[]   | Docker services shown on `/admin/docker`. See below.                                                                                                                                                                                                                                                                        |
-| `geoip_db_path`                      | string \| null    | Path to a GeoLite2-City.mmdb. Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset.                                                                                                                                                                                                                                       |
-| `secret_scan_paths`                  | string[]          | Directory paths the secrets scanner walks recursively.                                                                                                                                                                                                                                                                      |
-| `postgres_url`                       | string \| null    | libpq URL (`postgresql://user:pass@host:port/db`) for the Postgres admin page.                                                                                                                                                                                                                                              |
-| `clamav_addr`                        | string \| null    | TCP address of a `clamd` daemon, e.g. `"host.docker.internal:3310"`. Enables ClamAV scanning.                                                                                                                                                                                                                               |
-| `virustotal_api_key`                 | string \| null    | VirusTotal public API key. Enables hash-based lookups on the File Sanitizer page.                                                                                                                                                                                                                                           |
-| `spotlight_scripts`                  | SpotlightScript[] | Pre-defined shell commands runnable from the Ctrl+K palette. See below.                                                                                                                                                                                                                                                     |
-| `sshd_auth_log_path`                 | string \| null    | Path of the host sshd auth log to tail in order to populate each key's "Last used". See below.                                                                                                                                                                                                                              |
-| `firewall_backend`                   | string \| null    | Force the firewall backend: `"nftables"`, `"ufw"`, `"iptables"`, or `"disabled"`. Unset = auto-detect by probing each binary. `"disabled"` keeps the UI but issues no kernel commands. See below.                                                                                                                           |
-| `update_check_interval_hours`        | u64 \| null       | Hours between background container image-update checks. `0` disables. Unset defaults to `12`. See [Container image updates](#container-image-update-detection).                                                                                                                                                             |
-| `chromium_path`                      | string \| null    | Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF render endpoints. Unset = probe common names on `PATH`; if none found those endpoints return an error.                                                                                                                                                 |
-| `ffmpeg_path`                        | string \| null    | Path to an `ffmpeg` binary for the video/HEIC transcode endpoint. Unset = use `ffmpeg` on `PATH`; if absent the endpoint returns an error.                                                                                                                                                                                  |
-| `max_upload_bytes`                   | u64 \| null       | Maximum accepted size of a single uploaded image, in bytes. `0`/unset, defaults to 10 MiB.                                                                                                                                                                                                                                  |
-| `ai.api_key`                         | string \| null    | Groq API key (`gsk_…`, free from [console.groq.com/keys](https://console.groq.com/keys)) enabling the "Ask the AI" feature. Held server-side only; the browser talks to the rate-limited `/api/ask` proxy. Unset = feature disabled (`/api/ask` returns 503). See [Ask AI](#ask-ai).       |
-| `ai.model`                           | string \| null    | Groq model id for `/api/ask`. Unset defaults to `llama-3.3-70b-versatile` (free tier, supports tool-calling).                                                                                                                                                                                                               |
-| `ai.public`                          | bool              | **Default** for "may non-admins spend tokens?". `false` (default) restricts `/api/ask` to **admin accounts**; `true` lets anyone use it (still rate-limited). Only the initial value — admins flip it live via `POST /admin/ai/public` (persisted in the `storage` KV table, which then wins).                          |
-| `sso_secret`                         | string \| null    | Optional shared HMAC key (hex) enabling single sign-on with the Percy dashboard. Set to the **same** value here and in the dashboard's `sso_secret`, and a logged-in user with a linked Discord is signed straight into the dashboard via the `/percy` link (short-lived signed handoff — no shared DB or session store). Unset ⇒ `/percy` is a plain redirect. See [Discord login & the Percy dashboard](#discord-login--the-percy-dashboard). |
-| `gallery_provision_token`            | string \| null    | Optional shared service token letting the bot (Percy) provision **per-guild** `images:guild` keys via `POST /api/v1/guilds/{id}/provision-key`. Set to the **same** high-entropy value here and in Percy's `KLAPPSTUHL_ME_PROVISION_TOKEN`. Each guild gets its own key, minted on demand under a dedicated non-personal `percy-service` account and stored in `guild_api_key`, so the bot never needs a personal/all-access key. Unset ⇒ the endpoint returns `401` (feature off). |
-
-### Docker services configuration
-
-Each entry powers one card on `/admin/docker`:
-
-```json
-{
-  "name": "Percy",
-  "identifier": "percy_main",
-  "path": "/home/parzival/Percy"
-}
-```
-
-| Field        | Description                                                                                                                                                                                 |
-|--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `name`       | Human-readable label shown on the card.                                                                                                                                                     |
-| `identifier` | Container name passed to `docker ps` / `stop` / `start`.                                                                                                                                    |
-| `path`       | (Optional) Path containing a `docker-compose.yml`. When set, Start/Stop/Restart/Pull/Recreate use `docker compose` commands in that directory instead of plain `docker start/stop/restart`. |
-
-> **Note:** The legacy `kind` field (`"docker"` / `"screen"`) is silently ignored if present in an old config file.
-> Screen support has been removed — all services are Docker.
-
-### Spotlight scripts configuration
-
-Pre-defined shell commands that appear in the Ctrl+K palette under the **Scripts** section and can be run directly from
-the palette:
-
-```json
-{
-  "spotlight_scripts": [
-    {
-      "id": "restart-nginx",
-      "name": "Restart nginx",
-      "command": "systemctl restart nginx",
-      "description": "Reload nginx config and restart the service",
-      "cwd": null
-    },
-    {
-      "id": "git-pull-site",
-      "name": "Pull site repo",
-      "command": "git pull",
-      "cwd": "/home/user/mysite"
-    }
-  ]
-}
-```
-
-| Field         | Description                                                                                                    |
-|---------------|----------------------------------------------------------------------------------------------------------------|
-| `id`          | Unique identifier used internally. Must be unique across all scripts.                                          |
-| `name`        | Display name shown in the palette.                                                                             |
-| `command`     | Shell command executed via `sh -c` on Unix or `cmd /C` on Windows.                                             |
-| `description` | (Optional) Subtitle shown below the name in the palette. Defaults to the raw command string.                   |
-| `cwd`         | (Optional) Working directory for the command. Defaults to the process working directory.                       |
-| `schedule`    | (Optional) 5-field cron expression (`min hour dom month dow`, UTC) to run the script automatically. See below. |
-
-Scripts time out after 30 seconds. Every execution is recorded in the audit log (`spotlight.script.run` with the script
-name as target).
-
-**Scheduled scripts (cron).** Add a `schedule` to any script to run it automatically in addition to on-demand palette
-runs — turning the script list into a lightweight cron without a separate daemon:
-
-```json
-{
-  "spotlight_scripts": [
-    {
-      "id": "nightly-restic",
-      "name": "Nightly backup",
-      "command": "restic backup /data",
-      "schedule": "0 4 * * *"
-    }
-  ]
-}
-```
-
-The expression is standard 5-field cron evaluated in **UTC**, supporting `*`, lists (`1,15`), ranges (`9-17`), and
-steps (`*/15`); day-of-month and day-of-week follow the usual Vixie-cron "either matches when both are set" rule. A
-background task wakes at the top of every minute and runs whatever is due. Invalid expressions are logged at start-up
-and skipped. Scheduled runs are audited as `spotlight.script.scheduled` (actor `scheduler`).
-
-### Enabling the security dashboard's optional features
-
-**GeoIP** — sign up for a free account at [maxmind.com](https://www.maxmind.com), download the GeoLite2-City **binary**
-database (the `.mmdb` file, not the CSV). Drop the file in any of these locations — the first existing one wins:
-
-| Priority | Location                                           |
-|----------|----------------------------------------------------|
-| 1        | The exact path in `config.geoip_db_path` (if set). |
-| 2        | `<data dir>/geoip/GeoLite2-City.mmdb`              |
-| 3        | `<data dir>/GeoLite2-City.mmdb`                    |
-| 4        | `<config dir>/geoip/GeoLite2-City.mmdb`            |
-| 5        | `<config dir>/GeoLite2-City.mmdb`                  |
-
-On Windows the data dir and config dir are both `%AppData%\klappstuhl_me\`, so simply dropping the `.mmdb` file
-alongside your `config.json` works. For Docker that's `./data/geoip/GeoLite2-City.mmdb` on the host (mapped to
-`/data/geoip/` in the container). If no file is found, the security dashboard still works — country/city columns are
-simply hidden.
-
-**Cloudflare** — create an API token with `Zone.Analytics:Read` on your zone, paste it as `cloudflare.api_token` along
-with the `cloudflare.zone_id`. The Cloudflare section appears automatically. Failures are non-fatal — if CF is
-unreachable, the rest of the dashboard still renders. (To *also* manage a Cloudflare Tunnel from `/admin/proxy`, the
-same token needs the extra **Account › Cloudflare Tunnel › Edit** + **Zone › DNS › Edit** permissions and the
-`cloudflare.account_id` / `cloudflare.tunnel_id` settings — see [Cloudflare Tunnel](#cloudflare-tunnel-cloudflared).)
-
-**ClamAV** — run `clamd` on the same host (or reachable via TCP) and set `clamav_addr` to its address. The File
-Sanitizer streams uploaded files to clamd using the native INSTREAM protocol — no `clamdscan` binary required.
-
-When the app runs in Docker and `clamd` runs on the host, there are three traps to avoid. Walk this checklist
-top-to-bottom and uploads should "just work":
-
-1. **Make `clamd` listen on TCP, not just the unix socket.** In `/etc/clamav/clamd.conf` make sure both of these are
-   uncommented:
-   ```
-   TCPSocket 3310
-   TCPAddr 0.0.0.0
-   ```
-   Then `sudo systemctl restart clamav-daemon`. Verify with `sudo ss -tlnp | grep clamd` — you should see
-   `LISTEN ... 0.0.0.0:3310`. If `systemd` co-owns the FD (you'll see `("systemd",pid=1,...)` next to
-   `("clamd",pid=N,...)` in the `users:` column), that's fine — socket activation works as long as `clamd` itself is
-   healthy.
-
-2. **Let the container reach clamd.** Because the compose file uses `network_mode: host`, the container shares the
-   host's network stack — `localhost` inside the container *is* the host. Set `clamav_addr` in `config.json` to:
-   ```json
-   {
-      "clamav_addr": "127.0.0.1:3310"
-   }
-   ```
-   No `host.docker.internal` alias or `extra_hosts` entry is needed.
-
-3. **No extra UFW rule required for clamd.** With host networking the traffic never crosses a Docker bridge, so the old
-   `ufw allow from 172.16.0.0/12 to any port 3310` rule is unnecessary (though harmless to keep).
-
-Quick end-to-end test (install `nc` first if missing: `apt-get install -y --no-install-recommends netcat-openbsd`):
-
-```bash
-printf "zPING\0" | nc -w 3 127.0.0.1 3310
-# expected output: PONG
-```
-
-Because the container uses host networking you can run this from either the host shell or
-`docker compose exec klappstuhl_me sh -c '...'` — both hit the same `127.0.0.1:3310`. If it hangs, check that clamd is
-listening (`ss -tlnp | grep 3310`) and that `TCPAddr 0.0.0.0` is set in `/etc/clamav/clamd.conf`.
-
-**VirusTotal** — set `virustotal_api_key` to a free public API key. The File Sanitizer computes the SHA-256 of each
-upload and does a hash-only lookup against VT v3 — no file data is ever sent to VirusTotal. Files not yet in the VT
-database show as "Not in VT".
-
-**Database** — the internal SQLite databases (`main`, `requests`) are browsable out of the box. To also browse an
-external Postgres server, set `postgres_url` to a libpq connection string. The configured credential should have at
-least `pg_read_all_data`; a superuser works too since safe-mode queries are always wrapped in
-`BEGIN TRANSACTION READ ONLY`.
-
-### SSH key sync and "Last used" tracking
-
-The `/admin/ssh` page stores keys in SQLite by default — sshd on the host doesn't know about them until you wire one or
-both of the integrations below. They're independent, so you can enable either, both, or neither.
-
-**File sync — no config, just bind-mounts.** The target host user is derived from each key's comment (`root@laptop` →
-`root`, `parzival@nas` → `parzival`). The server writes to `/host-home/<user>/.ssh/authorized_keys` for normal users and
-`/host-root/.ssh/authorized_keys` for root, atomic temp-file + `rename`, mode `0600`. If `~/.ssh` doesn't exist on the
-host the server creates it (mode `0700`) and `chown`s both it and `authorized_keys` to match the home dir's UID/GID —
-that keeps sshd's `StrictModes yes` (the default) happy.
-
-Recommended Docker layout — two bind-mounts of the host's home roots:
-
-```yaml
-volumes:
-  - /home:/host-home
-  - /root:/host-root
-```
-
-That's all. No config keys, no per-user wiring. To add a key for a new host user, just upload it — as long as that user
-exists on the host (i.e. `/home/<user>` is a directory), the add succeeds and the file appears on the next sync. If the
-user doesn't exist, the add returns HTTP 422 with a clear message.
-
-Adding a key with no comment (`ssh-ed25519 AAAA…`) also returns 422 — the server has no way to know which account to
-route it to. Append `user@host` and retry.
-
-The mounted directories are rewritten in place — pre-existing `authorized_keys` content **is overwritten** on the next
-sync, so move any hand-managed keys into the admin UI first or back them up. Legacy keys from before the `target_user`
-column was added show up as **not synced** in the admin UI; delete and re-add them to fix. The export endpoint at
-`/admin/ssh/export/authorized_keys` still works for one-shot downloads of every active key regardless of target.
-
-**"Last used" — `sshd_auth_log_path`.** When set, a background thread tails the file and updates `ssh_key.last_used_at`
-whenever sshd logs a successful publickey auth whose `SHA256:<fingerprint>` matches a stored key (also fires an
-`ssh.key.use` audit entry). Survives log rotation via inode + size checks and reopens on errors.
-
-```yaml
-volumes:
-  - /var/log/auth.log:/host-log/auth.log:ro
-```
-
-```json
-{
-  "sshd_auth_log_path": "/host-log/auth.log"
-}
-```
-
-Distro-specific log locations:
-
-| Distro                | Log path                          |
-|-----------------------|-----------------------------------|
-| Debian / Ubuntu       | `/var/log/auth.log`               |
-| RHEL / Fedora / Rocky | `/var/log/secure`                 |
-| Alpine / Arch         | usually journald only — see below |
-
-sshd must log fingerprints for the parser to match. On modern OpenSSH this is the default; if your
-`Accepted publickey ...` lines lack `ssh2: <algo> SHA256:<fp>`, set `LogLevel VERBOSE` in `/etc/ssh/sshd_config` and
-reload sshd.
-
-If the host runs systemd-only (no rsyslog / no `/var/log/auth.log`), the simplest fix is `apt install rsyslog` (or the
-distro equivalent); the watcher needs a real file. Piping `journalctl -u ssh -f` into a file via a sidecar works too but
-is uglier.
-
-Unknown / revoked fingerprints in the log are ignored at DEBUG level — a noisy log from brute-force attempts will not
-flood the audit table.
-
-### Firewall backend
-
-`/admin/firewall` auto-detects a packet-filter backend at startup by probing
-`nft`, then `ufw`, then `iptables` (the first one whose status command succeeds
-wins). Set `firewall_backend` to pin a specific one, or `"disabled"` to keep the
-UI working without touching the kernel — rule edits still persist to SQLite so
-the page is usable in dev or in a container started without `--cap-add=NET_ADMIN`.
-
-Applying rules and lockouts shells out to the backend, which needs root or
-`CAP_NET_ADMIN`. If `sudo` is present the commands are prefixed with `sudo -n`
-(non-interactive); otherwise the process must already be privileged. Each rule
-create / toggle / delete and every lockout is recorded in the audit log
-(`firewall.rule.*`, `firewall.lockout.*`, `firewall.apply_all`).
-
-Automatic lockout reads the existing `auth.login.fail` audit entries: 8 failures
-from one IP within 10 minutes triggers a 1-hour block (`firewall.lockout.auto`).
-A background task releases expired lockouts every minute and removes the
-corresponding kernel rule. nftables lockouts assume an `inet filter` table with
-an `input` chain.
-
-**Live ruleset import (ufw).** The `firewall_rule` table is normally a one-way
-mirror — the UI writes rows and they're pushed to the kernel — which means a host
-configured out-of-band shows an empty dashboard even though rules are live. To
-close that gap, each time `/admin/firewall` loads its data the server runs
-`ufw status`, parses it, and reconciles the result into the mirror: live rules
-not yet present are inserted (tagged `{"source":"ufw"}` in their `meta_json`),
-and previously-imported rows that no longer appear live are pruned.
-Hand-made rows created in the UI carry no marker and are never touched. This is
-ufw-only for now (its status output is stable and parsable; nft/iptables have no
-equivalent import). A few accepted caveats: a UI-created rule that's also live in
-ufw can appear twice (once as the UI row, once as an imported one); imported rows
-are a read-only reflection, so deleting or toggling one in the UI may not map
-cleanly to a `ufw delete` and it will simply re-import on the next load. The
-import is best-effort — any failure (no backend, command error, parse miss) is
-logged and swallowed so the dashboard still renders.
-
-### Reverse proxy / domain manager
-
-`/admin/proxy` keeps a row per managed subdomain in SQLite and (optionally)
-renders real proxy config from it. Set `proxy.config_dir` to the directory your
-proxy includes route files from, `proxy.kind` to `"nginx"` (default), `"caddy"`,
-or `"cloudflared"`, and `proxy.reload_command` to whatever reloads the proxy:
-
-```json
-{
-  "proxy": {
-    "kind": "nginx",
-    "config_dir": "/etc/nginx/conf.d",
-    "reload_command": "nginx -s reload"
-  }
-}
-```
-
-On any route change (and via the "Regenerate & reload" button) the server writes
-one file per enabled route — `<subdomain>.conf` for nginx, `<subdomain>.caddy`
-for Caddy — prunes managed files that no longer map to an enabled route (only
-files carrying the `# Managed by klappstuhl.me` marker are removed, so
-hand-written config sharing the directory is left alone), then runs the reload
-command. For nginx routes with HTTP basic auth an `<subdomain>.htpasswd` sidecar
-is written alongside and referenced via `auth_basic_user_file`; Caddy embeds the
-bcrypt hash inline. Use the per-route **Preview** to see the exact output before
-it touches disk.
-
-#### Cloudflare Tunnel (cloudflared)
-
-With `proxy.kind` set to `"cloudflared"`, routes map onto a Cloudflare Tunnel's
-ingress (one rule per enabled route, plus the mandatory `http_status:404`
-catch-all). There are two modes depending on how your tunnel is run.
-
-**API mode (recommended — for a remotely-managed / dashboard tunnel).** A tunnel
-created in the Cloudflare dashboard and run with `cloudflared tunnel run --token …`
-has **no local credentials file or `config.yml`** — its ingress lives in
-Cloudflare. Point the app at the tunnel and it manages that ingress over the
-Cloudflare API:
-
-```json
-{
-  "proxy": {
-    "kind": "cloudflared"
-  },
-  "cloudflare": {
-    "api_token": "<token>",
-    "zone_id": "<zone id>",
-    "account_id": "<account id>",
-    "tunnel_id": "<tunnel id>"
-  }
-}
-```
-
-In this mode:
-
-- **Import** — the **Import from Cloudflare** button on `/admin/proxy` pulls the
-  tunnel's existing public hostnames (created in the dashboard or elsewhere)
-  into the route table, so they're managed from here too.
-- **Push** — creating/editing/toggling a route (or **Regenerate & reload**)
-  writes every enabled route back as the tunnel's ingress **and** upserts the
-  proxied `CNAME <hostname> → <tunnel>.cfargotunnel.com` DNS record so the
-  hostname resolves. Because pushing **replaces** the whole ingress, import
-  first so the DB mirrors Cloudflare before you push.
-- **No reload, no config dir, no systemd.** Cloudflare propagates the pushed
-  config to your running `cloudflared` automatically — so `proxy.config_dir` and
-  `proxy.reload_command` are irrelevant here (handy when `cloudflared` runs as a
-  container with no `systemctl`).
-
-The API token needs **Account › Cloudflare Tunnel › Edit** and (for the DNS
-upserts) **Zone › DNS › Edit** on the relevant zone — broader than the
-analytics-only `Zone.Analytics:Read` token.
-
-**Local-file mode (for a locally-managed tunnel).** If the API settings above
-aren't all present, cloudflared falls back to writing a single combined
-`config.yml` to `proxy.config_dir`:
-
-```json
-{
-  "proxy": {
-    "kind": "cloudflared",
-    "config_dir": "/etc/cloudflared",
-    "reload_command": "docker restart cloudflared"
-  },
-  "cloudflare": {
-    "tunnel_name": "my-tunnel",
-    "tunnel_credentials_file": "/etc/cloudflared/<uuid>.json"
-  }
-}
-```
-
-The file is rewritten wholesale on every change (nothing per-route to prune);
-`cloudflare.tunnel_name` / `cloudflare.tunnel_credentials_file` fill the
-`tunnel:` / `credentials-file:` headers (editable placeholders when unset). For a reload in
-a containerized deployment use `docker restart <cloudflared-container>` (the app
-already has the Docker socket) rather than `systemctl`, which isn't available
-inside the container.
-
-In both modes an `https` upstream gets `originRequest.noTLSVerify: true`
-(internal services are often self-signed). Tunnels terminate TLS at Cloudflare's
-edge, so cloudflared routes carry no local certificate — they show as
-**Cloudflare edge** on the Certs page. Per-route HTTP basic-auth, rate limits,
-and IP allow/deny aren't expressible in a tunnel ingress (enforce them with
-Cloudflare Access / WAF). All applies are logged (`tracing`) and audited
-(`proxy.apply`, `proxy.import`).
-
-The emitted nginx config references conventional certbot cert paths
-(`/etc/letsencrypt/live/<subdomain>/…`) and, for rate limits, a `limit_req_zone`
-you must declare once in the `http {}` block (the per-route `limit_req` line and
-a commented template are emitted for you). Anything in the route's **Extra
-config** field is appended verbatim inside the server/site block. When
-`proxy.config_dir` is unset the page is purely a record-keeping view — no files
-are written. All changes are audited (`proxy.route.*`, `proxy.apply`).
-
-### SQLite backups
-
-A background task takes a `VACUUM INTO` snapshot of `main.db` every
-`backup.interval_hours` (default 24; `0` disables the scheduler) and prunes to
-the most recent `backup.keep` files (default 14). Backups land in
-`<data>/backups/` as `backup-<unix-ts>.db`. `VACUUM INTO` produces a consistent,
-fully-checkpointed copy without an exclusive lock, so it's safe while the server
-is serving requests.
-
-`/admin/backups` is a **data-protection dashboard**: summary cards for the
-schedule (interval + estimated next run), retention, snapshot count + last
-backup, and off-site status (how many local backups are mirrored, or why the
-remote is unreachable). Below that, every backup is listed with its size, an
-off-site badge (✓ stored / local only), and per-file download / upload / delete
-actions. You can also take a backup on demand. **Restore is a manual, offline step:**
-stop the server and replace `main.db` with the downloaded file — swapping it
-under live WAL connections is unsafe, so the UI deliberately doesn't offer it.
-
-### Off-site backups
-
-Local backups share a disk with the live database, so a dead disk takes them
-with it. Set `backup.remote` to also mirror every new backup to an
-S3-compatible object store. Path-style addressing + AWS Signature V4 are used,
-which AWS S3, Backblaze B2, Cloudflare R2, MinIO, and Wasabi all accept — no
-extra binary or SDK:
-
-```json
-{
-  "backup": {
-    "remote": {
-      "kind": "s3",
-      "endpoint": "https://s3.us-west-002.backblazeb2.com",
-      "region": "us-west-002",
-      "bucket": "my-backups",
-      "prefix": "website/",
-      "access_key_id": "…",
-      "secret_access_key": "…"
-    }
-  }
-}
-```
-
-| Field               | Notes                                                                                                   |
-|---------------------|---------------------------------------------------------------------------------------------------------|
-| `kind`              | Storage backend. Currently only `"s3"`.                                                                 |
-| `endpoint`          | Base URL of the store. For AWS use `https://s3.<region>.amazonaws.com`; for B2/R2/MinIO use their host. |
-| `region`            | Signing region. AWS needs the real region; B2/R2/MinIO accept any value (defaults to `us-east-1`).      |
-| `bucket`            | Destination bucket.                                                                                     |
-| `prefix`            | (Optional) key prefix inside the bucket; a trailing slash is added automatically.                       |
-| `access_key_id`     | Access key id. (Usually generated at access token creation.)                                            |
-| `secret_access_key` | Secret access key. (Usually generated at access token creation.)                                        |
-
-Each scheduled and manual backup is uploaded in the background; an upload
-failure raises an alert through the configured sinks (Discord / ntfy / webhook)
-so a silently broken target doesn't go unnoticed. The `/admin/backups` page
-shows the configured target and adds a per-backup **Upload off-site** button
-(handy to validate credentials right after configuring). Uploads are audited as
-`backup.upload`.
-
-### Container image update detection
-
-For every entry in `config.services`, a background task asks the image's
-registry what digest it currently serves for the running tag (Docker Registry
-v2 API, with anonymous pull-token auth handled for Docker Hub / GHCR) and
-compares it against the digest the local image was pulled at. A mismatch means
-`docker pull` would fetch something newer. Results drive an **update available**
-badge on the `/admin/docker` service cards; a **Check updates** button there
-runs the check on demand. A freshly-discovered update (one that wasn't available
-on the previous run) fans out an alert. Set `update_check_interval_hours` to
-tune the cadence (default 12; `0` disables). The status is also exposed at
-`GET /api/v1/admin/updates` for external dashboards — the first endpoint to require
-the `admin:read` token scope.
-
-Images built locally (no registry digest) and private registries that need
-credentials degrade gracefully to an `unknown` state rather than erroring.
-
-> **Internal endpoints (not for public use).** A few documented routes exist only
-> for the operator's own services and appear in the API docs purely for reference:
-> the **guild galleries** (`/api/v1/guilds/{id}/images…`, scope `images:guild`,
-> used by Percy) and the **admin** routes (`/api/v1/admin/…`, scopes
-> `admin:read` / `admin:write`). Their scopes are never granted to a normal
-> personal API key — `Scope::requires_admin` filters them out at key-generation
-> time and the account page hides them from non-admins — so a key you create
-> cannot call them. Don't build against these.
-
-### External render tools (Chromium / ffmpeg)
-
-The `/api/v1/render/screenshot`, `/api/v1/render/markdown-pdf`, and
-`/api/v1/convert/transcode` endpoints shell out to external binaries:
-
-- **Chromium** (screenshots + Markdown→PDF) — set `chromium_path` to a
-  Chromium/Chrome binary, or leave it unset to probe common names on `PATH`.
-- **ffmpeg** (video / HEIC transcode) — set `ffmpeg_path`, or leave it unset to
-  use `ffmpeg` on `PATH`.
-
-When the required binary can't be found the corresponding endpoint returns an
-error rather than failing obscurely; the rest of the API is unaffected. The
-code-render endpoint (`/api/v1/render/code`) needs no external tool — it uses the
-in-process `syntect` highlighter.
-
-### Ask AI
-
-Admins can ask the assistant questions about the site from the Ctrl+K command
-palette (type a question and pick **Ask the AI**). The browser POSTs the
-conversation to `POST /api/ask`, which proxies to the **Groq API server-side**
-(the key in `ai.api_key` never reaches the browser) and streams the answer back
-over SSE. Groq's free tier (available in the EU) means the feature costs nothing
-to run. A small function-calling loop lets the model answer live questions and
-guide the visitor — `get_site_status` reads the health monitors (the same data
-behind `/status`), `list_projects` describes the site's features, and `navigate`
-can redirect the visitor to a page (whitelisted to a fixed set of internal
-routes, so the model can never send anyone to an arbitrary or external URL).
-
-To enable it, create a free API key at
-[console.groq.com/keys](https://console.groq.com/keys) and set it as
-`ai.api_key`. Groq is OpenAI-compatible, and the integration is provider-neutral
-in the codebase (`src/integrations/ai.rs`) — only that file's upstream HTTP call
-is provider-specific, so swapping to a self-hosted Ollama or another provider
-later is a contained change.
-
-The endpoint is defensive by default: rate-limited to 6 asks per minute per IP,
-output-token-capped, history-length-bounded, and the model is a free default
-(`llama-3.3-70b-versatile`) unless `ai.model` overrides it. When `ai.api_key` is
-unset the `/api/ask` endpoint returns 503.
-
-**Token-spend control.** Spending tokens for non-admin callers is **off by
-default** — out of the box `/api/ask` is admin-only (it returns 403 for everyone
-else). Whether non-admins may use it is governed by a runtime toggle, flipped
-live via `POST /admin/ai/public` (no restart, no config edit). The choice is
-persisted in the `storage` KV table (audited as `ai.public.toggle`) and overrides
-the `ai.public` config default. Admins can always use the assistant regardless of
-the toggle.
+Notable optional keys: `clamav_addr` / `virustotal_api_key` (File Sanitizer),
+`chromium_path` / `ffmpeg_path` (screenshot / PDF / transcode render endpoints —
+absent ⇒ those endpoints return an error, the rest of the API is unaffected),
+`postgres_url` (Postgres browser), `geoip_db_path` + `cloudflare.*` (security
+dashboard), `backup.remote` (off-site S3), `services` (Docker cards),
+`spotlight_scripts` (Ctrl+K palette / cron), `ai.api_key` ("Ask AI").
+
+</details>
+
+## Admin dashboard
+
+`/admin` is a self-hosting control panel. Every integration is **optional and
+non-fatal** — an unreachable or unconfigured backend simply hides its panel:
+
+- **Metrics & security** — host/app metrics, request analytics, GeoIP + Cloudflare-backed security views.
+- **File Sanitizer** — ClamAV (INSTREAM) + VirusTotal hash-lookup scanning of uploads.
+- **Databases** — browse the internal SQLite files and (read-only) an external Postgres.
+- **SSH keys** — store keys, sync to host `authorized_keys` via bind-mounts, track "last used" from the sshd log.
+- **Firewall** — nftables/ufw/iptables rule manager with automatic brute-force lockouts.
+- **Reverse proxy** — per-subdomain nginx/Caddy config generation, or Cloudflare Tunnel ingress via the CF API.
+- **Docker** — start/stop/restart/pull service containers and detect image updates.
+- **Backups** — scheduled `VACUUM INTO` snapshots with retention and optional S3 off-site mirroring.
+- **Secrets scanner**, **audit log**, and a **Ctrl+K command palette** (with optional cron scripts).
+
+Container image-update status is also exposed at `GET /api/v1/admin/updates` (scope `admin:read`).
 
 ## Discord login & the Percy dashboard
 
-### Discord login (this app)
+Users can **log in / sign up with Discord** (requests only the `identify` scope);
+configure the OAuth2 app under `discord` in `config.json` and register the
+`redirect_uri` in the [Discord Developer Portal](https://discord.com/developers/applications).
 
-klappstuhl.me lets users **log in / sign up with Discord** and link a Discord account to an existing login. Configure the OAuth2 app in `config.json`:
+The Percy bot dashboard is its **own application**
+([`klappstuhlpy/percy-dashboard`](https://github.com/klappstuhlpy/percy-dashboard)),
+served on the `percy.<domain>` subdomain — this app only links to it via `/percy`.
+Set the same **`sso_secret`** in both apps and a user logged in here with a linked
+Discord account is signed straight into the dashboard via a short-lived signed
+handoff (no shared DB or session store); leave it unset and `/percy` is a plain
+redirect. Both apps share their design system, cookie crypto, and Percy API client
+through the [`klappstuhl_me-shared`](https://github.com/klappstuhlpy/klappstuhl_me-shared) crates.
 
-```json
-{
-  "discord": {
-    "client_id": "<Discord OAuth2 application ID>",
-    "client_secret": "<client secret>",
-    "redirect_uri": "https://<your-domain>/auth/discord/callback"
-  }
-}
-```
+> **Deployment:** add `percy.<domain>` to `domains` so the ACME cert covers it
+> (keep the apex first — it drives `canonical_url`, the cookie `Domain`, and the
+> `r.` short-link subdomain). The session cookie is scoped to the registrable
+> domain so the SSO handoff works across the subdomain.
 
-Register the redirect URI in the [Discord Developer Portal](https://discord.com/developers/applications) under OAuth2. The flow requests only the `identify` scope.
+## Data & log paths
 
-### Percy dashboard (a separate app)
-
-The Percy bot dashboard is now its **own application** — [`klappstuhlpy/percy-dashboard`](https://github.com/klappstuhlpy/percy-dashboard) — served on the `percy.<your-domain>` subdomain. It was split out of this monolith (see `DASHBOARD_DECOUPLING_PLAN.md`); this app no longer serves any dashboard pages, it only links to it via the `/percy` redirect. Both apps share their design system, signed-cookie crypto, and Percy API client through the [`klappstuhl_me-shared`](https://github.com/klappstuhlpy/klappstuhl_me-shared) crates.
-
-### Optional: single sign-on with the dashboard
-
-Set **`sso_secret`** (a hex HMAC key) to the **same** value in this app's `config.json` and the dashboard's, and a user logged in here with a linked Discord account is signed straight into the dashboard when they follow the `/percy` link — via a short-lived signed handoff (`kls_web_core::sso::Handoff`), with no shared database or session store. Leave it unset and `/percy` is a plain redirect (the dashboard does its own Discord login). The dashboard's README documents the full flow.
-
-### Deployment notes (the `percy.` subdomain)
-
-- **TLS:** add `percy.<domain>` to the `domains` list in `config.json` so the ACME cert covers it (keep the primary apex first — it's used for `canonical_url`, the cookie `Domain`, and to derive the `r.` short-link subdomain).
-- **Auth cookie:** the session cookie is scoped to the registrable domain (`Domain=<apex>`) so a login on the apex is also presented to `percy.<domain>` — which is what makes the SSO handoff seamless. In local dev the cookie is scoped to `localhost`; access the app via `localhost`, not a raw `127.0.0.1`.
-
----
-## Metric alert thresholds
-
-Hard-coded (`src/services/metrics/alerts.rs`). On the `OK → ALERT` transition, an alert fans out to every configured
-channel (`alerts.discord_webhook_url` / `alerts.ntfy_url` / `alerts.webhook_url`) with a 30-minute cooldown per metric:
-
-| Metric          | Threshold | Notes                            |
-|-----------------|-----------|----------------------------------|
-| CPU             | > 90%     | Must be sustained for 5 minutes. |
-| RAM             | > 90%     | Instant.                         |
-| Disk (root `/`) | > 90%     | Instant.                         |
-
-## Data and log paths
-
-When running directly (not in Docker), paths follow [XDG basedirs](https://specifications.freedesktop.org/basedir-spec/)
-on Linux:
+Running directly (not Docker), paths follow [XDG basedirs](https://specifications.freedesktop.org/basedir-spec/):
 
 | Kind       | Linux                             | macOS                                          | Windows                         |
 |------------|-----------------------------------|------------------------------------------------|---------------------------------|
@@ -793,77 +209,19 @@ on Linux:
 | Logs       | `$XDG_STATE_HOME/klappstuhl_me/`  | `./logs/`                                      | `./logs/`                       |
 | ACME cache | `$XDG_CACHE_HOME/klappstuhl_me/`  | `~/Library/Caches/klappstuhl_me/`              | `%LocalAppData%\klappstuhl_me\` |
 
-Inside the Docker image these all live under `/data` via `XDG_CONFIG_HOME=/data/config`, `XDG_DATA_HOME=/data/data`,
-`XDG_STATE_HOME=/data/state`, `XDG_CACHE_HOME=/data/cache`.
+In Docker these live under `/data` via `XDG_*_HOME=/data/...`.
 
 ## Building from source
 
-Requires Rust 1.74 or higher (uses 2021 edition with some newer stdlib features).
+Requires Rust 1.74+ (2021 edition).
 
 ```bash
 cargo build --release
-./target/release/klappstuhl_me           # run normally
+./target/release/klappstuhl_me           # run
 ./target/release/klappstuhl_me admin     # create the first admin account
 ```
 
-The `static/` directory must be alongside the binary at runtime — it serves the CSS, JS, and image assets.
-
-### Database migrations
-
-The schema is versioned via `PRAGMA user_version` and migrations are applied automatically on startup from `sql/0.sql`
-through `sql/N.sql`. The migration list is discovered automatically: `build.rs` scans `sql/*.sql` at build time
-(enforcing a gapless `0..N` sequence) and embeds them into the binary, and the runner in `src/core/migrations.rs`
-applies any that are pending. **To add a migration, just drop in a new `sql/<N+1>.sql`** — no `PRAGMA user_version`
-line and no source edits are needed; the runner owns the version and bumps it after each migration. Each applied
-migration is recorded in a `schema_migrations` table with a SHA-256 checksum, and the runner verifies on every startup
-that previously-applied migrations still match their recorded checksum, refusing to start on schema drift — so never
-edit an already-applied migration, add a new one instead.
-
-The `request` table (in `requests.db`, separate from `main.db`) uses idempotent `ALTER TABLE` for compatibility with
-existing production databases.
-
-## Project layout
-
-The source is grouped by domain. `lib.rs` re-exports the leaf modules flat, so
-internal paths stay short (`crate::config`, `crate::docker`, …) regardless of
-the physical nesting.
-
-```
-src/
-├── main.rs               — entry point: server, ACME, run/admin commands
-├── lib.rs                — module roots + flat re-exports
-├── core/                 — config, async SQLite pool, models, CLI, logging, app state, errors, utils
-├── auth/                 — Argon2 helpers, session-token signing, secret key, TOTP 2FA
-├── integrations/         — external services: Cloudflare analytics + tunnel/DNS (cf_tunnel.rs), Discord/ntfy/webhook alerts, GeoIP, Chromium/ffmpeg helpers, Groq streaming client + tool-use loop (ai.rs)
-├── media/                — image manipulation/conversion, metadata, code-to-image, shared SSRF-guarded fetch (scan.rs)
-├── services/             — background/admin domains:
-│   ├── docker.rs         — bollard client wrapper + event watcher
-│   ├── backup/           — VACUUM INTO backups + scheduler (mod.rs) and S3 off-site upload (s3.rs)
-│   ├── updates.rs        — container image-update detection (registry digest checks)
-│   ├── cron.rs           — 5-field cron parser + scheduler for spotlight scripts
-│   ├── alerts.rs         — alert fan-out
-│   ├── audit.rs          — audit-log writer
-│   ├── ssh.rs            — SSH key storage + log tailer
-│   ├── firewall/         — backend abstraction (nft/ufw/iptables), storage, auto-lockout, ufw import
-│   ├── health/           — uptime checker probes, storage, background monitor
-│   ├── metrics/          — host parsers, docker stats, alerts, storage
-│   ├── dbadmin/          — database admin: Postgres + internal SQLite backends, safe-mode wrapper
-│   ├── proxy/            — route storage, nginx/caddy/cloudflared renderer + reload (mod.rs), Cloudflare Tunnel API import/push (cloudflared.rs)
-│   └── secrets/          — rules, scanner, storage
-└── web/                  — HTTP layer: caching, flash, headers, rate limiter
-    └── routes/
-        ├── admin.rs      — Dashboard
-        ├── auth.rs       — Login / signup / 2FA / password change / account
-        ├── audit.rs · backups.rs · certs.rs · logs.rs · docker.rs · firewall.rs · health.rs
-        ├── image.rs · metrics.rs · dbadmin.rs · proxy.rs · sanitizer.rs
-        ├── secrets.rs · security.rs · spotlight.rs · ssh.rs · ws.rs
-        ├── ask.rs        — streaming /api/ask AI (Groq) proxy + public-access toggle
-        └── api/           — REST API: images, media, scan, code, external (Chromium/ffmpeg), admin, auth/scopes
-
-templates/                — Askama HTML templates (grouped into subfolders)
-static/                   — CSS, JS, images served verbatim (grouped into subfolders)
-sql/                      — Numbered migration files (0.sql … N.sql), auto-discovered by build.rs
-```
+The `static/` directory must sit alongside the binary at runtime (it serves CSS, JS, and image assets).
 
 ## License
 

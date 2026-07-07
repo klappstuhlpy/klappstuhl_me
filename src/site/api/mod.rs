@@ -4,8 +4,12 @@ mod code;
 mod external;
 mod guild_images;
 mod images;
+mod links;
 mod media;
+mod pastes;
+mod qr;
 mod scan;
+mod unfurl;
 pub mod utils;
 
 use crate::{models::Account, ratelimit::RateLimit, AppState};
@@ -39,7 +43,7 @@ pub use media::serve_media;
     info(
         title = "Klappstuhl.me",
         description = include_str!("../../../templates/api/api_description.md"),
-        version = "1.1.0"
+        version = "1.2.0"
     ),
     paths(
         images::upload_files,
@@ -48,13 +52,23 @@ pub use media::serve_media;
         guild_images::upload_guild_images,
         guild_images::list_guild_images,
         guild_images::delete_guild_image,
+        links::create_link,
+        links::list_links,
+        links::get_link,
+        links::delete_link,
+        pastes::create_paste,
+        pastes::list_pastes,
+        pastes::get_paste,
+        pastes::delete_paste,
         media::manipulate_image,
         media::convert_file,
         media::image_info,
         code::render_code,
+        qr::render_qr,
         external::screenshot,
         external::markdown_pdf,
         external::transcode,
+        unfurl::unfurl,
         scan::scan_file,
         admin::list_updates,
     ),
@@ -69,20 +83,31 @@ pub use media::serve_media;
             crate::site::image::BulkFilesPayload,
             guild_images::GuildImageInfo,
             guild_images::GuildImagesResult,
+            links::ApiShortLink,
+            links::CreateLinkBody,
+            pastes::ApiPaste,
+            pastes::CreatePasteBody,
             crate::scan::ScanReport,
             media::ImageInfo,
             media::ShareResult,
             code::CodeImageRequest,
+            qr::QrRequest,
+            qr::QrFormat,
+            qr::QrEcc,
             external::ScreenshotRequest,
             external::MarkdownRequest,
+            unfurl::UnfurlResult,
         ),
         responses(utils::RateLimitResponse),
     ),
     modifiers(&RequiredAuthentication),
     tags(
         (name = "images", description = "Endpoints for uploading/deleting and getting images at the server."),
+        (name = "links", description = "Create, list, and delete your short links (URL shortener)."),
+        (name = "pastes", description = "Create, list, read, and delete hosted text/code pastes."),
         (name = "media", description = "Image manipulation and format conversion. Accepts a `file` upload or a public image `url`."),
-        (name = "render", description = "Render content to images (syntax-highlighted code screenshots, …)."),
+        (name = "render", description = "Render content to images (syntax-highlighted code screenshots, QR codes, …)."),
+        (name = "web", description = "Web utilities: unfurl a URL into Open Graph / link-preview metadata."),
         (name = "scan", description = "Scan uploaded files for malware via ClamAV and VirusTotal."),
         (name = "admin", description = "Admin-scoped homelab state (requires admin:read / admin:write).")
     )
@@ -238,9 +263,15 @@ mod tests {
             "/image/{op}",
             "/metadata",
             "/render/code",
+            "/render/qr",
             "/render/screenshot",
             "/render/markdown-pdf",
             "/convert/transcode",
+            "/unfurl",
+            "/links",
+            "/links/{code}",
+            "/pastes",
+            "/pastes/{id}",
             "/admin/updates",
         ] {
             let expected = format!("{base}{suffix}");
@@ -287,14 +318,20 @@ fn v1() -> Router<AppState> {
             "/guilds/:guild_id/provision-key",
             post(guild_images::provision_guild_key),
         )
+        .route("/links", post(links::create_link).get(links::list_links))
+        .route("/links/:code", get(links::get_link).delete(links::delete_link))
+        .route("/pastes", post(pastes::create_paste).get(pastes::list_pastes))
+        .route("/pastes/:id", get(pastes::get_paste).delete(pastes::delete_paste))
         .route("/scan", post(scan::scan_file))
         .route("/metadata", post(media::image_info))
         .route("/image/:op", post(media::manipulate_image))
         .route("/convert", post(media::convert_file))
         .route("/render/code", post(code::render_code))
+        .route("/render/qr", post(qr::render_qr))
         .route("/render/screenshot", post(external::screenshot))
         .route("/render/markdown-pdf", post(external::markdown_pdf))
         .route("/convert/transcode", post(external::transcode))
+        .route("/unfurl", get(unfurl::unfurl))
         .route("/admin/updates", get(admin::list_updates))
 }
 

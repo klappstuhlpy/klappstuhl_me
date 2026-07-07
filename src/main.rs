@@ -192,6 +192,9 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
     // Reap expired image uploads (TTL) hourly.
     klappstuhl_me::routes::spawn_expiry_reaper(state.clone());
 
+    // Reap expired pastes (TTL) hourly.
+    klappstuhl_me::routes::spawn_paste_reaper(state.clone());
+
     // Middleware order for request processing is bottom to top
     // and for response processing it's top to bottom
     let router = klappstuhl_me::routes::all()

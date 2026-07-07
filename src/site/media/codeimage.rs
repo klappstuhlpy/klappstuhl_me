@@ -42,6 +42,44 @@ fn xml_escape(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+/// Resolves a syntect syntax + theme from a language token/extension and theme
+/// name, falling back to plain text / the default theme.
+fn resolve<'a>(
+    ps: &'a SyntaxSet,
+    ts: &'a ThemeSet,
+    language: &str,
+    theme_name: &str,
+) -> Result<(&'a syntect::parsing::SyntaxReference, &'a syntect::highlighting::Theme), String> {
+    let lang = language.trim();
+    let syntax = ps
+        .find_syntax_by_token(lang)
+        .or_else(|| ps.find_syntax_by_extension(lang))
+        .unwrap_or_else(|| ps.find_syntax_plain_text());
+    let theme = ts
+        .themes
+        .get(theme_name)
+        .or_else(|| ts.themes.get(DEFAULT_THEME))
+        .ok_or("no themes available")?;
+    Ok((syntax, theme))
+}
+
+/// Renders `code` to a self-contained, syntax-highlighted HTML `<pre>` block for
+/// the paste viewer. Returns the HTML and the theme's background colour (hex).
+/// `language` is a token/extension; unknown/empty falls back to plain text.
+pub fn render_html(code: &str, language: &str, theme_name: &str) -> Result<(String, String), String> {
+    let ps = syntaxes();
+    let ts = theme_set();
+    let (syntax, theme) = resolve(ps, ts, language, theme_name)?;
+    let bg = theme.settings.background.unwrap_or(Color {
+        r: 40,
+        g: 44,
+        b: 52,
+        a: 255,
+    });
+    let html = syntect::html::highlighted_html_for_string(code, ps, syntax, theme).map_err(|e| e.to_string())?;
+    Ok((html, hex(bg)))
+}
+
 /// Renders `code` to an SVG string. `language` is a token or extension
 /// (e.g. `rust`, `py`, `js`); unknown/empty falls back to plain text.
 pub fn render_svg(code: &str, language: &str, theme_name: &str) -> Result<String, String> {

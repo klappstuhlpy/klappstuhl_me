@@ -10,9 +10,6 @@
 //! SSRF-guarded (private/reserved addresses are refused, redirects disabled,
 //! and the download is size-capped).
 
-use std::net::IpAddr;
-use std::time::Duration;
-
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -25,7 +22,7 @@ use utoipa::{IntoParams, ToSchema};
 use crate::{error::ApiError, headers::ClientIp, models::Scope, AppState};
 
 use super::auth::ApiToken;
-use super::utils::RateLimitResponse;
+use super::utils::{fetch_guarded, RateLimitResponse};
 
 // ─── Shared request body (documentation) ──────────────────────────────────────
 
@@ -77,103 +74,15 @@ async fn read_image_input(mut mp: Multipart) -> Result<Vec<u8>, ApiError> {
     Err(ApiError::new("provide either a `file` upload or a `url` field"))
 }
 
-/// Returns true if `ip` is loopback, private, link-local, or otherwise
-/// reserved — i.e. an address an SSRF attacker might target. Used to reject
-/// `url` inputs that resolve to internal infrastructure.
-fn ip_is_blocked(ip: &IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => {
-            v4.is_private()
-                || v4.is_loopback()
-                || v4.is_link_local()
-                || v4.is_unspecified()
-                || v4.is_broadcast()
-                || v4.is_documentation()
-                || v4.octets()[0] == 0
-                // Carrier-grade NAT, 100.64.0.0/10
-                || (v4.octets()[0] == 100 && (v4.octets()[1] & 0xc0) == 0x40)
-        }
-        IpAddr::V6(v6) => {
-            v6.is_loopback()
-                || v6.is_unspecified()
-                // Unique local, fc00::/7
-                || (v6.segments()[0] & 0xfe00) == 0xfc00
-                // Link-local, fe80::/10
-                || (v6.segments()[0] & 0xffc0) == 0xfe80
-                || v6
-                    .to_ipv4_mapped()
-                    .map(|v4| ip_is_blocked(&IpAddr::V4(v4)))
-                    .unwrap_or(false)
-        }
-    }
-}
-
-/// Fetches an image from a remote URL with SSRF protections: http(s) only,
-/// the resolved address must be public, redirects are disabled, and the body
-/// is capped at [`crate::MAX_UPLOAD_SIZE`].
+/// Fetches an image from a remote URL with SSRF protections (see
+/// [`fetch_guarded`]): http(s) only, the resolved address must be public,
+/// redirects are disabled, and the body is capped at [`crate::MAX_UPLOAD_SIZE`].
 async fn fetch_remote_image(url_str: &str) -> Result<Vec<u8>, ApiError> {
-    let url = reqwest::Url::parse(url_str).map_err(|_| ApiError::new("invalid url"))?;
-    if !matches!(url.scheme(), "http" | "https") {
-        return Err(ApiError::new("url must use http or https"));
-    }
-    let host = url.host_str().ok_or_else(|| ApiError::new("url has no host"))?;
-    if host.eq_ignore_ascii_case("localhost") {
-        return Err(ApiError::new("refusing to fetch a local address"));
-    }
-
-    // Resolve up front and verify every candidate address is public. This
-    // defends against hostnames that point at internal infrastructure.
-    let port = url.port_or_known_default().unwrap_or(80);
-    let mut resolved = false;
-    for addr in tokio::net::lookup_host((host, port))
-        .await
-        .map_err(|_| ApiError::new("could not resolve url host"))?
-    {
-        resolved = true;
-        if ip_is_blocked(&addr.ip()) {
-            return Err(ApiError::new("refusing to fetch a private or reserved address"));
-        }
-    }
-    if !resolved {
-        return Err(ApiError::new("could not resolve url host"));
-    }
-
-    // Dedicated client: no redirects (a redirect could otherwise bounce us to
-    // a blocked address after the check above) and a short timeout.
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(ApiError::from)?;
-
-    let resp = client
-        .get(url)
-        .header(reqwest::header::USER_AGENT, "klappstuhl.me image fetcher")
-        .send()
-        .await
-        .map_err(|e| ApiError::new(format!("fetch failed: {e}")))?;
-    if !resp.status().is_success() {
-        return Err(ApiError::new(format!(
-            "remote returned HTTP {}",
-            resp.status().as_u16()
-        )));
-    }
-
-    use futures_util::StreamExt;
-    let cap = crate::MAX_UPLOAD_SIZE as usize;
-    let mut stream = resp.bytes_stream();
-    let mut buf: Vec<u8> = Vec::new();
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| ApiError::new(format!("fetch failed: {e}")))?;
-        if buf.len() + chunk.len() > cap {
-            return Err(ApiError::new("remote image exceeds the size limit"));
-        }
-        buf.extend_from_slice(&chunk);
-    }
-    if buf.is_empty() {
+    let body = fetch_guarded(url_str, crate::MAX_UPLOAD_SIZE as usize, "klappstuhl.me image fetcher").await?;
+    if body.bytes.is_empty() {
         return Err(ApiError::new("remote image was empty"));
     }
-    Ok(buf)
+    Ok(body.bytes)
 }
 
 // ─── Image codec helpers (CPU-bound; run on a blocking thread) ─────────────────
@@ -667,24 +576,5 @@ mod tests {
     fn unsupported_target_is_rejected() {
         let img = decode_image(&sample_png()).unwrap();
         assert!(encode_to(&img, "heic", 85).is_err());
-    }
-
-    #[test]
-    fn private_addresses_are_blocked() {
-        use std::net::IpAddr;
-        for ip in [
-            "127.0.0.1",
-            "10.0.0.1",
-            "192.168.1.1",
-            "169.254.1.1",
-            "::1",
-            "fe80::1",
-            "100.64.0.1",
-        ] {
-            assert!(ip_is_blocked(&ip.parse::<IpAddr>().unwrap()), "{ip} should be blocked");
-        }
-        for ip in ["8.8.8.8", "1.1.1.1", "2606:4700:4700::1111"] {
-            assert!(!ip_is_blocked(&ip.parse::<IpAddr>().unwrap()), "{ip} should be allowed");
-        }
     }
 }

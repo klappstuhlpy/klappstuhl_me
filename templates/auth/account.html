@@ -122,6 +122,30 @@
                     <span class="scope-name">images:write</span>
                     <span class="scope-desc">Upload and delete images</span>
                 </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="links:read"
+                        {% if api_key_scopes.contains("links:read") %}checked{% endif %}>
+                    <span class="scope-name">links:read</span>
+                    <span class="scope-desc">List and read your short links</span>
+                </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="links:write"
+                        {% if api_key_scopes.contains("links:write") %}checked{% endif %}>
+                    <span class="scope-name">links:write</span>
+                    <span class="scope-desc">Create and delete short links</span>
+                </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="pastes:read"
+                        {% if api_key_scopes.contains("pastes:read") %}checked{% endif %}>
+                    <span class="scope-name">pastes:read</span>
+                    <span class="scope-desc">List and read your hosted pastes</span>
+                </label>
+                <label class="scope-row">
+                    <input type="checkbox" name="scope" value="pastes:write"
+                        {% if api_key_scopes.contains("pastes:write") %}checked{% endif %}>
+                    <span class="scope-name">pastes:write</span>
+                    <span class="scope-desc">Create and delete pastes</span>
+                </label>
                 {% if is_admin %}
                 {# Privileged scopes — only ever shown to admin accounts. `images:guild`
                    is minted automatically as a per-guild service key (never a personal

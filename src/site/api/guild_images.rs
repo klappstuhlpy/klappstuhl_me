@@ -20,7 +20,7 @@ use utoipa::ToSchema;
 
 use super::{
     auth::ApiToken,
-    utils::{ApiJson as Json, RateLimitResponse},
+    utils::{ApiJson as Json, Page, RateLimitResponse},
 };
 use crate::{
     error::ApiError,
@@ -128,11 +128,15 @@ pub async fn upload_guild_images(
 /// > to Percy's per-guild service keys, not to public API keys.
 ///
 /// List the images in a Discord guild's shared gallery, newest first. Expired
-/// uploads are omitted.
+/// uploads are omitted. Supports Discord-style cursor pagination via
+/// `limit`/`before`/`after` (see the [`Page`] parameters).
 #[utoipa::path(
     get,
     path = "/guilds/{guild_id}/images",
-    params(("guild_id" = String, Path, description = "The Discord guild snowflake.")),
+    params(
+        ("guild_id" = String, Path, description = "The Discord guild snowflake."),
+        Page,
+    ),
     responses(
         (status = 200, description = "The guild's gallery", body = GuildImagesResult),
         (status = 401, description = "User is unauthenticated", body = ApiError),
@@ -145,23 +149,48 @@ pub async fn upload_guild_images(
 pub async fn list_guild_images(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
+    Query(page): Query<Page>,
     auth: ApiToken,
 ) -> Result<Json<GuildImagesResult>, ApiError> {
     auth.require(Scope::GuildImages)?;
+
+    let limit = page.effective_limit();
+    let after = page.after.clone();
+    let before = page.before.clone();
 
     let rows = state
         .database()
         .call(
             move |conn| -> rusqlite::Result<Vec<(String, String, i64, Option<String>, String)>> {
+                // Keyset pagination over (uploaded_at DESC). The cursors are image
+                // ids resolved to their `uploaded_at` via a scalar subquery:
+                // `after` walks to older rows, `before` to newer ones. An unknown
+                // cursor id (no such row) is forgiven — the `NOT EXISTS` guard
+                // makes it behave as "no bound" instead of erroring or returning
+                // an empty page.
                 let mut stmt = conn.prepare(
                     "SELECT id, mimetype, size, original_name, uploaded_at FROM images \
-                 WHERE guild_id = ? AND (expires_at IS NULL OR datetime(expires_at) > datetime('now')) \
-                 ORDER BY uploaded_at DESC",
+                     WHERE guild_id = :guild \
+                       AND (expires_at IS NULL OR datetime(expires_at) > datetime('now')) \
+                       AND (:after IS NULL \
+                            OR NOT EXISTS (SELECT 1 FROM images WHERE id = :after) \
+                            OR uploaded_at < (SELECT uploaded_at FROM images WHERE id = :after)) \
+                       AND (:before IS NULL \
+                            OR NOT EXISTS (SELECT 1 FROM images WHERE id = :before) \
+                            OR uploaded_at > (SELECT uploaded_at FROM images WHERE id = :before)) \
+                     ORDER BY uploaded_at DESC \
+                     LIMIT :limit",
                 )?;
                 let rows = stmt
-                    .query_map([guild_id], |r| {
-                        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
-                    })?
+                    .query_map(
+                        rusqlite::named_params! {
+                            ":guild": guild_id,
+                            ":after": after,
+                            ":before": before,
+                            ":limit": limit,
+                        },
+                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+                    )?
                     .collect::<rusqlite::Result<Vec<_>>>()?;
                 Ok(rows)
             },

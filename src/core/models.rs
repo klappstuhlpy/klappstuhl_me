@@ -228,6 +228,56 @@ impl Table for ShortLink {
     }
 }
 
+/// A hosted text/code paste, served at `/p/<id>` (highlighted) and
+/// `/p/<id>.txt` (raw), and managed over the public API.
+#[derive(Debug, Clone, Serialize)]
+pub struct Paste {
+    /// The random short id that appears in the URL.
+    pub id: String,
+    /// Owner account id.
+    pub account_id: i64,
+    /// The paste body.
+    pub content: String,
+    /// Optional syntect language token / extension used to pick a highlighter.
+    pub language: Option<String>,
+    /// Number of times the paste has been viewed.
+    pub views: i64,
+    /// When the paste was created.
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+    /// When the paste auto-deletes, if ever.
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub expires_at: Option<OffsetDateTime>,
+}
+
+impl Table for Paste {
+    const NAME: &'static str = "paste";
+
+    const COLUMNS: &'static [&'static str] = &[
+        "id",
+        "account_id",
+        "content",
+        "language",
+        "views",
+        "created_at",
+        "expires_at",
+    ];
+
+    type Id = String;
+
+    fn from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            id: row.get("id")?,
+            account_id: row.get("account_id")?,
+            content: row.get("content")?,
+            language: row.get("language")?,
+            views: row.get("views")?,
+            created_at: row.get("created_at")?,
+            expires_at: row.get("expires_at")?,
+        })
+    }
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq, Clone, ToSchema)]
 pub struct ResolvedImageData {
     /// encoded image bytes
@@ -479,6 +529,14 @@ pub enum Scope {
     /// `/guilds/:id/images` endpoints. Held by trusted service keys (Percy);
     /// the caller is responsible for authorising the acting guild.
     GuildImages,
+    /// Read + list your short links via the API.
+    LinksRead,
+    /// Create + delete your short links via the API.
+    LinksWrite,
+    /// Read + fetch your hosted pastes via the API.
+    PastesRead,
+    /// Create + delete your hosted pastes via the API.
+    PastesWrite,
     /// Read-only access to admin dashboard JSON endpoints
     /// (metrics, security, secrets, audit).
     AdminRead,
@@ -492,6 +550,10 @@ impl Scope {
             Scope::ImagesRead => "images:read",
             Scope::ImagesWrite => "images:write",
             Scope::GuildImages => "images:guild",
+            Scope::LinksRead => "links:read",
+            Scope::LinksWrite => "links:write",
+            Scope::PastesRead => "pastes:read",
+            Scope::PastesWrite => "pastes:write",
             Scope::AdminRead => "admin:read",
             Scope::AdminWrite => "admin:write",
         }
@@ -502,6 +564,10 @@ impl Scope {
             "images:read" => Some(Scope::ImagesRead),
             "images:write" => Some(Scope::ImagesWrite),
             "images:guild" => Some(Scope::GuildImages),
+            "links:read" => Some(Scope::LinksRead),
+            "links:write" => Some(Scope::LinksWrite),
+            "pastes:read" => Some(Scope::PastesRead),
+            "pastes:write" => Some(Scope::PastesWrite),
             "admin:read" => Some(Scope::AdminRead),
             "admin:write" => Some(Scope::AdminWrite),
             _ => None,
@@ -514,6 +580,10 @@ impl Scope {
             Scope::ImagesRead,
             Scope::ImagesWrite,
             Scope::GuildImages,
+            Scope::LinksRead,
+            Scope::LinksWrite,
+            Scope::PastesRead,
+            Scope::PastesWrite,
             Scope::AdminRead,
             Scope::AdminWrite,
         ]
