@@ -66,10 +66,7 @@ pub async fn upload_files(
     auth: ApiToken,
     multipart: Multipart,
 ) -> Result<Json<UploadResult>, ApiError> {
-    auth.require(Scope::ImagesWrite)?;
-    let Some(account) = state.get_account(auth.id).await else {
-        return Err(ApiError::unauthorized());
-    };
+    let account = auth.require_account(&state, Scope::ImagesWrite).await?;
 
     let expires_at = crate::site::image::expiry_from_params(&params);
     let result = raw_upload_file(state, account, client_ip, multipart, true, expires_at, None).await?;
@@ -107,10 +104,7 @@ pub async fn delete_image_by_id(
     auth: ApiToken,
     Path(id): Path<String>,
 ) -> Result<Json<DeleteResult>, ApiError> {
-    auth.require(Scope::ImagesWrite)?;
-    let Some(account) = state.get_account(auth.id).await else {
-        return Err(ApiError::unauthorized());
-    };
+    let account = auth.require_account(&state, Scope::ImagesWrite).await?;
 
     let result = delete_image(state, account, client_ip, id.clone(), true).await?;
     if result.is_error() {
@@ -160,10 +154,7 @@ pub async fn download_images(
     auth: ApiToken,
     Json(payload): Json<BulkFilesPayload>,
 ) -> Result<Response, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let Some(account) = state.get_account(auth.id).await else {
-        return Err(ApiError::unauthorized());
-    };
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
 
     let total = payload.files.len();
     let (bytes, count) = build_images_zip(&state, &account, &payload.files).await?;

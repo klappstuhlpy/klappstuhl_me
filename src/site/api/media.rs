@@ -291,10 +291,7 @@ pub async fn manipulate_image(
     Query(params): Query<ManipulateParams>,
     multipart: Multipart,
 ) -> Result<Response, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let Some(account) = state.get_account(auth.id).await else {
-        return Err(ApiError::unauthorized());
-    };
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
 
     let op = op.to_ascii_lowercase();
     if !matches!(op.as_str(), "blur" | "pixelate" | "deepfry" | "invert" | "grayscale") {
@@ -367,10 +364,7 @@ pub async fn convert_file(
     Query(params): Query<ConvertParams>,
     multipart: Multipart,
 ) -> Result<Response, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let Some(account) = state.get_account(auth.id).await else {
-        return Err(ApiError::unauthorized());
-    };
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
 
     let bytes = read_image_input(multipart).await?;
     let to = params.to.to_ascii_lowercase();
@@ -466,10 +460,7 @@ pub async fn image_info(
     auth: ApiToken,
     multipart: Multipart,
 ) -> Result<Json<ImageInfo>, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    if state.get_account(auth.id).await.is_none() {
-        return Err(ApiError::unauthorized());
-    }
+    auth.require_account(&state, Scope::ImagesRead).await?;
 
     let bytes = read_image_input(multipart).await?;
     let info = tokio::task::spawn_blocking(move || -> Result<ImageInfo, ApiError> {
@@ -492,6 +483,153 @@ pub async fn image_info(
     .map_err(|_| ApiError::new("image inspection task failed"))??;
 
     Ok(Json(info))
+}
+
+// ─── Color palette extraction ──────────────────────────────────────────────────
+
+/// One extracted palette color.
+#[derive(Serialize, ToSchema)]
+pub struct PaletteColor {
+    /// The color as a `#rrggbb` hex string.
+    pub hex: String,
+    /// The color as `[r, g, b]`.
+    pub rgb: [u8; 3],
+    /// The share of sampled pixels this color covers (0..=1).
+    pub proportion: f64,
+}
+
+/// The extracted palette, most dominant color first.
+#[derive(Serialize, ToSchema)]
+pub struct PaletteResult {
+    /// The dominant colors, ordered by coverage.
+    pub colors: Vec<PaletteColor>,
+    /// How many pixels were sampled (after downscaling; transparent pixels are
+    /// skipped).
+    pub pixels_sampled: u64,
+}
+
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct PaletteParams {
+    /// How many colors to return (1–12, default 6).
+    count: Option<usize>,
+}
+
+/// Extract a color palette
+///
+/// Returns the dominant colors of an image, most prominent first — handy for
+/// theming, `accent-color` picks, or embed colors.
+///
+/// Supply the source as a multipart `file` upload or a `url` form field.
+#[utoipa::path(
+    post,
+    path = "/color/palette",
+    request_body(
+        content = inline(ImageInput),
+        content_type = "multipart/form-data",
+        description = "The source image, as a `file` upload or a `url` field."
+    ),
+    params(PaletteParams),
+    responses(
+        (status = 200, description = "The dominant colors", body = PaletteResult),
+        (status = 400, description = "Bad input or undecodable image", body = ApiError),
+        (status = 401, description = "User is unauthenticated", body = ApiError),
+        (status = 429, response = RateLimitResponse),
+    ),
+    security(("api_key" = ["images:read"])),
+    tag = "media"
+)]
+pub async fn color_palette(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    auth: ApiToken,
+    Query(params): Query<PaletteParams>,
+    multipart: Multipart,
+) -> Result<Json<PaletteResult>, ApiError> {
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
+
+    let count = params.count.unwrap_or(6).clamp(1, 12);
+    let bytes = read_image_input(multipart).await?;
+    let result = tokio::task::spawn_blocking(move || -> Result<PaletteResult, ApiError> {
+        let img = decode_image(&bytes)?;
+        Ok(extract_palette(&img, count))
+    })
+    .await
+    .map_err(|_| ApiError::new("palette extraction task failed"))??;
+
+    state
+        .audit("api.color.palette")
+        .actor(&account)
+        .ip_opt(client_ip)
+        .fire();
+
+    Ok(Json(result))
+}
+
+/// Dominant-color extraction by histogram binning: downscale, bucket pixels at
+/// 4 bits per channel, average each bucket's true colors, then merge buckets
+/// that are perceptually close so near-identical shades don't crowd out the
+/// rest of the palette. Deterministic (no k-means seeding).
+fn extract_palette(img: &DynamicImage, count: usize) -> PaletteResult {
+    // Downscale for a bounded, structure-preserving sample.
+    let small = img.resize(96, 96, FilterType::Triangle).to_rgba8();
+
+    // 16 levels per channel → 4096 buckets: (count, sum r, sum g, sum b).
+    let mut bins: std::collections::HashMap<u16, (u64, u64, u64, u64)> = std::collections::HashMap::new();
+    let mut sampled = 0u64;
+    for p in small.pixels() {
+        let [r, g, b, a] = p.0;
+        if a < 128 {
+            continue;
+        }
+        sampled += 1;
+        let key = ((r as u16 >> 4) << 8) | ((g as u16 >> 4) << 4) | (b as u16 >> 4);
+        let e = bins.entry(key).or_default();
+        e.0 += 1;
+        e.1 += r as u64;
+        e.2 += g as u64;
+        e.3 += b as u64;
+    }
+    if sampled == 0 {
+        return PaletteResult {
+            colors: Vec::new(),
+            pixels_sampled: 0,
+        };
+    }
+
+    // Bucket → average color, biggest first.
+    let mut clusters: Vec<(u64, [u8; 3])> = bins
+        .into_values()
+        .map(|(n, r, g, b)| (n, [(r / n) as u8, (g / n) as u8, (b / n) as u8]))
+        .collect();
+    clusters.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
+
+    // Greedy merge: absorb any cluster close to an already-kept color.
+    let dist2 = |a: [u8; 3], b: [u8; 3]| -> u32 {
+        let d = |x: u8, y: u8| (x as i32 - y as i32).pow(2) as u32;
+        d(a[0], b[0]) + d(a[1], b[1]) + d(a[2], b[2])
+    };
+    let mut kept: Vec<(u64, [u8; 3])> = Vec::new();
+    for (n, color) in clusters {
+        match kept.iter_mut().find(|(_, k)| dist2(*k, color) < 32 * 32) {
+            Some(existing) => existing.0 += n,
+            None => kept.push((n, color)),
+        }
+    }
+    kept.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
+    kept.truncate(count);
+
+    PaletteResult {
+        colors: kept
+            .into_iter()
+            .map(|(n, [r, g, b])| PaletteColor {
+                hex: format!("#{r:02x}{g:02x}{b:02x}"),
+                rgb: [r, g, b],
+                proportion: n as f64 / sampled as f64,
+            })
+            .collect(),
+        pixels_sampled: sampled,
+    }
 }
 
 /// Stores `bytes` in the shareable-media cache and builds the JSON result
@@ -551,6 +689,37 @@ mod tests {
             // Output must round-trip back through the decoder.
             decode_image(&bytes).unwrap_or_else(|e| panic!("re-decode {op}: {e:?}"));
         }
+    }
+
+    #[test]
+    fn palette_finds_dominant_colors() {
+        // Three-quarters red, one-quarter blue.
+        let mut img = RgbaImage::new(40, 40);
+        for (x, _, p) in img.enumerate_pixels_mut() {
+            *p = if x < 30 {
+                Rgba([220, 40, 30, 255])
+            } else {
+                Rgba([20, 60, 200, 255])
+            };
+        }
+        let result = extract_palette(&DynamicImage::ImageRgba8(img), 6);
+        assert!(result.pixels_sampled > 0);
+        assert!(result.colors.len() >= 2);
+        // Red dominates and comes first; proportions sum to ~1.
+        let first = &result.colors[0];
+        assert!(first.rgb[0] > first.rgb[2], "expected red first, got {:?}", first.rgb);
+        assert!(first.proportion > 0.5);
+        let total: f64 = result.colors.iter().map(|c| c.proportion).sum();
+        assert!((0.9..=1.01).contains(&total));
+        assert!(first.hex.starts_with('#') && first.hex.len() == 7);
+    }
+
+    #[test]
+    fn palette_of_fully_transparent_image_is_empty() {
+        let img = RgbaImage::new(8, 8); // all pixels default to alpha 0
+        let result = extract_palette(&DynamicImage::ImageRgba8(img), 6);
+        assert_eq!(result.pixels_sampled, 0);
+        assert!(result.colors.is_empty());
     }
 
     #[test]

@@ -68,8 +68,7 @@ pub async fn unfurl(
     Query(query): Query<UnfurlQuery>,
     auth: ApiToken,
 ) -> Result<Json<UnfurlResult>, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let account = state.get_account(auth.id).await.ok_or_else(ApiError::unauthorized)?;
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
 
     let body = fetch_guarded(&query.url, MAX_HTML_BYTES, "klappstuhl.me link unfurler").await?;
 

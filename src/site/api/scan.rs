@@ -57,10 +57,7 @@ pub async fn scan_file(
     auth: ApiToken,
     mut multipart: Multipart,
 ) -> Result<Json<ScanReport>, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let Some(account) = state.get_account(auth.id).await else {
-        return Err(ApiError::unauthorized());
-    };
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
 
     // Pull the first `file` field out of the multipart body.
     let mut data: Option<Vec<u8>> = None;

@@ -17,7 +17,7 @@ use super::{
 use crate::{
     error::ApiError,
     headers::ClientIp,
-    models::{Account, Paste, Scope},
+    models::{Paste, Scope},
     utils::get_new_image_id,
     AppState,
 };
@@ -84,10 +84,6 @@ pub struct CreatePasteBody {
     pub expires_in: Option<i64>,
 }
 
-async fn account_or_401(state: &AppState, id: i64) -> Result<Account, ApiError> {
-    state.get_account(id).await.ok_or_else(ApiError::unauthorized)
-}
-
 /// Create a paste
 #[utoipa::path(
     post,
@@ -109,8 +105,7 @@ pub async fn create_paste(
     auth: ApiToken,
     Json(body): Json<CreatePasteBody>,
 ) -> Result<Json<ApiPaste>, ApiError> {
-    auth.require(Scope::PastesWrite)?;
-    let account = account_or_401(&state, auth.id).await?;
+    let account = auth.require_account(&state, Scope::PastesWrite).await?;
 
     if body.content.trim().is_empty() {
         return Err(ApiError::validation("content", "`content` is required"));
@@ -168,8 +163,7 @@ pub async fn list_pastes(
     Query(page): Query<Page>,
     auth: ApiToken,
 ) -> Result<Json<Vec<ApiPaste>>, ApiError> {
-    auth.require(Scope::PastesRead)?;
-    let account = account_or_401(&state, auth.id).await?;
+    let account = auth.require_account(&state, Scope::PastesRead).await?;
 
     let limit = page.effective_limit() as i64;
     let pastes: Vec<Paste> = state
@@ -216,8 +210,7 @@ pub async fn get_paste(
     Path(id): Path<String>,
     auth: ApiToken,
 ) -> Result<Json<ApiPaste>, ApiError> {
-    auth.require(Scope::PastesRead)?;
-    let account = account_or_401(&state, auth.id).await?;
+    let account = auth.require_account(&state, Scope::PastesRead).await?;
 
     let paste = fetch_owned_paste(&state, &id, account.id)
         .await?
@@ -246,8 +239,7 @@ pub async fn delete_paste(
     Path(id): Path<String>,
     auth: ApiToken,
 ) -> Result<Json<ApiPaste>, ApiError> {
-    auth.require(Scope::PastesWrite)?;
-    let account = account_or_401(&state, auth.id).await?;
+    let account = auth.require_account(&state, Scope::PastesWrite).await?;
 
     let paste = fetch_owned_paste(&state, &id, account.id)
         .await?

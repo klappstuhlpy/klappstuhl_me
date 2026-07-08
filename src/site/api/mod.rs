@@ -1,10 +1,12 @@
 mod admin;
 mod auth;
+mod chart;
 mod code;
 mod external;
 mod guild_images;
 mod images;
 mod links;
+mod me;
 mod media;
 mod pastes;
 mod qr;
@@ -43,7 +45,7 @@ pub use media::serve_media;
     info(
         title = "Klappstuhl.me",
         description = include_str!("../../../templates/api/api_description.md"),
-        version = "1.2.0"
+        version = "1.3.0"
     ),
     paths(
         images::upload_files,
@@ -55,6 +57,7 @@ pub use media::serve_media;
         links::create_link,
         links::list_links,
         links::get_link,
+        links::update_link,
         links::delete_link,
         pastes::create_paste,
         pastes::list_pastes,
@@ -63,8 +66,12 @@ pub use media::serve_media;
         media::manipulate_image,
         media::convert_file,
         media::image_info,
+        media::color_palette,
         code::render_code,
         qr::render_qr,
+        chart::render_chart,
+        me::get_me,
+        me::get_usage,
         external::screenshot,
         external::markdown_pdf,
         external::transcode,
@@ -85,15 +92,27 @@ pub use media::serve_media;
             guild_images::GuildImagesResult,
             links::ApiShortLink,
             links::CreateLinkBody,
+            links::UpdateLinkBody,
             pastes::ApiPaste,
             pastes::CreatePasteBody,
             crate::scan::ScanReport,
             media::ImageInfo,
             media::ShareResult,
+            media::PaletteColor,
+            media::PaletteResult,
             code::CodeImageRequest,
             qr::QrRequest,
             qr::QrFormat,
             qr::QrEcc,
+            chart::ChartRequest,
+            chart::ChartSeries,
+            chart::ChartKind,
+            chart::ChartTheme,
+            chart::DataPoint,
+            me::ApiMe,
+            me::ApiUsage,
+            me::ResourceUsage,
+            me::UsageSeries,
             external::ScreenshotRequest,
             external::MarkdownRequest,
             unfurl::UnfurlResult,
@@ -106,7 +125,8 @@ pub use media::serve_media;
         (name = "links", description = "Create, list, and delete your short links (URL shortener)."),
         (name = "pastes", description = "Create, list, read, and delete hosted text/code pastes."),
         (name = "media", description = "Image manipulation and format conversion. Accepts a `file` upload or a public image `url`."),
-        (name = "render", description = "Render content to images (syntax-highlighted code screenshots, QR codes, …)."),
+        (name = "render", description = "Render content to images (syntax-highlighted code screenshots, QR codes, charts, …)."),
+        (name = "account", description = "Introspect the calling account: identity, key scopes, and resource usage."),
         (name = "web", description = "Web utilities: unfurl a URL into Open Graph / link-preview metadata."),
         (name = "scan", description = "Scan uploaded files for malware via ClamAV and VirusTotal."),
         (name = "admin", description = "Admin-scoped homelab state (requires admin:read / admin:write).")
@@ -264,6 +284,10 @@ mod tests {
             "/metadata",
             "/render/code",
             "/render/qr",
+            "/render/chart",
+            "/color/palette",
+            "/me",
+            "/me/usage",
             "/render/screenshot",
             "/render/markdown-pdf",
             "/convert/transcode",
@@ -319,15 +343,24 @@ fn v1() -> Router<AppState> {
             post(guild_images::provision_guild_key),
         )
         .route("/links", post(links::create_link).get(links::list_links))
-        .route("/links/:code", get(links::get_link).delete(links::delete_link))
+        .route(
+            "/links/:code",
+            get(links::get_link)
+                .patch(links::update_link)
+                .delete(links::delete_link),
+        )
         .route("/pastes", post(pastes::create_paste).get(pastes::list_pastes))
         .route("/pastes/:id", get(pastes::get_paste).delete(pastes::delete_paste))
         .route("/scan", post(scan::scan_file))
+        .route("/me", get(me::get_me))
+        .route("/me/usage", get(me::get_usage))
         .route("/metadata", post(media::image_info))
         .route("/image/:op", post(media::manipulate_image))
         .route("/convert", post(media::convert_file))
+        .route("/color/palette", post(media::color_palette))
         .route("/render/code", post(code::render_code))
         .route("/render/qr", post(qr::render_qr))
+        .route("/render/chart", post(chart::render_chart))
         .route("/render/screenshot", post(external::screenshot))
         .route("/render/markdown-pdf", post(external::markdown_pdf))
         .route("/convert/transcode", post(external::transcode))
@@ -355,7 +388,7 @@ pub fn routes() -> Router<AppState> {
         .route_layer(RateLimit::default().quota(25, 60.0).build())
         .route_layer(
             CorsLayer::new()
-                .allow_methods([Method::GET, Method::POST, Method::DELETE])
+                .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
                 .allow_credentials(true)
                 .allow_origin(AllowOrigin::mirror_request())
                 .allow_headers([AUTHORIZATION, USER_AGENT]),

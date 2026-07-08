@@ -89,8 +89,7 @@ pub async fn screenshot(
     Query(q): Query<ShareQuery>,
     ApiJson(req): ApiJson<ScreenshotRequest>,
 ) -> Result<Response, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let account = state.get_account(auth.id).await.ok_or_else(ApiError::unauthorized)?;
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
 
     exttools::assert_public_url(&req.url).await.map_err(ApiError::new)?;
     let Some(bin) = exttools::chromium(&state) else {
@@ -170,8 +169,7 @@ pub async fn markdown_pdf(
     Query(q): Query<ShareQuery>,
     ApiJson(req): ApiJson<MarkdownRequest>,
 ) -> Result<Response, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let account = state.get_account(auth.id).await.ok_or_else(ApiError::unauthorized)?;
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
     if req.markdown.trim().is_empty() {
         return Err(ApiError::new("`markdown` is required"));
     }
@@ -243,8 +241,7 @@ pub async fn transcode(
     Query(q): Query<TranscodeQuery>,
     mut multipart: Multipart,
 ) -> Result<Response, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let account = state.get_account(auth.id).await.ok_or_else(ApiError::unauthorized)?;
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
 
     let to = q.to.to_ascii_lowercase();
     let (in_ext, out_ext, out_args, mime): (&str, &str, Vec<&str>, &str) = match to.as_str() {

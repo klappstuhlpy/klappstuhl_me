@@ -30,22 +30,31 @@ at the successor. Please migrate to the `{base}` prefix.
 ### Endpoint groups
 
 - **Images** — upload, delete, and bulk-download your hosted images.
+- **Account** — introspect the calling account: `GET {base}/me` returns who
+  the key belongs to and which scopes it holds; `GET {base}/me/usage` returns
+  resource totals (images, links, pastes) plus a zero-filled 30-day upload
+  series shaped to drop straight into `POST {base}/render/chart` (or uPlot).
+  Any valid key may call these — no specific scope needed.
 - **Links** — a URL shortener: create (`POST {base}/links`), list
-  (`GET {base}/links`), fetch (`GET {base}/links/{code}`), and delete
-  (`DELETE {base}/links/{code}`) your short links. Requires `links:read` /
-  `links:write`.
+  (`GET {base}/links`), fetch (`GET {base}/links/{code}`), repoint
+  (`PATCH {base}/links/{code}`), and delete (`DELETE {base}/links/{code}`)
+  your short links. Requires `links:read` / `links:write`.
 - **Pastes** — a text/code paste host: create (`POST {base}/pastes`), list
   (`GET {base}/pastes`), fetch (`GET {base}/pastes/{id}`), and delete
   (`DELETE {base}/pastes/{id}`). Bodies are also viewable, without auth, at
   `/p/{id}` (syntax-highlighted) and `/p/{id}.txt` (raw). Requires
   `pastes:read` / `pastes:write`.
 - **Media** — apply visual effects (`{base}/image/{op}`), transcode between
-  raster formats (`{base}/convert`), or inspect an image (`{base}/metadata`).
+  raster formats (`{base}/convert`), inspect an image (`{base}/metadata`), or
+  extract its dominant colors (`{base}/color/palette`).
   Each accepts either a multipart `file` upload or a public image `url` that
   the server fetches on your behalf (private/reserved addresses are refused).
 - **Render** — turn content into images/documents: a syntax-highlighted code
   screenshot (`{base}/render/code`, pure Rust), a QR code
-  (`{base}/render/qr`, SVG or PNG), a web-page screenshot
+  (`{base}/render/qr`, SVG or PNG), a chart (`{base}/render/chart` — line,
+  area, bar, scatter, pie, and donut SVGs from a JSON spec, with
+  colorblind-validated dark/light palettes and a `?share=true` option that
+  stores the result behind a short `/m/{id}` link), a web-page screenshot
   (`{base}/render/screenshot`), or Markdown → PDF (`{base}/render/markdown-pdf`).
   The latter two need a Chromium binary on the server and return `500
   (not available)` until one is installed. `{base}/convert/transcode` converts

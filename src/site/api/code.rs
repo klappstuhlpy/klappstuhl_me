@@ -61,8 +61,7 @@ pub async fn render_code(
     Query(query): Query<CodeQuery>,
     ApiJson(req): ApiJson<CodeImageRequest>,
 ) -> Result<Response, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let account = state.get_account(auth.id).await.ok_or_else(ApiError::unauthorized)?;
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
 
     let code = req.code;
     if code.trim().is_empty() {

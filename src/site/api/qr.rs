@@ -107,8 +107,7 @@ pub async fn render_qr(
     auth: ApiToken,
     ApiJson(req): ApiJson<QrRequest>,
 ) -> Result<Response, ApiError> {
-    auth.require(Scope::ImagesRead)?;
-    let account = state.get_account(auth.id).await.ok_or_else(ApiError::unauthorized)?;
+    let account = auth.require_account(&state, Scope::ImagesRead).await?;
 
     if req.data.is_empty() {
         return Err(ApiError::validation("data", "`data` is required"));

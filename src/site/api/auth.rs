@@ -5,7 +5,11 @@ use axum::{
     response::Response,
 };
 
-use crate::{error::ApiError, models::Scope, AppState};
+use crate::{
+    error::ApiError,
+    models::{Account, Scope},
+    AppState,
+};
 
 /// An API token, carrying the account id and the token's granted scopes.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -36,6 +40,19 @@ impl ApiToken {
         } else {
             Err(ApiError::forbidden().with_message(format!("this API key is missing the `{}` scope", needed.as_str())))
         }
+    }
+
+    /// The standard endpoint preamble in one call: enforce `needed`, then load
+    /// the calling [`Account`] (401 when the account no longer exists).
+    pub async fn require_account(&self, state: &AppState, needed: Scope) -> Result<Account, ApiError> {
+        self.require(needed)?;
+        self.account(state).await
+    }
+
+    /// Loads the calling [`Account`] without a scope check — for endpoints any
+    /// valid key may call (e.g. `/me`).
+    pub async fn account(&self, state: &AppState) -> Result<Account, ApiError> {
+        state.get_account(self.id).await.ok_or_else(ApiError::unauthorized)
     }
 }
 

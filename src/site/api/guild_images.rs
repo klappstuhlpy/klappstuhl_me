@@ -109,10 +109,7 @@ pub async fn upload_guild_images(
     auth: ApiToken,
     multipart: Multipart,
 ) -> Result<Json<UploadResult>, ApiError> {
-    auth.require(Scope::GuildImages)?;
-    let Some(account) = state.get_account(auth.id).await else {
-        return Err(ApiError::unauthorized());
-    };
+    let account = auth.require_account(&state, Scope::GuildImages).await?;
 
     let expires_at = expiry_from_params(&params);
     let result = raw_upload_file(state, account, client_ip, multipart, true, expires_at, Some(guild_id)).await?;
@@ -252,10 +249,7 @@ pub async fn delete_guild_image(
     Path((guild_id, id)): Path<(String, String)>,
     auth: ApiToken,
 ) -> Result<Json<DeleteResult>, ApiError> {
-    auth.require(Scope::GuildImages)?;
-    let Some(account) = state.get_account(auth.id).await else {
-        return Err(ApiError::unauthorized());
-    };
+    let account = auth.require_account(&state, Scope::GuildImages).await?;
 
     // Accept both `abc123` and `abc123.png`.
     let bare = id.split('.').next().unwrap_or(&id).to_string();

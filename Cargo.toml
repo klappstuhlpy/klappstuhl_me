@@ -1,6 +1,6 @@
 [package]
 name = "klappstuhl_me"
-version = "1.2.0"
+version = "1.3.0"
 edition = "2021"
 license = "AGPL-v3"
 description = "A custom information website about Klappstuhl and API support."

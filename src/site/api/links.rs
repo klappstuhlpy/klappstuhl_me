@@ -17,7 +17,7 @@ use super::{
 use crate::{
     error::ApiError,
     headers::ClientIp,
-    models::{Account, Scope, ShortLink},
+    models::{Scope, ShortLink},
     site::links::{count_links, insert_link, normalize_target, validate_code, InsertError, FREE_LINK_LIMIT},
     utils::get_new_image_id,
     AppState,
@@ -65,10 +65,6 @@ pub struct CreateLinkBody {
     pub code: Option<String>,
 }
 
-async fn account_or_401(state: &AppState, id: i64) -> Result<Account, ApiError> {
-    state.get_account(id).await.ok_or_else(ApiError::unauthorized)
-}
-
 /// Create a short link
 ///
 /// Creates a short link for the authenticated account. Non-admin accounts are
@@ -94,8 +90,7 @@ pub async fn create_link(
     auth: ApiToken,
     Json(body): Json<CreateLinkBody>,
 ) -> Result<Json<ApiShortLink>, ApiError> {
-    auth.require(Scope::LinksWrite)?;
-    let account = account_or_401(&state, auth.id).await?;
+    let account = auth.require_account(&state, Scope::LinksWrite).await?;
 
     if !account.flags.is_admin() && count_links(&state, account.id).await >= FREE_LINK_LIMIT {
         return Err(ApiError::forbidden().with_message(format!(
@@ -157,8 +152,7 @@ pub async fn list_links(
     Query(page): Query<Page>,
     auth: ApiToken,
 ) -> Result<Json<Vec<ApiShortLink>>, ApiError> {
-    auth.require(Scope::LinksRead)?;
-    let account = account_or_401(&state, auth.id).await?;
+    let account = auth.require_account(&state, Scope::LinksRead).await?;
 
     let limit = page.effective_limit() as i64;
     // Numbered params (?1 reused) drive keyset pagination over created_at DESC.
@@ -206,12 +200,75 @@ pub async fn get_link(
     Path(code): Path<String>,
     auth: ApiToken,
 ) -> Result<Json<ApiShortLink>, ApiError> {
-    auth.require(Scope::LinksRead)?;
-    let account = account_or_401(&state, auth.id).await?;
+    let account = auth.require_account(&state, Scope::LinksRead).await?;
 
     let link = fetch_owned_link(&state, &code, account.id)
         .await?
         .ok_or_else(|| ApiError::not_found(format!("no short link `{code}`")))?;
+    Ok(Json(ApiShortLink::from_link(&state, link)))
+}
+
+/// Body of an update-link request.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateLinkBody {
+    /// The new destination URL. A missing scheme defaults to `https://`. The
+    /// short code itself is immutable — delete and recreate to change it.
+    pub url: String,
+}
+
+/// Update a short link
+///
+/// Repoints an existing short link at a new destination. The code stays the
+/// same, so anything already sharing the short URL keeps working.
+#[utoipa::path(
+    patch,
+    path = "/links/{code}",
+    params(("code" = String, Path, description = "The link's short code / alias.")),
+    request_body(content = UpdateLinkBody, content_type = "application/json"),
+    responses(
+        (status = 200, description = "The updated short link", body = ApiShortLink),
+        (status = 400, description = "Invalid URL", body = ApiError),
+        (status = 401, description = "Unauthenticated", body = ApiError),
+        (status = 403, description = "Missing the links:write scope", body = ApiError),
+        (status = 404, description = "No such link owned by this account", body = ApiError),
+        (status = 429, response = RateLimitResponse),
+    ),
+    security(("api_key" = ["links:write"])),
+    tag = "links"
+)]
+pub async fn update_link(
+    State(state): State<AppState>,
+    ClientIp(client_ip): ClientIp,
+    Path(code): Path<String>,
+    auth: ApiToken,
+    Json(body): Json<UpdateLinkBody>,
+) -> Result<Json<ApiShortLink>, ApiError> {
+    let account = auth.require_account(&state, Scope::LinksWrite).await?;
+
+    let mut link = fetch_owned_link(&state, &code, account.id)
+        .await?
+        .ok_or_else(|| ApiError::not_found(format!("no short link `{code}`")))?;
+
+    let target = normalize_target(&body.url).map_err(|e| ApiError::validation("url", e))?;
+
+    state
+        .database()
+        .execute(
+            "UPDATE short_link SET target_url = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+            (target.clone(), link.id),
+        )
+        .await
+        .map_err(|_| ApiError::new("could not update the short link"))?;
+
+    state
+        .audit("link.update")
+        .actor(&account)
+        .target(link.code.clone())
+        .ip_opt(client_ip)
+        .meta(serde_json::json!({ "via_api": true, "from": link.target_url, "to": target }))
+        .fire();
+
+    link.target_url = target;
     Ok(Json(ApiShortLink::from_link(&state, link)))
 }
 
@@ -236,8 +293,7 @@ pub async fn delete_link(
     Path(code): Path<String>,
     auth: ApiToken,
 ) -> Result<Json<ApiShortLink>, ApiError> {
-    auth.require(Scope::LinksWrite)?;
-    let account = account_or_401(&state, auth.id).await?;
+    let account = auth.require_account(&state, Scope::LinksWrite).await?;
 
     let link = fetch_owned_link(&state, &code, account.id)
         .await?

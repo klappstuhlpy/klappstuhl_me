@@ -28,7 +28,9 @@ Personal website, image host, and homelab admin platform — built in Rust.
 
 ## Documentation
 
-The **public API** (images, links, pastes, media, render, web/unfurl, scan, admin)
+The **public API** (images, links, pastes, media — effects, conversion,
+metadata, color-palette extraction — render — code screenshots, QR codes, and
+SVG charts — account/usage introspection, web/unfurl, scan, admin)
 is documented by its live, interactive **Scalar** reference at
 [`/api/docs`](https://klappstuhl.me/api/docs), generated from the OpenAPI schema in
 `src/site/api/`. Add or change an endpoint and the page updates automatically; the
