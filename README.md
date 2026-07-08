@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="/static/img/logo.png" height="100" alt="klappstuhl_me logo" style="margin-top: 1rem; border-radius: 0.25rem;">
+
 # Klappstuhl.me
 
 Personal website, image host, and homelab admin platform — built in Rust.
