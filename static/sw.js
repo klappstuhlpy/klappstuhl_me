@@ -32,7 +32,7 @@ const SHELL_ASSETS = [
   "/kls/base.css",
   "/kls/base.js",
   "/static/js/live.js",
-  "/static/img/logo.jpg",
+  "/static/img/logo.png",
   "/static/img/favicon.ico",
   "/static/img/discord.svg",
   "/static/img/visibility.svg",
