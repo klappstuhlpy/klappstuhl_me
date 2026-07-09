@@ -402,9 +402,9 @@ impl AppState {
             Err(guard) => {
                 // LEFT JOIN the Discord link so the cached account carries the
                 // linked Discord id (used by the site header, which resolves the
-                // avatar live from the bot — the avatar is never stored). Keep this
-                // in sync with the inline query in `get_session_account` so both
-                // cache writers store the same shape.
+                // avatar via GET /account/discord/avatar from the stored hash).
+                // Keep this in sync with the inline query in `get_session_account`
+                // so both cache writers store the same shape.
                 let query = r#"
                     SELECT account.id AS id, account.name AS name, account.password AS password,
                            account.flags AS flags, account.totp_secret AS totp_secret,

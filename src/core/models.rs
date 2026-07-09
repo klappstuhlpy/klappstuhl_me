@@ -400,9 +400,9 @@ impl Account {
 
     /// Whether a Discord account is currently linked to this account.
     ///
-    /// The linked user's avatar is **not** stored here — the site header resolves
-    /// it live from the bot via `GET /account/discord/avatar`, so it can't go
-    /// stale. Only the link's existence (and id) is persisted.
+    /// The linked user's avatar hash lives in `user_discord_links.discord_avatar`
+    /// (refreshed on each OAuth login); the site header resolves the CDN URL via
+    /// `GET /account/discord/avatar`. Only the Discord id is carried on `Account`.
     pub fn has_discord(&self) -> bool {
         self.discord_id.is_some()
     }

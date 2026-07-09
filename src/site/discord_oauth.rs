@@ -48,13 +48,18 @@ struct TokenResponse {
 
 /// Discord's /users/@me response (only the fields we need).
 ///
-/// The avatar hash is intentionally *not* captured: the site resolves the
-/// avatar live from the bot (`GET /account/discord/avatar`) so it never goes
-/// stale, and nothing about the avatar is persisted.
+/// The avatar hash is persisted into `user_discord_links.discord_avatar` on
+/// every OAuth exchange (link, signup, and subsequent logins), so the site
+/// header can render the user's real avatar. It is refreshed on each login,
+/// keeping it from going stale. `avatar` is `None` for users with no custom
+/// avatar, in which case the handler falls back to Discord's default embed
+/// avatar.
 #[derive(Deserialize)]
 struct DiscordUser {
     id: String,
     username: String,
+    #[serde(default)]
+    avatar: Option<String>,
 }
 
 /// Query params on the OAuth2 callback.
@@ -231,13 +236,15 @@ async fn link_discord(
 ) -> Response {
     let discord_id = user.id.clone();
     let username = user.username.clone();
+    let avatar = user.avatar.clone();
 
     let result: rusqlite::Result<()> = state
         .database()
         .call(move |conn| {
             conn.execute(
-                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username) VALUES (?, ?, ?)",
-                rusqlite::params![account_id, discord_id, username],
+                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username, discord_avatar) \
+                 VALUES (?, ?, ?, ?)",
+                rusqlite::params![account_id, discord_id, username, avatar],
             )?;
             Ok(())
         })
@@ -305,6 +312,21 @@ async fn login_or_create(
             return flasher.add("Linked account no longer exists.").bail("/login");
         };
 
+        // Refresh the stored avatar hash so the header stays current with the
+        // user's Discord profile (best-effort; a failure here doesn't block login).
+        let refresh_id = user.id.clone();
+        let refresh_avatar = user.avatar.clone();
+        let _ = state
+            .database()
+            .call(move |conn| {
+                conn.execute(
+                    "UPDATE user_discord_links SET discord_avatar = ? WHERE discord_user_id = ?",
+                    rusqlite::params![refresh_avatar, refresh_id],
+                )
+            })
+            .await;
+        state.invalidate_account_cache(account_id);
+
         // Discord OAuth is treated as a sufficiently strong factor on its own:
         // verifying ownership of the linked Discord account stands in for the
         // password+TOTP path, so we skip the TOTP challenge here even when the
@@ -315,6 +337,7 @@ async fn login_or_create(
         let username = sanitize_username(&user.username);
         let discord_id_for_insert = user.id.clone();
         let discord_username_for_insert = user.username.clone();
+        let discord_avatar_for_insert = user.avatar.clone();
 
         // Discord-created accounts have no password: store a sentinel that can
         // never validate. The user may optionally set one later from /account.
@@ -331,8 +354,14 @@ async fn login_or_create(
                 )?;
                 let new_id = tx.last_insert_rowid();
                 tx.execute(
-                    "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username) VALUES (?, ?, ?)",
-                    rusqlite::params![new_id, discord_id_for_insert, discord_username_for_insert],
+                    "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username, discord_avatar) \
+                     VALUES (?, ?, ?, ?)",
+                    rusqlite::params![
+                        new_id,
+                        discord_id_for_insert,
+                        discord_username_for_insert,
+                        discord_avatar_for_insert
+                    ],
                 )?;
                 tx.commit()?;
                 Ok(new_id)
@@ -366,6 +395,7 @@ async fn login_or_create(
                     let suffixed = append_random_suffix(&username);
                     let discord_id2 = user.id.clone();
                     let discord_username2 = user.username.clone();
+                    let discord_avatar2 = user.avatar.clone();
                     let password_hash2 = crate::auth::NO_PASSWORD_SENTINEL.to_string();
                     let suffixed_clone = suffixed.clone();
                     let retry: rusqlite::Result<i64> = state
@@ -378,8 +408,9 @@ async fn login_or_create(
                             )?;
                             let new_id = tx.last_insert_rowid();
                             tx.execute(
-                                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username) VALUES (?, ?, ?)",
-                                rusqlite::params![new_id, discord_id2, discord_username2],
+                                "INSERT INTO user_discord_links (account_id, discord_user_id, discord_username, discord_avatar) \
+                                 VALUES (?, ?, ?, ?)",
+                                rusqlite::params![new_id, discord_id2, discord_username2, discord_avatar2],
                             )?;
                             tx.commit()?;
                             Ok(new_id)
@@ -519,6 +550,19 @@ fn default_discord_avatar(discord_id: &str) -> String {
     format!("https://cdn.discordapp.com/embed/avatars/{idx}.png")
 }
 
+/// The CDN URL for a linked user's custom avatar, or the default embed avatar
+/// when no avatar hash is stored. Animated avatars (hashes prefixed `a_`) are
+/// served as GIF; everything else as PNG.
+fn discord_avatar_url(discord_id: &str, avatar_hash: Option<&str>) -> String {
+    match avatar_hash {
+        Some(hash) if !hash.is_empty() => {
+            let ext = if hash.starts_with("a_") { "gif" } else { "png" };
+            format!("https://cdn.discordapp.com/avatars/{discord_id}/{hash}.{ext}?size=128")
+        }
+        _ => default_discord_avatar(discord_id),
+    }
+}
+
 fn avatar_redirect(url: &str) -> Response {
     let mut resp = Redirect::temporary(url).into_response();
     resp.headers_mut()
@@ -528,11 +572,31 @@ fn avatar_redirect(url: &str) -> Response {
 
 /// `GET /account/discord/avatar` — 302-redirects to the linked user's Discord
 /// avatar. The site header points its `<img>` here.
-async fn discord_avatar(account: Account) -> Response {
+async fn discord_avatar(State(state): State<AppState>, account: Account) -> Response {
     let Some(discord_id) = account.discord_id.clone() else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    avatar_redirect(&default_discord_avatar(&discord_id))
+
+    // Look up the avatar hash persisted during the OAuth exchange. A missing
+    // row or NULL hash (e.g. a link created before avatars were captured, or a
+    // user with no custom avatar) falls back to the default embed avatar.
+    let lookup_id = discord_id.clone();
+    let avatar_hash: Option<String> = state
+        .database()
+        .call(move |conn| {
+            conn.query_row(
+                "SELECT discord_avatar FROM user_discord_links WHERE discord_user_id = ?",
+                [&lookup_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()
+        })
+        .await
+        .ok()
+        .flatten()
+        .flatten();
+
+    avatar_redirect(&discord_avatar_url(&discord_id, avatar_hash.as_deref()))
 }
 
 // -- Router ------------------------------------------------------------------
