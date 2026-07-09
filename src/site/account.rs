@@ -237,6 +237,19 @@ async fn logout(
     let headers = response.headers_mut();
     headers.append(SET_COOKIE, HeaderValue::from_str(&cookie).unwrap());
     headers.append(SET_COOKIE, clear_host_only_cookie());
+    // Single sign-out with the Percy dashboard (served on the `percy.` subdomain):
+    // clear its domain-scoped `session` cookie too, so one logout covers both apps.
+    if let Some(d) = state.config().cookie_domain() {
+        let percy_session = Cookie::build(("session", ""))
+            .path("/")
+            .domain(d)
+            .expires(cookie::time::OffsetDateTime::UNIX_EPOCH)
+            .build()
+            .to_string();
+        if let Ok(value) = HeaderValue::from_str(&percy_session) {
+            headers.append(SET_COOKIE, value);
+        }
+    }
     response
 }
 

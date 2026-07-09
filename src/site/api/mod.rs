@@ -45,7 +45,7 @@ pub use media::serve_media;
     info(
         title = "Klappstuhl.me",
         description = include_str!("../../../templates/api/api_description.md"),
-        version = "1.3.1"
+        version = "1.3.2"
     ),
     paths(
         images::upload_files,
