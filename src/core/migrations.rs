@@ -85,4 +85,75 @@ mod tests {
         migrate(&mut conn).expect("second migrate");
         assert_eq!(user_version(&conn).unwrap(), target_version());
     }
+
+    fn table_has_column(conn: &rusqlite::Connection, table: &str, column: &str) -> bool {
+        conn.prepare(&format!("PRAGMA table_info({table})"))
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|name| name == column)
+    }
+
+    /// A full fresh migration leaves `user_discord_links.discord_avatar` present —
+    /// i.e. migration 20's table rebuild does not break databases where migration
+    /// 13 already created the column.
+    #[test]
+    fn discord_avatar_present_after_fresh_migration() {
+        let mut conn = open_memory();
+        migrate(&mut conn).expect("migrate fresh db");
+        assert!(
+            table_has_column(&conn, "user_discord_links", "discord_avatar"),
+            "discord_avatar must exist after a fresh migration"
+        );
+    }
+
+    /// Migration 20 adds the column to a *legacy* `user_discord_links` — the shape
+    /// migration 13 created before `discord_avatar` was added to it — while
+    /// preserving existing link rows. This is the case that broke Discord linking.
+    #[test]
+    fn migration_20_converges_legacy_discord_links_table() {
+        let conn = open_memory();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        // Reproduce the pre-column schema plus one linked row.
+        conn.execute_batch(
+            "CREATE TABLE account(id INTEGER PRIMARY KEY, name TEXT, password TEXT);
+             INSERT INTO account(id, name, password) VALUES (1, 'ferris', 'x');
+             CREATE TABLE user_discord_links (
+                 account_id       INTEGER PRIMARY KEY REFERENCES account(id) ON DELETE CASCADE,
+                 discord_user_id  TEXT    NOT NULL UNIQUE,
+                 discord_username TEXT,
+                 linked_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+             );
+             INSERT INTO user_discord_links(account_id, discord_user_id, discord_username)
+                 VALUES (1, '42', 'ferris');",
+        )
+        .unwrap();
+        assert!(!table_has_column(&conn, "user_discord_links", "discord_avatar"));
+
+        let migration = EMBEDDED_MIGRATIONS
+            .iter()
+            .find(|m| m.version == 20)
+            .expect("migration 20 exists");
+        conn.execute_batch(migration.sql)
+            .expect("migration 20 applies to legacy table");
+
+        // Column now present, the existing link preserved.
+        assert!(table_has_column(&conn, "user_discord_links", "discord_avatar"));
+        let username: String = conn
+            .query_row(
+                "SELECT discord_username FROM user_discord_links WHERE account_id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(username, "ferris");
+
+        // The link INSERT that the OAuth flow runs (writing discord_avatar) now works.
+        conn.execute(
+            "UPDATE user_discord_links SET discord_avatar = 'a1b2' WHERE account_id = 1",
+            [],
+        )
+        .expect("discord_avatar is writable");
+    }
 }

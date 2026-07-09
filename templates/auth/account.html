@@ -192,7 +192,8 @@
     <h2>Discord</h2>
     {% if !discord_username.is_empty() %}
     <p>Linked to <strong>{{ discord_username }}</strong>.</p>
-    <form method="POST" action="/account/discord/unlink">
+    <form method="POST" action="/account/discord/unlink"
+          onsubmit="return confirm('Unlink your Discord account? You will need to re-authorize with Discord to link it again.');">
         <button class="button danger outline" type="submit">Unlink Discord</button>
     </form>
     {% else if discord_enabled %}
