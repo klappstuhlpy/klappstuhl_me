@@ -23,7 +23,7 @@ pub use auth::{token, totp};
 pub use core::{cli, config, database, error, filters, logging, migrations, models, state, utils};
 pub use integrations::{ai, cf_tunnel, cloudflare, discord, exttools, geoip};
 pub use kls_web_core::key;
-pub use platform::{cached, flash, headers, ratelimit, scope};
+pub use platform::{cached, cookies, flash, headers, ratelimit, scope};
 pub use site::media::{codeimage, metadata, scan, thumbnail};
 // Each admin feature slice keeps its service's public API at the module root,
 // so `crate::firewall::spawn_workers`, `crate::docker::…`, etc. are unchanged.

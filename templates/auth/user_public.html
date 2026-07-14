@@ -1,0 +1,57 @@
+{#
+    A read-only look at another account. Deliberately slim: it shows what is
+    already public elsewhere on the site (the name, when they joined, what they
+    have published) and nothing that belongs to the owner's own shell.
+#}
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/account.css" type="text/css"/>
+{% endblock %}
+
+{% block title %}{{ user.name }} | Klappstuhl.me{% endblock %}
+
+{% block body %}
+{%- for flash in flashes -%}
+{{ flash.html()|safe }}
+{%- endfor -%}
+
+<div class="user-public">
+    <div class="account-header">
+        <div class="account-identity">
+            <span class="account-avatar-mark" aria-hidden="true"><span class="spark">✻</span></span>
+            <div class="account-id-text">
+                <h1 class="account-name">{{ user.name }}</h1>
+                <p class="account-handle"><span class="account-handle-prompt">$</span> ~/{{ user.name }}{% if user.flags.is_admin() %} · <span class="account-handle-root">root</span>{% endif %}</p>
+            </div>
+            {% if user.flags.is_admin() %}
+            <span class="badge branding">Admin</span>
+            {% endif %}
+        </div>
+        <div class="account-header-meta">
+            <span class="account-meta-label">Member since</span>
+            <time class="js-ts" datetime="{{ user.created_at|isoformat }}">{{ user.created_at|isoformat }}</time>
+        </div>
+    </div>
+
+    <section class="account-section">
+        <h2>Published</h2>
+        <div class="stat-tiles">
+            <span class="stat-tile static">
+                <span class="stat-value">{{ images }}</span>
+                <span class="stat-label">Image{% if images != 1 %}s{% endif %}</span>
+                <span class="stat-sub">{{ images_size }}</span>
+            </span>
+            <span class="stat-tile static">
+                <span class="stat-value">{{ links }}</span>
+                <span class="stat-label">Short link{% if links != 1 %}s{% endif %}</span>
+                <span class="stat-sub">r.klappstuhl.me</span>
+            </span>
+        </div>
+    </section>
+
+    {% if is_self %}
+    <p class="section-note">This is how others see you. <a href="/account">Back to your account →</a></p>
+    {% endif %}
+</div>
+{% endblock %}

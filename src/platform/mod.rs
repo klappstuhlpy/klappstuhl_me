@@ -3,6 +3,7 @@
 //! These wrap the route handlers in `site` and `admin` but belong to neither.
 
 pub mod cached;
+pub mod cookies;
 pub mod flash;
 pub mod headers;
 pub mod ratelimit;

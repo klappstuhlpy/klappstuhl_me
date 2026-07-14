@@ -1,0 +1,144 @@
+{% extends "auth/account_layout.html" %}
+
+{% block title %}Account | Klappstuhl.me{% endblock %}
+
+{% block page_head %}
+{% let me = account.as_ref().unwrap() %}
+<div class="account-header">
+    <div class="account-identity">
+        <span class="account-avatar-mark" aria-hidden="true"><span class="spark">✻</span></span>
+        <div class="account-id-text">
+            <h1 class="account-name">{{ me.name }}</h1>
+            <p class="account-handle"><span class="account-handle-prompt">$</span> ~/account{% if me.flags.is_admin() %} · <span class="account-handle-root">root</span>{% endif %}</p>
+        </div>
+        {% if me.flags.is_admin() %}
+        <span class="badge branding">Admin</span>
+        {% endif %}
+    </div>
+    <div class="account-header-meta">
+        <span class="account-meta-label">Member since</span>
+        <time class="js-ts" datetime="{{ me.created_at|isoformat }}">{{ me.created_at|isoformat }}</time>
+    </div>
+</div>
+{% endblock %}
+
+{% block account_body %}
+{# ─── Stat tiles ──────────────────────────────────────────────── #}
+<section class="account-section">
+    <h2>At a glance</h2>
+    <div class="stat-tiles">
+        <a class="stat-tile" href="/images">
+            <span class="stat-value">{{ images }}</span>
+            <span class="stat-label">Image{% if images != 1 %}s{% endif %}</span>
+            <span class="stat-sub">{{ images_size }}</span>
+        </a>
+        <a class="stat-tile" href="/links">
+            <span class="stat-value">{{ links }}</span>
+            <span class="stat-label">Short link{% if links != 1 %}s{% endif %}</span>
+            <span class="stat-sub">r.klappstuhl.me</span>
+        </a>
+        <a class="stat-tile" href="/account/content">
+            <span class="stat-value">{{ pastes }}</span>
+            <span class="stat-label">Paste{% if pastes != 1 %}s{% endif %}</span>
+            <span class="stat-sub">via the API</span>
+        </a>
+        <a class="stat-tile" href="/account/sessions">
+            <span class="stat-value">{{ sessions }}</span>
+            <span class="stat-label">Active session{% if sessions != 1 %}s{% endif %}</span>
+            <span class="stat-sub">Revoke what you don't know</span>
+        </a>
+    </div>
+</section>
+
+{# ─── Security checklist ──────────────────────────────────────── #}
+<section class="account-section">
+    <h2>Security checklist</h2>
+    <ul class="checklist">
+        <li class="check-row {% if has_password %}ok{% else %}warn{% endif %}">
+            <span class="check-mark" aria-hidden="true">{% if has_password %}✓{% else %}!{% endif %}</span>
+            <span class="check-text">
+                <strong>Password</strong>
+                <span class="check-note">
+                    {% if has_password %}A password is set on this account.
+                    {% else %}You signed in with Discord and have no password. Setting one lets you log in without it — and is required for 2FA and account deletion.{% endif %}
+                </span>
+            </span>
+            <a class="check-action" href="/account/security">{% if has_password %}Change{% else %}Set password{% endif %}</a>
+        </li>
+        <li class="check-row {% if totp_enabled %}ok{% else %}warn{% endif %}">
+            <span class="check-mark" aria-hidden="true">{% if totp_enabled %}✓{% else %}!{% endif %}</span>
+            <span class="check-text">
+                <strong>Two-factor authentication</strong>
+                <span class="check-note">
+                    {% if totp_enabled %}A code from your authenticator app is required at sign-in.
+                    {% else %}Add a second factor (TOTP). Strongly recommended for admins.{% endif %}
+                </span>
+            </span>
+            <a class="check-action" href="/account/security">{% if totp_enabled %}Manage{% else %}Enable{% endif %}</a>
+        </li>
+        <li class="check-row {% if !has_api_key %}ok{% else if api_key_scoped %}ok{% else %}warn{% endif %}">
+            <span class="check-mark" aria-hidden="true">{% if !has_api_key || api_key_scoped %}✓{% else %}!{% endif %}</span>
+            <span class="check-text">
+                <strong>API key</strong>
+                <span class="check-note">
+                    {% if !has_api_key %}No API key exists — nothing to leak.
+                    {% else if api_key_scoped %}Your key is limited to the scopes you granted it.
+                    {% else %}Your key has no scopes, which means legacy full access. Regenerate it with only the scopes you need.{% endif %}
+                </span>
+            </span>
+            <a class="check-action" href="/account/api">{% if has_api_key %}Review{% else %}Create{% endif %}</a>
+        </li>
+        {% if discord_enabled %}
+        <li class="check-row {% if discord_linked %}ok{% else %}info{% endif %}">
+            <span class="check-mark" aria-hidden="true">{% if discord_linked %}✓{% else %}·{% endif %}</span>
+            <span class="check-text">
+                <strong>Discord</strong>
+                <span class="check-note">
+                    {% if discord_linked %}Linked — you can sign in with Discord and use the Percy dashboard.
+                    {% else %}Not linked. Linking unlocks the Percy bot dashboard.{% endif %}
+                </span>
+            </span>
+            <a class="check-action" href="/account/profile">{% if discord_linked %}Manage{% else %}Link{% endif %}</a>
+        </li>
+        {% endif %}
+    </ul>
+</section>
+
+{# ─── Recent activity ─────────────────────────────────────────── #}
+<section class="account-section">
+    <h2>Recent activity</h2>
+    {% if activity.is_empty() %}
+    <p class="muted">Nothing recorded yet.</p>
+    {% else %}
+    <ul class="activity-list">
+        {% for entry in activity %}
+        <li class="activity-row{% if entry.is_failure() %} failure{% endif %}">
+            <span class="activity-label">{{ entry.label() }}</span>
+            <span class="activity-meta">
+                {% match entry.ip %}
+                {% when Some with (ip) %}<code class="activity-ip">{{ ip }}</code>
+                {% when None %}
+                {% endmatch %}
+                <time class="js-ts" datetime="{{ entry.ts|isoformat }}">{{ entry.ts|isoformat }}</time>
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+    <p class="section-note">Full sign-in history lives on the <a href="/account/security">Security</a> page.</p>
+    {% endif %}
+</section>
+
+{# ─── Quick actions ───────────────────────────────────────────── #}
+<section class="account-section">
+    <h2>Quick actions</h2>
+    <div class="quick-links">
+        <a href="/images" class="quick-link"><span>Upload an image</span></a>
+        <a href="/links" class="quick-link"><span>New short link</span></a>
+        <a href="/api/docs" class="quick-link"><span>API docs</span></a>
+        {% if discord_linked %}
+        <a href="/percy" class="quick-link"><span>Percy dashboard</span></a>
+        {% endif %}
+        <a href="/account/export" class="quick-link"><span>Export my data</span></a>
+    </div>
+</section>
+{% endblock %}

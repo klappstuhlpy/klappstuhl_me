@@ -1,0 +1,85 @@
+{% extends "auth/account_layout.html" %}
+
+{% block title %}My Content | Klappstuhl.me{% endblock %}
+{% block page_title %}My Content{% endblock %}
+{% block page_sub %}ls -la ~/{% endblock %}
+
+{% block account_body %}
+<section class="account-section">
+    <h2>Overview</h2>
+    <div class="stat-tiles">
+        <a class="stat-tile" href="/images">
+            <span class="stat-value">{{ images }}</span>
+            <span class="stat-label">Image{% if images != 1 %}s{% endif %}</span>
+            <span class="stat-sub">{{ images_size }}</span>
+        </a>
+        <a class="stat-tile" href="/links">
+            <span class="stat-value">{{ links }}</span>
+            <span class="stat-label">Short link{% if links != 1 %}s{% endif %}</span>
+            <span class="stat-sub">Manage →</span>
+        </a>
+        <span class="stat-tile static">
+            <span class="stat-value">{{ pastes }}</span>
+            <span class="stat-label">Paste{% if pastes != 1 %}s{% endif %}</span>
+            <span class="stat-sub">Created via the API</span>
+        </span>
+    </div>
+</section>
+
+<section class="account-section">
+    <h2>Recent images</h2>
+    {% if recent_images.is_empty() %}
+    <p class="muted">You haven't uploaded any images yet. <a href="/images">Upload one →</a></p>
+    {% else %}
+    <div class="thumb-grid">
+        {% for img in recent_images %}
+        <a class="thumb-card" href="/gallery/{{ img.id }}" title="{{ img.id }}">
+            <img src="/gallery/thumb/{{ img.id }}" alt="" loading="lazy">
+            <span class="thumb-meta">
+                <time class="js-ts" datetime="{{ img.uploaded_at|isoformat }}">{{ img.uploaded_at|isoformat }}</time>
+                <span>{{ img.views }} view{% if img.views != 1 %}s{% endif %}</span>
+            </span>
+        </a>
+        {% endfor %}
+    </div>
+    <p class="section-note"><a href="/images">Manage all {{ images }} image{% if images != 1 %}s{% endif %} →</a></p>
+    {% endif %}
+</section>
+
+<section class="account-section">
+    <h2>Recent pastes</h2>
+    {% if recent_pastes.is_empty() %}
+    <p class="muted">No pastes. They're created through the <a href="/api/docs">API</a> (scope <code>pastes:write</code>).</p>
+    {% else %}
+    <div class="record-list">
+        {% for paste in recent_pastes %}
+        <div class="record">
+            <div class="record-main">
+                <a class="record-title" href="/p/{{ paste.id }}">/p/{{ paste.id }}</a>
+                <span class="record-sub">
+                    {% match paste.language %}
+                    {% when Some with (lang) %}<code>{{ lang }}</code> ·
+                    {% when None %}
+                    {% endmatch %}
+                    {{ paste.views }} view{% if paste.views != 1 %}s{% endif %}
+                    {% match paste.expires_at %}
+                    {% when Some with (exp) %} · expires <time class="js-ts" datetime="{{ exp|isoformat }}">{{ exp|isoformat }}</time>
+                    {% when None %}
+                    {% endmatch %}
+                </span>
+            </div>
+            <time class="record-time js-ts" datetime="{{ paste.created_at|isoformat }}">{{ paste.created_at|isoformat }}</time>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+
+<section class="account-section">
+    <h2>Take it with you</h2>
+    <p>Download everything this site stores about you as a single JSON file — account metadata, image and link entries, paste metadata, and session labels. No secrets are included.</p>
+    <div class="section-actions">
+        <a class="button outline" href="/account/export">Export my data</a>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,94 @@
+{#
+    Account shell — the sidebar nav wrapped around every /account/* page.
+
+    Child templates must:
+      - extend account_layout.html
+      - override {% block account_body %}{% endblock %}
+      - expose an `active_page: &'static str` field on the template struct
+        (highlights the matching sidebar link)
+
+    Optional overrides: {% block page_title %} / {% block page_sub %} fill the
+    default page header; {% block page_head %} replaces it wholesale (the
+    overview swaps in the identity card); {% block page_js %} adds a page script.
+#}
+{% extends "layout.html" %}
+
+{% block css %}
+{# auth.css carries the form primitives the dialogs share with the login page
+   (.field-group, .field-label, .password-container); account.css owns the shell. #}
+<link rel="stylesheet" href="/static/css/auth.css" type="text/css">
+<link rel="stylesheet" href="/static/css/account.css" type="text/css">
+{% endblock %}
+
+{% block body %}
+{% let user = account.as_ref().unwrap() %}
+<div class="account-shell">
+    <aside class="account-sidebar" id="account-sidebar">
+        <div class="account-sidebar-title"><span class="spark" aria-hidden="true">✻</span> Account</div>
+        <button type="button" class="account-sidebar-toggle" aria-expanded="false" aria-controls="account-sidebar"><span>Menu</span></button>
+        <nav class="account-nav">
+            <a href="/account" class="account-nav-item{% if active_page == "overview" %} active{% endif %}">
+                <span>Overview</span>
+            </a>
+            <a href="/account/profile" class="account-nav-item{% if active_page == "profile" %} active{% endif %}">
+                <span>Profile</span>
+            </a>
+            <a href="/account/security" class="account-nav-item{% if active_page == "security" %} active{% endif %}">
+                <span>Security</span>
+            </a>
+            <a href="/account/sessions" class="account-nav-item{% if active_page == "sessions" %} active{% endif %}">
+                <span>Sessions</span>
+            </a>
+            <a href="/account/api" class="account-nav-item{% if active_page == "api" %} active{% endif %}">
+                <span>API &amp; Tools</span>
+            </a>
+            <a href="/account/content" class="account-nav-item{% if active_page == "content" %} active{% endif %}">
+                <span>My Content</span>
+            </a>
+            <a href="/account/danger" class="account-nav-item danger{% if active_page == "danger" %} active{% endif %}">
+                <span>Danger Zone</span>
+            </a>
+        </nav>
+        {% if user.flags.is_admin() %}
+        <div class="account-sidebar-section">
+            <div class="account-sidebar-heading">Admin</div>
+            <nav class="account-nav">
+                <a href="/admin" class="account-nav-item"><span>Dashboard</span></a>
+                <a href="/admin/metrics" class="account-nav-item"><span>Metrics</span></a>
+                <a href="/admin/security" class="account-nav-item"><span>Security</span></a>
+                <a href="/admin/audit" class="account-nav-item"><span>Audit log</span></a>
+                <a href="/admin/docker" class="account-nav-item"><span>Docker</span></a>
+            </nav>
+        </div>
+        <div class="account-sidebar-section">
+            <div class="account-sidebar-heading">Apps</div>
+            <nav class="account-nav">
+                <a href="https://ssh.klappstuhl.me" class="account-nav-item external" rel="noopener"><span>SSH Terminal</span></a>
+                <a href="https://vaultwarden.klappstuhl.me" class="account-nav-item external" rel="noopener"><span>Vaultwarden</span></a>
+                <a href="https://cloud.klappstuhl.me" class="account-nav-item external" rel="noopener"><span>Nextcloud</span></a>
+            </nav>
+        </div>
+        {% endif %}
+    </aside>
+
+    <section class="account-content">
+        {%- for flash in flashes -%}
+        {{ flash.html()|safe }}
+        {%- endfor -%}
+
+        {% block page_head %}
+        <div class="account-page-header">
+            <h1>{% block page_title %}Account{% endblock %}</h1>
+            <p class="account-page-sub"><span class="account-page-prompt">$</span> {% block page_sub %}~/account{% endblock %}</p>
+        </div>
+        {% endblock %}
+
+        {% block account_body %}{% endblock %}
+    </section>
+</div>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/account.js"></script>
+{% block page_js %}{% endblock %}
+{% endblock %}

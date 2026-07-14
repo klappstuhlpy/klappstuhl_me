@@ -1,0 +1,66 @@
+{% extends "auth/account_layout.html" %}
+
+{% block title %}Profile | Klappstuhl.me{% endblock %}
+{% block page_title %}Profile{% endblock %}
+{% block page_sub %}whoami{% endblock %}
+
+{% block account_body %}
+{% let me = account.as_ref().unwrap() %}
+
+<section class="account-section">
+    <h2>Identity</h2>
+    <dl class="detail-grid">
+        <dt>Username</dt>
+        <dd>{{ me.name }}</dd>
+
+        <dt>Account ID</dt>
+        <dd><code>{{ me.id }}</code></dd>
+
+        <dt>Member since</dt>
+        <dd><time class="js-ts" datetime="{{ me.created_at|isoformat }}">{{ me.created_at|isoformat }}</time></dd>
+
+        <dt>Role</dt>
+        <dd>{% if me.flags.is_admin() %}<span class="badge branding">Admin</span>{% else %}<span class="badge">User</span>{% endif %}</dd>
+
+        <dt>Sign-in</dt>
+        <dd>
+            {% if has_password %}Username &amp; password{% if !discord_username.is_empty() %}, or Discord{% endif %}
+            {% else if !discord_username.is_empty() %}Discord only — no password set
+            {% else %}No sign-in method configured{% endif %}
+        </dd>
+
+        <dt>Public page</dt>
+        <dd><a href="/user/{{ me.name }}">/user/{{ me.name }}</a></dd>
+    </dl>
+    <p class="section-note">
+        Usernames can't be changed yet — the name is baked into your public page and audit history.
+    </p>
+</section>
+
+<section class="account-section">
+    <h2>Discord</h2>
+    {% if !discord_username.is_empty() %}
+    <p>Linked to <strong>{{ discord_username }}</strong>. You can sign in with Discord and manage the Percy bot from its dashboard.</p>
+    <div class="section-actions">
+        <a class="button primary outline" href="/percy">Open Percy dashboard</a>
+        <form method="POST" action="/account/discord/unlink"
+              onsubmit="return confirm('Unlink your Discord account? You will need to re-authorize with Discord to link it again.');">
+            <button class="button danger outline" type="submit">Unlink Discord</button>
+        </form>
+    </div>
+    {% if !has_password %}
+    <p class="section-note warn">
+        Discord is currently your only way in. Set a password on the
+        <a href="/account/security">Security</a> page before unlinking it.
+    </p>
+    {% endif %}
+    {% else if discord_enabled %}
+    <p>Link your Discord account to sign in with Discord and access the Percy bot dashboard.</p>
+    <div class="section-actions">
+        <a href="/auth/discord" class="button primary">Link Discord</a>
+    </div>
+    {% else %}
+    <p class="muted">Discord integration is not configured on this instance.</p>
+    {% endif %}
+</section>
+{% endblock %}

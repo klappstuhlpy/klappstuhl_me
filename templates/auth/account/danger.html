@@ -1,0 +1,98 @@
+{% extends "auth/account_layout.html" %}
+
+{% block title %}Danger Zone | Klappstuhl.me{% endblock %}
+{% block page_title %}Danger Zone{% endblock %}
+{% block page_sub %}rm -rf ~/ <span class="blink">█</span>{% endblock %}
+
+{% block account_body %}
+{% let me = account.as_ref().unwrap() %}
+
+<section class="account-section">
+    <h2>Export</h2>
+    <p>Take a copy before you go. The export is a JSON file with your account metadata, images, short links, paste metadata, and session labels — never passwords, 2FA secrets, or tokens.</p>
+    <div class="section-actions">
+        <a class="button outline" href="/account/export">Export my data</a>
+    </div>
+</section>
+
+<section class="account-section danger-card">
+    <h2>Delete account</h2>
+    <p>
+        This is permanent and immediate. There is no grace period, no undo, and no way for anyone
+        to restore the account afterwards.
+    </p>
+
+    <div class="danger-summary">
+        <div class="danger-summary-head">Deleting <strong>{{ me.name }}</strong> removes:</div>
+        <ul class="danger-list">
+            <li><strong>{{ sessions }}</strong> active session{% if sessions != 1 %}s{% endif %} and any API key</li>
+            <li><strong>{{ links }}</strong> short link{% if links != 1 %}s{% endif %} — the URLs stop resolving</li>
+            <li><strong>{{ pastes }}</strong> paste{% if pastes != 1 %}s{% endif %}</li>
+            <li>Your Discord link, two-factor secret, and recovery codes</li>
+            <li><strong>{{ images }}</strong> image{% if images != 1 %}s{% endif %} ({{ images_size }}) — <em>optional</em>: keep them and they stay online without an owner</li>
+        </ul>
+        <p class="danger-note">
+            Audit-log entries are kept. They record what happened on this site, not who you are,
+            and are unlinked from your account when it goes.
+        </p>
+    </div>
+
+    {% if is_last_admin %}
+    <p class="danger-block">
+        <strong>Blocked:</strong> this is the last admin account. Promote another admin first —
+        otherwise nobody could administer this instance.
+    </p>
+    {% else if !has_password %}
+    <p class="danger-block">
+        <strong>Set a password first.</strong> Deletion is confirmed with your password, and this
+        account only signs in through Discord. Set one on the <a href="/account/security">Security</a> page.
+    </p>
+    {% else %}
+    <div class="section-actions">
+        <button class="button danger" id="delete-account" type="button">Delete my account</button>
+    </div>
+    {% endif %}
+</section>
+
+{% if !is_last_admin && has_password %}
+<dialog id="delete-account-modal">
+    <form autocomplete="off" method="POST" action="/account/delete" id="delete-account-form">
+        <h1>Delete account</h1>
+        <p>
+            This permanently deletes <strong>{{ me.name }}</strong> and everything listed on the page behind
+            this dialog. Type the username to confirm.
+        </p>
+        <div class="form-container">
+            <div class="field-group">
+                <label class="field-label" for="delete-username">Type <code>{{ me.name }}</code> to confirm</label>
+                <input class="form-field" required placeholder=" " name="username" id="delete-username" type="text"
+                       autocomplete="off" spellcheck="false" data-expect="{{ me.name }}">
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="delete-password">Current password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="password" id="delete-password" type="password" autocomplete="current-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+            {% if totp_enabled %}
+            <div class="field-group">
+                <label class="field-label" for="delete-code">Two-factor code</label>
+                <input class="form-field" required placeholder=" " name="code" id="delete-code" inputmode="numeric"
+                       autocomplete="one-time-code" maxlength="10">
+                <span class="input-hint">Recovery codes are not accepted here — they restore access, they don't destroy it.</span>
+            </div>
+            {% endif %}
+            <label class="checkbox-container delete-images-row">
+                <input type="checkbox" name="delete_images" id="delete-images" value="1" checked>
+                <label for="delete-images">Also permanently delete my {{ images }} uploaded image{% if images != 1 %}s{% endif %} ({{ images_size }})</label>
+            </label>
+        </div>
+        <footer>
+            <button class="button danger" type="submit" id="delete-confirm" disabled>Delete forever</button>
+            <button class="button" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+{% endif %}
+{% endblock %}

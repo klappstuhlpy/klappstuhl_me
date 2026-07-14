@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/account.css" type="text/css"/>
+{% endblock %}
+
+{% block title %}Recovery codes | Klappstuhl.me{% endblock %}
+
+{% block body %}
+<section class="twofa-wrap">
+    <h1>New recovery codes</h1>
+    <p class="twofa-warn">
+        Save these now — each can be used once if you lose your authenticator.
+        Your previous codes no longer work, and these won't be shown again.
+    </p>
+    <ul class="twofa-codes">
+        {% for code in recovery_codes %}
+        <li>{{ code }}</li>
+        {% endfor %}
+    </ul>
+    <div class="twofa-actions twofa-codes-actions">
+        <button type="button" class="button outline" id="dl-codes">Download .txt</button>
+        <a class="button primary" href="/account/security">Done</a>
+    </div>
+</section>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/account.js"></script>
+{% endblock %}

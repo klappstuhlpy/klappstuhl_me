@@ -1,0 +1,1024 @@
+/* ─────────────────────────────────────────────────────────────
+   The account shell: sidebar + content column, the cards inside
+   it, and the 2FA / recovery-code pages that hang off it.
+
+   Pairs with auth.css, which the account pages also load for the
+   form primitives their dialogs share with the login page
+   (.field-group, .field-label, .password-container).
+
+   Colours come from base.css tokens only — the light theme
+   ([data-theme=light]) redefines those same tokens, so nothing
+   here may hardcode a colour that isn't theme-neutral.
+   ───────────────────────────────────────────────────────────── */
+
+.account-shell {
+    display: flex;
+    gap: 2rem;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+
+.account-sidebar {
+    flex-shrink: 0;
+    width: 200px;
+    position: sticky;
+    top: 1rem;
+    align-self: flex-start;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 0.75rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.625rem;
+}
+
+.account-sidebar-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--box-border);
+    margin-bottom: 0.5rem;
+}
+.account-sidebar-title .spark { color: var(--branding); text-transform: none; }
+
+/* Mobile-only collapse toggle (revealed in the media query below). */
+.account-sidebar-toggle {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.55rem 0.85rem;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--foreground);
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+.account-sidebar-toggle::after {
+    content: "\25BE";
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+.account-sidebar.open .account-sidebar-toggle::after { transform: rotate(180deg); }
+
+.account-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.account-nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    color: var(--nav-link);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: background 0.12s, color 0.12s, transform 0.12s;
+}
+
+.account-nav-item:hover {
+    background: var(--box-shade);
+    color: var(--foreground);
+    transform: translateX(2px);
+}
+
+.account-nav-item.active {
+    background: var(--branding-dim);
+    color: var(--branding);
+    font-weight: 600;
+}
+
+/* Coral accent bar on the active item, matching the admin shell. */
+.account-nav-item.active::before {
+    content: "";
+    position: absolute;
+    left: -0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 1.1rem;
+    border-radius: 0 3px 3px 0;
+    background: var(--branding);
+}
+
+/* The one destructive destination reads as one, even before you click it. */
+.account-nav-item.danger { color: var(--error-text); }
+.account-nav-item.danger:hover { background: var(--error-bg); }
+.account-nav-item.danger.active {
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+.account-nav-item.danger.active::before { background: var(--error-text); }
+
+.account-nav-item.external::after {
+    content: "↗";
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.account-sidebar-section {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--box-border);
+}
+
+.account-sidebar-heading {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0 0.75rem 0.4rem;
+}
+
+.account-content {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 768px) {
+    .account-shell {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .account-sidebar {
+        width: 100%;
+        position: static;
+    }
+    .account-sidebar-toggle { display: flex; margin-top: 0.25rem; }
+    /* Collapsed by default on mobile; the toggle adds .open. */
+    .account-nav { display: none; }
+    .account-sidebar.open .account-nav {
+        display: flex;
+        margin-top: 0.5rem;
+    }
+    .account-sidebar-section { display: none; }
+    .account-sidebar.open .account-sidebar-section { display: block; }
+}
+
+/* ── Page headers ────────────────────────────────────────────── */
+
+.account-page-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--box-border);
+}
+
+.account-page-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.account-page-sub {
+    margin: 0.35rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+.account-page-prompt { color: var(--prompt); font-weight: 700; }
+
+/* ── Identity header (overview + public profile) ─────────────── */
+
+.account-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1.5rem 1.6rem;
+    margin-bottom: 1.75rem;
+    border: 1px solid var(--box-border);
+    border-radius: 0.85rem;
+    background:
+        radial-gradient(120% 140% at 0% 0%, var(--branding-dim), transparent 55%),
+        var(--box);
+    overflow: hidden;
+    animation: account-rise 0.5s both;
+}
+
+/* A coral hairline accent running down the left edge. */
+.account-header::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(var(--branding), transparent);
+}
+
+.account-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+.account-avatar-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex-shrink: 0;
+    border-radius: 0.7rem;
+    background: var(--tui-bg);
+    border: 1px solid color-mix(in srgb, var(--branding) 40%, var(--box-border));
+    box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--branding) 80%, transparent);
+}
+.account-avatar-mark .spark {
+    color: var(--branding);
+    font-size: 1.3rem;
+}
+
+.account-id-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.account-name {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.account-handle {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+}
+.account-handle-prompt { color: var(--prompt); font-weight: 700; }
+.account-handle-root { color: var(--branding); }
+
+.account-header-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+    font-size: 0.82rem;
+    color: var(--foreground);
+}
+
+.account-meta-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+@keyframes account-rise {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* ── Section cards ───────────────────────────────────────────── */
+
+.account-section {
+    position: relative;
+    margin-bottom: 1.25rem;
+    padding: 1.25rem 1.5rem 1.4rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.85rem;
+    transition: border-color 180ms ease;
+    animation: account-rise 0.5s both;
+}
+
+.account-section:hover {
+    border-color: color-mix(in srgb, var(--branding) 45%, var(--box-border));
+}
+
+.account-section:nth-of-type(1) { animation-delay: 0.04s; }
+.account-section:nth-of-type(2) { animation-delay: 0.09s; }
+.account-section:nth-of-type(3) { animation-delay: 0.14s; }
+.account-section:nth-of-type(4) { animation-delay: 0.19s; }
+.account-section:nth-of-type(5) { animation-delay: 0.24s; }
+
+.account-section > h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 0;
+    margin-bottom: 0.65rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+/* Coral terminal glyph before each section title. */
+.account-section > h2::before {
+    content: "✻";
+    color: var(--branding);
+    font-size: 0.85em;
+    text-transform: none;
+}
+
+.account-section > h3 {
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.account-section > p {
+    margin: 0 0 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.section-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.section-note {
+    margin: 0.9rem 0 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.section-note.warn { color: var(--warning-text); }
+
+.muted { color: var(--text-muted); }
+
+/* ── Stat tiles ──────────────────────────────────────────────── */
+
+.stat-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.75rem;
+}
+
+.stat-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.9rem 1rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.6rem;
+    color: var(--foreground);
+    text-decoration: none;
+    transition: border-color 0.12s, transform 0.12s, background 0.12s;
+}
+
+a.stat-tile:hover {
+    background: var(--tui-bg);
+    border-color: var(--branding);
+    transform: translateY(-2px);
+}
+
+/* Tiles that aren't links (nothing to navigate to) shouldn't invite a click. */
+.stat-tile.static { cursor: default; }
+
+.stat-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--branding);
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.stat-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+/* ── Security checklist ──────────────────────────────────────── */
+
+.checklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.check-row {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 0.9rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+}
+
+.check-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.check-row.ok   .check-mark { background: var(--success-bg); color: var(--success-text); }
+.check-row.warn .check-mark { background: var(--warning-bg); color: var(--warning-text); }
+.check-row.info .check-mark { background: var(--info-bg);    color: var(--info-text); }
+
+.check-row.warn { border-color: color-mix(in srgb, var(--warning-border) 60%, var(--box-border)); }
+
+.check-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.check-text > strong { font-size: 0.88rem; }
+
+.check-note {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.check-action {
+    font-size: 0.8rem;
+    white-space: nowrap;
+    color: var(--branding);
+    text-decoration: none;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--box-border);
+    border-radius: 0.375rem;
+    transition: border-color 0.12s, background 0.12s;
+}
+.check-action:hover {
+    border-color: var(--branding);
+    background: var(--branding-dim);
+    color: var(--branding);
+}
+
+@media (max-width: 560px) {
+    .check-row {
+        grid-template-columns: 1.6rem 1fr;
+        row-gap: 0.5rem;
+    }
+    .check-action { grid-column: 2; justify-self: start; }
+}
+
+/* ── Activity / sign-in history ──────────────────────────────── */
+
+.activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.activity-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--box-shade);
+    font-size: 0.85rem;
+}
+.activity-row + .activity-row { border-top: 1px solid var(--box-border); }
+.activity-row:hover { background: var(--tui-bg); }
+
+/* Failed attempts are the whole point of showing this list — make them findable. */
+.activity-row.failure .activity-label { color: var(--error-text); }
+
+.activity-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.activity-ip {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.35rem;
+    background: var(--box);
+    border: 1px solid var(--box-border);
+    border-radius: 0.25rem;
+}
+
+@media (max-width: 560px) {
+    .activity-row { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+}
+
+/* ── Quick links ─────────────────────────────────────────────── */
+
+.quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.quick-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.375rem;
+    color: var(--foreground);
+    text-decoration: none;
+    font-size: 0.82rem;
+    transition: background 0.12s, border-color 0.12s, transform 0.12s;
+}
+
+.quick-link:hover {
+    background: var(--box);
+    border-color: var(--branding);
+    transform: translateY(-2px);
+}
+
+/* ── Definition grid (profile) ───────────────────────────────── */
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.5rem 1.5rem;
+    margin: 0;
+    font-size: 0.88rem;
+}
+
+.detail-grid dt {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    align-self: center;
+}
+
+.detail-grid dd {
+    margin: 0;
+    align-self: center;
+}
+
+@media (max-width: 560px) {
+    .detail-grid { grid-template-columns: 1fr; gap: 0.15rem 0; }
+    .detail-grid dd { margin-bottom: 0.6rem; }
+}
+
+/* ── Sessions ────────────────────────────────────────────────── */
+
+.session-list {
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.session {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--box-shade);
+    gap: 1rem;
+    transition: background 0.12s ease;
+}
+
+.session + .session { border-top: 1px solid var(--box-border); }
+.session:hover { background: var(--tui-bg); }
+
+.session-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.session-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.session-time {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.session-actions {
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+/* ── API key ─────────────────────────────────────────────────── */
+
+.api-key-row { margin-bottom: 0.4rem; }
+
+/* Wraps the input + reveal button as a single rounded control. */
+.api-key-field {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--box-border);
+    background: var(--box-shade);
+    border-radius: 0.375rem;
+    overflow: hidden;
+    max-width: 32rem;
+}
+
+.api-key-field:focus-within { border-color: var(--form-input-focus-border); }
+
+.api-key-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: transparent;
+    border: none;
+    color: var(--foreground);
+    font-family: inherit;
+    font-size: 0.85rem;
+    outline: none;
+    letter-spacing: 0.05em;
+    min-width: 0;
+    /* The field copies on click rather than being editable. */
+    cursor: pointer;
+    transition: filter 0.25s ease, opacity 0.25s ease;
+}
+
+/* While the "Copied" badge is showing, blur the token underneath it. */
+.api-key-field.copied .api-key-input {
+    filter: blur(4px);
+    opacity: 0.5;
+}
+
+.api-key-copied {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--branding);
+    pointer-events: none;
+    opacity: 0;
+    filter: blur(6px);
+    transition: opacity 0.25s ease, filter 0.25s ease;
+}
+
+.api-key-field.copied .api-key-copied {
+    opacity: 1;
+    filter: blur(0);
+}
+
+.api-key-input[type="password"] { letter-spacing: 0.15em; }
+
+.api-key-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--box-border);
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: background 0.12s;
+}
+
+.api-key-toggle:hover { background: var(--box); }
+.api-key-toggle img { display: block; }
+
+.api-key-hint {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin: 0 0 0.75rem;
+}
+
+/* ── Scope picker ────────────────────────────────────────────── */
+
+.scope-fieldset {
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem 1rem;
+    margin: 0 0 1rem;
+}
+
+.scope-fieldset legend {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 0 0.4rem;
+}
+
+.scope-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.scope-row {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: baseline;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.3rem 0.4rem;
+    border-radius: 0.25rem;
+    transition: background 0.12s;
+}
+
+.scope-row:hover { background: var(--box-shade); }
+
+.scope-row .scope-name {
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: var(--branding);
+    font-weight: 500;
+}
+
+.scope-row .scope-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* ── Code sample ─────────────────────────────────────────────── */
+
+.code-sample {
+    margin: 0 0 0.75rem;
+    padding: 0.85rem 1rem;
+    background: var(--tui-bg);
+    border: 1px solid var(--tui-border);
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    overflow-x: auto;
+}
+.code-sample code { color: var(--foreground); }
+
+/* ── Content page ────────────────────────────────────────────── */
+
+.thumb-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+    gap: 0.6rem;
+}
+
+.thumb-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: var(--box-shade);
+    text-decoration: none;
+    color: var(--foreground);
+    transition: border-color 0.12s, transform 0.12s;
+}
+
+.thumb-card:hover {
+    border-color: var(--branding);
+    transform: translateY(-2px);
+}
+
+.thumb-card img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    background: var(--tui-bg);
+}
+
+.thumb-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.4rem 0.55rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.record-list {
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.record {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.65rem 0.9rem;
+    background: var(--box-shade);
+}
+.record + .record { border-top: 1px solid var(--box-border); }
+.record:hover { background: var(--tui-bg); }
+
+.record-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.record-title {
+    font-size: 0.87rem;
+    color: var(--foreground);
+    text-decoration: none;
+}
+.record-title:hover { color: var(--branding); }
+
+.record-sub,
+.record-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* ── Recovery-code status ────────────────────────────────────── */
+
+.recovery-status {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.recovery-status.warn {
+    background: var(--warning-bg);
+    border-color: var(--warning-border);
+    color: var(--warning-text);
+}
+
+.recovery-count {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--branding);
+}
+.recovery-status.warn .recovery-count { color: var(--warning-text); }
+
+.recovery-text { color: var(--text-muted); }
+.recovery-status.warn .recovery-text { color: inherit; }
+
+/* ── Danger zone ─────────────────────────────────────────────── */
+
+.account-section.danger-card {
+    border-color: color-mix(in srgb, var(--error-border) 70%, var(--box-border));
+    background:
+        radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--error-bg) 60%, transparent), transparent 55%),
+        var(--box);
+}
+.account-section.danger-card:hover {
+    border-color: var(--error-border);
+}
+.account-section.danger-card > h2 { color: var(--error-text); }
+.account-section.danger-card > h2::before { color: var(--error-text); }
+
+.danger-summary {
+    margin-bottom: 1rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.5rem;
+}
+
+.danger-summary-head {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+}
+
+.danger-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+}
+.danger-list strong { color: var(--foreground); }
+
+.danger-note {
+    margin: 0.75rem 0 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.danger-block {
+    margin: 0;
+    padding: 0.75rem 0.9rem;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+    border-radius: 0.5rem;
+    color: var(--warning-text);
+    font-size: 0.85rem;
+}
+
+#delete-account-modal { width: min(480px, 92vw); }
+#change-password-modal,
+#disable-2fa-modal,
+#regen-codes-modal,
+#rename-session-modal { width: min(440px, 92vw); }
+
+.delete-images-row { margin-top: 0.25rem; }
+
+/* ── 2FA setup + recovery-code pages ─────────────────────────── */
+
+.twofa-wrap { max-width: 560px; margin: 1rem auto 3rem; }
+
+.twofa-wrap h2 { margin-top: 2rem; }
+
+/* The QR must stay dark-on-white in both themes — a scanner needs the contrast,
+   so this white is deliberate and not a token. */
+.twofa-qr {
+    display: flex;
+    justify-content: center;
+    padding: 1rem;
+    background: #fff;
+    border-radius: 12px;
+    width: max-content;
+    margin: 1rem auto;
+}
+.twofa-qr svg { width: 220px; height: 220px; }
+
+.twofa-secret {
+    word-break: break-all;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+}
+
+.twofa-codes {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+}
+
+.twofa-codes li {
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    text-align: center;
+}
+
+.twofa-warn { color: var(--warning-text); }
+
+.twofa-actions {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.twofa-codes-actions { margin-top: 0.6rem; }
+
+.twofa-wrap .form-field { margin-bottom: 1.5rem; }
+
+/* ── Public profile ──────────────────────────────────────────── */
+
+.user-public { max-width: 720px; margin: 0 auto; }
+
+/* Respect reduced-motion: keep the layout, drop the entrance + lift. */
+@media (prefers-reduced-motion: reduce) {
+    .account-header,
+    .account-section { animation: none; }
+    .quick-link:hover,
+    a.stat-tile:hover,
+    .thumb-card:hover,
+    .account-nav-item:hover { transform: none; }
+}

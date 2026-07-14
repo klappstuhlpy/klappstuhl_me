@@ -1,0 +1,75 @@
+{% extends "auth/account_layout.html" %}
+
+{% block title %}Sessions | Klappstuhl.me{% endblock %}
+{% block page_title %}Sessions{% endblock %}
+{% block page_sub %}who{% endblock %}
+
+{% block account_body %}
+<section class="account-section">
+    <h2>Active sign-ins</h2>
+    <p>Every device currently signed in to your account. Revoke anything you don't recognise, then change your password.</p>
+
+    {% match current_session %}
+    {% when Some with (session) %}
+    <h3>This device</h3>
+    <div class="session-list">
+        <div class="session">
+            <div class="session-info">
+                <span class="session-label">{{ session.label() }}</span>
+                <time class="session-time js-ts" datetime="{{ session.created_at|isoformat }}">{{ session.created_at|isoformat }}</time>
+            </div>
+            <div class="session-actions">
+                <button class="button outline small rename"
+                        data-token="{{ session.signed(key)|as_ref|maybe_display }}"
+                        data-label="{{ session.label() }}">Rename</button>
+                <a class="button danger outline small" href="/logout">Sign out</a>
+            </div>
+        </div>
+    </div>
+    {% when None %}
+    {% endmatch %}
+
+    {% if !sessions.is_empty() %}
+    <h3>Other devices</h3>
+    <div class="session-list">
+        {% for session in sessions %}
+        <div class="session">
+            <div class="session-info">
+                <span class="session-label">{{ session.label() }}</span>
+                <time class="session-time js-ts" datetime="{{ session.created_at|isoformat }}">{{ session.created_at|isoformat }}</time>
+            </div>
+            <div class="session-actions">
+                <button class="button outline small rename"
+                        data-token="{{ session.signed(key)|as_ref|maybe_display }}"
+                        data-label="{{ session.label() }}">Rename</button>
+                <button class="button danger outline small invalidate"
+                        data-token="{{ session.signed(key)|as_ref|maybe_display }}">Revoke</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="section-actions">
+        <a class="button danger outline" href="/logout/all">Sign out everywhere</a>
+    </div>
+    {% else %}
+    <p class="muted">No other devices are signed in.</p>
+    {% endif %}
+</section>
+
+<dialog id="rename-session-modal">
+    <form id="rename-session-form" autocomplete="off" method="dialog">
+        <h1>Rename session</h1>
+        <p>A label only you see — "work laptop", "phone", "that one time in a hotel".</p>
+        <div class="form-container">
+            <div class="field-group">
+                <label class="field-label" for="session-name">Description</label>
+                <input class="form-field" required placeholder=" " maxlength="100" name="description" id="session-name" type="text">
+            </div>
+        </div>
+        <footer>
+            <button class="button primary" type="submit" id="rename-session-save">Save</button>
+            <button class="button" type="button" id="rename-session-cancel">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+{% endblock %}
