@@ -413,6 +413,14 @@
     align-items: center;
 }
 
+/* Actions usually trail a paragraph, whose bottom margin is the gap. After a
+   `.detail-grid` (which has none) they'd sit flush against the last row, so the
+   gap has to come from here — see the rename button on the profile page. */
+.detail-grid + .section-actions,
+.detail-grid + .section-note {
+    margin-top: 1.1rem;
+}
+
 .section-note {
     margin: 0.9rem 0 0;
     font-size: 0.8rem;

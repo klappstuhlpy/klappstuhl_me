@@ -8,6 +8,8 @@
 //!   (overview, profile, security, sessions, api, content, danger) and the
 //!   read-only `/user/:name` page.
 //! - [`security`] — password changes, TOTP enrollment, recovery codes.
+//! - [`username`] — renaming the account (and the live availability check that
+//!   signup shares).
 //! - [`api_keys`] — API-token generation and the ShareX uploader config.
 //! - [`sessions`] — revoking and renaming sessions.
 //! - [`delete`] — the data export and the permanent account-deletion flow.
@@ -22,6 +24,7 @@ pub mod delete;
 pub mod pages;
 pub mod security;
 pub mod sessions;
+pub mod username;
 
 use crate::{models::Account, ratelimit::RateLimit, AppState};
 use axum::{
@@ -192,6 +195,8 @@ impl ActivityEntry {
             "auth.logout" => "Signed out",
             "auth.logout_all" => "Signed out of all sessions",
             "auth.password.change" => "Password changed",
+            "auth.username.change" => "Username changed",
+            "auth.username.change_fail" => "Failed username change",
             "auth.session.invalidate" => "Session revoked",
             "auth.session.rename" => "Session renamed",
             "auth.api_key.generate" => "API key generated",
@@ -285,6 +290,16 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/account/change_password",
             post(security::change_password).layer(RateLimit::default().quota(5, 60.0).build()),
+        )
+        .route(
+            "/account/username",
+            post(username::change_username).layer(RateLimit::default().quota(5, 600.0).build()),
+        )
+        // Reachable logged-out: the signup form's live "is this name free?" hint
+        // calls it too. Rate-limited accordingly — it is an existence oracle.
+        .route(
+            "/account/username/check",
+            get(username::check).layer(RateLimit::default().quota(30, 60.0).build()),
         )
         .route("/account/2fa/setup", post(security::totp_setup))
         .route("/account/2fa/enable", post(security::totp_enable))

@@ -4,6 +4,10 @@
 {% block page_title %}Profile{% endblock %}
 {% block page_sub %}whoami{% endblock %}
 
+{% block page_js %}
+<script src="/static/js/username.js"></script>
+{% endblock %}
+
 {% block account_body %}
 {% let me = account.as_ref().unwrap() %}
 
@@ -31,10 +35,32 @@
 
         <dt>Public page</dt>
         <dd><a href="/user/{{ me.name }}">/user/{{ me.name }}</a></dd>
+
+        {% if !previous_names.is_empty() %}
+        <dt>Previously</dt>
+        <dd>
+            {% for old in previous_names %}<code>{{ old }}</code>{% if !loop.last %}, {% endif %}{% endfor %}
+        </dd>
+        {% endif %}
     </dl>
-    <p class="section-note">
-        Usernames can't be changed yet — the name is baked into your public page and audit history.
+
+    {% match rename_available_at %}
+    {% when Some with (until) %}
+    <p class="section-note warn">
+        You changed your username recently. You can change it again after
+        <time class="js-ts" datetime="{{ until|isoformat }}">{{ until|isoformat }}</time>.
     </p>
+    {% when None %}
+    <div class="section-actions">
+        <button class="button outline" id="change-username" type="button">Change username</button>
+    </div>
+    <p class="section-note">
+        Renaming moves your public page to the new name. The old one is reserved for you — and nobody
+        else — for {{ release_hold_days }} days, so you can undo it; after that it is free. You can
+        rename once every {{ cooldown_days }} days. Your sign-in history keeps the name each event was
+        recorded under.
+    </p>
+    {% endmatch %}
 </section>
 
 <section class="account-section">
@@ -63,4 +89,46 @@
     <p class="muted">Discord integration is not configured on this instance.</p>
     {% endif %}
 </section>
+
+{# ─── Dialogs ─────────────────────────────────────────────────── #}
+{% match rename_available_at %}
+{% when Some with (_until) %}
+{% when None %}
+<dialog id="change-username-modal">
+    <form autocomplete="off" method="POST" action="/account/username">
+        <h1>Change username</h1>
+        <p>
+            You are <strong>{{ me.name }}</strong>. Pick a new name and your public page moves with you;
+            <code>/user/{{ me.name }}</code> stays reserved for you for {{ release_hold_days }} days.
+        </p>
+        <div class="form-container">
+            <div class="field-group">
+                <label class="field-label" for="new-username">New username</label>
+                <input class="form-field" required placeholder=" "
+                       pattern="[a-z0-9._\-]{3,32}"
+                       minlength="3" maxlength="32"
+                       name="username" id="new-username"
+                       type="text" autocomplete="off" spellcheck="false"
+                       data-username-status="new-username-status"
+                       data-username-submit="rename-confirm">
+                {# Filled in by username.js; the server checks the same rules again. #}
+                <p class="username-status" id="new-username-status" role="status" aria-live="polite"></p>
+            </div>
+            {% if has_password %}
+            <div class="field-group">
+                <label class="field-label" for="rename-password">Password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="password" id="rename-password" type="password" autocomplete="current-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        <footer>
+            <button id="rename-confirm" class="button primary" type="submit">Change username</button>
+            <button class="button" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+{% endmatch %}
 {% endblock %}

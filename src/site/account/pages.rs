@@ -171,16 +171,35 @@ struct ProfileTemplate {
     discord_username: String,
     discord_enabled: bool,
     has_password: bool,
+    /// `Some` while this account is inside the rename cooldown — the card then
+    /// says when it lapses instead of offering the dialog. The POST re-checks it.
+    rename_available_at: Option<OffsetDateTime>,
+    /// Names this account gave up, newest first. Each is reserved for it for
+    /// `RELEASE_HOLD_DAYS`, so it is a list of names it can still take back.
+    previous_names: Vec<String>,
+    /// Days a released name stays reserved / days between renames — rendered
+    /// into the card's copy so the page and the rules can't drift apart.
+    release_hold_days: i64,
+    cooldown_days: i64,
 }
 
 pub async fn profile(State(state): State<AppState>, flashes: Flashes, account: Account) -> Response {
-    let discord = discord_username(&state, account.id).await;
+    let (discord, rename_available_at, previous_names) = tokio::join!(
+        discord_username(&state, account.id),
+        super::username::cooldown_until(&state, account.id),
+        super::username::previous_names(&state, account.id),
+    );
+
     ProfileTemplate {
         active_page: "profile",
         flashes,
         discord_username: discord,
         discord_enabled: state.config().discord.enabled(),
         has_password: account.has_password(),
+        rename_available_at,
+        previous_names,
+        release_hold_days: super::username::RELEASE_HOLD_DAYS,
+        cooldown_days: super::username::COOLDOWN_DAYS,
         account: Some(account),
     }
     .into_response()

@@ -190,12 +190,23 @@ Container image-update status is also exposed at `GET /api/v1/admin/updates` (sc
 | Page                | What it does                                                                        |
 |---------------------|-------------------------------------------------------------------------------------|
 | `/account`          | Overview: stat tiles, a security checklist, recent account activity, quick actions  |
-| `/account/profile`  | Identity and the Discord link                                                       |
+| `/account/profile`  | Identity, changing your username, and the Discord link                              |
 | `/account/security` | Password, two-factor (TOTP) enrollment, recovery-code status, sign-in history       |
 | `/account/sessions` | Active sign-ins — rename or revoke individually, or sign out everywhere             |
 | `/account/api`      | The scoped API token, a `curl` starter, and the ShareX uploader config              |
 | `/account/content`  | Images, short links, and pastes you own                                             |
 | `/account/danger`   | Data export and permanent account deletion                                          |
+
+**Changing your username** (`POST /account/username`) re-authenticates with your
+password, then renames the account under a single transaction that also writes the
+`username_change` history. A username is an identity here — it addresses your public
+page (`/user/:name`) and labels your audit rows — so handing one over is guarded:
+the name you release stays reserved for **you** for 30 days (a rename is undoable,
+and nobody can snipe the name you just left), you may rename once every 30 days, and
+service labels the audit log uses for non-account actors (`system`, `scheduler`,
+`anonymous`, `percy-service`) can never be taken. Signup and the rename dialog both
+call `GET /account/username/check?name=…`, which answers with the *same* rules, so
+the live "available / taken" hint can't promise a name the submit would refuse.
 
 **Data export** (`GET /account/export`) downloads a JSON file with your account
 metadata, image/link entries, paste metadata, and session labels — never password

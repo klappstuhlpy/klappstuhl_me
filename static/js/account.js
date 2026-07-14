@@ -39,6 +39,12 @@ function wireModal(buttonId, dialogId) {
   return dialog;
 }
 
+/* ── Profile page ────────────────────────────────────────────── */
+
+/* The rename dialog. The availability hint inside it is wired by username.js,
+   which the page loads alongside this file. */
+wireModal('change-username', 'change-username-modal');
+
 /* ── Security page ───────────────────────────────────────────── */
 
 wireModal('change-password', 'change-password-modal');

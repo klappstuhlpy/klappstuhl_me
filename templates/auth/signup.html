@@ -8,6 +8,7 @@
 
 {% block body_end %}
 <script src="/static/js/auth.js"></script>
+<script src="/static/js/username.js"></script>
 {% endblock %}
 
 {% block body %}
@@ -30,7 +31,11 @@
                        pattern="[a-z0-9._\-]{3,32}"
                        minlength="3" maxlength="32"
                        name="username" id="username"
-                       type="text" autocomplete="username">
+                       type="text" autocomplete="username"
+                       data-username-status="username-status"
+                       data-username-submit="signup-submit">
+                {# Filled in by username.js; /signup checks the same rules again. #}
+                <p class="username-status" id="username-status" role="status" aria-live="polite"></p>
             </div>
 
             <div class="field-group">
@@ -48,7 +53,7 @@
 
             <input type="hidden" id="session-description" name="session_description" value="">
             <input type="hidden" name="next" value="{{ next }}">
-            <button class="button primary login-submit" type="submit">Create account</button>
+            <button class="button primary login-submit" id="signup-submit" type="submit">Create account</button>
         </form>
 
         {% if discord_enabled %}

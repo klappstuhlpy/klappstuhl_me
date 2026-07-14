@@ -91,6 +91,27 @@
     letter-spacing: 0.02em;
 }
 
+/* ── Live username availability (signup + the rename dialog) ── */
+
+/* Empty until username.js has something to say, so it takes no space until it
+   does — the field must not jump on the first keystroke. */
+.username-status {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--text-muted);
+}
+
+.username-status:empty { display: none; }
+
+.username-status.ok  { color: var(--success-text); }
+.username-status.bad { color: var(--error-text); }
+
+.username-status.checking::before {
+    content: '✻ ';
+    color: var(--branding);
+}
+
 /* ── Password visibility toggle ─────────────────────────────── */
 
 .password-container {
