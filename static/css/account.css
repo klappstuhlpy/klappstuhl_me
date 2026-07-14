@@ -285,6 +285,64 @@
     to   { opacity: 1; transform: none; }
 }
 
+/* ── Role badges ─────────────────────────────────────────────────
+   The identity header and the profile's Role row both label who you
+   are. The shared `.badge` in base.css is a plain outlined chip used
+   all over the site; these are the account shell's own pill, so the
+   two can diverge without disturbing anything else. */
+
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    line-height: 1.5;
+    white-space: nowrap;
+    border: 1px solid var(--box-border);
+    border-radius: 999px;
+    background: var(--box-shade);
+    color: var(--text-muted);
+}
+
+/* The glyph that opens each pill; overridden per role below. */
+.role-badge::before {
+    content: "·";
+    font-size: 1em;
+    letter-spacing: 0;
+}
+
+.role-badge.admin {
+    color: var(--branding-bright);
+    background: var(--branding-dim);
+    border-color: color-mix(in srgb, var(--branding) 45%, transparent);
+    box-shadow: 0 6px 20px -14px color-mix(in srgb, var(--branding) 90%, transparent);
+}
+
+.role-badge.admin::before {
+    content: "✻";
+    color: var(--branding);
+    font-size: 0.85em;
+}
+
+.role-badge.user {
+    color: var(--foreground);
+    border-color: color-mix(in srgb, var(--foreground) 22%, var(--box-border));
+}
+
+.role-badge.user::before {
+    content: "◇";
+    color: var(--text-muted);
+    font-size: 0.8em;
+}
+
+/* In the header the pill sits beside the name; in the Role row it sits in a
+   <dd>, where the surrounding text is left-aligned and needs no extra lead. */
+.account-identity .role-badge { align-self: center; }
+
 /* ── Section cards ───────────────────────────────────────────── */
 
 .account-section {
@@ -339,7 +397,10 @@
     letter-spacing: 0.04em;
 }
 
-.account-section > p {
+/* Body copy inside a card. Notes are excluded: they trail the card's content
+   instead of leading it, and this selector would otherwise out-specify
+   `.section-note` and strip both its top margin and its smaller size. */
+.account-section > p:not(.section-note) {
     margin: 0 0 1rem;
     color: var(--text-muted);
     font-size: 0.9rem;

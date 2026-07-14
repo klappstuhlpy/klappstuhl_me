@@ -25,7 +25,9 @@
                 <p class="account-handle"><span class="account-handle-prompt">$</span> ~/{{ user.name }}{% if user.flags.is_admin() %} · <span class="account-handle-root">root</span>{% endif %}</p>
             </div>
             {% if user.flags.is_admin() %}
-            <span class="badge branding">Admin</span>
+            <span class="role-badge admin">Admin</span>
+            {% else %}
+            <span class="role-badge user">User</span>
             {% endif %}
         </div>
         <div class="account-header-meta">

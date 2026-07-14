@@ -12,7 +12,9 @@
             <p class="account-handle"><span class="account-handle-prompt">$</span> ~/account{% if me.flags.is_admin() %} · <span class="account-handle-root">root</span>{% endif %}</p>
         </div>
         {% if me.flags.is_admin() %}
-        <span class="badge branding">Admin</span>
+        <span class="role-badge admin" title="Full access to the admin shell">Admin</span>
+        {% else %}
+        <span class="role-badge user" title="Standard account">User</span>
         {% endif %}
     </div>
     <div class="account-header-meta">

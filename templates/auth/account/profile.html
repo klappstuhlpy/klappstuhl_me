@@ -20,7 +20,7 @@
         <dd><time class="js-ts" datetime="{{ me.created_at|isoformat }}">{{ me.created_at|isoformat }}</time></dd>
 
         <dt>Role</dt>
-        <dd>{% if me.flags.is_admin() %}<span class="badge branding">Admin</span>{% else %}<span class="badge">User</span>{% endif %}</dd>
+        <dd>{% if me.flags.is_admin() %}<span class="role-badge admin" title="Full access to the admin shell">Admin</span>{% else %}<span class="role-badge user" title="Standard account">User</span>{% endif %}</dd>
 
         <dt>Sign-in</dt>
         <dd>
