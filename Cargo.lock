@@ -1921,6 +1921,7 @@ dependencies = [
  "rustls-pki-types",
  "sanitise-file-name",
  "scraper",
+ "secretshape",
  "serde",
  "serde_json",
  "sha1",
@@ -3306,6 +3307,16 @@ dependencies = [
  "once_cell",
  "selectors",
  "tendril",
+]
+
+[[package]]
+name = "secretshape"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71b33e25522be02445301b91b3b4fcf9ece8817e8d0bd6b0c5fa36a1e79b2019"
+dependencies = [
+ "regex",
+ "serde",
 ]
 
 [[package]]
