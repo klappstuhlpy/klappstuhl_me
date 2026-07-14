@@ -24,3 +24,7 @@ docker-compose.yml
 # Docs / misc
 *.md
 LICENSE
+
+# …except the changelog: src/site/changelog.rs `include_str!`s it, so it is a
+# build input, not a doc. Without this the release build fails to compile.
+!CHANGELOG.md
