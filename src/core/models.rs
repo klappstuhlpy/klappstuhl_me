@@ -379,6 +379,10 @@ pub struct Account {
     pub password: String,
     /// The account flags associated with this account.
     pub flags: AccountFlags,
+    /// When the account was registered. Queries that JOIN `session` must alias
+    /// the session's own timestamp (see `get_session_account`), otherwise the
+    /// two `created_at` columns collide and this one wins.
+    pub created_at: OffsetDateTime,
     /// Encrypted TOTP shared secret (base64 nonce‖ciphertext), or `None` when
     /// 2FA has never been set up. See [`crate::totp`].
     pub totp_secret: Option<String>,
@@ -421,7 +425,15 @@ impl Account {
 impl Table for Account {
     const NAME: &'static str = "account";
 
-    const COLUMNS: &'static [&'static str] = &["id", "name", "password", "flags", "totp_secret", "totp_enabled"];
+    const COLUMNS: &'static [&'static str] = &[
+        "id",
+        "name",
+        "password",
+        "flags",
+        "created_at",
+        "totp_secret",
+        "totp_enabled",
+    ];
 
     type Id = i64;
 
@@ -434,6 +446,9 @@ impl Table for Account {
             // Tolerant of result sets that don't select these columns (e.g. the
             // explicit-column session JOIN): a missing column yields the
             // default rather than an error.
+            created_at: row
+                .get::<_, OffsetDateTime>("created_at")
+                .unwrap_or(OffsetDateTime::UNIX_EPOCH),
             totp_secret: row.get::<_, Option<String>>("totp_secret").unwrap_or(None),
             totp_enabled: row.get::<_, bool>("totp_enabled").unwrap_or(false),
             // Populated only when the loader JOINs `user_discord_links`;

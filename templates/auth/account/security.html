@@ -1,0 +1,159 @@
+{% extends "auth/account_layout.html" %}
+
+{% block title %}Security | Klappstuhl.me{% endblock %}
+{% block page_title %}Security{% endblock %}
+{% block page_sub %}chmod 600 ~/.secrets{% endblock %}
+
+{% block account_body %}
+
+{# ─── Password ────────────────────────────────────────────────── #}
+<section class="account-section">
+    <h2>Password</h2>
+    {% if has_password %}
+    <p>Used together with your username to sign in. Changing it signs out every other session.</p>
+    {% else %}
+    <p>
+        You signed in with Discord, so this account has no password. Setting one is optional —
+        it lets you sign in without Discord, and unlocks two-factor authentication and account deletion.
+    </p>
+    {% endif %}
+    <div class="section-actions">
+        <button class="button {% if has_password %}danger outline{% else %}primary{% endif %}" id="change-password">
+            {% if has_password %}Change password{% else %}Set a password{% endif %}
+        </button>
+    </div>
+</section>
+
+{# ─── Two-factor ──────────────────────────────────────────────── #}
+<section class="account-section">
+    <h2>Two-factor authentication</h2>
+    {% if totp_enabled %}
+    <p>2FA is <strong>enabled</strong>. You'll be asked for a code from your authenticator app when you sign in with your password.</p>
+    <div class="recovery-status {% if recovery_codes_left == 0 %}warn{% else if recovery_codes_left <= 2 %}warn{% endif %}">
+        <span class="recovery-count">{{ recovery_codes_left }}</span>
+        <span class="recovery-text">
+            unused recovery code{% if recovery_codes_left != 1 %}s{% endif %} left.
+            {% if recovery_codes_left == 0 %}Regenerate now — without one, a lost device locks you out.{% endif %}
+        </span>
+    </div>
+    <div class="section-actions">
+        <button class="button outline" id="regen-codes" type="button">Regenerate recovery codes</button>
+        <button class="button danger outline" id="disable-2fa" type="button">Deactivate 2FA</button>
+    </div>
+    {% else if !has_password %}
+    <p class="muted">
+        2FA only protects username &amp; password sign-ins, and Discord sign-in skips it.
+        Set a password above to enable two-factor authentication.
+    </p>
+    {% else %}
+    <p>Add a second factor (TOTP) for stronger account security. Recommended for admins.</p>
+    <form method="POST" action="/account/2fa/setup">
+        <button class="button primary" type="submit">Set up 2FA</button>
+    </form>
+    {% endif %}
+</section>
+
+{# ─── Login history ───────────────────────────────────────────── #}
+<section class="account-section">
+    <h2>Sign-in history</h2>
+    {% if login_history.is_empty() %}
+    <p class="muted">No sign-ins recorded yet.</p>
+    {% else %}
+    <p>The last {{ login_history.len() }} sign-in event{% if login_history.len() != 1 %}s{% endif %} on this account. Anything you don't recognise is worth changing your password over.</p>
+    <ul class="activity-list">
+        {% for entry in login_history %}
+        <li class="activity-row{% if entry.is_failure() %} failure{% endif %}">
+            <span class="activity-label">{{ entry.label() }}</span>
+            <span class="activity-meta">
+                {% match entry.ip %}
+                {% when Some with (ip) %}<code class="activity-ip">{{ ip }}</code>
+                {% when None %}
+                {% endmatch %}
+                <time class="js-ts" datetime="{{ entry.ts|isoformat }}">{{ entry.ts|isoformat }}</time>
+            </span>
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</section>
+
+{# ─── Dialogs ─────────────────────────────────────────────────── #}
+<dialog id="change-password-modal">
+    <form autocomplete="off" method="POST" action="/account/change_password">
+        <h1>{% if has_password %}Change password{% else %}Set password{% endif %}</h1>
+        <p>Pick a password of at least 8 characters. You'll stay signed in on this device.</p>
+        <div class="form-container">
+            {% if has_password %}
+            <div class="field-group">
+                <label class="field-label" for="old-password">Current password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="old_password" id="old-password" type="password" autocomplete="current-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+            {% endif %}
+            <div class="field-group">
+                <label class="field-label" for="new-password">New password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="new_password" id="new-password" type="password" autocomplete="new-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+            <div class="field-group">
+                <label class="field-label" for="confirm-password">Confirm new password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="confirm_password" id="confirm-password" type="password" autocomplete="new-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+            <input type="hidden" id="session-description" name="session_description" value="">
+        </div>
+        <footer>
+            <button id="confirm" class="button primary">Save password</button>
+            <button class="button" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+
+{% if totp_enabled %}
+<dialog id="disable-2fa-modal">
+    <form autocomplete="off" method="POST" action="/account/2fa/disable">
+        <h1>Disable two-factor</h1>
+        <p>Confirm your password to turn off 2FA. Your recovery codes will be deleted.</p>
+        <div class="form-container">
+            <div class="field-group">
+                <label class="field-label" for="disable-2fa-password">Password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="password" id="disable-2fa-password" type="password" autocomplete="current-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+        </div>
+        <footer>
+            <button class="button danger" type="submit">Deactivate</button>
+            <button class="button" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+
+<dialog id="regen-codes-modal">
+    <form autocomplete="off" method="POST" action="/account/2fa/recovery_codes">
+        <h1>Regenerate recovery codes</h1>
+        <p>Confirm your password. Your existing codes stop working immediately, and the new ones are shown once.</p>
+        <div class="form-container">
+            <div class="field-group">
+                <label class="field-label" for="regen-codes-password">Password</label>
+                <div class="password-container form-field">
+                    <input class="form-field" required placeholder=" " minlength="8" maxlength="128" name="password" id="regen-codes-password" type="password" autocomplete="current-password">
+                    <span class="password-icon"><img alt="" src="/static/img/visibility.svg" width="20" height="20"/></span>
+                </div>
+            </div>
+        </div>
+        <footer>
+            <button class="button primary" type="submit">Generate new codes</button>
+            <button class="button" formmethod="dialog">Cancel</button>
+        </footer>
+    </form>
+</dialog>
+{% endif %}
+{% endblock %}

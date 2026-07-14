@@ -2,19 +2,7 @@
 
 {% block css %}
 <link rel="stylesheet" href="/static/css/auth.css" type="text/css"/>
-<style>
-    .twofa-wrap { max-width: 560px; margin: 1rem auto 3rem; }
-    .twofa-qr { display: flex; justify-content: center; padding: 1rem; background: #fff; border-radius: 12px; width: max-content; margin: 1rem auto; }
-    .twofa-qr svg { width: 220px; height: 220px; }
-    .twofa-secret { font-family: monospace; word-break: break-all; background: var(--box-shade); border: 1px solid var(--box-border); border-radius: 8px; padding: 0.6rem 0.8rem; }
-    .twofa-codes { list-style: none; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
-    .twofa-codes li { font-family: monospace; background: var(--box-shade); border: 1px solid var(--box-border); border-radius: 6px; padding: 0.4rem 0.6rem; text-align: center; }
-    .twofa-warn { color: var(--warning-text); }
-    .twofa-actions { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
-    .twofa-codes-actions { margin-top: 0.6rem; }
-    .form-field { margin-bottom: 1.5rem; }
-    h2 { margin-top: 2rem; }
-</style>
+<link rel="stylesheet" href="/static/css/account.css" type="text/css"/>
 {% endblock %}
 
 {% block title %}Set up 2FA | Klappstuhl.me{% endblock %}
@@ -54,29 +42,12 @@
         </div>
         <div class="twofa-actions">
             <button class="button primary" type="submit">Enable 2FA</button>
-            <a class="button outline" href="/account">Cancel</a>
+            <a class="button outline" href="/account/security">Cancel</a>
         </div>
     </form>
 </section>
 {% endblock %}
 
 {% block body_end %}
-<script>
-    document.getElementById('dl-codes')?.addEventListener('click', () => {
-        const codes = Array.from(document.querySelectorAll('.twofa-codes li'))
-            .map(li => li.textContent.trim())
-            .filter(Boolean);
-        const text = 'Klappstuhl.me 2FA recovery codes\n'
-            + 'Keep these safe. Each code can be used once.\n\n'
-            + codes.join('\n') + '\n';
-        const blob = new Blob([text], { type: 'text/plain' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'klappstuhl-recovery-codes.txt';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(a.href);
-    });
-</script>
+<script src="/static/js/account.js"></script>
 {% endblock %}

@@ -21,6 +21,7 @@ Personal website, image host, and homelab admin platform — built in Rust.
 - [Quick start (Docker)](#quick-start-docker)
 - [Configuration](#configuration)
 - [Admin dashboard](#admin-dashboard)
+- [Account](#account)
 - [Discord login & the Percy dashboard](#discord-login--the-percy-dashboard)
 - [Data & log paths](#data--log-paths)
 - [Building from source](#building-from-source)
@@ -181,6 +182,33 @@ non-fatal** — an unreachable or unconfigured backend simply hides its panel:
 - **Secrets scanner**, **audit log**, and a **Ctrl+K command palette** (with optional cron scripts).
 
 Container image-update status is also exposed at `GET /api/v1/admin/updates` (scope `admin:read`).
+
+## Account
+
+`/account` is a sidebar shell rather than one long page — each area owns a route:
+
+| Page                | What it does                                                                        |
+|---------------------|-------------------------------------------------------------------------------------|
+| `/account`          | Overview: stat tiles, a security checklist, recent account activity, quick actions  |
+| `/account/profile`  | Identity and the Discord link                                                       |
+| `/account/security` | Password, two-factor (TOTP) enrollment, recovery-code status, sign-in history       |
+| `/account/sessions` | Active sign-ins — rename or revoke individually, or sign out everywhere             |
+| `/account/api`      | The scoped API token, a `curl` starter, and the ShareX uploader config              |
+| `/account/content`  | Images, short links, and pastes you own                                             |
+| `/account/danger`   | Data export and permanent account deletion                                          |
+
+**Data export** (`GET /account/export`) downloads a JSON file with your account
+metadata, image/link entries, paste metadata, and session labels — never password
+hashes, TOTP secrets, or tokens.
+
+**Account deletion** (`POST /account/delete`) is immediate and permanent — there is
+no soft-delete or grace period. It requires a browser session (never an API key),
+the username typed back, the current password (Discord-only accounts must set one
+first), and a TOTP code when 2FA is on — recovery codes are rejected here, since
+they exist to restore access rather than destroy it. It is rate-limited, refuses to
+delete the **last admin account**, and offers a choice to delete or orphan your
+uploaded images. Sessions, API keys, recovery codes, the Discord link, short links,
+and pastes go with the account; audit-log rows are retained with the actor unlinked.
 
 ## Discord login & the Percy dashboard
 

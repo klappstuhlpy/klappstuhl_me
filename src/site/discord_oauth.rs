@@ -8,10 +8,7 @@ use crate::{
 };
 use axum::{
     extract::{Query, State},
-    http::{
-        header::{CACHE_CONTROL, SET_COOKIE},
-        HeaderValue, StatusCode,
-    },
+    http::{header::CACHE_CONTROL, HeaderValue, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
     Router,
@@ -382,6 +379,7 @@ async fn login_or_create(
                     name: username,
                     password: String::new(),
                     flags: Default::default(),
+                    created_at: time::OffsetDateTime::now_utc(),
                     totp_secret: None,
                     totp_enabled: false,
                     discord_id: Some(user.id.clone()),
@@ -430,6 +428,7 @@ async fn login_or_create(
                                 name: suffixed,
                                 password: String::new(),
                                 flags: Default::default(),
+                                created_at: time::OffsetDateTime::now_utc(),
                                 totp_secret: None,
                                 totp_enabled: false,
                                 discord_id: Some(user.id.clone()),
@@ -477,9 +476,9 @@ async fn discord_unlink(
                 .actor(&account)
                 .ip_opt(client_ip)
                 .fire();
-            flasher.add("Discord account unlinked.").bail("/account")
+            flasher.add("Discord account unlinked.").bail("/account/profile")
         }
-        _ => flasher.add("No Discord account was linked.").bail("/account"),
+        _ => flasher.add("No Discord account was linked.").bail("/account/profile"),
     }
 }
 
@@ -500,10 +499,10 @@ async fn create_session_response(
     state.save_session(&token, Some("Discord OAuth".to_string())).await;
     state.audit(audit_action).actor(account).ip_opt(client_ip).fire();
 
+    // Queued, not inserted: the flash layer would otherwise overwrite it on any
+    // callback path that also flashes a message. See platform/cookies.rs.
     let mut response = Redirect::to(target).into_response();
-    if let Ok(val) = HeaderValue::from_str(&cookie.to_string()) {
-        response.headers_mut().insert(SET_COOKIE, val);
-    }
+    crate::cookies::queue_cookie(&mut response, cookie);
     response
 }
 

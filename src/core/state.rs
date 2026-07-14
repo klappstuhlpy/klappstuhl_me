@@ -407,7 +407,8 @@ impl AppState {
                 // so both cache writers store the same shape.
                 let query = r#"
                     SELECT account.id AS id, account.name AS name, account.password AS password,
-                           account.flags AS flags, account.totp_secret AS totp_secret,
+                           account.flags AS flags, account.created_at AS created_at,
+                           account.totp_secret AS totp_secret,
                            account.totp_enabled AS totp_enabled,
                            dl.discord_user_id AS discord_id
                     FROM account
@@ -492,12 +493,15 @@ impl AppState {
                 account
             }
             Err(guard) => {
+                // `created_at` is the *account's* (Account::from_row reads that name);
+                // the session's own timestamp is aliased apart so the two don't collide.
                 let query = r#"
                     SELECT account.id AS id, account.name AS name, account.password AS password,
-                           account.flags AS flags, account.totp_secret AS totp_secret,
+                           account.flags AS flags, account.created_at AS created_at,
+                           account.totp_secret AS totp_secret,
                            account.totp_enabled AS totp_enabled,
                            dl.discord_user_id AS discord_id,
-                           session.api_key AS api_key, session.created_at AS created_at
+                           session.api_key AS api_key, session.created_at AS session_created_at
                     FROM account INNER JOIN session ON session.account_id = account.id
                     LEFT JOIN user_discord_links dl ON dl.account_id = account.id
                     WHERE session.id = ? AND session.account_id = ? AND session.api_key = ?
@@ -512,7 +516,7 @@ impl AppState {
                             let info = SessionInfo {
                                 id: account.id,
                                 api_key: row.get("api_key")?,
-                                created_at: row.get("created_at")?,
+                                created_at: row.get("session_created_at")?,
                                 // Browser-session path: scopes are irrelevant
                                 // (cookie sessions bypass scope checks).
                                 scopes: String::new(),
