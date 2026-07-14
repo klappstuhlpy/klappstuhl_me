@@ -2,14 +2,15 @@
 //! in configured filesystem paths.
 //!
 //! Architecture mirrors `crate::metrics`:
-//!   * `rules` — what to look for (compiled regex set)
+//!   * the `secretshape` crate — what to look for (the rule table that used to
+//!     be `rules.rs` here, now published standalone by the same author; rule
+//!     names are byte-identical, so `secret_finding` dedupe hashes are stable)
 //!   * `scanner` — the file walker + per-line matching (sync, runs in
 //!     `spawn_blocking`)
 //!   * `storage` — persistence and dashboard queries
 //!   * this file — public API: `spawn_scheduler`, `run_scan`.
 pub mod routes; // HTTP handlers for this admin feature (see admin/mod.rs)
 
-pub mod rules;
 pub mod scanner;
 pub mod storage;
 
@@ -61,7 +62,7 @@ pub async fn run_scan(state: &AppState) -> anyhow::Result<()> {
     let total = findings.len();
     let critical = findings
         .iter()
-        .filter(|f| matches!(f.severity, rules::Severity::Critical))
+        .filter(|f| matches!(f.severity, secretshape::Severity::Critical))
         .count();
 
     let new_count = storage::record_scan(state, findings, counters.files_scanned, counters.bytes_scanned, None).await?;

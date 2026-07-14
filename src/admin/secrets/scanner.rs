@@ -9,15 +9,15 @@
 //! * Each line is truncated to [`MAX_LINE_BYTES`] before being run against
 //!   the rules to bound regex work on pathological one-line minified files.
 
+use secretshape::{Scanner, Severity};
 use sha2::{Digest, Sha256};
 use std::{
     fs::File,
     io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 use tracing::warn;
-
-use super::rules::{rules, Severity};
 
 /// Files larger than this are skipped (1 MiB).
 const MAX_FILE_BYTES: u64 = 1 * 1024 * 1024;
@@ -60,7 +60,7 @@ const SKIP_EXTS: &[&str] = &[
 /// as the natural key in the `secret_finding` table.
 #[derive(Debug, Clone)]
 pub struct Finding {
-    pub rule: &'static str,
+    pub rule: String,
     pub severity: Severity,
     pub file_path: PathBuf,
     pub line: u32,
@@ -190,25 +190,37 @@ fn scan_file(path: &Path, out: &mut Vec<Finding>, counters: &mut ScanCounters) {
     counters.bytes_scanned += meta.len();
 
     for (i, line) in reader.lines().enumerate() {
-        let Ok(mut line) = line else { continue };
-        if line.len() > MAX_LINE_BYTES {
-            line.truncate(MAX_LINE_BYTES);
-        }
-        for rule in rules() {
-            if let Some(m) = rule.regex.find(&line) {
-                let snippet = redact_snippet(&line, m.start(), m.end());
-                let hash = hash_finding(rule.name, path, &snippet);
-                out.push(Finding {
-                    rule: rule.name,
-                    severity: rule.severity,
-                    file_path: path.to_path_buf(),
-                    line: (i + 1) as u32,
-                    snippet,
-                    finding_hash: hash,
-                });
+        let Ok(line) = line else { continue };
+        // The scanner's own input cap replaces the old manual `line.truncate(...)`:
+        // same 8 KiB bound, but cut on a char boundary, so a multibyte character
+        // straddling the mark can no longer panic the walk.
+        let mut seen: Vec<std::borrow::Cow<'static, str>> = Vec::new();
+        for finding in scanner().scan(&line) {
+            // Keep the historical "first match per rule per line" shape — findings
+            // arrive position-sorted, so the first occurrence of a rule name is the
+            // same match `Regex::find` used to return, and its hash is unchanged.
+            if seen.contains(&finding.rule) {
+                continue;
             }
+            let snippet = redact_snippet(&line, finding.span.start, finding.span.end);
+            let hash = hash_finding(&finding.rule, path, &snippet);
+            out.push(Finding {
+                rule: finding.rule.to_string(),
+                severity: finding.severity,
+                file_path: path.to_path_buf(),
+                line: (i + 1) as u32,
+                snippet,
+                finding_hash: hash,
+            });
+            seen.push(finding.rule);
         }
     }
+}
+
+/// The compiled rule set, built once. Line truncation lives here (see the loop above).
+fn scanner() -> &'static Scanner {
+    static SLOT: OnceLock<Scanner> = OnceLock::new();
+    SLOT.get_or_init(|| Scanner::new().max_input_bytes(MAX_LINE_BYTES))
 }
 
 /// Returns a context-trimmed line with the matched span partially redacted
