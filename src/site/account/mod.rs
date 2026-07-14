@@ -36,12 +36,12 @@ use time::OffsetDateTime;
 
 /// Set the session cookie and redirect to `target` (an already-validated path).
 ///
-/// The cookie is *queued* rather than written directly: handlers that also flash
-/// a message (signup, change_password) would otherwise have it overwritten by
-/// the flash layer's `Set-Cookie`. See [`crate::cookies`].
+/// The cookie is *appended*, so it survives alongside the flash layer's own
+/// `Set-Cookie` on handlers that do both (signup, change_password).
+/// See [`crate::cookies`].
 pub(crate) fn cookie_redirect(cookie: Cookie<'static>, target: &str) -> Response {
     let mut response = Redirect::to(target).into_response();
-    crate::cookies::queue_cookie(&mut response, cookie);
+    crate::cookies::set_cookie(&mut response, cookie);
     response
 }
 

@@ -334,6 +334,17 @@ impl RequestLogger {
         Ok(Self { sender })
     }
 
+    /// A logger that discards everything, for tests.
+    ///
+    /// [`RequestLogger::new`] opens `requests.db` on disk and spawns a worker
+    /// thread; a test wants neither. The receiver is dropped immediately, so
+    /// every `send` fails — which every caller here already ignores.
+    #[cfg(test)]
+    pub fn null() -> Self {
+        let (sender, _) = crossbeam_channel::unbounded();
+        Self { sender }
+    }
+
     /// Requests to terminate the worker thread
     pub fn quit(&self) {
         let _ = self.sender.send(RequestMessage::Quit);

@@ -216,10 +216,6 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         ))
         .layer(klappstuhl_me::logging::HttpTrace::new(state.requests.clone()))
         .layer(middleware::from_fn(klappstuhl_me::flash::process_flash_messages))
-        // Must stay *below* the flash layer: that one `insert`s its Set-Cookie
-        // (replacing any the handler set), so queued auth cookies are appended
-        // here afterwards. See platform/cookies.rs.
-        .layer(middleware::from_fn(klappstuhl_me::cookies::apply_pending_cookies))
         .layer(middleware::from_fn(klappstuhl_me::parse_cookies))
         .layer(Extension(secret_key))
         // Scope the auth cookie to the registrable domain so a login on the apex

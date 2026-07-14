@@ -221,8 +221,7 @@ pub async fn logout(
 /// legacy host-only one, and the Percy dashboard's `session` cookie (single
 /// sign-out across the `percy.` subdomain). Shared by logout and account deletion.
 ///
-/// Queued (not written) so the flash layer can't clobber the teardown — deletion
-/// flashes a farewell message on its way out. See [`crate::cookies`].
+/// All three are appended, so they coexist on one response. See [`crate::cookies`].
 pub(crate) fn clear_session_cookies(state: &AppState, response: &mut Response) {
     let mut builder = Cookie::build(("token", ""))
         .path("/")
@@ -230,15 +229,15 @@ pub(crate) fn clear_session_cookies(state: &AppState, response: &mut Response) {
     if let Some(d) = state.config().cookie_domain() {
         builder = builder.domain(d);
     }
-    crate::cookies::queue_cookie(response, builder.build());
-    crate::cookies::queue_raw(response, clear_host_only_cookie());
+    crate::cookies::set_cookie(response, builder.build());
+    crate::cookies::set_raw_cookie(response, clear_host_only_cookie());
     if let Some(d) = state.config().cookie_domain() {
         let percy_session = Cookie::build(("session", ""))
             .path("/")
             .domain(d)
             .expires(cookie::time::OffsetDateTime::UNIX_EPOCH)
             .build();
-        crate::cookies::queue_cookie(response, percy_session);
+        crate::cookies::set_cookie(response, percy_session);
     }
 }
 
@@ -409,7 +408,7 @@ fn clear_pending_cookie() -> Cookie<'static> {
 /// 303 to /login/2fa carrying the pending-challenge cookie.
 fn pending_totp_response(signed: String) -> Response {
     let mut resp = Redirect::to("/login/2fa").into_response();
-    crate::cookies::queue_cookie(&mut resp, pending_totp_cookie(signed));
+    crate::cookies::set_cookie(&mut resp, pending_totp_cookie(signed));
     resp
 }
 
@@ -528,7 +527,7 @@ pub async fn login_totp_verify(
     let trusted = state.config().trusted_domain();
     let target = crate::utils::safe_next_for_domain(pending.next.as_deref(), Some(&trusted));
     let mut resp = Redirect::to(target.as_deref().unwrap_or("/")).into_response();
-    crate::cookies::queue_cookie(&mut resp, session_cookie);
-    crate::cookies::queue_cookie(&mut resp, clear_pending_cookie());
+    crate::cookies::set_cookie(&mut resp, session_cookie);
+    crate::cookies::set_cookie(&mut resp, clear_pending_cookie());
     resp
 }

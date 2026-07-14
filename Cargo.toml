@@ -11,8 +11,8 @@ description = "A custom information website about Klappstuhl and API support."
 # repo and percy-dashboard when cutting a new shared release; never move a
 # published tag, since both consumers pin to it.
 [dependencies]
-kls-ui = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.3" }
-kls-web-core = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.3" }
+kls-ui = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.9" }
+kls-web-core = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.9" }
 anyhow = "1.0.80"
 argon2 = { version = "0.5.3", features = ["std"] }
 async-trait = "0.1.77"

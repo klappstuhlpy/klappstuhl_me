@@ -243,6 +243,59 @@ impl AppState {
         }
     }
 
+    /// An `AppState` for tests, over the `database` you hand it.
+    ///
+    /// [`AppState::new`] is unusable from a test: it probes the filesystem for a
+    /// GeoIP database, *writes back to `config.json`*, opens `requests.db`, dials
+    /// the Docker socket and shells out to detect a firewall backend. This does
+    /// none of that — every optional integration is off, the request logger
+    /// discards, and the config is a throwaway with a random secret key.
+    ///
+    /// Pair it with an in-memory database, which must be single-connection: each
+    /// `:memory:` connection is its *own* database, so a pool of 10 would hand
+    /// each query a different empty one.
+    ///
+    /// ```ignore
+    /// let db = Database::file(":memory:")
+    ///     .connections(1)
+    ///     .with_init(crate::migrations::migrate)
+    ///     .open()
+    ///     .await?;
+    /// let state = AppState::for_tests(db).await;
+    /// ```
+    #[cfg(test)]
+    pub async fn for_tests(database: Database) -> Self {
+        // `Config` has no `Default` (its `secret_key` is required), but every
+        // other field is `#[serde(default)]` — so the key is the whole config.
+        let secret_key = crate::key::SecretKey::random().expect("random secret key");
+        let config: Config = serde_json::from_value(serde_json::json!({ "secret_key": secret_key.hex() }))
+            .expect("a config from just a secret key");
+
+        let (live_tx, _) = broadcast::channel(64);
+        Self {
+            inner: Arc::new(InnerState {
+                config,
+                database,
+                cached_images: TimedCachedValue::new(Duration::from_secs(60 * 30)),
+                cached_image_files: TimedCachedValue::new(Duration::from_secs(60 * 30)),
+                cached_users: Cache::new(1000),
+                valid_sessions: Cache::new(1000),
+                processed_media: Cache::new(512),
+                thumbnails: Cache::new(1024),
+                geoip: GeoIp::open(None),
+                cloudflare: None,
+                live_tx,
+                docker: None,
+                firewall_backend: None,
+                image_updates: std::sync::Mutex::new(std::collections::HashMap::new()),
+            }),
+            client: reqwest::Client::new(),
+            requests: RequestLogger::null(),
+            incorrect_default_password_hash: hash_password("incorrect-default-password")
+                .expect("could not hash default password"),
+        }
+    }
+
     pub fn geoip(&self) -> &GeoIp {
         &self.inner.geoip
     }

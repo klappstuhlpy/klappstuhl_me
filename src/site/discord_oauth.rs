@@ -499,10 +499,10 @@ async fn create_session_response(
     state.save_session(&token, Some("Discord OAuth".to_string())).await;
     state.audit(audit_action).actor(account).ip_opt(client_ip).fire();
 
-    // Queued, not inserted: the flash layer would otherwise overwrite it on any
-    // callback path that also flashes a message. See platform/cookies.rs.
+    // Appended, not inserted, so a callback path that also flashes a message
+    // keeps both cookies. See platform/cookies.rs.
     let mut response = Redirect::to(target).into_response();
-    crate::cookies::queue_cookie(&mut response, cookie);
+    crate::cookies::set_cookie(&mut response, cookie);
     response
 }
 

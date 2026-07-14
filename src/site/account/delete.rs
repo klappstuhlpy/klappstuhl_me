@@ -535,6 +535,370 @@ pub async fn delete_account(
     response
 }
 
+/// Drives `delete_account` over HTTP against a real (in-memory) database.
+///
+/// Every test starts from [`guards::Request::valid`] — a request that satisfies
+/// every guard and really does delete the account (`deleting_for_real_removes_the_account`
+/// proves it). Each guard test then breaks exactly *one* precondition, so a
+/// refusal can only be the guard under test: nothing else about the request changed.
+#[cfg(test)]
+mod guards {
+    use crate::{
+        auth::hash_password,
+        models::Account,
+        token::Token,
+        totp::{current_code, encrypt_secret, generate_secret},
+        AppState, Database,
+    };
+    use axum::{
+        body::Body,
+        http::{header::LOCATION, Request, StatusCode},
+        routing::post,
+        Extension, Router,
+    };
+    use tower::ServiceExt;
+
+    const PASSWORD: &str = "correct-horse-battery";
+
+    async fn test_state() -> AppState {
+        // One connection: every `:memory:` connection is a separate database.
+        let database = Database::file(":memory:")
+            .connections(1)
+            .with_init(crate::migrations::migrate)
+            .open()
+            .await
+            .expect("open in-memory db");
+        AppState::for_tests(database).await
+    }
+
+    /// The handler alone — the real route also carries a rate-limit layer, which
+    /// is not what these tests are about.
+    fn router(state: AppState) -> Router {
+        let key = state.config().secret_key;
+        // Mirrors main.rs: layers run bottom-to-top, so the secret key is in the
+        // extensions before `parse_cookies` runs, and both are there for flash.
+        Router::new()
+            .route("/account/delete", post(super::delete_account))
+            .with_state(state)
+            .layer(axum::middleware::from_fn(crate::flash::process_flash_messages))
+            .layer(axum::middleware::from_fn(crate::parse_cookies))
+            .layer(Extension(key))
+    }
+
+    /// Inserts an account and returns it.
+    async fn seed_account(state: &AppState, name: &str, admin: bool, totp_secret: Option<&[u8]>) -> Account {
+        let password = hash_password(PASSWORD).expect("hash");
+        let flags = i64::from(admin); // AccountFlags::ADMIN is bit 0
+        let encrypted = totp_secret.map(|s| encrypt_secret(&state.config().secret_key, s).expect("encrypt totp"));
+        let name = name.to_owned();
+        state
+            .database()
+            .execute(
+                "INSERT INTO account(name, password, flags, totp_secret, totp_enabled)
+                 VALUES (?, ?, ?, ?, ?)",
+                (name.clone(), password, flags, encrypted, totp_secret.is_some()),
+            )
+            .await
+            .expect("insert account");
+        state
+            .database()
+            .get::<Account, _, _>("SELECT * FROM account WHERE name = ?", [name])
+            .await
+            .expect("load account")
+            .expect("account exists")
+    }
+
+    /// A browser login for `account`, returning the signed `token` cookie value.
+    async fn login(state: &AppState, account: &Account) -> String {
+        let token = Token::new(account.id).expect("token");
+        state.save_session(&token, Some("laptop".to_owned())).await;
+        token.to_cookie(&state.config().secret_key, None).value().to_owned()
+    }
+
+    /// The form fields of a deletion request.
+    struct Params {
+        username: String,
+        password: String,
+        code: String,
+        delete_images: bool,
+    }
+
+    impl Params {
+        /// Every guard satisfied.
+        fn valid(account: &Account) -> Self {
+            Self {
+                username: account.name.clone(),
+                password: PASSWORD.to_owned(),
+                code: String::new(),
+                delete_images: false,
+            }
+        }
+
+        fn body(&self) -> String {
+            let mut body = format!(
+                "username={}&password={}&code={}",
+                self.username, self.password, self.code
+            );
+            if self.delete_images {
+                body.push_str("&delete_images=on");
+            }
+            body
+        }
+    }
+
+    /// `POST /account/delete`, returning the `Location` it redirects to.
+    async fn post_delete(state: &AppState, cookie: &str, params: &Params) -> String {
+        let response = router(state.clone())
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/account/delete")
+                    .header("Cookie", format!("token={cookie}"))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .body(Body::from(params.body()))
+                    .unwrap(),
+            )
+            .await
+            .expect("handler ran");
+
+        assert_eq!(
+            response.status(),
+            StatusCode::SEE_OTHER,
+            "expected a redirect, got {}",
+            response.status()
+        );
+        response
+            .headers()
+            .get(LOCATION)
+            .expect("a Location header")
+            .to_str()
+            .expect("ascii location")
+            .to_owned()
+    }
+
+    async fn account_exists(state: &AppState, id: i64) -> bool {
+        state
+            .database()
+            .get::<Account, _, _>("SELECT * FROM account WHERE id = ?", [id])
+            .await
+            .expect("query")
+            .is_some()
+    }
+
+    /// Asserts the request was refused and the account is still there.
+    async fn assert_refused(state: &AppState, location: &str, id: i64) {
+        assert_eq!(location, super::DANGER_PAGE, "expected a bounce to the danger zone");
+        assert!(
+            account_exists(state, id).await,
+            "the account was deleted despite the refusal"
+        );
+    }
+
+    // ── The baseline: a request that satisfies every guard really does delete ──
+
+    #[tokio::test]
+    async fn deleting_for_real_removes_the_account() {
+        let state = test_state().await;
+        let account = seed_account(&state, "victim", false, None).await;
+        let cookie = login(&state, &account).await;
+
+        let location = post_delete(&state, &cookie, &Params::valid(&account)).await;
+
+        assert_eq!(location, "/", "a successful deletion goes home");
+        assert!(!account_exists(&state, account.id).await, "the account survived");
+    }
+
+    /// The teardown sets three expiry cookies *and* flashes a farewell. Before
+    /// kls-web-core v0.1.9 the flash layer's `insert` dropped all three, leaving
+    /// the browser holding a session cookie for an account that no longer exists.
+    #[tokio::test]
+    async fn deletion_clears_the_session_cookies_alongside_the_flash() {
+        let state = test_state().await;
+        let account = seed_account(&state, "leaver", false, None).await;
+        let cookie = login(&state, &account).await;
+
+        let response = router(state.clone())
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/account/delete")
+                    .header("Cookie", format!("token={cookie}"))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .body(Body::from(Params::valid(&account).body()))
+                    .unwrap(),
+            )
+            .await
+            .expect("handler ran");
+
+        let cookies: Vec<_> = response
+            .headers()
+            .get_all(axum::http::header::SET_COOKIE)
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .collect();
+
+        assert!(
+            cookies.iter().any(|c| c.starts_with("token=;")),
+            "the session cookie was not torn down: {cookies:?}"
+        );
+        assert!(
+            cookies.iter().any(|c| c.starts_with("flash_messages=")),
+            "the farewell flash was lost: {cookies:?}"
+        );
+    }
+
+    // ── One guard broken per test ────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn the_last_admin_cannot_delete_itself() {
+        let state = test_state().await;
+        let account = seed_account(&state, "onlyadmin", true, None).await;
+        let cookie = login(&state, &account).await;
+
+        let location = post_delete(&state, &cookie, &Params::valid(&account)).await;
+
+        assert_refused(&state, &location, account.id).await;
+    }
+
+    /// The same admin, once they are no longer the *last* one, may leave.
+    #[tokio::test]
+    async fn an_admin_with_a_peer_can_delete_itself() {
+        let state = test_state().await;
+        let account = seed_account(&state, "admin", true, None).await;
+        seed_account(&state, "coadmin", true, None).await;
+        let cookie = login(&state, &account).await;
+
+        let location = post_delete(&state, &cookie, &Params::valid(&account)).await;
+
+        assert_eq!(location, "/");
+        assert!(!account_exists(&state, account.id).await);
+    }
+
+    #[tokio::test]
+    async fn a_mistyped_username_is_refused() {
+        let state = test_state().await;
+        let account = seed_account(&state, "victim", false, None).await;
+        let cookie = login(&state, &account).await;
+
+        let mut params = Params::valid(&account);
+        params.username = "victjm".to_owned();
+        let location = post_delete(&state, &cookie, &params).await;
+
+        assert_refused(&state, &location, account.id).await;
+    }
+
+    #[tokio::test]
+    async fn a_wrong_password_is_refused() {
+        let state = test_state().await;
+        let account = seed_account(&state, "victim", false, None).await;
+        let cookie = login(&state, &account).await;
+
+        let mut params = Params::valid(&account);
+        params.password = "hunter2".to_owned();
+        let location = post_delete(&state, &cookie, &params).await;
+
+        assert_refused(&state, &location, account.id).await;
+    }
+
+    #[tokio::test]
+    async fn a_missing_totp_code_is_refused_when_2fa_is_on() {
+        let state = test_state().await;
+        let secret = generate_secret();
+        let account = seed_account(&state, "careful", false, Some(&secret)).await;
+        let cookie = login(&state, &account).await;
+
+        // Password is right; the second factor is simply absent.
+        let location = post_delete(&state, &cookie, &Params::valid(&account)).await;
+
+        assert_refused(&state, &location, account.id).await;
+    }
+
+    #[tokio::test]
+    async fn the_right_totp_code_lets_the_deletion_through() {
+        let state = test_state().await;
+        let secret = generate_secret();
+        let account = seed_account(&state, "careful", false, Some(&secret)).await;
+        let cookie = login(&state, &account).await;
+
+        let mut params = Params::valid(&account);
+        params.code = current_code(&secret);
+        let location = post_delete(&state, &cookie, &params).await;
+
+        assert_eq!(location, "/");
+        assert!(!account_exists(&state, account.id).await);
+    }
+
+    /// Recovery codes restore *access*; they must never authorise destruction.
+    /// A valid, unused recovery code is offered where the TOTP code goes and is
+    /// rejected exactly like any other wrong code.
+    #[tokio::test]
+    async fn a_recovery_code_cannot_authorise_deletion() {
+        let state = test_state().await;
+        let secret = generate_secret();
+        let account = seed_account(&state, "careful", false, Some(&secret)).await;
+        let cookie = login(&state, &account).await;
+
+        let recovery = crate::totp::generate_recovery_codes();
+        let code = recovery.first().expect("a recovery code").clone();
+        state
+            .database()
+            .execute(
+                "INSERT INTO totp_recovery_code(account_id, code_hash) VALUES (?, ?)",
+                (account.id, crate::totp::hash_recovery_code(&code)),
+            )
+            .await
+            .expect("insert recovery code");
+
+        let mut params = Params::valid(&account);
+        params.code = code.clone();
+        let location = post_delete(&state, &cookie, &params).await;
+
+        assert_refused(&state, &location, account.id).await;
+
+        // Without this the test proves nothing: it would pass just as happily if
+        // we had offered a code that was never valid in the first place. The code
+        // is still live and unused, so deletion *refused* it rather than failing
+        // to recognise it.
+        assert!(
+            super::super::auth::consume_recovery_code(&state, account.id, &code).await,
+            "the code offered was not a valid, unused recovery code — the refusal above was meaningless"
+        );
+    }
+
+    /// An API key must never be able to destroy the account.
+    ///
+    /// Reaching this guard takes some doing, which is the point: the `Account`
+    /// extractor asks `get_session_account(.., api_key = false)`, whose SQL
+    /// filters API-key sessions out — but its cache branch returns whatever is
+    /// cached for that session id *without* re-checking the flag, and the `/api`
+    /// token path (`site::api::auth`) populates that cache with `api_key = true`
+    /// entries. So we prime the cache the way a prior `/api` request would, which
+    /// gets an API-key session past the extractor and onto the handler, where the
+    /// handler's own re-read of the session row is the thing that stops it.
+    #[tokio::test]
+    async fn an_api_key_session_cannot_delete_the_account() {
+        let state = test_state().await;
+        let account = seed_account(&state, "victim", false, None).await;
+
+        let mut token = Token::new(account.id).expect("token");
+        token.api_key = true;
+        state
+            .database()
+            .execute(
+                "INSERT INTO session(id, account_id, description, api_key) VALUES (?, ?, 'API Key', 1)",
+                (token.base64(), account.id),
+            )
+            .await
+            .expect("insert api key session");
+        state.is_session_valid(&token.base64()).await;
+
+        let cookie = token.to_cookie(&state.config().secret_key, None).value().to_owned();
+        let location = post_delete(&state, &cookie, &Params::valid(&account)).await;
+
+        assert_refused(&state, &location, account.id).await;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::purge_account;

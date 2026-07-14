@@ -1,56 +1,71 @@
-//! Cookies that survive the flash middleware.
+//! Setting cookies on an outgoing response.
 //!
-//! `flash::process_flash_messages` writes its cookie with `HeaderMap::insert`,
-//! which *replaces* every `Set-Cookie` already on the response. Any handler that
-//! both flashes a message and sets a cookie therefore loses the cookie — which
-//! silently broke signup's auto-login, the new session `change_password` hands
-//! back, and the session teardown on account deletion.
+//! Always **append** — never `insert`. A handler that sets a cookie is often one
+//! that also flashes a message (signup's auto-login, the new session
+//! `change_password` hands back, the session teardown on account deletion), and
+//! `insert` would replace whatever `Set-Cookie` is already on the response.
+//! Some responses legitimately carry several: the session teardown expires the
+//! domain-scoped `token`, the legacy host-only one, and the Percy `session`
+//! cookie in a single response.
 //!
-//! Rather than have every such handler fight the layer, they queue their cookies
-//! in a response extension and [`apply_pending_cookies`] appends them **outside**
-//! the flash layer, after it has had its say. (The real fix is `append` instead
-//! of `insert` in `kls-web-core`; until that ships, this keeps the two from
-//! stepping on each other.)
-//!
-//! Ordering matters: the layer must sit *below* the flash layer in `main.rs`'s
-//! list, since a later `.layer(...)` wraps the earlier ones and so processes the
-//! response last.
+//! This module used to be a workaround: `kls-web-core`'s flash layer wrote its
+//! cookie with `insert`, clobbering any the handler had set, so handlers queued
+//! cookies in a response extension and a middleware replayed them *below* the
+//! flash layer. That bug is fixed upstream as of `kls-web-core` v0.1.9 — the
+//! queue, the middleware and the layer-ordering constraint are all gone, and
+//! what's left is the plain helper.
 
 use axum::{
-    extract::Request,
     http::{header::SET_COOKIE, HeaderValue},
-    middleware::Next,
     response::Response,
 };
 use cookie::Cookie;
 
-/// `Set-Cookie` values waiting to be written onto the response.
-#[derive(Clone, Default)]
-pub struct PendingCookies(pub Vec<HeaderValue>);
-
-/// Queues a cookie to be set on `response` once the flash layer is done with it.
-pub fn queue_cookie(response: &mut Response, cookie: Cookie<'static>) {
+/// Appends a `Set-Cookie` for `cookie` to `response`.
+///
+/// A cookie that can't be rendered into a header value is dropped rather than
+/// panicking the handler — the values here are all built in-process, so this is
+/// unreachable in practice.
+pub fn set_cookie(response: &mut Response, cookie: Cookie<'static>) {
     if let Ok(value) = HeaderValue::from_str(&cookie.to_string()) {
-        queue_raw(response, value);
+        set_raw_cookie(response, value);
     }
 }
 
-/// Queues an already-built `Set-Cookie` header value (for hand-rolled cookies
+/// Appends an already-built `Set-Cookie` header value (for hand-rolled cookies
 /// like the legacy host-only teardown).
-pub fn queue_raw(response: &mut Response, value: HeaderValue) {
-    let mut pending = response.extensions_mut().remove::<PendingCookies>().unwrap_or_default();
-    pending.0.push(value);
-    response.extensions_mut().insert(pending);
+pub fn set_raw_cookie(response: &mut Response, value: HeaderValue) {
+    response.headers_mut().append(SET_COOKIE, value);
 }
 
-/// Appends every queued cookie to the outgoing response.
-pub async fn apply_pending_cookies(request: Request, next: Next) -> Response {
-    let mut response = next.run(request).await;
-    if let Some(PendingCookies(values)) = response.extensions_mut().remove::<PendingCookies>() {
-        let headers = response.headers_mut();
-        for value in values {
-            headers.append(SET_COOKIE, value);
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::response::IntoResponse;
+
+    /// The property the whole module exists for: cookies accumulate, they don't
+    /// replace each other. The session teardown sets three at once.
+    #[test]
+    fn cookies_accumulate_instead_of_replacing() {
+        let mut response = ().into_response();
+        set_cookie(&mut response, Cookie::build(("token", "a")).path("/").build());
+        set_cookie(&mut response, Cookie::build(("session", "b")).path("/").build());
+        set_raw_cookie(&mut response, HeaderValue::from_static("legacy=; Max-Age=0"));
+
+        let cookies: Vec<_> = response
+            .headers()
+            .get_all(SET_COOKIE)
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .collect();
+
+        assert_eq!(
+            cookies.len(),
+            3,
+            "a cookie was replaced instead of appended: {cookies:?}"
+        );
+        assert!(cookies.iter().any(|c| c.starts_with("token=a")));
+        assert!(cookies.iter().any(|c| c.starts_with("session=b")));
+        assert!(cookies.iter().any(|c| c.starts_with("legacy=")));
     }
-    response
 }
