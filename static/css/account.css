@@ -244,6 +244,9 @@
     height: 100%;
     display: block;
     object-fit: cover;
+    /* The wrapper's `overflow: hidden` alone leaves the image's own corners
+       square in some engines, so round the image to the same radius. */
+    border-radius: inherit;
 }
 
 .account-id-text {
