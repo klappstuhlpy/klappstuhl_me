@@ -19,7 +19,13 @@
 <div class="user-public">
     <div class="account-header">
         <div class="account-identity">
-            <span class="account-avatar-mark" aria-hidden="true"><span class="spark">✻</span></span>
+            <span class="account-avatar-mark" aria-hidden="true">
+                {% if user.has_discord() %}
+                <img src="/user/{{ user.name }}/avatar" alt="" width="44" height="44" loading="lazy">
+                {% else %}
+                <img src="/static/img/avatar_placeholder.svg" alt="" width="44" height="44">
+                {% endif %}
+            </span>
             <div class="account-id-text">
                 <h1 class="account-name">{{ user.name }}</h1>
                 <p class="account-handle"><span class="account-handle-prompt">$</span> ~/{{ user.name }}{% if user.flags.is_admin() %} · <span class="account-handle-root">root</span>{% endif %}</p>

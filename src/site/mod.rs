@@ -1,6 +1,7 @@
 //! The public website surface at klappstuhl.me: the homepage, the image hoster,
 //! short links, the code screenshot / spotlight tools, the AI `ask` endpoint,
-//! account/login pages, and the documented public JSON API (`site::api`). Each
+//! account/login pages, the public changelog, and the documented public JSON API
+//! (`site::api`). Each
 //! feature owns its handlers here; [`routes`] assembles them into the public
 //! sub-router that `crate::routes::all` merges with the admin shell.
 
@@ -17,6 +18,7 @@ use axum::{
 pub mod account;
 pub mod api;
 pub mod ask;
+pub mod changelog;
 pub mod discord_oauth;
 pub mod image;
 pub mod links;
@@ -84,6 +86,7 @@ pub fn routes() -> Router<AppState> {
         .route("/percy", get(percy_redirect))
         .route("/m/:id", get(api::serve_media))
         .merge(account::routes())
+        .merge(changelog::routes())
         .merge(discord_oauth::routes())
         .merge(image::routes())
         .merge(links::routes())

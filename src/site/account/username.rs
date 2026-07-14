@@ -76,7 +76,7 @@ const RESERVED: &[&str] = &[
     "percy",
     "admin",
     "moderator",
-    "owner"
+    "owner",
 ];
 
 /// Why a name cannot be taken. Everything user-facing goes through

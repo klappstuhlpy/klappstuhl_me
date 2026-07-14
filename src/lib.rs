@@ -31,6 +31,12 @@ pub use admin::{
     alerts, audit, backup, cron, dbadmin, docker, firewall, health, metrics, proxy, secrets, ssh, updates,
 };
 
+/// The running version, taken from `Cargo.toml` — the single source of truth for
+/// it. The site footer, the changelog page and the OpenAPI docs all derive from
+/// this; never hardcode a version string anywhere else (see
+/// `.claude/CHANGELOG_GUIDE.md`).
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 // Curated value re-exports (the crate's public API surface).
 pub use core::cli::{Command, PROGRAM_NAME};
 pub use core::config::{Config, CONFIG};

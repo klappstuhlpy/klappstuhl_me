@@ -6,6 +6,7 @@ Discord/Percy integration, and where everything lands on disk.
 - [Admin dashboard](#admin-dashboard)
 - [Account](#account)
 - [Discord login & the Percy dashboard](#discord-login--the-percy-dashboard)
+- [Changelog & versioning](#changelog--versioning)
 - [Data & log paths](#data--log-paths)
 
 See also: [Setup](setup.md) for how to install and configure these, and the live
@@ -85,6 +86,24 @@ through the [`klappstuhl_me-shared`](https://github.com/klappstuhlpy/klappstuhl_
 > (keep the apex first — it drives `canonical_url`, the cookie `Domain`, and the
 > `r.` short-link subdomain). The session cookie is scoped to the registrable
 > domain so the SSO handoff works across the subdomain.
+
+## Changelog & versioning
+
+The version in `Cargo.toml` is the single source of truth: it is shown in the
+footer of every public page (linking to `/changelog`) and stamped into the
+OpenAPI docs. Nothing else hardcodes a version string.
+
+`/changelog` renders the repo-root `CHANGELOG.md` — the same file GitHub shows.
+It is embedded into the binary at compile time and parsed into releases, each
+rendered as a terminal window with colour-coded category badges (Added, Changed,
+Deprecated, Removed, Fixed, Security). Entries under `## [Unreleased]` are never
+published, so a change becomes public only when its release ships.
+
+The format is a strict subset of [Keep a Changelog](https://keepachangelog.com):
+releases are `## [X.Y.Z] - YYYY-MM-DD`, newest first, each holding only the six
+category headings above with single-line `- ` bullets under them. `cargo test`
+validates the real file against that grammar, so a malformed changelog fails the
+build instead of breaking the page.
 
 ## Data & log paths
 

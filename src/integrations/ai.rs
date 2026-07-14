@@ -103,6 +103,7 @@ const ALLOWED_ROUTES: &[&str] = &[
     "/",
     "/projects",
     "/status",
+    "/changelog",
     "/images",
     "/account",
     "/login",

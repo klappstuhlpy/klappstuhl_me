@@ -7,7 +7,7 @@ use crate::{
     AppState,
 };
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::{header::CACHE_CONTROL, HeaderValue, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
@@ -598,6 +598,32 @@ async fn discord_avatar(State(state): State<AppState>, account: Account) -> Resp
     avatar_redirect(&discord_avatar_url(&discord_id, avatar_hash.as_deref()))
 }
 
+/// `GET /user/:name/avatar` — the same redirect for *another* account, so the
+/// public profile page can show a real face instead of a generic mark. Gated on
+/// a session like the `/user/:name` page it serves. Accounts with no Discord
+/// link 404; the page renders the placeholder for them and never asks.
+async fn user_avatar(State(state): State<AppState>, _viewer: Account, Path(name): Path<String>) -> Response {
+    let link: Option<(String, Option<String>)> = state
+        .database()
+        .call(move |conn| {
+            conn.query_row(
+                "SELECT dl.discord_user_id, dl.discord_avatar FROM user_discord_links dl \
+                 INNER JOIN account ON account.id = dl.account_id WHERE account.name = ?",
+                [&name],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+        })
+        .await
+        .ok()
+        .flatten();
+
+    match link {
+        Some((discord_id, avatar_hash)) => avatar_redirect(&discord_avatar_url(&discord_id, avatar_hash.as_deref())),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
 // -- Router ------------------------------------------------------------------
 
 use rusqlite::OptionalExtension;
@@ -611,4 +637,5 @@ pub fn routes() -> Router<AppState> {
         )
         .route("/account/discord/unlink", post(discord_unlink))
         .route("/account/discord/avatar", get(discord_avatar))
+        .route("/user/:name/avatar", get(user_avatar))
 }

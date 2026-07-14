@@ -1,0 +1,233 @@
+/* Public changelog (/changelog).
+   Each release is a .tui-box terminal window; each category inside it is colour-
+   coded with the shared semantic tokens from base.css, so both themes work with
+   no per-theme rules here. Only tokens defined in base.css are used. */
+
+.changelog {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.cl-kicker {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0 0 0.75rem;
+}
+
+.cl-kicker-prompt {
+    color: var(--prompt);
+    font-weight: 700;
+    margin-right: 0.4rem;
+}
+
+.cl-head h1 {
+    margin: 0 0 0.5rem;
+    font-size: 1.9rem;
+}
+
+.cl-sub {
+    margin: 0 0 2rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.cl-current {
+    color: var(--branding);
+    background: var(--branding-dim);
+    border-radius: 0.35rem;
+    padding: 0.05rem 0.4rem;
+    white-space: nowrap;
+}
+
+/* ── Release list ───────────────────────────────────────────────────────── */
+
+.cl-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Anchored jumps (#v1.4.2) shouldn't tuck the title bar under the sticky header. */
+.cl-release {
+    scroll-margin-top: 5rem;
+}
+
+.cl-anchor {
+    color: var(--foreground);
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.cl-anchor:hover {
+    color: var(--branding);
+}
+
+.cl-latest {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--branding);
+    background: var(--branding-dim);
+    border: 1px solid var(--branding);
+    border-radius: 999px;
+    padding: 0.05rem 0.45rem;
+}
+
+/* Push the date to the right edge of the title bar. */
+.cl-date {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.cl-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* ── Categories ─────────────────────────────────────────────────────────── */
+
+/* Each .cl-section sets --cl-accent/--cl-bg/--cl-border below; everything here
+   is written against those, so a new category only needs its colour trio. */
+.cl-section {
+    border-left: 2px solid var(--cl-border);
+    padding-left: 0.9rem;
+}
+
+.cl-category {
+    display: inline-block;
+    margin: 0 0 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--cl-accent);
+    background: var(--cl-bg);
+    border: 1px solid var(--cl-border);
+    border-radius: 0.35rem;
+    padding: 0.1rem 0.5rem;
+}
+
+.cl-entries {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.cl-entries li {
+    position: relative;
+    padding-left: 1rem;
+    color: var(--foreground);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.cl-entries li::before {
+    content: "+";
+    position: absolute;
+    left: 0;
+    color: var(--cl-accent);
+    font-weight: 700;
+}
+
+.cl-entries code {
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+    border-radius: 0.3rem;
+    padding: 0.05rem 0.3rem;
+    font-size: 0.85em;
+}
+
+.cl-entries a {
+    color: var(--link-text);
+}
+
+.cl-entries a:hover {
+    color: var(--link-hover-text);
+}
+
+/* Category colour trios (see .claude/CHANGELOG_GUIDE.md). The bullet glyph
+   doubles as a diff marker: + added, ~ changed, - removed, and so on. */
+
+.cl-added {
+    --cl-accent: var(--success-text);
+    --cl-bg: var(--success-bg);
+    --cl-border: var(--success-border);
+}
+
+.cl-changed {
+    --cl-accent: var(--info-text);
+    --cl-bg: var(--info-bg);
+    --cl-border: var(--info-border);
+}
+.cl-changed .cl-entries li::before { content: "~"; }
+
+.cl-deprecated {
+    --cl-accent: var(--warning-text);
+    --cl-bg: var(--warning-bg);
+    --cl-border: var(--warning-border);
+}
+.cl-deprecated .cl-entries li::before { content: "!"; }
+
+.cl-removed {
+    --cl-accent: var(--error-text);
+    --cl-bg: var(--error-bg);
+    --cl-border: var(--error-border);
+}
+.cl-removed .cl-entries li::before { content: "-"; }
+
+.cl-fixed {
+    --cl-accent: var(--branding);
+    --cl-bg: var(--branding-dim);
+    --cl-border: var(--branding);
+}
+.cl-fixed .cl-entries li::before { content: "*"; }
+
+/* Security shares the red trio with Removed, so the badge is filled rather than
+   outlined to keep the two visually distinct.
+
+   The fill needs a *deep* red for the near-white --button-text to read on, but
+   the red tokens invert between themes: the deep red is --error-border (#991b1b)
+   in dark and --error-text (#b91c1c) in light, while the other is a pale pink in
+   each. So the fill is paired per theme — using one token for both would leave
+   the badge as white-on-pink in one of them. */
+.cl-security {
+    --cl-accent: var(--error-text);
+    --cl-bg: var(--error-bg);
+    --cl-border: var(--error-border);
+}
+.cl-security .cl-category {
+    color: var(--button-text);
+    background: var(--error-border);
+    border-color: var(--error-border);
+}
+[data-theme="light"] .cl-security .cl-category {
+    background: var(--error-text);
+    border-color: var(--error-text);
+}
+.cl-security .cl-entries li::before { content: "⚑"; }
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+.cl-foot {
+    margin: 2rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+@media (max-width: 640px) {
+    .changelog { padding: 1.25rem 0.75rem 3rem; }
+    .cl-date { display: none; }
+}

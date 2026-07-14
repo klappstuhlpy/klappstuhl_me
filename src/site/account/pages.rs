@@ -466,9 +466,23 @@ pub async fn user_public(
     account: Account,
     Path(name): Path<String>,
 ) -> Result<Response, Redirect> {
+    // The LEFT JOIN is what populates `discord_id`, so the header can tell a
+    // Discord-linked account (real avatar via `/user/:name/avatar`) from one
+    // that only ever gets the placeholder.
     let user = state
         .database()
-        .get::<Account, _, _>("SELECT * FROM account WHERE name = ?", [name])
+        .get::<Account, _, _>(
+            r#"
+            SELECT account.id AS id, account.name AS name, account.password AS password,
+                   account.flags AS flags, account.created_at AS created_at,
+                   account.totp_secret AS totp_secret, account.totp_enabled AS totp_enabled,
+                   dl.discord_user_id AS discord_id
+            FROM account
+            LEFT JOIN user_discord_links dl ON dl.account_id = account.id
+            WHERE account.name = ?
+            "#,
+            [name],
+        )
         .await
         .ok()
         .flatten()

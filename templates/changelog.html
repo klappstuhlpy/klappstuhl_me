@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+
+{% block title %}Changelog | Klappstuhl.me{% endblock %}
+
+{% block css %}
+<link href="/static/css/changelog.css" rel="stylesheet">
+{% endblock %}
+
+{% block og_title %}Changelog | Klappstuhl.me{% endblock %}
+{% block og_description %}Every notable change to Klappstuhl.me, release by release.{% endblock %}
+{% block meta_description %}Every notable change to Klappstuhl.me, release by release.{% endblock %}
+
+{% block body %}
+<section class="changelog">
+    <header class="cl-head">
+        <p class="cl-kicker"><span class="cl-kicker-prompt">$</span> git log --oneline --decorate</p>
+        <h1>Changelog</h1>
+        <p class="cl-sub">
+            Every notable change to the site, newest first.
+            Currently running <span class="cl-current">v{{ current }}</span>.
+        </p>
+    </header>
+
+    <ol class="cl-list">
+        {% for release in releases %}
+        <li class="cl-release tui-box" id="v{{ release.version }}">
+            <div class="tui-bar">
+                <span class="tui-lights" aria-hidden="true"><span></span><span></span><span></span></span>
+                <span class="tui-title">
+                    <span class="glyph" aria-hidden="true">✻</span>
+                    <a class="cl-anchor" href="#v{{ release.version }}">v{{ release.version }}</a>
+                </span>
+                {% if loop.first %}
+                <span class="cl-latest">latest</span>
+                {% endif %}
+                <time class="cl-date" datetime="{{ release.date }}">{{ release.date_label }}</time>
+            </div>
+
+            <div class="tui-body cl-body">
+                {% for section in release.sections %}
+                <div class="cl-section cl-{{ section.slug }}">
+                    <h2 class="cl-category">{{ section.name }}</h2>
+                    <ul class="cl-entries">
+                        {% for entry in section.entries %}
+                        <li>{{ entry|safe }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+            </div>
+        </li>
+        {% endfor %}
+    </ol>
+
+    <p class="cl-foot">
+        Versioning follows <a href="https://semver.org" target="_blank" rel="noopener">Semantic Versioning</a>.
+        The source of this page is
+        <a href="https://github.com/klappstuhlpy/klappstuhl_me/blob/main/CHANGELOG.md" target="_blank" rel="noopener">CHANGELOG.md</a>.
+    </p>
+</section>
+{% endblock %}

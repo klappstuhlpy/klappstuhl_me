@@ -159,6 +159,8 @@
     <footer class="grid-item">
         <div class="copyright">
             <span>© 2026 Klappstuhl65</span>
+            {# The running version, straight from Cargo.toml (crate::VERSION). #}
+            <a class="footer-link" href="/changelog" title="What's new">v{{ crate::VERSION }}</a>
         </div>
         {% block footer %}{% endblock %}
     </footer>

@@ -224,6 +224,8 @@
     gap: 0.9rem;
 }
 
+/* The profile picture: the linked Discord avatar, or the placeholder for
+   accounts with no link — same source of truth as the nav bar. */
 .account-avatar-mark {
     display: inline-flex;
     align-items: center;
@@ -235,10 +237,13 @@
     background: var(--tui-bg);
     border: 1px solid color-mix(in srgb, var(--branding) 40%, var(--box-border));
     box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--branding) 80%, transparent);
+    overflow: hidden;
 }
-.account-avatar-mark .spark {
-    color: var(--branding);
-    font-size: 1.3rem;
+.account-avatar-mark img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
 }
 
 .account-id-text {
