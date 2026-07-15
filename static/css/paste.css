@@ -1,0 +1,937 @@
+/* The pastebin: editor (/paste), viewer (/p/:id), list (/pastes).
+ *
+ * Composes the terminal primitives from /kls/base.css (.tui-box, .tui-bar,
+ * .tui-prompt, .blink) with the glass chrome from glass.css. Colours are tokens
+ * or color-mixes over tokens — never a hex literal, so light theme comes for
+ * free. The one exception, deliberately: the code surface's background and
+ * foreground come from the chosen *syntect* theme, injected inline. A terminal
+ * on a light desktop is still a dark terminal.
+ */
+
+.paste-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.1rem;
+}
+
+.paste-head h1 {
+    margin: 0;
+}
+
+.paste-head-sub {
+    margin: 0.3rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+/* The status chip must wrap rather than run off a narrow screen (it can't shrink
+   on its own — glass chips are nowrap by default). */
+.paste-head .glass-chip {
+    white-space: normal;
+    min-width: 0;
+}
+
+.paste-head-sub .prompt {
+    color: var(--prompt);
+    font-weight: 700;
+    margin-right: 0.4rem;
+}
+
+/* ── Editor (/paste) ──────────────────────────────────────────────────────── */
+
+.paste-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+/* The writing surface is a terminal window, not glass. A *definite* height (not
+   just min-height) is load-bearing: the gutter and textarea are both 100% tall
+   and scroll internally, so a long paste never drags the frame off the page. */
+.editor-frame {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    height: min(62vh, 42rem);
+    overflow: hidden;
+}
+
+.editor-gutter {
+    padding: 0.9rem 0.5rem 0.9rem 0.9rem;
+    text-align: right;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--tui-bg) 92%, var(--foreground));
+    border-right: 1px solid var(--tui-border);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    user-select: none;
+    white-space: pre;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* The code column: a positioned box holding the highlight layer and the
+   textarea, one exactly on top of the other. */
+.editor-code {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* The highlight layer and the textarea MUST share an identical box — same font,
+   size, line-height, padding, tabs and wrapping — or the caret drifts off the
+   glyphs. Change one, change both. */
+.editor-highlight,
+.editor-input {
+    margin: 0;
+    padding: 0.9rem 1rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    tab-size: 4;
+    white-space: pre;
+    overflow-wrap: normal;
+    border: 0;
+}
+
+/* The coloured layer sits behind the textarea and is painted by JS. It's as wide
+   and tall as its content; the container clips and JS translates it to follow the
+   textarea's scroll. */
+.editor-highlight {
+    position: absolute;
+    top: 0;
+    left: 0;
+    min-width: 100%;
+    pointer-events: none;
+    color: var(--foreground);
+    will-change: transform;
+}
+
+/* The base stylesheet gives every <textarea> `height: 2rem; min-height: 5rem`
+   and — because this one is `required` + empty on load — a red `:invalid`
+   border. Both are wrong here, so override height, border and outline in every
+   state. Text is visible by default so the editor works with JS off; the overlay
+   below makes it transparent only once JS has a <pre> to read from. */
+.editor-input,
+.editor-input:focus,
+.editor-input:invalid {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    min-height: 0;
+    resize: none;
+    background: transparent;
+    color: var(--foreground);
+    caret-color: var(--foreground);
+    overflow: auto;
+    border: 0;
+    outline: none;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+/* JS adds `is-live` once the highlight layer is wired: now the <pre> shows the
+   glyphs and the textarea only carries the caret and selection. */
+.editor-code.is-live .editor-input {
+    color: transparent;
+}
+
+.editor-input::placeholder {
+    color: var(--text-muted);
+}
+
+.editor-input::selection {
+    background: color-mix(in srgb, var(--branding) 40%, transparent);
+}
+
+/* Drop a file anywhere on the frame to load it. */
+.editor-frame.is-dropping {
+    outline: 2px dashed var(--branding);
+    outline-offset: -4px;
+}
+
+/* The option rails: expiry chips + the visibility segmented control. */
+.editor-options {
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    flex-wrap: wrap;
+    padding: 0.75rem 0.9rem;
+}
+
+.editor-option-group {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+.editor-option-label {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-right: 0.15rem;
+}
+
+/* The three-way visibility control reads as one object, so its segments sit
+   flush instead of floating apart like the expiry chips do. */
+.segmented {
+    display: inline-flex;
+    border-radius: 9999px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--box-border) 60%, transparent);
+}
+
+.segmented .glass-chip {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+.segmented .glass-chip + .glass-chip {
+    border-left: 1px solid color-mix(in srgb, var(--box-border) 60%, transparent);
+}
+
+/* The sticky action bar. Everything you press to finish a paste lives here. */
+.editor-actions {
+    position: sticky;
+    bottom: 0.75rem;
+    z-index: 2;
+}
+
+/* The title takes its own row, so the picker and the password never have to
+   compete with it for width — that competition is what let them collide. */
+.editor-actions .editor-title {
+    flex: 1 1 100%;
+    min-width: 0;
+}
+
+/* Picker and password each keep a min-width floor: when the row is too narrow
+   for both they wrap onto separate lines instead of shrinking into each other. */
+.editor-actions .editor-password {
+    flex: 1 1 10rem;
+    min-width: 9rem;
+}
+
+.editor-actions .editor-language {
+    min-width: 0;
+}
+
+.editor-actions input,
+.editor-actions select {
+    margin: 0;
+}
+
+.editor-counter {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.editor-counter.is-over {
+    color: var(--error-text);
+    font-weight: 700;
+}
+
+.editor-actions .button {
+    margin-left: auto;
+}
+
+/* ── Language picker (the enhanced <select>) ──────────────────────────────── */
+
+.lang-picker {
+    position: relative;
+    flex: 1 1 12rem;
+    min-width: 10rem;
+}
+
+/* The native select is the no-JS fallback and the form's real value; once JS
+   enhances it, it stays in the DOM (still submitted) but leaves the layout. */
+.lang-picker.is-enhanced > select {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    border: 0;
+}
+
+.lang-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    height: 2rem;
+    padding: 0 0.55rem;
+    background: var(--form-input-background);
+    border: 2px solid var(--form-input-border);
+    border-radius: 0.25rem;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 150ms ease;
+}
+
+.lang-toggle:hover,
+.lang-picker.is-open .lang-toggle {
+    border-color: var(--form-input-focus-border);
+}
+
+.lang-toggle .lang-name {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lang-toggle .lang-caret {
+    flex: 0 0 auto;
+    opacity: 0.6;
+}
+
+/* The dropdown opens *upward*: the picker lives in a sticky bottom action bar. */
+.lang-panel {
+    position: absolute;
+    bottom: calc(100% + 0.4rem);
+    left: 0;
+    z-index: 20;
+    width: min(20rem, 82vw);
+    max-height: 20rem;
+    display: none;
+    flex-direction: column;
+    padding: 0.5rem;
+    border-radius: 10px;
+}
+
+.lang-picker.is-open .lang-panel {
+    display: flex;
+}
+
+.lang-search {
+    margin: 0 0 0.4rem;
+    width: 100%;
+    height: 1.9rem;
+}
+
+.lang-list {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.lang-option {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.32rem 0.5rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--foreground);
+    font: inherit;
+    font-size: 0.82rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.lang-option:hover,
+.lang-option.is-active {
+    background: color-mix(in srgb, var(--branding) 16%, transparent);
+}
+
+.lang-option[hidden] {
+    display: none;
+}
+
+.lang-option .lang-token {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A real brand logo, its tinted-badge fallback, and the Auto glyph all occupy
+   the same box, so the list never reflows as logos load or fail. */
+.lang-logo,
+.lang-badge,
+.lang-auto {
+    flex: 0 0 auto;
+    width: 1.15rem;
+    height: 1.15rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lang-logo {
+    object-fit: contain;
+}
+
+.lang-badge {
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--branding) 22%, var(--box-shade));
+    border: 1px solid color-mix(in srgb, var(--branding) 40%, transparent);
+    color: var(--foreground);
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+}
+
+.lang-auto {
+    color: var(--branding);
+    font-weight: 700;
+}
+
+.editor-format {
+    cursor: pointer;
+}
+
+.editor-hint {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.editor-hint kbd {
+    padding: 0.05rem 0.3rem;
+    border: 1px solid var(--box-border);
+    border-radius: 4px;
+    background: var(--box-shade);
+    font-size: 0.72rem;
+}
+
+/* ── The secret-scan warning ─────────────────────────────────────────────── */
+
+.secret-warning h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
+    color: var(--warning-text);
+}
+
+.secret-warning p {
+    margin: 0 0 0.9rem;
+    font-size: 0.88rem;
+    line-height: 1.6;
+}
+
+.secret-rules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1.1rem;
+}
+
+.secret-rule {
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+    color: var(--warning-text);
+    font-size: 0.76rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: flex-end;
+}
+
+/* ── Viewer (/p/:id) ──────────────────────────────────────────────────────── */
+
+.paste-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.paste-meta {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 3;
+}
+
+.paste-meta-title {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 22rem;
+}
+
+.paste-meta-facts {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+}
+
+.paste-meta-facts .sep {
+    opacity: 0.4;
+}
+
+.paste-meta-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+.paste-meta-actions form {
+    display: inline;
+}
+
+/* A flag that changes how the paste behaves (encrypted, burning, expiring)
+   earns a coloured chip — these are not decoration, they are warnings. */
+.chip-danger {
+    color: var(--error-text);
+    background: var(--error-bg);
+    border-color: var(--error-border);
+}
+
+.chip-warning {
+    color: var(--warning-text);
+    background: var(--warning-bg);
+    border-color: var(--warning-border);
+}
+
+/* The code surface: an opaque terminal window. Never glass — text must never
+   sit on a blurred, moving background. */
+.paste-code {
+    overflow: hidden;
+}
+
+.paste-code-scroll {
+    overflow-x: auto;
+    padding: 0.9rem 0;
+}
+
+.paste-lines {
+    margin: 0;
+    display: table;
+    width: 100%;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    tab-size: 4;
+}
+
+.paste-line {
+    display: table-row;
+}
+
+.paste-line > a,
+.paste-line > code {
+    display: table-cell;
+}
+
+/* The gutter is a link per line: click for #L12, shift-click for a range. */
+.paste-line > a {
+    width: 1%;
+    padding: 0 0.9rem 0 1rem;
+    text-align: right;
+    color: color-mix(in srgb, currentColor 45%, transparent);
+    text-decoration: none;
+    user-select: none;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.paste-line > a:hover {
+    color: var(--branding);
+}
+
+/* Each line is a bare <code>, so base.css's inline-code chip styling
+   (`:not(pre) > code` → a filled, bordered, rounded box) matches it and paints
+   every row as a black band with a border sitting on the theme background. Undo
+   all of it here: the line must be transparent so the one pane background shows
+   through uniformly. */
+.paste-line > code {
+    padding: 0 1.2rem 0 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    white-space: pre;
+    width: 99%;
+}
+
+.paste-line:target,
+.paste-line.is-selected {
+    background: color-mix(in srgb, var(--branding) 14%, transparent);
+}
+
+/* Word-wrap toggle (a class the viewer's JS puts on the container). */
+.paste-lines.is-wrapped .paste-line > code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Rendered markdown, shown instead of the code when the toggle is on. */
+.paste-markdown {
+    padding: 1.4rem 1.6rem;
+    line-height: 1.7;
+}
+
+.paste-markdown img {
+    max-width: 100%;
+}
+
+.paste-markdown pre {
+    overflow-x: auto;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    background: var(--box-shade);
+    border: 1px solid var(--box-border);
+}
+
+.paste-markdown table {
+    border-collapse: collapse;
+}
+
+.paste-markdown td,
+.paste-markdown th {
+    border: 1px solid var(--box-border);
+    padding: 0.35rem 0.6rem;
+}
+
+/* The share popover. */
+.paste-share {
+    position: relative;
+}
+
+.paste-share-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 5;
+    width: 17rem;
+    padding: 1rem;
+    display: none;
+}
+
+.paste-share-panel[open],
+.paste-share-panel.is-open {
+    display: block;
+}
+
+.paste-share-panel h3 {
+    margin: 0 0 0.6rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.paste-share-url {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.paste-share-url input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.76rem;
+}
+
+.paste-share-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.paste-share-links a {
+    color: var(--link-text);
+    font-size: 0.8rem;
+    text-decoration: none;
+}
+
+.paste-share-links a:hover {
+    color: var(--link-hover-text);
+    text-decoration: underline;
+}
+
+.paste-share-qr {
+    margin-top: 0.75rem;
+    display: none;
+    background: #fff; /* a QR must be dark-on-light to scan; that is not a theme choice */
+    padding: 0.5rem;
+    border-radius: 8px;
+}
+
+.paste-share-qr.is-open {
+    display: block;
+}
+
+.paste-share-qr svg,
+.paste-share-qr img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* ── The gates: unlock + burn interstitial ────────────────────────────────── */
+
+/* Both are shown as a centred card. The body of the paste is *not in the DOM*
+   behind them (see site::paste::resolve_body) — the blur is aesthetic, never the
+   security boundary. */
+.paste-gate {
+    display: flex;
+    justify-content: center;
+    padding: 3rem 1rem;
+}
+
+.paste-gate-card {
+    width: min(28rem, 100%);
+    text-align: center;
+}
+
+.paste-gate-card h1 {
+    margin: 0 0 0.5rem;
+    font-size: 1.15rem;
+}
+
+.paste-gate-card p {
+    margin: 0 0 1.2rem;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    line-height: 1.6;
+}
+
+.paste-gate-card .glyph {
+    display: block;
+    font-size: 2rem;
+    margin-bottom: 0.6rem;
+}
+
+.paste-gate-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.paste-burn-notice {
+    color: var(--warning-text);
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+    border-radius: 8px;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
+}
+
+/* ── List (/pastes) ───────────────────────────────────────────────────────── */
+
+.paste-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 1.1rem;
+}
+
+.paste-filters input[type="search"] {
+    flex: 1 1 12rem;
+    min-width: 0;
+    margin: 0;
+}
+
+.paste-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: 0.9rem;
+}
+
+.paste-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1rem 1.1rem;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.paste-card:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--branding) 40%, transparent);
+    box-shadow:
+        0 12px 36px color-mix(in srgb, var(--background) 60%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+.paste-card[hidden] {
+    display: none;
+}
+
+.paste-card-title {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.paste-card-chips {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.paste-card-facts {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: auto;
+}
+
+.paste-card-actions {
+    display: flex;
+    gap: 0.4rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid color-mix(in srgb, var(--box-border) 60%, transparent);
+}
+
+.paste-empty {
+    padding: 3rem 1rem;
+    text-align: center;
+}
+
+.paste-empty .tui-prompt {
+    display: inline-block;
+    text-align: left;
+}
+
+.paste-quota {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .paste-card {
+        transition: none;
+    }
+
+    .paste-card:hover {
+        transform: none;
+    }
+}
+
+/* ── History (/p/:id/history) ─────────────────────────────────────────────── */
+
+.revision {
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.revision-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.revision-head .revision-label {
+    font-weight: 700;
+}
+
+.revision-diff {
+    margin: 0;
+    padding: 0.8rem 0;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    background: var(--tui-bg);
+}
+
+.diff-line {
+    display: block;
+    padding: 0 1rem;
+    white-space: pre;
+}
+
+.diff-line.add {
+    color: var(--success-text);
+    background: color-mix(in srgb, var(--success-bg) 55%, transparent);
+}
+
+.diff-line.del {
+    color: var(--error-text);
+    background: color-mix(in srgb, var(--error-bg) 55%, transparent);
+}
+
+.diff-line.ctx {
+    color: var(--text-muted);
+}
+
+.diff-line::before {
+    display: inline-block;
+    width: 1.2rem;
+    opacity: 0.7;
+}
+
+.diff-line.add::before {
+    content: "+";
+}
+
+.diff-line.del::before {
+    content: "-";
+}
+
+.diff-line.ctx::before {
+    content: " ";
+}
+
+/* ── Embed (/p/:id/embed) ─────────────────────────────────────────────────── */
+
+/* No layout, no nav, no grid — the page *is* the paste, sized to its iframe. */
+body.paste-embed {
+    margin: 0;
+    padding: 0;
+}
+
+body.paste-embed .paste-code {
+    border-radius: 0;
+    border: 0;
+    min-height: 100vh;
+}
+
+body.paste-embed .embed-bar {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+}
+
+body.paste-embed .embed-bar a {
+    margin-left: auto;
+    color: var(--link-text);
+    text-decoration: none;
+    font-size: 0.76rem;
+}
+
+@media (max-width: 640px) {
+    .paste-meta-title {
+        max-width: 100%;
+    }
+
+    .paste-grid {
+        grid-template-columns: 1fr;
+    }
+}

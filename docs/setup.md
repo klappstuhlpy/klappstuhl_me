@@ -45,6 +45,7 @@ The keys you almost always need:
 | `server.ip` / `server.port` | string / u16   | Listen address (`0.0.0.0` / `443` in prod).                            |
 | `secret_key`                | string         | Auto-generated HMAC key for session/flash cookies — leave it alone.    |
 | `max_upload_bytes`          | u64 \| null    | Max single-image upload size. Unset ⇒ 10 MiB.                          |
+| `paste`                     | object         | Pastebin limits and the anonymous switch — see below.                  |
 | `discord`                   | object \| null | OAuth2 `{ client_id, client_secret, redirect_uri }` for Discord login. |
 | `gallery_provision_token`   | string \| null | Shared token letting Percy provision per-guild `images:guild` keys.    |
 | `sso_secret`                | string \| null | Shared HMAC key for single sign-on with the Percy dashboard.           |
@@ -114,10 +115,27 @@ dashboard panel when set:
     "model": null,
     "public": false
   },
+  "paste": {
+    "anonymous": true,
+    "max_bytes": 524288,
+    "anonymous_max_bytes": 262144,
+    "anonymous_ttl_days": 30,
+    "account_limit": 100,
+    "account_max_total_bytes": 16777216,
+    "default_theme": "base16-ocean.dark"
+  },
   "sso_secret": null,
   "gallery_provision_token": null
 }
 ```
+
+The `paste` block (all keys optional; the shown values are the defaults) controls
+the [pastebin](features.md#pastebin): `anonymous` toggles signed-out / `curl`
+pastes; `max_bytes` and `anonymous_max_bytes` cap paste size for accounts and
+strangers; `anonymous_ttl_days` is the forced expiry on anonymous pastes;
+`account_limit` and `account_max_total_bytes` are the per-account quotas (admins are
+exempt); `default_theme` is the syntect theme the viewer highlights with until a
+visitor picks another.
 
 Notable optional keys: `clamav_addr` / `virustotal_api_key` (File Sanitizer),
 `chromium_path` / `ffmpeg_path` (screenshot / PDF / transcode render endpoints —

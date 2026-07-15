@@ -69,7 +69,9 @@ struct ExportedLink {
 struct ExportedPaste {
     id: String,
     url: String,
+    title: Option<String>,
     language: Option<String>,
+    visibility: String,
     views: i64,
     size_bytes: i64,
     #[serde(with = "time::serde::rfc3339")]
@@ -110,7 +112,16 @@ type ImageRow = (
     Option<OffsetDateTime>,
 );
 type LinkRow = (String, String, i64, OffsetDateTime);
-type PasteRow = (String, Option<String>, i64, i64, OffsetDateTime, Option<OffsetDateTime>);
+type PasteRow = (
+    String,
+    Option<String>,
+    Option<String>,
+    String,
+    i64,
+    i64,
+    OffsetDateTime,
+    Option<OffsetDateTime>,
+);
 
 /// `GET /account/export` — everything this site stores about you, as JSON.
 ///
@@ -195,14 +206,16 @@ pub async fn export(State(state): State<AppState>, ClientIp(client_ip): ClientIp
         .database()
         .call(move |conn| -> rusqlite::Result<Vec<PasteRow>> {
             let mut stmt = conn.prepare_cached(
-                "SELECT id, language, views, length(content) AS size_bytes, created_at, expires_at
+                "SELECT id, title, language, visibility, views, size_bytes, created_at, expires_at
                        FROM paste WHERE account_id = ? ORDER BY created_at DESC",
             )?;
             let rows: rusqlite::Result<Vec<_>> = stmt
                 .query_map([id], |row| {
                     Ok((
                         row.get("id")?,
+                        row.get("title")?,
                         row.get("language")?,
+                        row.get("visibility")?,
                         row.get("views")?,
                         row.get("size_bytes")?,
                         row.get("created_at")?,
@@ -216,10 +229,12 @@ pub async fn export(State(state): State<AppState>, ClientIp(client_ip): ClientIp
         .unwrap_or_default()
         .into_iter()
         .map(
-            |(id, language, views, size_bytes, created_at, expires_at)| ExportedPaste {
+            |(id, title, language, visibility, views, size_bytes, created_at, expires_at)| ExportedPaste {
                 url: config.url_to(format!("/p/{id}")),
                 id,
+                title,
                 language,
+                visibility,
                 views,
                 size_bytes,
                 created_at,

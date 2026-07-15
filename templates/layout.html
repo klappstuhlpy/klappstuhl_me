@@ -62,6 +62,10 @@
     <meta name="twitter:card" content="{% block twitter_card %}summary{% endblock %}"/>
     <link rel="stylesheet" href="/kls/base.css" type="text/css"/>
     {% block css %}{% endblock %}
+    {# Anything else a page needs in <head> — e.g. a `robots` directive. Pages are
+       indexable by default; the paste viewer opts *out* here for everything that
+       isn't a public paste. #}
+    {% block head %}{% endblock %}
 
     <script>
         // Register the service worker on the first paint. Skip on
@@ -120,6 +124,7 @@
                     <a class="account-dropdown-item" role="menuitem" href="/account">Account</a>
                     <a class="account-dropdown-item" role="menuitem" href="/images">Images</a>
                     <a class="account-dropdown-item" role="menuitem" href="/links">Short Links</a>
+                    <a class="account-dropdown-item" role="menuitem" href="/pastes">Pastes</a>
                     <a class="account-dropdown-item" role="menuitem" href="/percy">Percy</a>
                     <hr class="account-dropdown-sep">
                     {# Status group. The site links (Projects, GitHub) are

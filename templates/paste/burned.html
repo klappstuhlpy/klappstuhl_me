@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/glass.css" type="text/css">
+<link rel="stylesheet" href="/static/css/paste.css" type="text/css">
+{% endblock %}
+
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+
+{% block title %}{{ title }} | Klappstuhl.me{% endblock %}
+
+{% block body %}
+<div class="glass-ambient" aria-hidden="true"></div>
+
+{# This page renders exactly once, at the moment the paste is destroyed. There is
+   no reload, no back button, no second chance — so the body is here in full and
+   the copy button is the whole point of the screen. #}
+<div class="paste-view">
+    <div class="paste-burn-notice">
+        🔥 <strong>This paste has been destroyed.</strong> It is gone from the server — this page is the only
+        copy left, and reloading will show a 404. Copy what you need before you leave.
+    </div>
+
+    <div class="glass-bar paste-meta">
+        <span class="paste-meta-title" title="{{ title }}">{{ title }}</span>
+        <span class="paste-meta-facts">
+            <span class="glass-chip chip-danger">🔥 burned</span>
+            {% if language != "" %}<span class="glass-chip">{{ language }}</span>{% endif %}
+            <span>{{ lines.len() }} lines</span>
+        </span>
+        <span class="paste-meta-actions">
+            <button type="button" class="glass-chip" id="copy-all">copy</button>
+        </span>
+    </div>
+
+    <div class="tui-box paste-code" style="background: {{ background }}; color: {{ foreground }};">
+        <div class="tui-bar">
+            <span class="tui-lights" aria-hidden="true"><span></span><span></span><span></span></span>
+            <span class="tui-title"><span class="glyph">✻</span> {{ title }}</span>
+        </div>
+        <div class="paste-code-scroll">
+            <div class="paste-lines" id="paste-lines">
+                {% for row in lines %}
+                <div class="paste-line">
+                    <a href="#" data-line="{{ loop.index }}">{{ loop.index }}</a>
+                    <code>{{ row|safe }}</code>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_end %}
+{# The copy button reads the rendered lines out of the DOM (see paste_view.js),
+   so the body doesn't need to be repeated into a script tag — where HTML entity
+   rules would mangle it anyway. #}
+<script>
+    const PASTE_ID = "";
+    const PASTE_URL = "";
+</script>
+<script src="/static/js/paste_view.js"></script>
+{% endblock %}

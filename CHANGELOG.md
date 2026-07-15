@@ -14,6 +14,28 @@ changelog was introduced in July 2026; changes between 1.0.0 (January 2025) and
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-15
+
+### Added
+
+- A full pastebin you can use in the browser: create a paste at `/paste`, view it at `/p/<id>`, and manage your own at `/pastes` — no API key required.
+- A rewritten paste viewer with syntax highlighting, clickable line numbers and range links (`#L12-L20`), a word-wrap toggle, copy-all, download, and a share panel with a QR code.
+- Live syntax highlighting in the editor: you now type onto coloured syntax, not a plain textarea, with auto-indentation (Enter keeps the line's indent and adds a level after `:`/`{`, Backspace removes a whole step).
+- A searchable language picker in the editor covering every language the highlighter knows, each with its brand logo, plus an **Auto-detect** default that infers the language from the paste's content (keywords and shebangs), filename, or first line.
+- A **Format** button in the editor that pretty-prints JSON.
+- Titles, visibility (public / unlisted / private), and one-click expiry presets (10 minutes to 30 days, or never) on every paste.
+- Password-protected pastes: the body is encrypted at rest, and only someone with the password can read it.
+- Burn-after-read pastes that are destroyed the first time they're revealed — with a confirmation step, so a link-preview in Discord or Slack can't destroy one before you click it.
+- Anonymous pastes: `curl --data-binary @file.txt https://klappstuhl.me/p` returns a link (and a one-time edit token to manage it later). Can be turned off by the operator.
+- Editing, forking, and full revision history with a per-edit diff for any paste.
+- A secret scan on every paste: if it looks like it contains a live credential (an API key, a private key, a token) you're warned before publishing.
+- Public pastes now appear on your `/user/<name>` profile, and are the only ones search engines are allowed to index.
+- API: pastes gain `title`, `visibility`, `burn_after_read` and `password` on create; new `PATCH /api/pastes/{id}` (edit), `POST /api/pastes/{id}/fork`, and `GET /api/pastes/{id}/revisions` endpoints. Existing paste clients keep working unchanged.
+
+### Changed
+
+- The paste viewer now matches the rest of the site — terminal styling, the coral accent, and both light and dark themes — instead of the old bare dark page.
+
 ## [1.5.0] - 2026-07-14
 
 ### Added

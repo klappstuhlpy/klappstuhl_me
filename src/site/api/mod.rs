@@ -62,6 +62,9 @@ pub use media::serve_media;
         pastes::create_paste,
         pastes::list_pastes,
         pastes::get_paste,
+        pastes::update_paste,
+        pastes::fork_paste,
+        pastes::list_revisions,
         pastes::delete_paste,
         media::manipulate_image,
         media::convert_file,
@@ -94,7 +97,9 @@ pub use media::serve_media;
             links::CreateLinkBody,
             links::UpdateLinkBody,
             pastes::ApiPaste,
+            pastes::ApiRevision,
             pastes::CreatePasteBody,
+            pastes::UpdatePasteBody,
             crate::scan::ScanReport,
             media::ImageInfo,
             media::ShareResult,
@@ -350,7 +355,14 @@ fn v1() -> Router<AppState> {
                 .delete(links::delete_link),
         )
         .route("/pastes", post(pastes::create_paste).get(pastes::list_pastes))
-        .route("/pastes/:id", get(pastes::get_paste).delete(pastes::delete_paste))
+        .route(
+            "/pastes/:id",
+            get(pastes::get_paste)
+                .patch(pastes::update_paste)
+                .delete(pastes::delete_paste),
+        )
+        .route("/pastes/:id/fork", post(pastes::fork_paste))
+        .route("/pastes/:id/revisions", get(pastes::list_revisions))
         .route("/scan", post(scan::scan_file))
         .route("/me", get(me::get_me))
         .route("/me/usage", get(me::get_usage))

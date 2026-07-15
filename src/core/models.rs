@@ -228,26 +228,137 @@ impl Table for ShortLink {
     }
 }
 
+/// How discoverable a paste is.
+///
+/// This is *not* an access-control mechanism on its own — every visibility is
+/// still readable by anyone holding the (unguessable) id, which is what makes a
+/// paste linkable. It controls indexing and listing: only `Public` pastes are
+/// indexable by crawlers and shown on the owner's `/user/:name` page. Real
+/// secrecy comes from password encryption and burn-after-read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Visibility {
+    /// Indexable, and listed on the owner's public profile.
+    Public,
+    /// Reachable by link only: `noindex`, never listed publicly. The default.
+    #[default]
+    Unlisted,
+    /// Link-only *and* hidden from the owner's public profile.
+    Private,
+}
+
+impl Visibility {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Public => "public",
+            Self::Unlisted => "unlisted",
+            Self::Private => "private",
+        }
+    }
+
+    /// Parses a stored/form value, falling back to the safe default
+    /// ([`Visibility::Unlisted`]) for anything unrecognised.
+    pub fn parse(raw: &str) -> Self {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "public" => Self::Public,
+            "private" => Self::Private,
+            _ => Self::Unlisted,
+        }
+    }
+}
+
+impl std::fmt::Display for Visibility {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl ToSql for Visibility {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.as_str()))
+    }
+}
+
+impl FromSql for Visibility {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        value.as_str().map(Visibility::parse)
+    }
+}
+
 /// A hosted text/code paste, served at `/p/<id>` (highlighted) and
-/// `/p/<id>.txt` (raw), and managed over the public API.
+/// `/p/<id>.txt` (raw), and managed from the browser (`/paste`, `/pastes`) or
+/// over the public API.
+///
+/// `content` is bytes, not a `String`: a password-protected paste stores
+/// ChaCha20-Poly1305 ciphertext, which is not valid UTF-8. Use [`Paste::text`]
+/// on the unencrypted path.
 #[derive(Debug, Clone, Serialize)]
 pub struct Paste {
     /// The random short id that appears in the URL.
     pub id: String,
-    /// Owner account id.
-    pub account_id: i64,
-    /// The paste body.
-    pub content: String,
+    /// Owner account id. `None` for an anonymous paste.
+    pub account_id: Option<i64>,
+    /// Optional human-readable title.
+    pub title: Option<String>,
+    /// The paste body: plaintext UTF-8, or ciphertext when [`Paste::is_encrypted`].
+    #[serde(skip)]
+    pub content: Vec<u8>,
     /// Optional syntect language token / extension used to pick a highlighter.
     pub language: Option<String>,
+    /// Indexing / listing visibility.
+    pub visibility: Visibility,
+    /// Whether the paste is destroyed on its first explicit reveal.
+    pub burn_after_read: bool,
+    /// Argon2id salt for the content key. `None` = not password-protected.
+    #[serde(skip)]
+    pub enc_salt: Option<Vec<u8>>,
+    /// ChaCha20-Poly1305 nonce the content was sealed under.
+    #[serde(skip)]
+    pub enc_nonce: Option<Vec<u8>>,
+    /// SHA-256 of the anonymous edit/delete token, if this paste has one.
+    #[serde(skip)]
+    pub edit_token_hash: Option<String>,
+    /// Size of the stored body in bytes (ciphertext size when encrypted).
+    pub size_bytes: i64,
+    /// The paste this one was forked from, if any.
+    pub fork_of: Option<String>,
+    /// Creator IP, recorded for anonymous pastes so abuse can be traced.
+    /// Takedown plumbing only — never serialised into a response.
+    #[serde(skip)]
+    pub creator_ip: Option<String>,
     /// Number of times the paste has been viewed.
     pub views: i64,
     /// When the paste was created.
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
+    /// When the paste was last edited, if ever.
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub updated_at: Option<OffsetDateTime>,
     /// When the paste auto-deletes, if ever.
     #[serde(with = "time::serde::rfc3339::option")]
     pub expires_at: Option<OffsetDateTime>,
+}
+
+impl Paste {
+    /// Whether the body is password-encrypted (and therefore not readable
+    /// without the password).
+    pub fn is_encrypted(&self) -> bool {
+        self.enc_salt.is_some() && self.enc_nonce.is_some()
+    }
+
+    /// The body as text, for the unencrypted path. `None` when the paste is
+    /// encrypted (ciphertext is not UTF-8) or the bytes are somehow invalid.
+    pub fn text(&self) -> Option<&str> {
+        if self.is_encrypted() {
+            return None;
+        }
+        std::str::from_utf8(&self.content).ok()
+    }
+
+    /// Whether `account` owns this paste (admins own every paste).
+    pub fn owned_by(&self, account: &Account) -> bool {
+        self.account_id == Some(account.id) || account.flags.is_admin()
+    }
 }
 
 impl Table for Paste {
@@ -256,10 +367,20 @@ impl Table for Paste {
     const COLUMNS: &'static [&'static str] = &[
         "id",
         "account_id",
+        "title",
         "content",
         "language",
+        "visibility",
+        "burn_after_read",
+        "enc_salt",
+        "enc_nonce",
+        "edit_token_hash",
+        "size_bytes",
+        "fork_of",
+        "creator_ip",
         "views",
         "created_at",
+        "updated_at",
         "expires_at",
     ];
 
@@ -269,11 +390,59 @@ impl Table for Paste {
         Ok(Self {
             id: row.get("id")?,
             account_id: row.get("account_id")?,
+            title: row.get("title")?,
             content: row.get("content")?,
             language: row.get("language")?,
+            visibility: row.get("visibility")?,
+            burn_after_read: row.get("burn_after_read")?,
+            enc_salt: row.get("enc_salt")?,
+            enc_nonce: row.get("enc_nonce")?,
+            edit_token_hash: row.get("edit_token_hash")?,
+            size_bytes: row.get("size_bytes")?,
+            fork_of: row.get("fork_of")?,
+            creator_ip: row.get("creator_ip")?,
             views: row.get("views")?,
             created_at: row.get("created_at")?,
+            updated_at: row.get("updated_at")?,
             expires_at: row.get("expires_at")?,
+        })
+    }
+}
+
+/// A snapshot of a paste's body taken just before an edit overwrote it.
+#[derive(Debug, Clone, Serialize)]
+pub struct PasteRevision {
+    /// Auto-increment primary key.
+    pub id: i64,
+    /// The paste this revision belongs to.
+    pub paste_id: String,
+    /// The superseded body (ciphertext if the paste was encrypted at the time).
+    #[serde(skip)]
+    pub content: Vec<u8>,
+    /// The title as it was.
+    pub title: Option<String>,
+    /// The language as it was.
+    pub language: Option<String>,
+    /// When the snapshot was taken (i.e. when the edit happened).
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
+impl Table for PasteRevision {
+    const NAME: &'static str = "paste_revision";
+
+    const COLUMNS: &'static [&'static str] = &["id", "paste_id", "content", "title", "language", "created_at"];
+
+    type Id = i64;
+
+    fn from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            id: row.get("id")?,
+            paste_id: row.get("paste_id")?,
+            content: row.get("content")?,
+            title: row.get("title")?,
+            language: row.get("language")?,
+            created_at: row.get("created_at")?,
         })
     }
 }

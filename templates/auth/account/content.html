@@ -18,11 +18,11 @@
             <span class="stat-label">Short link{% if links != 1 %}s{% endif %}</span>
             <span class="stat-sub">Manage →</span>
         </a>
-        <span class="stat-tile static">
+        <a class="stat-tile" href="/pastes">
             <span class="stat-value">{{ pastes }}</span>
             <span class="stat-label">Paste{% if pastes != 1 %}s{% endif %}</span>
-            <span class="stat-sub">Created via the API</span>
-        </span>
+            <span class="stat-sub">Manage →</span>
+        </a>
     </div>
 </section>
 
@@ -49,7 +49,7 @@
 <section class="account-section">
     <h2>Recent pastes</h2>
     {% if recent_pastes.is_empty() %}
-    <p class="muted">No pastes. They're created through the <a href="/api/docs">API</a> (scope <code>pastes:write</code>).</p>
+    <p class="muted">No pastes yet. <a href="/paste">Create one →</a> or use the <a href="/api/docs">API</a> (scope <code>pastes:write</code>).</p>
     {% else %}
     <div class="record-list">
         {% for paste in recent_pastes %}

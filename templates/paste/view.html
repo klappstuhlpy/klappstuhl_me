@@ -1,0 +1,212 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/glass.css" type="text/css">
+<link rel="stylesheet" href="/static/css/paste.css" type="text/css">
+{% endblock %}
+
+{% block head %}
+{# Only a `public` paste is indexable. Unlisted, private, anonymous, encrypted
+   and burning ones all say so — an unlisted paste is reachable by link, which is
+   not the same thing as wanting it in a search index. #}
+{% if !indexable %}<meta name="robots" content="noindex">{% endif %}
+{% endblock %}
+
+{% block title %}{{ heading }} | Klappstuhl.me{% endblock %}
+{% block og_title %}{{ heading }}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_url %}{{ url }}{% endblock %}
+{% block og_description %}{% if gate.is_some() %}A protected paste on klappstuhl.me.{% else %}{{ language_label }} · {{ line_count }} lines · {{ size }}{% endif %}{% endblock %}
+
+{% block og_image %}
+{# A code screenshot of the first lines — or, for a protected paste, a card that
+   deliberately shows nothing. A crawler building an embed must be able to
+   neither read nor destroy the paste. #}
+<meta property="og:image" content="{{ url }}/og.svg"/>
+<meta property="og:image:type" content="image/svg+xml"/>
+<meta property="og:image:alt" content="{{ heading }}"/>
+{% endblock %}
+{% block twitter_card %}summary_large_image{% endblock %}
+
+{% block body %}
+<div class="glass-ambient" aria-hidden="true"></div>
+
+{%- for flash in flashes -%}
+{{ flash.html()|safe }}
+{%- endfor -%}
+
+{% match gate %}
+
+{# ── The password gate ─────────────────────────────────────────────────────
+   The body is not merely hidden behind this card — it is not in the response at
+   all (see site::paste::resolve_body). The blur is decoration; the fact that
+   there is nothing to un-blur is the actual boundary. #}
+{% when Some with ("locked") %}
+<div class="paste-gate">
+    <div class="glass-modal paste-gate-card">
+        <span class="glyph" aria-hidden="true">🔒</span>
+        <h1>This paste is password-protected</h1>
+        <p>Its contents are encrypted. Enter the password to decrypt them.</p>
+        <form method="POST" action="/p/{{ id }}/unlock">
+            <input type="password" name="password" placeholder="Password" autocomplete="off" autofocus required>
+            <button type="submit" class="button primary">Unlock</button>
+        </form>
+    </div>
+</div>
+
+{# ── The burn-after-read interstitial ──────────────────────────────────────
+   A burn paste never burns on a GET. Discord, Slack and iMessage prefetch every
+   URL they see to build an embed; burning on GET would destroy the paste before
+   its recipient ever clicked it. Only the POST below burns it. #}
+{% when Some with ("burn") %}
+<div class="paste-gate">
+    <div class="glass-modal paste-gate-card">
+        <span class="glyph" aria-hidden="true">🔥</span>
+        <h1>This paste is destroyed once read</h1>
+        <div class="paste-burn-notice">
+            You can only open it <strong>once</strong>. Nobody — not even its author — can read it afterwards.
+            Copy what you need before you leave the page.
+        </div>
+        <form method="POST" action="/p/{{ id }}/reveal">
+            {% if gate_needs_password %}
+            {# Encrypted *and* burning: the password comes in with the reveal, and
+                no unlock cookie is set — there is nothing left to come back to. #}
+            <input type="password" name="password" placeholder="Password" autocomplete="off" autofocus required>
+            {% endif %}
+            <button type="submit" class="button danger">Reveal and destroy</button>
+        </form>
+    </div>
+</div>
+
+{% when Some with (other) %}
+<div class="paste-gate">
+    <div class="glass-modal paste-gate-card">
+        <h1>This paste can't be displayed</h1>
+        <p>Its contents aren't readable as text.</p>
+    </div>
+</div>
+
+{# ── The paste itself ──────────────────────────────────────────────────────── #}
+{% when None %}
+<div class="paste-view">
+    <div class="glass-bar paste-meta">
+        <span class="paste-meta-title" title="{{ heading }}">{{ heading }}</span>
+
+        <span class="paste-meta-facts">
+            <span class="glass-chip">{{ language_label }}</span>
+            {% if burn %}<span class="glass-chip chip-danger">🔥 burn after read</span>{% endif %}
+            {% if encrypted %}<span class="glass-chip chip-warning">🔒 encrypted</span>{% endif %}
+            {% if visibility != "unlisted" %}<span class="glass-chip">{{ visibility }}</span>{% endif %}
+            <span>{{ line_count }} lines</span>
+            <span class="sep">·</span>
+            <span>{{ size }}</span>
+            <span class="sep">·</span>
+            <span>{{ views }} view{% if views != 1 %}s{% endif %}</span>
+            {% match author %}
+            {% when Some with (name) %}
+            <span class="sep">·</span>
+            <a href="/user/{{ name }}">{{ name }}</a>
+            {% when None %}
+            {% endmatch %}
+            <span class="sep">·</span>
+            <time class="js-ts" datetime="{{ created_at|isoformat }}">{{ created_at|isoformat }}</time>
+            {% match expires_at %}
+            {% when Some with (at) %}
+            <span class="sep">·</span>
+            <span class="glass-chip chip-warning">expires <time class="js-ts" datetime="{{ at|isoformat }}">{{ at|isoformat }}</time></span>
+            {% when None %}
+            {% endmatch %}
+            {% match forked_from %}
+            {% when Some with (source) %}
+            <span class="sep">·</span>
+            <span>forked from <a href="/p/{{ source }}">{{ source }}</a></span>
+            {% when None %}
+            {% endmatch %}
+        </span>
+
+        <span class="paste-meta-actions">
+            {% if markdown.is_some() %}
+            <button type="button" class="glass-chip" id="render-toggle" aria-pressed="true">rendered</button>
+            {% endif %}
+            <button type="button" class="glass-chip" id="wrap-toggle" aria-pressed="false">wrap</button>
+            <button type="button" class="glass-chip" id="copy-all">copy</button>
+            <a class="glass-chip" href="/p/{{ id }}.txt">raw</a>
+            <a class="glass-chip" href="/p/{{ id }}/raw">download</a>
+            {% if revisions > 0 %}
+            <a class="glass-chip" href="/p/{{ id }}/history">history ({{ revisions }})</a>
+            {% endif %}
+
+            <span class="paste-share">
+                <button type="button" class="glass-chip" id="share-toggle" aria-expanded="false">share</button>
+                <div class="glass paste-share-panel" id="share-panel">
+                    <h3>Share</h3>
+                    <div class="paste-share-url">
+                        <input type="text" id="share-url" value="{{ url }}" readonly>
+                        <button type="button" class="button small" id="share-copy">copy</button>
+                    </div>
+                    <div class="paste-share-links">
+                        <a href="#" id="share-qr-toggle">Show QR code</a>
+                        <a href="/p/{{ id }}/og.svg" download="{{ id }}.svg">Download as image</a>
+                        <a href="/p/{{ id }}/embed" target="_blank" rel="noopener">Open embed view</a>
+                    </div>
+                    <div class="paste-share-qr" id="share-qr"></div>
+                </div>
+            </span>
+
+            <form method="POST" action="/p/{{ id }}/fork">
+                <button type="submit" class="glass-chip">fork</button>
+            </form>
+
+            {% if is_owner %}
+            <a class="glass-chip" href="/p/{{ id }}/edit">edit</a>
+            <form method="POST" action="/p/{{ id }}/delete" data-confirm="Delete this paste permanently?">
+                <button type="submit" class="glass-chip chip-danger">delete</button>
+            </form>
+            {% endif %}
+        </span>
+    </div>
+
+    {% match markdown %}
+    {% when Some with (html) %}
+    {# Rendered through the *sanitised* parser (site::paste::render::markdown):
+       raw HTML is dropped and unsafe link targets are neutralised. Never render
+       a paste with the changelog's parser configuration. #}
+    <div class="tui-box paste-code" id="markdown-pane">
+        <div class="paste-markdown">{{ html|safe }}</div>
+    </div>
+    {% when None %}
+    {% endmatch %}
+
+    <div class="tui-box paste-code" id="code-pane"
+         {% if markdown.is_some() %}hidden{% endif %}
+         style="background: {{ background }}; color: {{ foreground }};">
+        <div class="tui-bar">
+            <span class="tui-lights" aria-hidden="true"><span></span><span></span><span></span></span>
+            <span class="tui-title"><span class="glyph">✻</span> {{ id }}{% if language != "" %}.{{ language }}{% endif %}</span>
+        </div>
+        <div class="paste-code-scroll">
+            <div class="paste-lines" id="paste-lines">
+                {% match lines %}
+                {% when Some with (rows) %}
+                {% for row in rows %}
+                <div class="paste-line" id="L{{ loop.index }}">
+                    <a href="#L{{ loop.index }}" data-line="{{ loop.index }}">{{ loop.index }}</a>
+                    <code>{{ row|safe }}</code>
+                </div>
+                {% endfor %}
+                {% when None %}
+                {% endmatch %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endmatch %}
+{% endblock %}
+
+{% block body_end %}
+<script>
+    const PASTE_ID = "{{ id }}";
+    const PASTE_URL = "{{ url }}";
+</script>
+<script src="/static/js/paste_view.js"></script>
+{% endblock %}

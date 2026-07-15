@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/glass.css" type="text/css">
+<link rel="stylesheet" href="/static/css/paste.css" type="text/css">
+{% endblock %}
+
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+
+{% block title %}History of {{ title }} | Klappstuhl.me{% endblock %}
+{% block og_title %}History of {{ title }}{% endblock %}
+
+{% block body %}
+<div class="glass-ambient" aria-hidden="true"></div>
+
+{%- for flash in flashes -%}
+{{ flash.html()|safe }}
+{%- endfor -%}
+
+<div class="paste-head">
+    <div>
+        <h1>History</h1>
+        <p class="paste-head-sub"><span class="prompt">$</span> git log --patch <a href="/p/{{ id }}">{{ title }}</a></p>
+    </div>
+    <a class="button" href="/p/{{ id }}">Back to paste</a>
+</div>
+
+{# Newest first. Each entry is shown as a diff against the version before it, so
+   reading down the page walks the paste backwards through its edits. #}
+{% for entry in entries %}
+<div class="glass revision">
+    <div class="glass-bar revision-head">
+        <span class="revision-label">{{ entry.label }}</span>
+        <span class="glass-chip">{{ entry.lines }} lines</span>
+        <span class="paste-meta-facts">
+            <time class="js-ts" datetime="{{ entry.created_at|isoformat }}">{{ entry.created_at|isoformat }}</time>
+        </span>
+    </div>
+    {% if entry.diff.is_empty() %}
+    <p class="paste-head-sub" style="padding: 0.9rem 1rem;">No changes.</p>
+    {% else %}
+    <pre class="revision-diff">{% for line in entry.diff %}<span class="diff-line {{ line.kind }}">{{ line.text }}</span>{% endfor %}</pre>
+    {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

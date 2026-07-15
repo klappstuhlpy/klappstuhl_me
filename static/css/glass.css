@@ -1,0 +1,173 @@
+/* Frosted-glass primitives.
+ *
+ * Every colour here is a `color-mix` over a token from the shared design system
+ * (kls-ui's base.css, served at /kls/base.css). There is not one hex literal and
+ * not one invented custom property — which is what makes the light theme correct
+ * by construction rather than by a second, hand-maintained block.
+ *
+ * The one rule that keeps this from turning gaudy: **glass is for chrome, never
+ * for content.** Toolbars, meta bars, chips, modals and panels are glass; the
+ * code surface itself stays a fully opaque terminal window (.tui-box).
+ *
+ * Performance: `backdrop-filter` re-samples everything beneath the element on
+ * every frame. Sticky bars and modals are small and few, so that is fine. Never
+ * put it on a scrolling code container, on per-line elements, or nest glass in
+ * glass.
+ *
+ * If these prove out, graduating them into kls-ui's base.css (so the admin shell
+ * and account pages can adopt them) is a follow-up shared-crate release.
+ */
+
+.glass {
+    background: color-mix(in srgb, var(--box) 62%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid color-mix(in srgb, var(--box-border) 55%, transparent);
+    border-radius: 12px;
+    box-shadow:
+        0 8px 32px color-mix(in srgb, var(--background) 55%, transparent),
+        /* the top-edge highlight is what sells it as a physical pane */
+        inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+/* Sticky toolbars: tighter radius, stronger tint, so labels stay readable when
+   code scrolls underneath them. */
+.glass-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 0.55rem 0.8rem;
+    background: color-mix(in srgb, var(--box) 82%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid color-mix(in srgb, var(--box-border) 60%, transparent);
+    border-radius: 10px;
+    box-shadow:
+        0 6px 24px color-mix(in srgb, var(--background) 50%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+/* Pills: expiry presets, language badges, the filter rail. */
+.glass-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.7rem;
+    font-size: 0.76rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--box) 55%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--box-border) 60%, transparent);
+    border-radius: 9999px;
+    cursor: pointer;
+    user-select: none;
+    transition: border-color 150ms ease, color 150ms ease, background-color 150ms ease;
+}
+
+.glass-chip:hover {
+    color: var(--foreground);
+    border-color: color-mix(in srgb, var(--branding) 40%, transparent);
+}
+
+/* The active state of a chip / segmented control: a coral fill. */
+.glass-chip.is-active,
+.glass-chip:has(input:checked) {
+    color: var(--branding-bright);
+    background: var(--branding-dim);
+    border-color: color-mix(in srgb, var(--branding) 45%, transparent);
+}
+
+/* Chips built as radio/checkbox labels hide the real control but keep it
+   focusable — the ring has to follow it, or keyboard users lose their place. */
+.glass-chip input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.glass-chip:has(input:focus-visible) {
+    outline: 2px solid var(--branding);
+    outline-offset: 2px;
+}
+
+/* Modals: unlock, the burn interstitial, the secret-scan warning. Heavier blur
+   over a dimmed backdrop. */
+.glass-modal {
+    background: color-mix(in srgb, var(--box) 80%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid color-mix(in srgb, var(--box-border) 70%, transparent);
+    border-radius: 14px;
+    box-shadow:
+        0 20px 60px color-mix(in srgb, var(--background) 70%, transparent),
+        inset 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent);
+    padding: 1.5rem;
+    max-width: 32rem;
+}
+
+.glass-modal::backdrop {
+    background: color-mix(in srgb, var(--background) 70%, transparent);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+}
+
+/* The ambient layer. Blur only reads as glass when there is something behind it,
+   so each paste page gets two large, static coral radial glows to refract — the
+   same trick index.css already plays. Fixed and non-interactive: it costs one
+   composited layer and never repaints. */
+.glass-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(60rem 40rem at 8% -5%, color-mix(in srgb, var(--branding) 8%, transparent), transparent 60%),
+        radial-gradient(50rem 36rem at 100% 105%, color-mix(in srgb, var(--branding) 8%, transparent), transparent 60%);
+}
+
+/* --- Fallbacks are part of the definition, not an afterthought ------------- */
+
+/* No backdrop-filter (older Firefox with the flag off, some embedded webviews):
+   fall back to a fully opaque surface. The page must stay completely usable —
+   glass is decoration, never a security boundary and never load-bearing. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass,
+    .glass-bar,
+    .glass-chip,
+    .glass-modal {
+        background: var(--box);
+        border-color: var(--box-border);
+    }
+
+    .glass-modal::backdrop {
+        background: color-mix(in srgb, var(--background) 85%, transparent);
+    }
+}
+
+/* The reader asked for less transparency. Honour it exactly. */
+@media (prefers-reduced-transparency: reduce) {
+    .glass,
+    .glass-bar,
+    .glass-chip,
+    .glass-modal {
+        background: var(--box);
+        border-color: var(--box-border);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    .glass-ambient {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .glass-chip {
+        transition: none;
+    }
+}

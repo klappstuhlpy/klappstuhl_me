@@ -1,0 +1,105 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/glass.css" type="text/css">
+<link rel="stylesheet" href="/static/css/paste.css" type="text/css">
+{% endblock %}
+
+{% block head %}<meta name="robots" content="noindex">{% endblock %}
+
+{% block title %}Your Pastes | Klappstuhl.me{% endblock %}
+{% block og_title %}Your Pastes | Klappstuhl.me{% endblock %}
+{% block og_url %}{{ crate::CONFIG.get().unwrap().canonical_url() }}/pastes{% endblock %}
+
+{% block body %}
+<div class="glass-ambient" aria-hidden="true"></div>
+
+{%- for flash in flashes -%}
+{{ flash.html()|safe }}
+{%- endfor -%}
+
+<div class="paste-head">
+    <div>
+        <h1>Your Pastes</h1>
+        <p class="paste-head-sub"><span class="prompt">$</span> ls ~/pastes</p>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+        {% if is_admin %}
+        <span class="paste-quota">Unlimited (admin) · {{ used }} stored</span>
+        {% else %}
+        <span class="paste-quota">{{ count }} / {{ limit }} · {{ used }} / {{ quota }}</span>
+        {% endif %}
+        <a class="button primary" href="/paste">New paste</a>
+    </div>
+</div>
+
+{% if pastes.is_empty() %}
+<div class="paste-empty">
+    <p class="tui-prompt" data-prompt="$">echo "hello" | paste<span class="blink">▌</span></p>
+    <p class="paste-head-sub">No pastes yet. <a href="/paste">Create your first one</a>.</p>
+</div>
+{% else %}
+
+<div class="glass-bar paste-filters">
+    <input type="search" id="paste-search" placeholder="Search titles, ids, languages…" aria-label="Search pastes">
+    <label class="glass-chip"><input type="radio" name="filter-visibility" value="" checked> all</label>
+    <label class="glass-chip"><input type="radio" name="filter-visibility" value="public"> public</label>
+    <label class="glass-chip"><input type="radio" name="filter-visibility" value="unlisted"> unlisted</label>
+    <label class="glass-chip"><input type="radio" name="filter-visibility" value="private"> private</label>
+    {% if !languages.is_empty() %}
+    <select id="filter-language" aria-label="Filter by language" style="margin: 0; flex: 0 1 9rem;">
+        <option value="">any language</option>
+        {% for language in languages %}
+        <option value="{{ language }}">{{ language }}</option>
+        {% endfor %}
+    </select>
+    {% endif %}
+</div>
+
+<div class="paste-grid" id="paste-grid">
+    {% for paste in pastes %}
+    <div class="glass paste-card"
+         data-title="{{ paste.title|lower }}"
+         data-id="{{ paste.id }}"
+         data-language="{{ paste.language }}"
+         data-visibility="{{ paste.visibility }}">
+        <a class="paste-card-title" href="/p/{{ paste.id }}">{{ paste.title }}</a>
+
+        <div class="paste-card-chips">
+            <span class="glass-chip">{{ paste.language }}</span>
+            <span class="glass-chip">{{ paste.visibility }}</span>
+            {% if paste.encrypted %}<span class="glass-chip chip-warning">🔒</span>{% endif %}
+            {% if paste.burn %}<span class="glass-chip chip-danger">🔥</span>{% endif %}
+        </div>
+
+        <div class="paste-card-facts">
+            <span>{{ paste.size }}</span>
+            <span>·</span>
+            <span>{{ paste.views }} view{% if paste.views != 1 %}s{% endif %}</span>
+            <span>·</span>
+            <time class="js-ts" datetime="{{ paste.created_at|isoformat }}">{{ paste.created_at|isoformat }}</time>
+            {% match paste.expires_at %}
+            {% when Some with (at) %}
+            <span>·</span>
+            <span>expires <time class="js-ts" datetime="{{ at|isoformat }}">{{ at|isoformat }}</time></span>
+            {% when None %}
+            {% endmatch %}
+        </div>
+
+        <div class="paste-card-actions">
+            <a class="button small" href="/p/{{ paste.id }}/edit">Edit</a>
+            <form method="POST" action="/p/{{ paste.id }}/delete" data-confirm="Delete “{{ paste.title }}” permanently?">
+                <button type="submit" class="button small danger">Delete</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<p class="paste-head-sub" id="no-results" hidden>Nothing matches that filter.</p>
+{% endif %}
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/paste_list.js"></script>
+{% endblock %}

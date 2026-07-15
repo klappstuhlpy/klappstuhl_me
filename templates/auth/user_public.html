@@ -55,8 +55,33 @@
                 <span class="stat-label">Short link{% if links != 1 %}s{% endif %}</span>
                 <span class="stat-sub">r.klappstuhl.me</span>
             </span>
+            <span class="stat-tile static">
+                <span class="stat-value">{{ public_pastes }}</span>
+                <span class="stat-label">Public paste{% if public_pastes != 1 %}s{% endif %}</span>
+                <span class="stat-sub">/p</span>
+            </span>
         </div>
     </section>
+
+    {% if !recent_public_pastes.is_empty() %}
+    <section class="account-section">
+        <h2>Public pastes</h2>
+        <div class="record-list">
+            {% for paste in recent_public_pastes %}
+            <div class="record">
+                <div class="record-main">
+                    <a class="record-title" href="/p/{{ paste.id }}">{{ paste.title }}</a>
+                    <span class="record-sub">
+                        <code>{{ paste.language }}</code> ·
+                        {{ paste.views }} view{% if paste.views != 1 %}s{% endif %}
+                    </span>
+                </div>
+                <time class="record-time js-ts" datetime="{{ paste.created_at|isoformat }}">{{ paste.created_at|isoformat }}</time>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
 
     {% if is_self %}
     <p class="section-note">This is how others see you. <a href="/account">Back to your account →</a></p>

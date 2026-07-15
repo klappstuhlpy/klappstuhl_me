@@ -1,0 +1,148 @@
+{% extends "layout.html" %}
+
+{% block css %}
+<link rel="stylesheet" href="/static/css/glass.css" type="text/css">
+<link rel="stylesheet" href="/static/css/paste.css" type="text/css">
+{% endblock %}
+
+{% block title %}{% match existing %}{% when Some with (p) %}Edit paste{% when None %}New paste{% endmatch %} | Klappstuhl.me{% endblock %}
+{% block og_title %}New paste | Klappstuhl.me{% endblock %}
+{% block og_description %}Paste code or text, highlighted, expiring, optionally password-protected.{% endblock %}
+{% block og_url %}{{ crate::CONFIG.get().unwrap().canonical_url() }}/paste{% endblock %}
+
+{% block body %}
+<div class="glass-ambient" aria-hidden="true"></div>
+
+{%- for flash in flashes -%}
+{{ flash.html()|safe }}
+{%- endfor -%}
+
+<div class="paste-head">
+    <div>
+        <h1>{% match existing %}{% when Some with (p) %}Edit paste{% when None %}New paste{% endmatch %}</h1>
+        <p class="paste-head-sub"><span class="prompt">$</span> cat &gt; paste.txt</p>
+    </div>
+    {% if account.is_none() && !anonymous_allowed %}
+    <span class="glass-chip chip-warning">Sign in to create a paste</span>
+    {% else if account.is_none() %}
+    <span class="glass-chip">Anonymous — you'll get an edit token</span>
+    {% endif %}
+</div>
+
+<form class="paste-editor" id="paste-form" autocomplete="off"
+      method="POST"
+      action="{% match existing %}{% when Some with (p) %}/p/{{ p.id }}/edit{% when None %}/paste{% endmatch %}">
+
+    {# The writing surface is a terminal window — opaque, never glass. The
+       textarea is transparent-text and sits over an aria-hidden <pre> that JS
+       fills with highlighted markup, so you type onto coloured syntax. With JS
+       off it degrades to a plain (visible-text) textarea. #}
+    <div class="tui-box editor-frame" id="editor-frame">
+        <div class="editor-gutter" id="editor-gutter" aria-hidden="true">1</div>
+        <div class="editor-code" id="editor-code">
+            <pre class="editor-highlight" id="editor-highlight" aria-hidden="true"></pre>
+            <textarea class="editor-input" id="editor-input" name="content" spellcheck="false"
+                      autocapitalize="off" autocorrect="off"
+                      placeholder="Paste or drop a file…" required>{% match existing %}{% when Some with (p) %}{{ p.content }}{% when None %}{% endmatch %}</textarea>
+        </div>
+    </div>
+
+    <div class="glass editor-options">
+        <div class="editor-option-group" role="group" aria-label="Expiry">
+            <span class="editor-option-label">Expires</span>
+            {# 0 = never. An anonymous paste is capped server-side regardless of
+               what is picked here — nothing anonymous lives forever. #}
+            <label class="glass-chip"><input type="radio" name="expires_in" value="600"> 10m</label>
+            <label class="glass-chip"><input type="radio" name="expires_in" value="3600"> 1h</label>
+            <label class="glass-chip"><input type="radio" name="expires_in" value="86400"> 1d</label>
+            <label class="glass-chip"><input type="radio" name="expires_in" value="604800"> 1w</label>
+            <label class="glass-chip"><input type="radio" name="expires_in" value="2592000"> 30d</label>
+            <label class="glass-chip"><input type="radio" name="expires_in" value="0" checked> never</label>
+        </div>
+
+        <div class="editor-option-group">
+            <span class="editor-option-label">Visibility</span>
+            <div class="segmented" role="group" aria-label="Visibility">
+                {% match existing %}
+                {% when Some with (p) %}
+                <label class="glass-chip"><input type="radio" name="visibility" value="public" {% if p.visibility == "public" %}checked{% endif %}> public</label>
+                <label class="glass-chip"><input type="radio" name="visibility" value="unlisted" {% if p.visibility == "unlisted" %}checked{% endif %}> unlisted</label>
+                <label class="glass-chip"><input type="radio" name="visibility" value="private" {% if p.visibility == "private" %}checked{% endif %}> private</label>
+                {% when None %}
+                <label class="glass-chip"><input type="radio" name="visibility" value="public"> public</label>
+                <label class="glass-chip"><input type="radio" name="visibility" value="unlisted" checked> unlisted</label>
+                <label class="glass-chip"><input type="radio" name="visibility" value="private"> private</label>
+                {% endmatch %}
+            </div>
+        </div>
+
+        {% match existing %}
+        {% when Some with (p) %}
+        {# Burn is a property of the paste at creation: flipping it on an existing
+           paste would change what its already-shared link means. #}
+        {% when None %}
+        <div class="editor-option-group">
+            <label class="glass-chip">
+                <input type="checkbox" name="burn_after_read" value="on"> 🔥 burn after read
+            </label>
+        </div>
+        {% endmatch %}
+    </div>
+
+    <div class="glass-bar editor-actions">
+        <input class="editor-title" type="text" name="title" maxlength="120" placeholder="Title (optional)"
+               value="{% match existing %}{% when Some with (p) %}{{ p.title }}{% when None %}{% endmatch %}">
+
+        {# Language picker. The native <select> is the no-JS fallback *and* the
+           form's source of truth; paste.js enhances it into a searchable, logo'd
+           combobox that only ever writes back to it. `data-icon` flags a token
+           that has a vendored brand logo under /static/img/lang/. #}
+        <div class="lang-picker" id="lang-picker">
+            <select class="editor-language" name="language" id="editor-language" aria-label="Language">
+                <option value=""{% match existing %}{% when Some with (p) %}{% if p.language == "" %} selected{% endif %}{% when None %} selected{% endmatch %}>Auto-detect</option>
+                {% for lang in languages %}
+                <option value="{{ lang.token }}"{% if lang.icon %} data-icon="1"{% endif %}{% match existing %}{% when Some with (p) %}{% if p.language == lang.token %} selected{% endif %}{% when None %}{% endmatch %}>{{ lang.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% match existing %}
+        {% when Some with (p) %}
+        {% if p.encrypted %}
+        <input class="editor-password" type="password" name="password" placeholder="Password (required)" required>
+        {% endif %}
+        <input type="hidden" name="token" id="edit-token" value="">
+        {% when None %}
+        <input class="editor-password" type="password" name="password" placeholder="Password (optional)">
+        {% endmatch %}
+
+        <button type="button" class="glass-chip editor-format" id="editor-format" title="Reformat the body (JSON is pretty-printed)">format</button>
+        <span class="editor-counter" id="editor-counter" data-max="{{ max_bytes }}">0 lines · 0 B</span>
+        <button type="submit" class="button primary">{% match existing %}{% when Some with (p) %}Save{% when None %}Create paste{% endmatch %}</button>
+    </div>
+
+    <p class="editor-hint">
+        <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to save · <kbd>Tab</kbd> inserts spaces · drop a file onto the editor to load it
+    </p>
+
+    {# Set by "publish anyway" on the secret-scan warning. #}
+    <input type="hidden" name="confirm_secrets" id="confirm-secrets" value="">
+</form>
+
+{# The secret-scan warning. Raised when the body looks like it carries a live
+   credential — an AWS key, a private key, a bot token. A signed-in author may
+   publish anyway; an anonymous one may not, and the dialog says so. #}
+<dialog class="glass-modal secret-warning" id="secret-modal">
+    <h2>⚠ This looks like it contains a secret</h2>
+    <p id="secret-message">Publishing it here makes it readable by anyone with the link. If it is a live credential, rotate it instead.</p>
+    <div class="secret-rules" id="secret-rules"></div>
+    <div class="modal-actions">
+        <button type="button" class="button" id="secret-cancel">Let me fix it</button>
+        <button type="button" class="button danger" id="secret-publish">Publish anyway</button>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block body_end %}
+<script src="/static/js/paste.js"></script>
+{% endblock %}

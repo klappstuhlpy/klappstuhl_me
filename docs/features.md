@@ -5,6 +5,7 @@ Discord/Percy integration, and where everything lands on disk.
 
 - [Admin dashboard](#admin-dashboard)
 - [Account](#account)
+- [Pastebin](#pastebin)
 - [Discord login & the Percy dashboard](#discord-login--the-percy-dashboard)
 - [Changelog & versioning](#changelog--versioning)
 - [Data & log paths](#data--log-paths)
@@ -40,7 +41,7 @@ Container image-update status is also exposed at `GET /api/v1/admin/updates` (sc
 | `/account/security` | Password, two-factor (TOTP) enrollment, recovery-code status, sign-in history       |
 | `/account/sessions` | Active sign-ins — rename or revoke individually, or sign out everywhere             |
 | `/account/api`      | The scoped API token, a `curl` starter, and the ShareX uploader config              |
-| `/account/content`  | Images, short links, and pastes you own                                             |
+| `/account/content`  | Images, short links, and pastes you own (links out to the [pastebin](#pastebin))    |
 | `/account/danger`   | Data export and permanent account deletion                                          |
 
 **Changing your username** (`POST /account/username`) re-authenticates with your
@@ -66,6 +67,63 @@ they exist to restore access rather than destroy it. It is rate-limited, refuses
 delete the **last admin account**, and offers a choice to delete or orphan your
 uploaded images. Sessions, API keys, recovery codes, the Discord link, short links,
 and pastes go with the account; audit-log rows are retained with the actor unlinked.
+
+## Pastebin
+
+A browser-first paste host. Create a paste at `/paste`, read it at `/p/<id>`,
+manage your own at `/pastes`, and drive the whole thing over the JSON API under
+`/api/pastes` (scopes `pastes:read` / `pastes:write`). The old raw view,
+`/p/<id>.txt`, is unchanged and still the documented `raw_url`.
+
+**The editor** (`/paste`) is a plain textarea with a line-number gutter — no
+in-browser code editor to download. Drop a file onto it to load it (the extension
+picks the highlighter), `Tab` inserts spaces, `Ctrl`/`Cmd`+`Enter` saves. You set a
+title, a language, an expiry (10 minutes to 30 days, or never), and a visibility.
+
+**Visibility** is `public`, `unlisted` (the default) or `private`. Every paste is
+readable by anyone who has the link — that is what makes it linkable — so visibility
+controls *listing and indexing*, not access: only `public` pastes are shown on your
+`/user/<name>` profile and allowed into a search index. Real secrecy comes from the
+two protections below. (There is deliberately no global "recent pastes" feed.)
+
+**Password protection** encrypts the body at rest with Argon2id + ChaCha20-Poly1305.
+No password is stored — the decryption succeeding *is* the check — so a lost password
+means a lost paste. This is server-side encryption: unlike a zero-knowledge,
+key-in-the-URL design, the operator could in principle read a paste if they held its
+password. The trade keeps server-side highlighting, link-preview cards and the API
+working. Unlocking sets a short-lived, paste-scoped cookie so the raw and embed views
+work without re-prompting.
+
+**Burn-after-read** destroys a paste the first time it is *explicitly* revealed. A
+plain visit shows a confirmation screen instead of the body, so a link-preview
+crawler (Discord, Slack, iMessage all prefetch URLs) can't destroy the paste before
+its recipient clicks — only the reveal button does, and only ever once.
+
+**Anonymous pastes** let a signed-out visitor (or `curl`) create one:
+
+```sh
+curl --data-binary @notes.txt https://klappstuhl.me/p
+# → https://klappstuhl.me/p/ab12cd34
+#   edit token: … (keep it — the only way to edit or delete this paste)
+```
+
+They carry a smaller size cap, a forced expiry, and a one-time **edit token** (the
+only way to manage them afterwards, since there's no account). The whole anonymous
+surface can be switched off with `paste.anonymous`.
+
+**Every paste is scanned** on save: if the body looks like it contains a live
+credential (an API key, a private key, a token), you're warned and can publish anyway
+— except an anonymous paste, where a detected secret is refused outright.
+
+**The viewer** highlights the code with clickable line anchors (`#L12`, and
+`#L12-L20` ranges), a word-wrap toggle, a per-browser theme picker, copy-all,
+download, an embeddable view (`/p/<id>/embed`), a link-preview image
+(`/p/<id>/og.svg`), forking, and full revision history with a per-edit diff. Markdown
+pastes get a rendered view — through a sanitising renderer that strips embedded HTML,
+so a markdown paste can't run script.
+
+Limits (paste count, total bytes, sizes, the anonymous switch and TTL) are all
+configurable — see [Setup](setup.md#pastebin). Admins bypass the quotas.
 
 ## Discord login & the Percy dashboard
 

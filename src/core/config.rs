@@ -287,6 +287,82 @@ impl AiConfig {
     }
 }
 
+/// Pastebin settings (`/paste`, `/pastes`, `/p/<id>`, `POST /p`).
+///
+/// Every field has a default, so an install that never writes a `paste` block
+/// gets the shipped behaviour: anonymous pastes on, 512 KB for accounts,
+/// 256 KB and a forced 30-day TTL for anonymous ones.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PasteConfig {
+    /// Whether strangers may create pastes without an account (the `curl`
+    /// endpoint, `POST /p`). This is the only surface on the site that
+    /// unauthenticated visitors can write to — turn it off if it gets abused.
+    #[serde(default = "default_true")]
+    pub anonymous: bool,
+    /// Maximum body size for a signed-in account's paste, in bytes.
+    #[serde(default = "default_paste_max_bytes")]
+    pub max_bytes: usize,
+    /// Maximum body size for an anonymous paste, in bytes.
+    #[serde(default = "default_paste_anon_max_bytes")]
+    pub anonymous_max_bytes: usize,
+    /// Forced TTL for anonymous pastes, in days — nothing anonymous lives
+    /// forever. A shorter requested expiry is honoured; a longer one is capped.
+    #[serde(default = "default_paste_anon_ttl_days")]
+    pub anonymous_ttl_days: i64,
+    /// Maximum pastes a non-admin account may own. Admins are unlimited.
+    #[serde(default = "default_paste_account_limit")]
+    pub account_limit: usize,
+    /// Maximum total paste bytes a non-admin account may store.
+    #[serde(default = "default_paste_account_max_total_bytes")]
+    pub account_max_total_bytes: i64,
+    /// The syntect theme the viewer highlights with by default. Visitors can
+    /// override it per-browser from the viewer's theme picker.
+    #[serde(default = "default_paste_theme")]
+    pub default_theme: String,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_paste_max_bytes() -> usize {
+    512 * 1024
+}
+
+fn default_paste_anon_max_bytes() -> usize {
+    256 * 1024
+}
+
+fn default_paste_anon_ttl_days() -> i64 {
+    30
+}
+
+fn default_paste_account_limit() -> usize {
+    100
+}
+
+fn default_paste_account_max_total_bytes() -> i64 {
+    16 * 1024 * 1024
+}
+
+fn default_paste_theme() -> String {
+    "base16-ocean.dark".to_string()
+}
+
+impl Default for PasteConfig {
+    fn default() -> Self {
+        Self {
+            anonymous: default_true(),
+            max_bytes: default_paste_max_bytes(),
+            anonymous_max_bytes: default_paste_anon_max_bytes(),
+            anonymous_ttl_days: default_paste_anon_ttl_days(),
+            account_limit: default_paste_account_limit(),
+            account_max_total_bytes: default_paste_account_max_total_bytes(),
+            default_theme: default_paste_theme(),
+        }
+    }
+}
+
 /// The server configuration.
 ///
 /// Field/declaration order is the canonical on-disk order: `load()` rewrites
@@ -421,6 +497,9 @@ pub struct Config {
     /// Off unless `ai.api_key` is set.
     #[serde(default)]
     pub ai: AiConfig,
+    /// Pastebin limits and the anonymous-paste switch.
+    #[serde(default)]
+    pub paste: PasteConfig,
     /// Discord OAuth2 settings for identity linking (bot dashboard access).
     /// Off unless all three fields (`client_id`, `client_secret`, `redirect_uri`) are set.
     #[serde(default)]
@@ -471,6 +550,7 @@ impl Config {
             ffmpeg_path: None,
             max_upload_bytes: None,
             ai: AiConfig::default(),
+            paste: PasteConfig::default(),
             discord: DiscordConfig::default(),
             sso_secret: None,
             gallery_provision_token: None,
@@ -833,6 +913,7 @@ mod tests {
             "ffmpeg_path",
             "max_upload_bytes",
             "ai",
+            "paste",
         ];
         let mut last = 0usize;
         for key in expected {

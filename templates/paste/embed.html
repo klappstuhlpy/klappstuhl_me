@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# An embed is always link-only by definition — never index the iframe target
+       itself; the paste page is the canonical thing to find. #}
+    <meta name="robots" content="noindex">
+    <title>{{ title }} | Klappstuhl.me</title>
+    <link rel="canonical" href="{{ url }}">
+    <link rel="stylesheet" href="/kls/base.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/glass.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/paste.css" type="text/css">
+</head>
+{# No nav, no footer, no grid: the page *is* the paste, sized to whatever iframe
+   holds it. Colours come from the syntect theme, not the site theme — an embed
+   lands on someone else's page and has to look the same wherever it is. #}
+<body class="paste-embed">
+<div class="tui-box paste-code" style="background: {{ background }}; color: {{ foreground }};">
+    <div class="tui-bar embed-bar">
+        <span class="tui-lights" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span class="tui-title"><span class="glyph">✻</span> {{ title }}{% if language != "" %} · {{ language }}{% endif %}</span>
+        <a href="{{ url }}" target="_blank" rel="noopener">open ↗</a>
+    </div>
+    <div class="paste-code-scroll">
+        <div class="paste-lines">
+            {% for row in lines %}
+            <div class="paste-line" id="L{{ loop.index }}">
+                <a href="{{ url }}#L{{ loop.index }}" target="_blank" rel="noopener">{{ loop.index }}</a>
+                <code>{{ row|safe }}</code>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+</body>
+</html>

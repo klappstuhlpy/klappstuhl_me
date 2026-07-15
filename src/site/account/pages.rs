@@ -452,9 +452,22 @@ struct UserPublicTemplate {
     images: i64,
     images_size: String,
     links: i64,
+    /// The count of the user's `public` pastes, and a few of the most recent —
+    /// the only pastes that show on a public profile (unlisted/private never do).
+    public_pastes: usize,
+    recent_public_pastes: Vec<PublicPasteRow>,
     /// True when you're looking at your own public page — the template then
     /// offers a link back into the account shell.
     is_self: bool,
+}
+
+/// A public paste as shown on a profile.
+struct PublicPasteRow {
+    id: String,
+    title: String,
+    language: String,
+    views: i64,
+    created_at: OffsetDateTime,
 }
 
 /// `GET /user/:name` — a slim, read-only view of another account. Deliberately
@@ -488,7 +501,38 @@ pub async fn user_public(
         .flatten()
         .ok_or_else(|| Redirect::to("/"))?;
 
-    let ((images, image_bytes), links) = tokio::join!(image_totals(&state, user.id), short_link_count(&state, user.id));
+    let ((images, image_bytes), links, public_pastes) = tokio::join!(
+        image_totals(&state, user.id),
+        short_link_count(&state, user.id),
+        // `public` visibility means *indexable + listed on your own profile*,
+        // and nothing more — there is still no global discover feed.
+        crate::site::paste::service::list_public(&state, user.id, 6),
+    );
+
+    let public_count: i64 = state
+        .database()
+        .get_row(
+            "SELECT COUNT(*) FROM paste WHERE account_id = ?1 AND visibility = 'public' \
+             AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))",
+            [user.id],
+            |row| row.get::<_, i64>(0),
+        )
+        .await
+        .unwrap_or(0);
+
+    let recent_public_pastes = public_pastes
+        .into_iter()
+        .map(|p| PublicPasteRow {
+            title: match p.title.as_deref() {
+                Some(t) if !t.is_empty() => t.to_string(),
+                _ => p.id.clone(),
+            },
+            language: p.language.clone().unwrap_or_else(|| "text".to_string()),
+            views: p.views,
+            created_at: p.created_at,
+            id: p.id,
+        })
+        .collect();
 
     Ok(UserPublicTemplate {
         is_self: account.id == user.id,
@@ -497,6 +541,8 @@ pub async fn user_public(
         images,
         images_size: human_bytes(image_bytes),
         links,
+        public_pastes: public_count.max(0) as usize,
+        recent_public_pastes,
         account: Some(account),
     }
     .into_response())
