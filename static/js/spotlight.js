@@ -119,71 +119,47 @@
         }
     }
 
-    // ── Fetch search results ──────────────────────────────────────────────────
+    // ── Static navigation items + AI ────────────────────────────────────────
 
-    async function fetchResults(q) {
-        results.innerHTML = '<div class="spotlight-spinner"></div>';
+    const SITE_NAV = [
+        { kind: 'page', title: 'Home', url: '/' },
+        { kind: 'page', title: 'Images', url: '/images' },
+        { kind: 'page', title: 'Pastes', url: '/pastes' },
+        { kind: 'page', title: 'Account', url: '/account' },
+        { kind: 'page', title: 'API Docs', url: '/api/docs' },
+        { kind: 'page', title: 'Changelog', url: '/changelog' },
+    ];
+
+    function fetchResults(q) {
         items = [];
         itemEls = [];
         activeIdx = -1;
         runOutput = null;
 
-        try {
-            const url = '/admin/spotlight/search?q=' + encodeURIComponent(q);
-            const r = await fetch(url);
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const data = await r.json();
-            const list = data.items || [];
-            // Admin-only AI: offer to ask the assistant about the typed query.
-            // Rendered last (see kindOrder) so it never steals the default Enter.
-            if (q) {
-                list.push({ kind: 'ai', title: 'Ask the AI', subtitle: '“' + q + '”', query: q });
-            }
-            renderItems(list);
-        } catch (err) {
-            results.innerHTML = '<div style="padding:1rem;font-size:0.82rem;color:var(--error-text)">Error: ' + escHtml(err.message) + '</div>';
+        const list = SITE_NAV.filter(item =>
+            !q || item.title.toLowerCase().includes(q.toLowerCase())
+        );
+        if (q) {
+            list.push({ kind: 'ai', title: 'Ask the AI', subtitle: '”' + q + '”', query: q });
         }
+        renderItems(list);
     }
 
     // ── Render items ──────────────────────────────────────────────────────────
 
     const KIND_ICONS = {
-        navigate:  '🔗',
         page:      '🌐',
-        api:       '🧩',
-        script:    '⚡',
-        image:     '🖼',
-        audit:     '📋',
-        scan:      '🛡',
-        ssh:       '🔑',
-        container: '🐳',
         ai:        '✻',
     };
 
     const KIND_LABELS = {
-        navigate:  '',          // no badge for admin nav items
-        page:      '',          // no badge for site pages
-        api:       'API',
-        script:    'Script',
-        image:     'Image',
-        audit:     'Audit',
-        scan:      'Scan',
-        ssh:       'SSH',
-        container: 'Container',
+        page:      '',
         ai:        'AI',
     };
 
     // Group items by kind for section headers
     const SECTION_TITLES = {
-        navigate:  'Admin',
         page:      'Site',
-        api:       'API',
-        script:    'Scripts',
-        image:     'Images',
-        audit:     'Audit log',
-        scan:      'File scans',
-        ssh:       'SSH keys',
-        container: 'Containers',
         ai:        'Assistant',
     };
 
@@ -211,7 +187,7 @@
         let html = '';
         let flatIdx = 0;
 
-        const kindOrder = ['navigate', 'page', 'api', 'script', 'image', 'audit', 'scan', 'ssh', 'container', 'ai'];
+        const kindOrder = ['navigate', 'page', 'api', 'image', 'audit', 'scan', 'ssh', 'container', 'ai'];
         for (const kind of kindOrder) {
             if (!groups[kind]) continue;
             const sectionTitle = SECTION_TITLES[kind] || kind;
@@ -257,15 +233,13 @@
         });
     }
 
-    // ── Activate an item (navigate or run script) ─────────────────────────────
+    // ── Activate an item (navigate or ask the AI) ─────────────────────────────
 
     function activateItem(item) {
         if (!item) return;
 
         if (item.kind === 'ai') {
             askAi(item.query);
-        } else if (item.kind === 'script') {
-            runScript(item);
         } else if (item.url) {
             close();
             window.location.href = item.url;
@@ -371,68 +345,6 @@
         if (!s) return;
         s.classList.add(kind);
         s.textContent = kind === 'ok' ? 'OK' : 'Error';
-    }
-
-    // ── Script execution ──────────────────────────────────────────────────────
-
-    async function runScript(item) {
-        // Show a spinner in the output area
-        showRunOutput(item.title, null, null);
-
-        try {
-            const r = await fetch('/admin/spotlight/run', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ script_id: item.script_id }),
-            });
-            const data = await r.json();
-
-            if (!r.ok) {
-                showRunOutput(item.title, null, data.error || 'HTTP ' + r.status);
-                return;
-            }
-
-            const output = [data.stdout, data.stderr].filter(Boolean).join('\n').trim() || '(no output)';
-            showRunOutput(item.title, data.success, output);
-        } catch (err) {
-            showRunOutput(item.title, null, err.message);
-        }
-    }
-
-    function showRunOutput(scriptName, success, output) {
-        // Remove any existing run output panel
-        const existing = document.getElementById('spotlight-run-panel');
-        if (existing) existing.remove();
-
-        const panel = document.createElement('div');
-        panel.id = 'spotlight-run-panel';
-        panel.className = 'spotlight-run-wrap';
-
-        if (output === null) {
-            // Loading state
-            panel.innerHTML = `
-                <div class="spotlight-run-header">
-                    Running <em>${escHtml(scriptName)}</em>…
-                </div>
-                <div class="spotlight-spinner"></div>
-            `;
-        } else {
-            const statusClass  = success === true ? 'ok' : (success === false ? 'err' : 'err');
-            const statusLabel  = success === true ? 'OK' : (success === false ? 'Failed' : 'Error');
-            panel.innerHTML = `
-                <div class="spotlight-run-header">
-                    <em>${escHtml(scriptName)}</em>
-                    <span class="spotlight-run-status ${statusClass}">${statusLabel}</span>
-                </div>
-                <pre class="spotlight-run-pre">${escHtml(String(output))}</pre>
-            `;
-        }
-
-        // Insert before footer
-        const modal = overlay.querySelector('.spotlight-modal');
-        const footer = modal.querySelector('.spotlight-footer');
-        modal.insertBefore(panel, footer);
-        runOutput = panel;
     }
 
     // ── Utilities ─────────────────────────────────────────────────────────────

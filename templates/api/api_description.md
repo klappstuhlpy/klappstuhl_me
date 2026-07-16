@@ -82,8 +82,6 @@ Please do not build against them:
 - **Guild galleries** (`{base}/guilds/{guild_id}/images…`) — require the
   `images:guild` scope, used by Percy to manage per-Discord-guild image
   galleries. Keys are minted per guild by the service, not issued to users.
-- **Admin** (`{base}/admin/…`) — require the `admin:read` / `admin:write` scopes
-  and expose the operator's homelab state.
 
 ### Rate Limits
 

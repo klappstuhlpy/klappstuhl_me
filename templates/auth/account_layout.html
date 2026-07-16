@@ -51,16 +51,6 @@
         </nav>
         {% if user.flags.is_admin() %}
         <div class="account-sidebar-section">
-            <div class="account-sidebar-heading">Admin</div>
-            <nav class="account-nav">
-                <a href="/admin" class="account-nav-item"><span>Dashboard</span></a>
-                <a href="/admin/metrics" class="account-nav-item"><span>Metrics</span></a>
-                <a href="/admin/security" class="account-nav-item"><span>Security</span></a>
-                <a href="/admin/audit" class="account-nav-item"><span>Audit log</span></a>
-                <a href="/admin/docker" class="account-nav-item"><span>Docker</span></a>
-            </nav>
-        </div>
-        <div class="account-sidebar-section">
             <div class="account-sidebar-heading">Apps</div>
             <nav class="account-nav">
                 <a href="https://ssh.klappstuhl.me" class="account-nav-item external" rel="noopener"><span>SSH Terminal</span></a>

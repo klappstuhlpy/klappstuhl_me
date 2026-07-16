@@ -504,6 +504,14 @@ pub struct Config {
     /// Off unless all three fields (`client_id`, `client_secret`, `redirect_uri`) are set.
     #[serde(default)]
     pub discord: DiscordConfig,
+    /// URL of a public status JSON (overall state + per-service up/down + 24h
+    /// uptime) that feeds the `/api/ask` `get_site_status` tool. Points at the
+    /// standalone admin app's status endpoint once host administration splits
+    /// out of this binary (see the admin-separation plan, Seam I); until it is
+    /// set the AI status tool is simply not offered. Fetched via the
+    /// SSRF-guarded fetcher, so it must be a public http(s) URL.
+    #[serde(default)]
+    pub status_url: Option<String>,
     /// Optional shared key for the cross-app SSO handoff to the Percy dashboard.
     /// Set to the **same** value as the dashboard's `sso_secret` to make the
     /// `/percy` link log a linked-Discord user straight into the dashboard.
@@ -552,6 +560,7 @@ impl Config {
             ai: AiConfig::default(),
             paste: PasteConfig::default(),
             discord: DiscordConfig::default(),
+            status_url: None,
             sso_secret: None,
             gallery_provision_token: None,
         })

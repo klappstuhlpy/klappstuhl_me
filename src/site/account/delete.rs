@@ -313,8 +313,8 @@ pub struct DeleteAccountForm {
 /// Records the refusal and sends the user back to the danger zone.
 ///
 /// A failed deletion attempt is an authentication failure on the most dangerous
-/// action the site has, so it feeds the firewall lockout counter exactly like a
-/// bad login does.
+/// action the site has, so it feeds the login soft-lockout counter exactly like
+/// a bad login does.
 async fn refuse(
     state: &AppState,
     account: &Account,
@@ -331,7 +331,7 @@ async fn refuse(
         .meta(serde_json::json!({ "reason": reason }))
         .fire();
     if lockout {
-        register_failure(state, client_ip).await;
+        register_failure(client_ip);
     }
     flasher.add(message).bail(DANGER_PAGE)
 }

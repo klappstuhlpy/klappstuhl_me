@@ -1,6 +1,7 @@
 //! Cross-cutting fundamentals: configuration, app state, the database layer,
 //! data models, error types, logging, CLI entry points, and shared utilities.
 
+pub mod audit;
 pub mod cli;
 pub mod config;
 pub mod database;

@@ -21,6 +21,7 @@
 pub mod api_keys;
 pub mod auth;
 pub mod delete;
+pub(crate) mod lockout;
 pub mod pages;
 pub mod security;
 pub mod sessions;
@@ -56,18 +57,14 @@ pub(crate) fn clear_host_only_cookie() -> HeaderValue {
     HeaderValue::from_static("token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax")
 }
 
-/// Forward a failed authentication attempt to the firewall lockout counter.
-/// Best-effort — never blocks the response and errors are swallowed (the audit
-/// row is the source of truth for an incident review).
-pub(crate) async fn register_failure(state: &AppState, ip: Option<std::net::IpAddr>) {
+/// Record a failed authentication attempt for the site's login soft-lockout.
+///
+/// In-process and best-effort (see [`lockout`]); a `None` IP (unknown client)
+/// is ignored. This is the site's own auth hardening — it no longer reaches
+/// into the admin firewall, so it stands whether or not the admin app is up.
+pub(crate) fn register_failure(ip: Option<std::net::IpAddr>) {
     if let Some(ip) = ip {
-        let ip_str = ip.to_string();
-        let state = state.clone();
-        tokio::spawn(async move {
-            if let Err(e) = crate::firewall::lockout::register_failure(&state, &ip_str).await {
-                tracing::warn!(error = %e, ip = %ip_str, "firewall lockout registration failed");
-            }
-        });
+        lockout::register_failure(ip);
     }
 }
 

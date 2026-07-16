@@ -1,5 +1,5 @@
 //! The public website surface at klappstuhl.me: the homepage, the image hoster,
-//! short links, the code screenshot / spotlight tools, the AI `ask` endpoint,
+//! short links, the code screenshot tools, the AI `ask` endpoint,
 //! account/login pages, the public changelog, and the documented public JSON API
 //! (`site::api`). Each
 //! feature owns its handlers here; [`routes`] assembles them into the public
@@ -24,7 +24,6 @@ pub mod image;
 pub mod links;
 pub mod media;
 pub mod paste;
-pub mod spotlight;
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -91,7 +90,6 @@ pub fn routes() -> Router<AppState> {
         .merge(image::routes())
         .merge(links::routes())
         .merge(paste::routes())
-        .merge(spotlight::routes())
         .merge(ask::routes())
         .nest("/api", api::routes())
 }

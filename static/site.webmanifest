@@ -1,8 +1,8 @@
 {
     "name": "Klappstuhl.me",
     "short_name": "Klappstuhl",
-    "description": "Personal site + homelab admin (metrics, security, secrets, audit, postgres).",
-    "start_url": "/admin",
+    "description": "Personal site, image host, and pastebin.",
+    "start_url": "/",
     "scope": "/",
     "display": "standalone",
     "orientation": "any",

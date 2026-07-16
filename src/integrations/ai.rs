@@ -18,7 +18,11 @@ use futures_util::StreamExt;
 use serde_json::{json, Value};
 use tokio::sync::mpsc;
 
-use crate::{health, AppState};
+use crate::site::api::utils::fetch_guarded;
+use crate::AppState;
+
+/// Cap on the status JSON we'll read — it is tiny (a handful of services).
+const MAX_STATUS_BYTES: usize = 64 * 1024;
 
 const API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
 const MAX_OUTPUT_TOKENS: u32 = 700;
@@ -102,7 +106,6 @@ pub enum AskEvent {
 const ALLOWED_ROUTES: &[&str] = &[
     "/",
     "/projects",
-    "/status",
     "/changelog",
     "/images",
     "/account",
@@ -118,43 +121,51 @@ pub struct ChatTurn {
 }
 
 /// OpenAI-format tool declarations advertised to the model. All read-only.
-fn tools() -> Value {
-    json!([
-        {
+///
+/// `get_site_status` is only offered when a `status_url` is configured — the
+/// live-status data lives behind that endpoint (the standalone admin app's
+/// status JSON once host administration splits out; see the admin-separation
+/// plan, Seam I). With no `status_url` the tool is omitted entirely, so the
+/// model can't promise status it has no way to read.
+fn tools(status_enabled: bool) -> Value {
+    let mut list = Vec::new();
+    if status_enabled {
+        list.push(json!({
             "type": "function",
             "function": {
                 "name": "get_site_status",
                 "description": "Get the current live uptime and health status of klappstuhl.me's monitored services (overall state plus per-service up/down and 24h uptime). Use whenever asked if the site or a service is up, about downtime, or about current status.",
                 "parameters": { "type": "object", "properties": {} }
             }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "list_projects",
-                "description": "List the main public features and projects of klappstuhl.me. Use when asked what the site does or what klappstuhl has built.",
-                "parameters": { "type": "object", "properties": {} }
-            }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "navigate",
-                "description": "Redirect the visitor's browser to a page on this site. Use when the visitor asks to go to / open / show a page, or when sending them to the right page clearly helps. After calling it, briefly tell the user which page you're opening.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "path": {
-                            "type": "string",
-                            "description": "The internal page path to open.",
-                            "enum": ALLOWED_ROUTES
-                        }
-                    },
-                    "required": ["path"]
-                }
+        }));
+    }
+    list.push(json!({
+        "type": "function",
+        "function": {
+            "name": "list_projects",
+            "description": "List the main public features and projects of klappstuhl.me. Use when asked what the site does or what klappstuhl has built.",
+            "parameters": { "type": "object", "properties": {} }
+        }
+    }));
+    list.push(json!({
+        "type": "function",
+        "function": {
+            "name": "navigate",
+            "description": "Redirect the visitor's browser to a page on this site. Use when the visitor asks to go to / open / show a page, or when sending them to the right page clearly helps. After calling it, briefly tell the user which page you're opening.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "The internal page path to open.",
+                        "enum": ALLOWED_ROUTES
+                    }
+                },
+                "required": ["path"]
             }
         }
-    ])
+    }));
+    Value::Array(list)
 }
 
 /// Execute a tool by name, returning a plain-text result for the model. Tools
@@ -190,42 +201,79 @@ klappstuhl.me is one Rust/Axum binary that bundles:
 - A documented REST API at /api/docs with image processing, conversion, code-to-image rendering, and malware scanning.
 - Two-factor auth (TOTP), API tokens with scopes, off-site S3 backups, and a Ctrl+K command palette.";
 
-/// Build a compact plain-text status summary from the health monitors.
+/// Fetch the configured status JSON and render a compact plain-text summary.
+///
+/// The data comes from `config.status_url` (public, non-sensitive) rather than
+/// this process's own state, so the site carries no health-monitoring code once
+/// that feature splits into the admin app. Only reached when a `status_url` is
+/// set (the tool is otherwise not advertised — see [`tools`]).
 async fn site_status_text(state: &AppState) -> String {
-    let summaries = match health::storage::list_summaries(state).await {
-        Ok(s) => s,
+    let Some(url) = state.config().status_url.clone().filter(|u| !u.is_empty()) else {
+        return "error: live status is not available on this server.".to_string();
+    };
+    let body = match fetch_guarded(&url, MAX_STATUS_BYTES, "klappstuhl.me status fetcher").await {
+        Ok(b) => b,
         Err(_) => return "error: could not read status right now".to_string(),
+    };
+    match serde_json::from_slice::<Value>(&body.bytes) {
+        Ok(json) => summarize_status(&json),
+        Err(_) => "error: the status endpoint returned data I couldn't read".to_string(),
+    }
+}
+
+/// Summarise a status document into the plain-text form the terminal renders.
+///
+/// Expected (all fields optional, parsed leniently):
+/// ```json
+/// { "overall": "all systems operational",
+///   "services": [ { "name": "Website", "status": "up", "uptime_24h": 99.98,
+///                   "enabled": true } ] }
+/// ```
+/// `overall` is computed from the per-service states when absent; a service
+/// with `"enabled": false` is skipped.
+fn summarize_status(json: &Value) -> String {
+    let Some(services) = json.get("services").and_then(Value::as_array) else {
+        return "No public uptime monitors are configured.".to_string();
     };
 
     let mut lines = Vec::new();
     let (mut up, mut down, mut degraded, mut total) = (0, 0, 0, 0);
-    for s in summaries.into_iter().filter(|s| s.target.enabled) {
+    for s in services {
+        if s.get("enabled").and_then(Value::as_bool) == Some(false) {
+            continue;
+        }
         total += 1;
-        let status = s.last_status.clone().unwrap_or_else(|| "unknown".to_string());
-        match status.as_str() {
+        let name = s.get("name").and_then(Value::as_str).unwrap_or("service");
+        let status = s.get("status").and_then(Value::as_str).unwrap_or("unknown");
+        match status {
             "up" => up += 1,
             "down" => down += 1,
             "degraded" => degraded += 1,
             _ => {}
         }
-        lines.push(format!(
-            "- {}: {} ({:.2}% 24h uptime)",
-            s.target.name, status, s.uptime_24h
-        ));
+        let uptime = s.get("uptime_24h").and_then(Value::as_f64).unwrap_or(0.0);
+        lines.push(format!("- {name}: {status} ({uptime:.2}% 24h uptime)"));
     }
 
     if total == 0 {
         return "No public uptime monitors are configured.".to_string();
     }
-    let overall = if down > 0 {
-        "major outage"
-    } else if degraded > 0 {
-        "degraded performance"
-    } else if up == total {
-        "all systems operational"
-    } else {
-        "status unknown"
-    };
+    let overall = json
+        .get("overall")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            if down > 0 {
+                "major outage"
+            } else if degraded > 0 {
+                "degraded performance"
+            } else if up == total {
+                "all systems operational"
+            } else {
+                "status unknown"
+            }
+            .to_string()
+        });
     format!(
         "Overall: {overall} ({up} of {total} operational).\n{}",
         lines.join("\n")
@@ -262,11 +310,14 @@ pub async fn stream_answer(state: AppState, history: Vec<ChatTurn>, tx: mpsc::Se
         }
     }
 
+    // Only advertise the live-status tool when there's a status endpoint to read.
+    let status_enabled = state.config().status_url.as_deref().is_some_and(|u| !u.is_empty());
+
     for _round in 0..MAX_TOOL_ROUNDS {
         let body = json!({
             "model": model,
             "messages": messages,
-            "tools": tools(),
+            "tools": tools(status_enabled),
             "max_tokens": MAX_OUTPUT_TOKENS,
             "temperature": 0.7,
             "stream": true,

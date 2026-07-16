@@ -14,6 +14,19 @@ changelog was introduced in July 2026; changes between 1.0.0 (January 2025) and
 
 ## [Unreleased]
 
+### Changed
+
+- The "Ask the AI" assistant only answers live "is the site up?" questions when the operator configures a status endpoint; without one it no longer offers that tool rather than guess at a status.
+
+### Removed
+
+- The Ctrl+K command palette is now search and navigation only — it no longer runs configured shell scripts (host script-running is moving to the standalone admin app).
+- The `admin:read`-scoped image-update endpoint has left the public API surface (it was operator-only and undocumented for general use); homelab image-update status is moving to the standalone admin app.
+
+### Security
+
+- Repeated failed logins from the same IP are now throttled by the site itself, independent of any firewall configuration.
+
 ## [1.6.0] - 2026-07-15
 
 ### Added

@@ -3,11 +3,7 @@ use crate::{
     auth::hash_password,
     boxed_params,
     cached::TimedCachedValue,
-    cloudflare::Cloudflare,
     database::Table,
-    docker::DockerClient,
-    firewall::Backend as FirewallBackend,
-    geoip::GeoIp,
     logging::RequestLogger,
     models::{Account, ImageEntry, Session},
     token::MAX_TOKEN_AGE,
@@ -15,20 +11,7 @@ use crate::{
 };
 use quick_cache::sync::Cache;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::{broadcast, RwLockReadGuard};
-
-/// One live event pushed over WebSocket subscribers.
-///
-/// `topic` is one of "metrics", "audit", "secrets" — clients say which
-/// topics they care about when they connect, and the `/ws` handler
-/// filters accordingly.  The `data` field is whatever JSON payload the
-/// producer chose to ship (typically the same JSON the matching HTTP
-/// endpoint would return).
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct LiveEvent {
-    pub topic: &'static str,
-    pub data: serde_json::Value,
-}
+use tokio::sync::RwLockReadGuard;
 
 /// A processed media result kept around for a shareable short link.
 #[derive(Debug, Clone)]
@@ -94,23 +77,6 @@ struct InnerState {
     /// bytes are immutable per id (ids are random and never reused), so entries
     /// never go stale; they're simply evicted under capacity pressure.
     thumbnails: Cache<String, Thumbnail>,
-    geoip: GeoIp,
-    cloudflare: Option<Cloudflare>,
-    /// Broadcast hub for live updates pushed to /ws subscribers. Each
-    /// LiveEvent carries its own topic tag; the WS handler decides
-    /// whether to forward it based on the client's subscriptions.
-    /// 64 buffer slots — slow clients get RecvError::Lagged rather than
-    /// blocking producers.
-    live_tx: broadcast::Sender<LiveEvent>,
-    /// Docker introspection client. `None` when Docker socket is unavailable.
-    docker: Option<Arc<DockerClient>>,
-    /// Firewall backend (nftables / ufw / iptables). `None` when none of
-    /// the supported binaries is available at startup.
-    firewall_backend: Option<FirewallBackend>,
-    /// Latest container image-update status, keyed by service name. Derived
-    /// data refreshed by the background checker, so it's kept in memory rather
-    /// than persisted.
-    image_updates: std::sync::Mutex<std::collections::HashMap<String, crate::updates::ImageUpdate>>,
 }
 
 /// Global application state for the axum Router.
@@ -123,7 +89,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub async fn new(mut config: Config, database: Database) -> Self {
+    pub async fn new(config: Config, database: Database) -> Self {
         let incorrect_default_password_hash =
             hash_password("incorrect-default-password").expect("could not hash default password");
         let client = reqwest::Client::builder()
@@ -132,93 +98,6 @@ impl AppState {
             .expect("could not build HTTP client");
 
         let requests = RequestLogger::new().expect("could not build request logger");
-
-        // Resolve a GeoIP database path. Tries (in order):
-        //   1. `config.geoip_db_path`              (explicit override)
-        //   2. `<data>/geoip/GeoLite2-City.mmdb`   (subdirectory layout — Docker)
-        //   3. `<data>/GeoLite2-City.mmdb`         (flat layout — bare-metal Windows/macOS)
-        //   4. `<config>/geoip/GeoLite2-City.mmdb` (subdirectory in config dir)
-        //   5. `<config>/GeoLite2-City.mmdb`       (flat in config dir, in case the
-        //                                          user dropped it next to config.json)
-        // The first one that actually exists on disk wins. If none exist, we log
-        // every path we tried so the user can see where to put the file.
-        let geoip_was_unset = config.geoip_db_path.is_none();
-        let geoip_path = {
-            let mut candidates: Vec<std::path::PathBuf> = Vec::new();
-            if let Some(p) = config.geoip_db_path.clone() {
-                candidates.push(p);
-            }
-            if let Some(data_dir) = crate::database::directory()
-                .ok()
-                .and_then(|p| p.parent().map(|d| d.to_owned()))
-            {
-                candidates.push(data_dir.join("geoip").join("GeoLite2-City.mmdb"));
-                candidates.push(data_dir.join("GeoLite2-City.mmdb"));
-            }
-            if let Some(config_dir) = crate::Config::path()
-                .ok()
-                .and_then(|p| p.parent().map(|d| d.to_owned()))
-            {
-                candidates.push(config_dir.join("geoip").join("GeoLite2-City.mmdb"));
-                candidates.push(config_dir.join("GeoLite2-City.mmdb"));
-            }
-
-            let found = candidates.iter().find(|p| p.exists()).cloned();
-            if found.is_none() {
-                tracing::info!(
-                    "GeoIP database not found. Checked: {}",
-                    candidates
-                        .iter()
-                        .map(|p| p.display().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                );
-            }
-            found
-        };
-
-        // Persist the discovered path back to config.json so subsequent
-        // start-ups skip the candidate scan and log a clear, stable path.
-        // We only persist when the user hadn't set one explicitly — that
-        // way an explicit override is never silently overwritten.
-        if geoip_was_unset {
-            if let Some(p) = geoip_path.as_ref() {
-                config.geoip_db_path = Some(p.clone());
-                match config.save() {
-                    Ok(()) => tracing::info!(
-                        path = %p.display(),
-                        "saved auto-detected GeoIP path to config"
-                    ),
-                    Err(e) => tracing::warn!(
-                        error = %e,
-                        "could not persist auto-detected GeoIP path to config"
-                    ),
-                }
-            }
-        }
-
-        let geoip = GeoIp::open(geoip_path.as_deref());
-
-        // Cloudflare client (only if both token and zone are configured).
-        let cloudflare = match (config.cloudflare.api_token.as_ref(), config.cloudflare.zone_id.as_ref()) {
-            (Some(token), Some(zone)) if !token.is_empty() && !zone.is_empty() => {
-                Some(Cloudflare::new(client.clone(), token.clone(), zone.clone()))
-            }
-            _ => None,
-        };
-
-        let (live_tx, _) = broadcast::channel(64);
-        let docker = DockerClient::connect();
-        let firewall_backend = {
-            let override_kind = config.firewall_backend.as_deref().filter(|s| !s.is_empty());
-            let backend = FirewallBackend::detect(override_kind).await;
-            tracing::info!(backend = %backend.kind.label(), "firewall backend detected");
-            if matches!(backend.kind, crate::firewall::BackendKind::Disabled) {
-                None
-            } else {
-                Some(backend)
-            }
-        };
 
         Self {
             inner: Arc::new(InnerState {
@@ -230,12 +109,6 @@ impl AppState {
                 valid_sessions: Cache::new(1000),
                 processed_media: Cache::new(512),
                 thumbnails: Cache::new(1024),
-                geoip,
-                cloudflare,
-                live_tx,
-                docker,
-                firewall_backend,
-                image_updates: std::sync::Mutex::new(std::collections::HashMap::new()),
             }),
             client,
             requests,
@@ -270,8 +143,6 @@ impl AppState {
         let secret_key = crate::key::SecretKey::random().expect("random secret key");
         let config: Config = serde_json::from_value(serde_json::json!({ "secret_key": secret_key.hex() }))
             .expect("a config from just a secret key");
-
-        let (live_tx, _) = broadcast::channel(64);
         Self {
             inner: Arc::new(InnerState {
                 config,
@@ -282,53 +153,12 @@ impl AppState {
                 valid_sessions: Cache::new(1000),
                 processed_media: Cache::new(512),
                 thumbnails: Cache::new(1024),
-                geoip: GeoIp::open(None),
-                cloudflare: None,
-                live_tx,
-                docker: None,
-                firewall_backend: None,
-                image_updates: std::sync::Mutex::new(std::collections::HashMap::new()),
             }),
             client: reqwest::Client::new(),
             requests: RequestLogger::null(),
             incorrect_default_password_hash: hash_password("incorrect-default-password")
                 .expect("could not hash default password"),
         }
-    }
-
-    pub fn geoip(&self) -> &GeoIp {
-        &self.inner.geoip
-    }
-
-    pub fn cloudflare(&self) -> Option<&Cloudflare> {
-        self.inner.cloudflare.as_ref()
-    }
-
-    /// Returns the Docker introspection client, if available.
-    pub fn docker(&self) -> Option<&Arc<DockerClient>> {
-        self.inner.docker.as_ref()
-    }
-
-    /// Replaces the stored container image-update results (called by the
-    /// background checker after each run).
-    pub fn set_image_updates(&self, updates: std::collections::HashMap<String, crate::updates::ImageUpdate>) {
-        if let Ok(mut guard) = self.inner.image_updates.lock() {
-            *guard = updates;
-        }
-    }
-
-    /// A snapshot clone of the current image-update map, keyed by service name.
-    pub fn image_updates_map(&self) -> std::collections::HashMap<String, crate::updates::ImageUpdate> {
-        self.inner.image_updates.lock().map(|g| g.clone()).unwrap_or_default()
-    }
-
-    /// The current image-update status for one service, if checked.
-    pub fn image_update(&self, service: &str) -> Option<crate::updates::ImageUpdate> {
-        self.inner
-            .image_updates
-            .lock()
-            .ok()
-            .and_then(|g| g.get(service).cloned())
     }
 
     /// Stores a processed media blob for sharing and returns its short id.
@@ -350,26 +180,6 @@ impl AppState {
         self.inner.processed_media.get(id)
     }
 
-    /// Returns the configured firewall backend, if any.  `None` means
-    /// neither `nft`, `ufw`, nor `iptables` was found at startup, in
-    /// which case rule edits still persist to the DB but no kernel
-    /// changes are applied.
-    pub fn firewall_backend(&self) -> Option<&FirewallBackend> {
-        self.inner.firewall_backend.as_ref()
-    }
-
-    /// Returns a fresh receiver for live events. Each WS connection
-    /// subscribes once and filters by topic in user space.
-    pub fn live_subscribe(&self) -> broadcast::Receiver<LiveEvent> {
-        self.inner.live_tx.subscribe()
-    }
-
-    /// Publish a live event. Never fails — when nobody is subscribed,
-    /// broadcast::Sender::send returns Err that we silently drop.
-    pub fn live_publish(&self, topic: &'static str, data: serde_json::Value) {
-        let _ = self.inner.live_tx.send(LiveEvent { topic, data });
-    }
-
     /// Start an audit-log entry. Call `.actor(…).target(…).ip_opt(…).fire()`
     /// to record it (fire-and-forget — the response is never delayed).
     pub fn audit(&self, action: &'static str) -> crate::audit::AuditBuilder<'_> {
@@ -384,56 +194,17 @@ impl AppState {
         &self.inner.database
     }
 
-    /// Returns true if at least one alert sink (Discord, ntfy, or generic
-    /// webhook) is configured. Callers use this to skip building alert
-    /// payloads when nothing would consume them.
-    pub fn has_any_alert_sink(&self) -> bool {
-        let cfg = self.config();
-        cfg.alerts.discord_webhook_url.is_some()
-            || cfg.alerts.ntfy_url.is_some()
-            || cfg.alerts.webhook_url.is_some()
-            || cfg.alerts.email.is_some()
-    }
-
-    /// Fans an alert out to every configured sink (Discord, ntfy, generic
-    /// webhook). The payload is the Discord webhook shape; a neutral
-    /// notification is derived from it for the non-Discord sinks.
-    ///
-    /// All deliveries happen in the background — failures are not surfaced.
+    /// Sends an alert to the configured Discord webhook (if any).
+    /// Delivery happens in the background — failures are not surfaced.
     pub fn send_alert<T: serde::Serialize + Send + 'static>(&self, payload: T) {
+        let Some(wh) = self.config().alerts.discord_webhook_url.clone() else {
+            return;
+        };
         let Ok(value) = serde_json::to_value(&payload) else {
             return;
         };
-        let cfg = self.config();
-
-        if let Some(wh) = cfg.alerts.discord_webhook_url.clone() {
-            let client = self.client.clone();
-            let v = value.clone();
-            tokio::spawn(async move { wh.prepare(v).send(&client).await });
-        }
-
-        if cfg.alerts.ntfy_url.is_none() && cfg.alerts.webhook_url.is_none() && cfg.alerts.email.is_none() {
-            return;
-        }
-        let note = crate::alerts::AlertNotification::from_discord_value(&value);
-        if let Some(url) = cfg.alerts.ntfy_url.clone() {
-            let client = self.client.clone();
-            let note = note.clone();
-            tokio::spawn(async move { crate::alerts::send_ntfy(&client, &url, &note).await });
-        }
-        if let Some(url) = cfg.alerts.webhook_url.clone() {
-            let client = self.client.clone();
-            let note = note.clone();
-            tokio::spawn(async move { crate::alerts::send_webhook(&client, &url, &note).await });
-        }
-        if let Some(email) = cfg.alerts.email.clone() {
-            let note = note.clone();
-            tokio::spawn(async move {
-                if let Err(e) = crate::alerts::send_email(&email, &note).await {
-                    tracing::warn!("alert email delivery failed: {e}");
-                }
-            });
-        }
+        let client = self.client.clone();
+        tokio::spawn(async move { wh.prepare(value).send(&client).await });
     }
 
     pub fn cached_images(&self) -> &TimedCachedValue<Vec<ImageEntry>> {

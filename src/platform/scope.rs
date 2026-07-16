@@ -55,8 +55,6 @@ macro_rules! scope_marker {
 scope_marker! {
     ImagesRead  => ImagesRead,
     ImagesWrite => ImagesWrite,
-    AdminRead   => AdminRead,
-    AdminWrite  => AdminWrite,
 }
 
 /// Extractor that succeeds only when the caller holds the marker's scope.

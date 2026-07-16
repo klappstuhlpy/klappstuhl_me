@@ -5,14 +5,13 @@ edition = "2021"
 license = "AGPL-v3"
 description = "A custom information website about Klappstuhl and API support."
 
-# The shared design/auth/API-client kernel now lives in its own repo,
-# klappstuhlpy/klappstuhl_me-shared, consumed as a tag-pinned git dependency (see
-# DASHBOARD_DECOUPLING_PLAN.md, Phase 5). Bump the tag in lock-step across this
-# repo and percy-dashboard when cutting a new shared release; never move a
-# published tag, since both consumers pin to it.
+# The shared design/auth/API-client kernel lives in its own repo,
+# klappstuhlpy/klappstuhl_me-shared, consumed as a tag-pinned git dependency.
+# Bump the tag in lock-step across this repo, percy-dashboard, and Vantage when
+# cutting a new shared release; never move a published tag.
 [dependencies]
-kls-ui = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.9" }
-kls-web-core = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.9" }
+kls-ui = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.11" }
+kls-web-core = { git = "ssh://git@github.com/klappstuhlpy/klappstuhl_me-shared", tag = "v0.1.11" }
 anyhow = "1.0.80"
 argon2 = { version = "0.5.3", features = ["std"] }
 async-trait = "0.1.77"
@@ -20,7 +19,6 @@ askama = { version = "0.12.1", features = ["with-axum", "serde-json", "markdown"
 askama_axum = "0.4.0"
 axum = { version = "0.7.4", features = ["multipart", "ws"] }
 base64 = "0.22"
-bcrypt = "0.15"
 brotli = "3.4.0"
 bytes = "1.5.0"
 socket2 = "0.5.10"
@@ -57,7 +55,7 @@ serde_json = "1.0.114"
 sha2 = "0.10.8"
 time = { version = "0.3.34", features = ["macros", "serde-human-readable"] }
 tokio = { version = "1.36.0", features = ["full"] }
-tokio-rustls = "0.25"
+tokio-rustls = "0.26"
 tower = { version = "0.4.13", features = ["limit", "util"] }
 tower-http = { version = "0.5.2", features = ["fs", "timeout", "normalize-path", "limit", "cors", "compression-full"] }
 tracing = "0.1.40"
@@ -67,15 +65,7 @@ utoipa = { version = "4.2.0", features = ["time", "axum_extras", "repr", "preser
 nanoid = "0.4.0"
 thiserror = "1"
 tree_magic = "0.2.3"
-bollard = { version = "0.17", default-features = false, features = ["ssl"] }
-maxminddb = "0.24.0"
-tokio-postgres = { version = "0.7", features = ["with-time-0_3", "with-serde_json-1", "with-uuid-1"] }
-uuid = { version = "1", features = ["v4"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
-x509-parser = "0.15"
-rustls = "0.22"
-rustls-pki-types = "1"
-webpki-roots = "0.26"
 
 [profile.release]
 # This is an I/O-bound web app (SQLite, HTTP, subprocess shelling), so it has no

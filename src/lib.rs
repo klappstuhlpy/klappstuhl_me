@@ -1,14 +1,10 @@
-// The source tree is organised feature-first around the two product surfaces:
-// `site` (the public klappstuhl.me website + JSON API) and `admin` (the
-// self-hosting control panel), each holding vertical feature slices that pair
-// HTTP routes with their backing service. `core` (fundamentals), `platform`
-// (shared HTTP plumbing), `auth` (crypto primitives) and `integrations`
-// (third-party clients) are the cross-cutting layers both surfaces build on.
-// `routes` stitches the two surfaces into one router.
+// The source tree is organised around the public klappstuhl.me website (`site`)
+// with cross-cutting layers: `core` (fundamentals), `platform` (shared HTTP
+// plumbing), `auth` (crypto primitives) and `integrations` (third-party clients).
+// `routes` stitches it into one router.
 //
 // The flat `pub use` aliases below preserve the historical `crate::<module>`
 // paths, so call sites don't need to spell out the surface a module lives in.
-pub mod admin;
 pub mod auth;
 pub mod core;
 pub mod integrations;
@@ -20,16 +16,12 @@ pub mod site;
 // `key` is re-exported from the shared kls-web-core crate so `crate::key::…`
 // call sites are unchanged.
 pub use auth::{token, totp};
-pub use core::{cli, config, database, error, filters, logging, migrations, models, state, utils};
-pub use integrations::{ai, cf_tunnel, cloudflare, discord, exttools, geoip};
+// `audit` is cross-cutting — it lives in `core`.
+pub use core::{audit, cli, config, database, error, filters, logging, migrations, models, state, utils};
+pub use integrations::{ai, discord, exttools};
 pub use kls_web_core::key;
 pub use platform::{cached, cookies, flash, headers, ratelimit, scope};
 pub use site::media::{codeimage, metadata, scan, thumbnail};
-// Each admin feature slice keeps its service's public API at the module root,
-// so `crate::firewall::spawn_workers`, `crate::docker::…`, etc. are unchanged.
-pub use admin::{
-    alerts, audit, backup, cron, dbadmin, docker, firewall, health, metrics, proxy, secrets, ssh, updates,
-};
 
 /// The running version, taken from `Cargo.toml` — the single source of truth for
 /// it. The site footer, the changelog page and the OpenAPI docs all derive from

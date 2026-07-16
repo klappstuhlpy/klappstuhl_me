@@ -155,40 +155,6 @@ async fn run_server(state: klappstuhl_me::AppState) -> anyhow::Result<()> {
         }
     });
 
-    // Live metrics: scrape host + docker every 30s, prune old samples hourly.
-    klappstuhl_me::metrics::spawn_collector(state.clone());
-    klappstuhl_me::metrics::spawn_pruner(state.clone());
-
-    // Periodic secret scanner (no-op if `secret_scan_paths` is empty).
-    klappstuhl_me::secrets::spawn_scheduler(state.clone());
-
-    // Sweep expired SSH tokens every hour.
-    klappstuhl_me::ssh::spawn_token_sweeper(state.clone());
-
-    // Tail sshd auth log → update ssh_key.last_used_at on successful publickey
-    // auth (no-op if `sshd_auth_log_path` is unset in config.json).
-    klappstuhl_me::ssh::spawn_auth_log_watcher(state.clone());
-
-    // Stream Docker daemon events → live "docker" WS topic.
-    klappstuhl_me::docker::spawn_event_watcher(state.clone());
-
-    // Periodic health/uptime probes for configured targets.
-    klappstuhl_me::health::spawn_monitor(state.clone());
-
-    // Firewall lockout reaper.
-    klappstuhl_me::firewall::spawn_workers(state.clone());
-
-    // Scheduled SQLite backups (VACUUM INTO) + retention pruning.
-    klappstuhl_me::backup::spawn_scheduler(state.clone());
-
-    // Periodic container image-update checks (queries registries for newer
-    // digests; no-op without Docker or when disabled in config).
-    klappstuhl_me::updates::spawn_update_checker(state.clone());
-
-    // Cron scheduler for spotlight scripts carrying a `schedule` (no-op if
-    // none do).
-    klappstuhl_me::cron::spawn_scheduler(state.clone());
-
     // Reap expired image uploads (TTL) hourly.
     klappstuhl_me::routes::spawn_expiry_reaper(state.clone());
 

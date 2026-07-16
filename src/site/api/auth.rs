@@ -129,7 +129,7 @@ mod tests {
     fn empty_scopes_grant_everything() {
         let t = tok("");
         assert!(t.has_scope(Scope::ImagesWrite));
-        assert!(t.has_scope(Scope::AdminWrite));
+        assert!(t.has_scope(Scope::PastesWrite));
         assert!(t.require(Scope::ImagesWrite).is_ok());
     }
 
@@ -147,7 +147,7 @@ mod tests {
         let t = tok("images:read, images:write");
         assert!(t.has_scope(Scope::ImagesRead));
         assert!(t.has_scope(Scope::ImagesWrite));
-        assert!(!t.has_scope(Scope::AdminRead));
+        assert!(!t.has_scope(Scope::PastesRead));
     }
 
     #[test]

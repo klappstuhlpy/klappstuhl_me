@@ -1,8 +1,6 @@
-//! Top-level router assembly. Stitches the public website (`site`) and the
-//! admin shell (`admin`) into a single axum `Router`, and re-exports the HTTP
-//! entry points `main.rs` drives (`all`, `spawn_expiry_reaper`, the API-token
-//! middleware). Feature routers live next to their handlers in `site::*` and
-//! `admin::*`; this module only wires them together.
+//! Top-level router assembly. Stitches the public website (`site`) into the
+//! axum `Router`, and re-exports the HTTP entry points `main.rs` drives (`all`,
+//! `spawn_expiry_reaper`, the API-token middleware).
 
 use crate::AppState;
 use axum::Router;
@@ -11,11 +9,9 @@ pub use crate::site::api::{copy_api_token, ApiToken};
 pub use crate::site::image::spawn_expiry_reaper;
 pub use crate::site::paste::spawn_paste_reaper;
 
-/// Builds the complete application router: every public and admin route, plus
-/// the short-link fallback that resolves bare `r.<domain>/<code>` links.
+/// Builds the complete application router.
 pub fn all() -> Router<AppState> {
     crate::site::routes()
-        .merge(crate::admin::routes())
         // Resolves bare `r.<domain>/<code>` short links; 404s everything else.
         .fallback(crate::site::links::short_link_fallback)
 }

@@ -379,7 +379,7 @@ pub async fn change_username(
             .ip_opt(client_ip)
             .meta(serde_json::json!({ "reason": "bad_password" }))
             .fire();
-        super::register_failure(&state, client_ip).await;
+        super::register_failure(client_ip);
         return flasher.add("Invalid password.").bail(PROFILE_PAGE);
     }
 

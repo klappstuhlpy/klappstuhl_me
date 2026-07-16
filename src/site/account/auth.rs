@@ -97,6 +97,22 @@ async fn authenticate(
         return Err(ApiError::new("password length must be 8 to 128 characters"));
     }
 
+    // Soft-lockout: refuse outright once this IP has failed too many times in
+    // the window, before touching the account row. In-process, so it holds even
+    // with no firewall/admin app present.
+    if let Some(ip) = client_ip {
+        if super::lockout::is_locked(ip) {
+            state
+                .audit("auth.login.throttled")
+                .actor_label(credentials.username.clone())
+                .ip(ip)
+                .fire();
+            return Err(ApiError::new(
+                "Too many failed attempts. Please wait a few minutes and try again.",
+            ));
+        }
+    }
+
     let username_for_audit = credentials.username.clone();
     let account: Option<Account> = state
         .database()
@@ -157,7 +173,7 @@ async fn authenticate(
                     .ip_opt(client_ip)
                     .meta(serde_json::json!({ "reason": "unknown_user" }))
                     .fire();
-                register_failure(state, client_ip).await;
+                register_failure(client_ip);
                 Err(ApiError::incorrect_login())
             }
         }
@@ -168,7 +184,7 @@ async fn authenticate(
             .ip_opt(client_ip)
             .meta(serde_json::json!({ "reason": "bad_password" }))
             .fire();
-        register_failure(state, client_ip).await;
+        register_failure(client_ip);
         Err(ApiError::incorrect_login())
     }
 }
@@ -502,7 +518,7 @@ pub async fn login_totp_verify(
     let ok = crate::totp::verify(&secret, code) || consume_recovery_code(&state, acc.id, code).await;
     if !ok {
         state.audit("auth.login.2fa_fail").actor(&acc).ip_opt(client_ip).fire();
-        register_failure(&state, client_ip).await;
+        register_failure(client_ip);
         return flasher.add("Invalid code. Please try again.").bail("/login/2fa");
     }
 

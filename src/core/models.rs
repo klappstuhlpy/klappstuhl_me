@@ -721,11 +721,6 @@ pub enum Scope {
     PastesRead,
     /// Create + delete your hosted pastes via the API.
     PastesWrite,
-    /// Read-only access to admin dashboard JSON endpoints
-    /// (metrics, security, secrets, audit).
-    AdminRead,
-    /// Mutate admin state (service actions, secret status).
-    AdminWrite,
 }
 
 impl Scope {
@@ -738,8 +733,6 @@ impl Scope {
             Scope::LinksWrite => "links:write",
             Scope::PastesRead => "pastes:read",
             Scope::PastesWrite => "pastes:write",
-            Scope::AdminRead => "admin:read",
-            Scope::AdminWrite => "admin:write",
         }
     }
 
@@ -752,8 +745,6 @@ impl Scope {
             "links:write" => Some(Scope::LinksWrite),
             "pastes:read" => Some(Scope::PastesRead),
             "pastes:write" => Some(Scope::PastesWrite),
-            "admin:read" => Some(Scope::AdminRead),
-            "admin:write" => Some(Scope::AdminWrite),
             _ => None,
         }
     }
@@ -768,18 +759,16 @@ impl Scope {
             Scope::LinksWrite,
             Scope::PastesRead,
             Scope::PastesWrite,
-            Scope::AdminRead,
-            Scope::AdminWrite,
         ]
     }
 
     /// Scopes a normal (non-admin) account may **not** attach to a personal API
-    /// key. The `admin:*` scopes are operator-only; `images:guild` is minted
-    /// exclusively for per-guild service keys (see the dashboard integration)
-    /// and is never handed to end users. Enforced in `generate_api_key` and
-    /// hidden from the personal-key UI unless the account is an admin.
+    /// key. `images:guild` is minted exclusively for per-guild service keys (see
+    /// the dashboard integration) and is never handed to end users. Enforced in
+    /// `generate_api_key` and hidden from the personal-key UI unless the account
+    /// is an admin.
     pub fn requires_admin(self) -> bool {
-        matches!(self, Scope::GuildImages | Scope::AdminRead | Scope::AdminWrite)
+        matches!(self, Scope::GuildImages)
     }
 }
 
@@ -835,9 +824,7 @@ mod scope_tests {
 
     #[test]
     fn privileged_scopes_require_admin() {
-        // Operator/internal-only scopes a normal user must never self-grant.
-        assert!(Scope::AdminRead.requires_admin());
-        assert!(Scope::AdminWrite.requires_admin());
+        // Internal-only scopes a normal user must never self-grant.
         assert!(Scope::GuildImages.requires_admin());
         // The everyday image scopes stay available to everyone.
         assert!(!Scope::ImagesRead.requires_admin());

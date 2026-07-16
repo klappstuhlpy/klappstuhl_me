@@ -1,4 +1,3 @@
-mod admin;
 mod auth;
 mod chart;
 mod code;
@@ -80,13 +79,10 @@ pub use media::serve_media;
         external::transcode,
         unfurl::unfurl,
         scan::scan_file,
-        admin::list_updates,
     ),
     components(
         schemas(
             ApiError,
-            crate::updates::ImageUpdate,
-            crate::updates::UpdateState,
             crate::models::ImageEntry,
             crate::site::image::UploadResult,
             crate::site::image::DeleteResult,
@@ -133,8 +129,7 @@ pub use media::serve_media;
         (name = "render", description = "Render content to images (syntax-highlighted code screenshots, QR codes, charts, …)."),
         (name = "account", description = "Introspect the calling account: identity, key scopes, and resource usage."),
         (name = "web", description = "Web utilities: unfurl a URL into Open Graph / link-preview metadata."),
-        (name = "scan", description = "Scan uploaded files for malware via ClamAV and VirusTotal."),
-        (name = "admin", description = "Admin-scoped homelab state (requires admin:read / admin:write).")
+        (name = "scan", description = "Scan uploaded files for malware via ClamAV and VirusTotal.")
     )
 )]
 pub struct Schema;
@@ -301,7 +296,6 @@ mod tests {
             "/links/{code}",
             "/pastes",
             "/pastes/{id}",
-            "/admin/updates",
         ] {
             let expected = format!("{base}{suffix}");
             assert!(paths.contains_key(&expected), "missing {expected} in OpenAPI spec");
@@ -377,7 +371,6 @@ fn v1() -> Router<AppState> {
         .route("/render/markdown-pdf", post(external::markdown_pdf))
         .route("/convert/transcode", post(external::transcode))
         .route("/unfurl", get(unfurl::unfurl))
-        .route("/admin/updates", get(admin::list_updates))
 }
 
 pub fn routes() -> Router<AppState> {
