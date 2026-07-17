@@ -12,6 +12,12 @@ Entries for 1.1.0 through 1.4.2 were backfilled from commit history when this
 changelog was introduced in July 2026; changes between 1.0.0 (January 2025) and
 1.1.0 (July 2026) predate it and are unrecorded.
 
+## [Unreleased]
+
+### Changed
+
+- Database migrations rebooted: the 28-file migration history (0–27) has been consolidated into 3 clean baseline files covering the same final schema — no tables, columns, or behavior changed.
+
 ## [1.7.0] - 2026-07-17
 
 ### Added

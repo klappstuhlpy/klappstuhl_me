@@ -51,7 +51,6 @@ mod tests {
 
     #[test]
     fn embedded_migrations_are_contiguous() {
-        // build.rs enforces this, but assert at runtime too as a guard.
         for (index, migration) in EMBEDDED_MIGRATIONS.iter().enumerate() {
             assert_eq!(
                 migration.version as usize, index,
@@ -70,7 +69,6 @@ mod tests {
         migrate(&mut conn).expect("migrate fresh db");
         assert_eq!(user_version(&conn).unwrap(), target_version());
 
-        // Every migration recorded with a checksum.
         let count: u32 = conn
             .query_row(&format!("SELECT COUNT(*) FROM {TRACKING_TABLE}"), [], |r| r.get(0))
             .unwrap();
@@ -81,7 +79,6 @@ mod tests {
     fn migrate_is_idempotent() {
         let mut conn = open_memory();
         migrate(&mut conn).expect("first migrate");
-        // A second run must be a no-op and must not error.
         migrate(&mut conn).expect("second migrate");
         assert_eq!(user_version(&conn).unwrap(), target_version());
     }
@@ -96,128 +93,28 @@ mod tests {
             > 0
     }
 
-    /// Migrations 23–26 drop everything the extracted admin control plane owned,
-    /// plus the two Percy tables the dashboard took over and the `invite`
-    /// leftover — and touch nothing the site still reads.
-    ///
-    /// `foreign_keys = ON` matters here: the pool turns it on for every real
-    /// connection, and several of these tables reference each other
-    /// (`ssh_session_audit` → `ssh_key`, health samples → `health_target`), so a
-    /// wrong drop order would fail *only* under this pragma.
     #[test]
-    fn migrations_23_to_26_drop_the_dead_tables_and_spare_the_live_ones() {
+    fn all_expected_tables_exist_after_fresh_migration() {
         let mut conn = open_memory();
         conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
         migrate(&mut conn).expect("migrate fresh db");
 
-        // Earlier migrations create each of these; 23–26 must remove them again.
-        for table in [
-            "metric_sample",
-            "docker_stat",
-            "docker_snapshot",
-            "health_check_sample",
-            "health_incident",
-            "health_target",
-            "firewall_rule",
-            "firewall_lockout",
-            "proxy_route",
-            "secret_finding",
-            "file_scan",
-            "scan_run",
-            "ssh_session_audit",
-            "ssh_token",
-            "ssh_key",
-            "user_discord_admin_guilds",
-            "percy_leaderboard_vanity",
-            "invite",
-        ] {
-            assert!(!table_exists(&conn, table), "{table} should have been dropped");
-        }
-
-        // The site's own schema is untouched.
         for table in [
             "account",
             "session",
-            "images",
             "storage",
+            "audit_log",
+            "images",
+            "short_link",
             "paste",
             "paste_revision",
-            "short_link",
-            "audit_log",
             "totp_recovery_code",
             "user_discord_links",
-            "username_change",
             "guild_api_key",
+            "username_change",
         ] {
-            assert!(table_exists(&conn, table), "{table} must survive");
+            assert!(table_exists(&conn, table), "{table} must exist");
         }
-    }
-
-    /// Migration 26 drops an `invite` table that only *some* databases have.
-    ///
-    /// The feature was removed by commenting out the CREATE inside migration 2
-    /// after it had already been applied, so databases from before that edit still
-    /// carry the table while fresh ones never made it. A fresh migration proves
-    /// the no-op half; this proves the half that actually has something to drop.
-    #[test]
-    fn migration_26_drops_a_legacy_invite_table() {
-        let conn = open_memory();
-        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
-        conn.execute_batch(
-            "CREATE TABLE account(id INTEGER PRIMARY KEY, name TEXT);
-             INSERT INTO account(id, name) VALUES (1, 'ferris');
-             CREATE TABLE invite (
-                 code       TEXT    PRIMARY KEY,
-                 created_by INTEGER NOT NULL REFERENCES account (id) ON DELETE CASCADE,
-                 created_at TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                 used_at    TEXT
-             ) WITHOUT ROWID;
-             INSERT INTO invite(code, created_by) VALUES ('abc123', 1);",
-        )
-        .unwrap();
-        assert!(table_exists(&conn, "invite"));
-
-        let migration = EMBEDDED_MIGRATIONS
-            .iter()
-            .find(|m| m.version == 26)
-            .expect("migration 26 exists");
-        conn.execute_batch(migration.sql)
-            .expect("migration 26 applies to a database that still has the table");
-
-        assert!(!table_exists(&conn, "invite"));
-        // The accounts the invites pointed at are not collateral damage.
-        assert!(table_exists(&conn, "account"));
-    }
-
-    /// Migration 27 clears the removed assistant's runtime "Public AI" toggle.
-    ///
-    /// Unlike 23–26 this is a row delete, not a table drop: `storage` is a
-    /// general-purpose KV table the site still uses, so only the one key goes and
-    /// everything else in there has to survive.
-    #[test]
-    fn migration_27_clears_the_ai_toggle_and_leaves_other_storage_keys() {
-        let conn = open_memory();
-        conn.execute_batch(
-            "CREATE TABLE storage (name TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
-             INSERT INTO storage(name, value) VALUES ('ai_public', 'true');
-             INSERT INTO storage(name, value) VALUES ('something_else', 'keep me');",
-        )
-        .unwrap();
-
-        let migration = EMBEDDED_MIGRATIONS
-            .iter()
-            .find(|m| m.version == 27)
-            .expect("migration 27 exists");
-        conn.execute_batch(migration.sql).expect("migration 27 applies");
-
-        let remaining: Vec<String> = conn
-            .prepare("SELECT name FROM storage ORDER BY name")
-            .unwrap()
-            .query_map([], |r| r.get(0))
-            .unwrap()
-            .filter_map(Result::ok)
-            .collect();
-        assert_eq!(remaining, vec!["something_else".to_string()]);
     }
 
     fn table_has_column(conn: &rusqlite::Connection, table: &str, column: &str) -> bool {
@@ -229,65 +126,17 @@ mod tests {
             .any(|name| name == column)
     }
 
-    /// A full fresh migration leaves `user_discord_links.discord_avatar` present —
-    /// i.e. migration 20's table rebuild does not break databases where migration
-    /// 13 already created the column.
     #[test]
-    fn discord_avatar_present_after_fresh_migration() {
+    fn schema_columns_match_model_expectations() {
         let mut conn = open_memory();
         migrate(&mut conn).expect("migrate fresh db");
-        assert!(
-            table_has_column(&conn, "user_discord_links", "discord_avatar"),
-            "discord_avatar must exist after a fresh migration"
-        );
-    }
 
-    /// Migration 20 adds the column to a *legacy* `user_discord_links` — the shape
-    /// migration 13 created before `discord_avatar` was added to it — while
-    /// preserving existing link rows. This is the case that broke Discord linking.
-    #[test]
-    fn migration_20_converges_legacy_discord_links_table() {
-        let conn = open_memory();
-        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
-        // Reproduce the pre-column schema plus one linked row.
-        conn.execute_batch(
-            "CREATE TABLE account(id INTEGER PRIMARY KEY, name TEXT, password TEXT);
-             INSERT INTO account(id, name, password) VALUES (1, 'ferris', 'x');
-             CREATE TABLE user_discord_links (
-                 account_id       INTEGER PRIMARY KEY REFERENCES account(id) ON DELETE CASCADE,
-                 discord_user_id  TEXT    NOT NULL UNIQUE,
-                 discord_username TEXT,
-                 linked_at        TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-             );
-             INSERT INTO user_discord_links(account_id, discord_user_id, discord_username)
-                 VALUES (1, '42', 'ferris');",
-        )
-        .unwrap();
-        assert!(!table_has_column(&conn, "user_discord_links", "discord_avatar"));
-
-        let migration = EMBEDDED_MIGRATIONS
-            .iter()
-            .find(|m| m.version == 20)
-            .expect("migration 20 exists");
-        conn.execute_batch(migration.sql)
-            .expect("migration 20 applies to legacy table");
-
-        // Column now present, the existing link preserved.
+        assert!(table_has_column(&conn, "session", "scopes"));
+        assert!(table_has_column(&conn, "images", "expires_at"));
+        assert!(table_has_column(&conn, "images", "guild_id"));
         assert!(table_has_column(&conn, "user_discord_links", "discord_avatar"));
-        let username: String = conn
-            .query_row(
-                "SELECT discord_username FROM user_discord_links WHERE account_id = 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(username, "ferris");
-
-        // The link INSERT that the OAuth flow runs (writing discord_avatar) now works.
-        conn.execute(
-            "UPDATE user_discord_links SET discord_avatar = 'a1b2' WHERE account_id = 1",
-            [],
-        )
-        .expect("discord_avatar is writable");
+        assert!(table_has_column(&conn, "paste", "enc_salt"));
+        assert!(table_has_column(&conn, "paste", "burn_after_read"));
+        assert!(table_has_column(&conn, "paste", "fork_of"));
     }
 }
