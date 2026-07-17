@@ -315,7 +315,7 @@ pub async fn raw_upload_file(
 
     state.invalidate_image_caches().await;
 
-    // Audit log so /admin/audit shows who uploaded what, from where, and
+    // Audit log so the audit trail shows who uploaded what, from where, and
     // how it went. Image IDs go in meta (target stays human-readable as a
     // count); for the common case of one upload the ID is enough to
     // round-trip to the /gallery URL.

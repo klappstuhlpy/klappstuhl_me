@@ -103,3 +103,42 @@ pub async fn sharex_config(State(state): State<AppState>, account: Account) -> R
     )
         .into_response()
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::models::Scope;
+
+    /// The scope checkboxes are hand-written in the template while the scopes
+    /// themselves live in [`Scope`], so the two can drift — and did: `admin:read`
+    /// and `admin:write` stayed on the page for a while after the admin control
+    /// plane (and the scopes) left. That failure is silent in the worst way,
+    /// because `generate_api_key` drops unparseable scopes rather than erroring:
+    /// you tick the box, save, and get a key without it, with nothing to tell you.
+    #[test]
+    fn the_page_offers_exactly_the_scopes_that_exist() {
+        let template = include_str!("../../../templates/auth/account/api.html");
+
+        let offered: Vec<&str> = template
+            .match_indices(r#"name="scope" value=""#)
+            .map(|(i, m)| {
+                let rest = &template[i + m.len()..];
+                &rest[..rest.find('"').expect("unterminated scope value")]
+            })
+            .collect();
+
+        for scope in Scope::all() {
+            assert!(
+                offered.contains(&scope.as_str()),
+                "scope `{}` exists but the API page never offers it",
+                scope.as_str()
+            );
+        }
+        for offer in &offered {
+            assert!(
+                Scope::from_str(offer).is_some(),
+                "the API page offers `{offer}`, which is not a real scope — ticking it \
+                 would silently do nothing"
+            );
+        }
+    }
+}

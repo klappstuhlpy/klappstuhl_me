@@ -18,7 +18,7 @@ pub mod site;
 pub use auth::{token, totp};
 // `audit` is cross-cutting — it lives in `core`.
 pub use core::{audit, cli, config, database, error, filters, logging, migrations, models, state, utils};
-pub use integrations::{ai, discord, exttools};
+pub use integrations::{discord, exttools};
 pub use kls_web_core::key;
 pub use platform::{cached, cookies, flash, headers, ratelimit, scope};
 pub use site::media::{codeimage, metadata, scan, thumbnail};

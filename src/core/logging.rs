@@ -92,7 +92,7 @@ fn is_ipv6_ula(addr: Ipv6Addr) -> bool {
 ///
 /// * `0` — the base request log (the schema before the security dashboard).
 /// * `1` — the `ip` / `bad_reason` columns and their indexes.
-const REQUESTS_MIGRATIONS: [crate::migrations::EmbeddedMigration; 2] = [
+pub(crate) const REQUESTS_MIGRATIONS: [crate::migrations::EmbeddedMigration; 2] = [
     crate::migrations::EmbeddedMigration {
         version: 0,
         sql: "CREATE TABLE IF NOT EXISTS request (
@@ -397,6 +397,34 @@ impl RequestLogger {
         self.call(move |conn| -> rusqlite::Result<Vec<RequestLogEntry>> {
             let mut stmt = conn.prepare_cached(query.as_ref())?;
             let result = match stmt.query_map(params, RequestLogEntry::from_row) {
+                Ok(value) => value.collect(),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(Vec::new()),
+                Err(e) => Err(e),
+            };
+            result
+        })
+        .await
+    }
+
+    /// Runs an arbitrary read against the request log, mapping each row with `f`.
+    ///
+    /// [`RequestLogger::query`] always hands back whole [`RequestLogEntry`] rows,
+    /// which is the wrong shape for an aggregate: the insights page groups and
+    /// counts in SQL and wants a handful of small tuples back, not every request
+    /// in the window materialised into a `Vec`.
+    pub async fn query_map<T, Q, P, F>(&self, query: Q, params: P, f: F) -> rusqlite::Result<Vec<T>>
+    where
+        Q: Into<std::borrow::Cow<'static, str>> + Send,
+        P: rusqlite::Params + Send + 'static,
+        F: FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<T> + Send + 'static,
+        T: Send + 'static,
+    {
+        let query = query.into();
+        self.call(move |conn| -> rusqlite::Result<Vec<T>> {
+            let mut stmt = conn.prepare_cached(query.as_ref())?;
+            // Bound rather than tail-returned: the `MappedRows` temporary borrows
+            // `stmt`, so it has to drop before `stmt` does (same shape as `query`).
+            let result = match stmt.query_map(params, f) {
                 Ok(value) => value.collect(),
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(Vec::new()),
                 Err(e) => Err(e),

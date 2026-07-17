@@ -12,16 +12,21 @@ Entries for 1.1.0 through 1.4.2 were backfilled from commit history when this
 changelog was introduced in July 2026; changes between 1.0.0 (January 2025) and
 1.1.0 (July 2026) predate it and are unrecorded.
 
-## [Unreleased]
+## [1.7.0] - 2026-07-17
 
-### Changed
+### Added
 
-- The "Ask the AI" assistant only answers live "is the site up?" questions when the operator configures a status endpoint; without one it no longer offers that tool rather than guess at a status.
+- A site traffic overview at **Account → Insights**: requests, active users, average response time and success rate over a chosen range, alongside the most-visited routes, referring sites, busiest API endpoints, and the accounts leaning hardest on the API.
 
 ### Removed
 
-- The Ctrl+K command palette is now search and navigation only — it no longer runs configured shell scripts (host script-running is moving to the standalone admin app).
-- The `admin:read`-scoped image-update endpoint has left the public API surface (it was operator-only and undocumented for general use); homelab image-update status is moving to the standalone admin app.
+- **The admin control panel is no longer part of this site.** `/admin` and everything under it — host and container metrics, uptime monitoring, the security and audit views, Docker, the firewall, the reverse-proxy generator, SSH keys, backups, the database browser, the secrets scanner and the file sanitizer — now live in **Vantage**, a separate app on its own subdomain. The site is a personal website, image host and pastebin again; nothing about running the machine is served from it. The parts that were genuinely about the *site* rather than the host stayed: traffic analytics moved to Account → Insights (above), and login throttling is now the site's own (below).
+- **Upgrading permanently deletes the old admin tables.** Metrics history, uptime history, firewall rules, proxy routes, stored SSH keys, secret findings and sanitizer results are dropped from the database on first start after this release, since nothing reads them here any more. Vantage keeps its own records and does not import these — if you still want anything out of them, take a copy of `main.db` **before** upgrading.
+- **`config.json` has lost the host-administration keys**: `cloudflare`, `proxy`, `backup`, `services`, `geoip_db_path`, `postgres_url`, `secret_scan_paths`, `spotlight_scripts`, `sshd_auth_log_path`, `firewall_backend`, `update_check_interval_hours`, and the `ntfy`/webhook/email alert sinks. Configure those in Vantage instead. Nothing breaks if you leave them in the file — unknown keys are ignored on load and dropped the next time the config is re-normalised. `clamav_addr` and `virustotal_api_key` **stay**: the sanitizer *page* moved, but scanning uploads did not.
+- **"Ask the AI" is gone.** The in-terminal assistant, the `POST /api/ask` proxy and the `ai` / `status_url` config keys have all been removed — the site no longer talks to any AI provider, and no API key is needed to run it. Its remaining use case went with the admin dashboard.
+- **The Ctrl+K command palette is gone.** Its only entry point lived in the admin layout, so it has been unreachable since the admin panel left; with the assistant removed as well there was nothing left for it to do.
+- The `admin:read`-scoped image-update endpoint has left the public API surface (it was operator-only and undocumented for general use); homelab image-update status lives in the standalone admin app.
+- Removed unused cursor spotlight left-overs from previous styling version from index.js/index.css.
 
 ### Security
 

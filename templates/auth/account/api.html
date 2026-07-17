@@ -83,18 +83,6 @@
                     <span class="scope-name">images:guild</span>
                     <span class="scope-desc">Manage per-guild image galleries (Percy poll banners + dashboard)</span>
                 </label>
-                <label class="scope-row">
-                    <input type="checkbox" name="scope" value="admin:read"
-                        {% if api_key_scopes.contains("admin:read") %}checked{% endif %}>
-                    <span class="scope-name">admin:read</span>
-                    <span class="scope-desc">Read-only admin dashboards (metrics / security / audit)</span>
-                </label>
-                <label class="scope-row">
-                    <input type="checkbox" name="scope" value="admin:write"
-                        {% if api_key_scopes.contains("admin:write") %}checked{% endif %}>
-                    <span class="scope-name">admin:write</span>
-                    <span class="scope-desc">Mutate admin state (services, secrets)</span>
-                </label>
                 {% endif %}
             </div>
         </fieldset>

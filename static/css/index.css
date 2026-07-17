@@ -1,6 +1,5 @@
 /* ── Homepage ────────────────────────────────────────────────────────────
-   Minimal profile card hero, then scroll-revealed projects / stack.
-   Ambient drifting-code field + cursor spotlight from index.js. */
+   Minimal profile card hero, then scroll-revealed projects / stack. */
 
 /* ── Hero ──────────────────────────────────────────────────────────────── */
 
@@ -129,7 +128,6 @@
 }
 
 .project-card {
-    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -139,26 +137,14 @@
     border-radius: 10px;
     text-decoration: none !important;
     color: var(--foreground) !important;
-    overflow: hidden;
     transition: border-color 200ms ease, background-color 200ms ease, transform 200ms ease;
 }
 
-.project-card::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(140px 140px at var(--mx, 50%) var(--my, 0%),
-    color-mix(in srgb, var(--branding) 22%, transparent), transparent 70%);
-    opacity: 0;
-    transition: opacity 220ms ease;
-    pointer-events: none;
-}
 .project-card:hover {
     border-color: var(--branding);
     background: var(--box-shade);
     transform: translateY(-3px);
 }
-.project-card:hover::after { opacity: 1; }
 
 .project-header {
     display: flex;
@@ -203,7 +189,6 @@
 
 @media (prefers-reduced-motion: reduce) {
     .js-index .reveal { transition: none; opacity: 1; transform: none; }
-    .ambient, .cursor-glow { display: none; }
 }
 
 @media (min-width: 480px) {

@@ -1,0 +1,21 @@
+-- Revises: 25
+-- Reason: Drop the `invite` table left behind by the removed invite-only signup.
+--
+-- This one is a divergence, not just a leftover. 2.sql originally created the
+-- table; when invite-only signup was dropped, the feature was removed by
+-- *commenting out* the CREATE inside that already-applied migration. So:
+--
+--   * databases that applied 2.sql before the edit  → still have `invite`
+--   * databases created after the edit              → never had it
+--
+-- Both then got adopted into the checksum tracker at whatever they had, so the
+-- two states persist side by side today. This is the same class of drift 20.sql
+-- had to repair for `user_discord_links.discord_avatar`, and the reason the rule
+-- is to add a migration rather than edit one.
+--
+-- `DROP TABLE IF EXISTS` converges both states in one statement: it removes the
+-- table where it lingers and is a no-op where it never existed. Nothing has
+-- referenced `invite` since signup went open, and no live table REFERENCES it,
+-- so the drop is safe with `foreign_keys = ON`.
+
+DROP TABLE IF EXISTS invite;

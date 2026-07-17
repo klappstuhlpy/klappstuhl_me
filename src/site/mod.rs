@@ -1,5 +1,5 @@
 //! The public website surface at klappstuhl.me: the homepage, the image hoster,
-//! short links, the code screenshot tools, the AI `ask` endpoint,
+//! short links, the code screenshot tools,
 //! account/login pages, the public changelog, and the documented public JSON API
 //! (`site::api`). Each
 //! feature owns its handlers here; [`routes`] assembles them into the public
@@ -17,7 +17,6 @@ use axum::{
 
 pub mod account;
 pub mod api;
-pub mod ask;
 pub mod changelog;
 pub mod discord_oauth;
 pub mod image;
@@ -43,8 +42,7 @@ async fn index(State(state): State<AppState>, account: Option<Account>, flashes:
 }
 
 /// The standalone projects page was folded into the homepage (`/#projects`).
-/// Kept as a redirect so old bookmarks, the spotlight palette, and the AI
-/// `navigate` tool's whitelisted `/projects` route still resolve.
+/// Kept as a redirect so old bookmarks still resolve.
 async fn projects() -> impl IntoResponse {
     Redirect::to("/#projects")
 }
@@ -90,6 +88,5 @@ pub fn routes() -> Router<AppState> {
         .merge(image::routes())
         .merge(links::routes())
         .merge(paste::routes())
-        .merge(ask::routes())
         .nest("/api", api::routes())
 }

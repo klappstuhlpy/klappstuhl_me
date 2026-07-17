@@ -7,6 +7,8 @@
 //! - [`pages`] — the GET handlers + Askama structs behind the account shell
 //!   (overview, profile, security, sessions, api, content, danger) and the
 //!   read-only `/user/:name` page.
+//! - [`insights`] — the admin-only site traffic overview (aggregates over
+//!   `requests.db`).
 //! - [`security`] — password changes, TOTP enrollment, recovery codes.
 //! - [`username`] — renaming the account (and the live availability check that
 //!   signup shares).
@@ -21,6 +23,7 @@
 pub mod api_keys;
 pub mod auth;
 pub mod delete;
+pub mod insights;
 pub(crate) mod lockout;
 pub mod pages;
 pub mod security;
@@ -282,6 +285,10 @@ pub fn routes() -> Router<AppState> {
         .route("/account/api", get(pages::api_page))
         .route("/account/content", get(pages::content))
         .route("/account/danger", get(pages::danger))
+        // Admin-only; both handlers check the flag themselves (there is no
+        // admin extractor — the shell gates in the sidebar, not the router).
+        .route("/account/insights", get(insights::page))
+        .route("/account/insights/data", get(insights::data))
         .route("/user/:name", get(pages::user_public))
         // ── Mutations (paths unchanged from the single-page account) ─────
         .route(

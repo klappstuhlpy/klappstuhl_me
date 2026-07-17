@@ -1,9 +1,9 @@
 # Features
 
-What the running app gives you: the admin control panel, the account shell, the
+What the running app gives you: the account shell, the site insights, the
 Discord/Percy integration, and where everything lands on disk.
 
-- [Admin dashboard](#admin-dashboard)
+- [Insights](#insights)
 - [Account](#account)
 - [Pastebin](#pastebin)
 - [Discord login & the Percy dashboard](#discord-login--the-percy-dashboard)
@@ -13,22 +13,25 @@ Discord/Percy integration, and where everything lands on disk.
 See also: [Setup](setup.md) for how to install and configure these, and the live
 [API reference](https://klappstuhl.me/api/docs) for the public JSON API.
 
-## Admin dashboard
+## Insights
 
-`/admin` is a self-hosting control panel. Every integration is **optional and
-non-fatal** — an unreachable or unconfigured backend simply hides its panel:
+`/account/insights` is a traffic overview for the site, visible to admin
+accounts. It aggregates `requests.db` (the HTTP access log, kept for 45 days)
+over a chosen range — today, 7, 14, or 30 days:
 
-- **Metrics & security** — host/app metrics, request analytics, GeoIP + Cloudflare-backed security views.
-- **File Sanitizer** — ClamAV (INSTREAM) + VirusTotal hash-lookup scanning of uploads.
-- **Databases** — browse the internal SQLite files and (read-only) an external Postgres.
-- **SSH keys** — store keys, sync to host `authorized_keys` via bind-mounts, track "last used" from the sshd log.
-- **Firewall** — nftables/ufw/iptables rule manager with automatic brute-force lockouts.
-- **Reverse proxy** — per-subdomain nginx/Caddy config generation, or Cloudflare Tunnel ingress via the CF API.
-- **Docker** — start/stop/restart/pull service containers and detect image updates.
-- **Backups** — scheduled `VACUUM INTO` snapshots with retention and optional S3 off-site mirroring.
-- **Secrets scanner**, **audit log**, and a **Ctrl+K command palette** (with optional cron scripts).
+- **Tiles** — requests, active users, average response time, success rate.
+- **Popular routes** — grouped by matched route pattern (`/p/:id`), not raw path.
+- **Referring sites** — external referrers only, with the big search engines collapsed to a name.
+- **API routes** and **top API consumers** — the busiest endpoints, and the accounts calling them, split by success and failure.
 
-Container image-update status is also exposed at `GET /api/v1/admin/updates` (scope `admin:read`).
+Aggregation happens in SQL; only counts reach the browser, never raw log rows.
+`/static/*` is excluded throughout.
+
+> **Host operations live elsewhere.** Server logs, uptime monitoring, metrics,
+> the 4xx/security feed, Docker, firewall, proxy, backups and the secrets scanner
+> are [Vantage](https://github.com/klappstuhlpy/vantage)'s job — a separate app on
+> its own subdomain. This page is the part that is about the *site*: it needs the
+> account database to name an API consumer, which Vantage deliberately cannot read.
 
 ## Account
 
@@ -43,6 +46,7 @@ Container image-update status is also exposed at `GET /api/v1/admin/updates` (sc
 | `/account/api`      | The scoped API token, a `curl` starter, and the ShareX uploader config              |
 | `/account/content`  | Images, short links, and pastes you own (links out to the [pastebin](#pastebin))    |
 | `/account/danger`   | Data export and permanent account deletion                                          |
+| `/account/insights` | Admin only: the site traffic overview (see [Insights](#insights))                   |
 
 **Changing your username** (`POST /account/username`) re-authenticates with your
 password, then renames the account under a single transaction that also writes the

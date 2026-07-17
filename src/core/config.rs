@@ -10,216 +10,19 @@ use serde::{Deserialize, Serialize};
 use crate::key::SecretKey;
 use crate::{cli::PROGRAM_NAME, discord::Webhook};
 
-/// Configuration for a single Docker service shown on the `/admin/docker` page.
+/// Where the site delivers its own alerts.
 ///
-/// Note: the legacy `kind` field (previously `"docker"` or `"screen"`) is silently
-/// ignored if present in the config file — all services are now Docker-only.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ServiceConfig {
-    /// Human-readable display name.
-    pub name: String,
-    /// The Docker container name passed to `docker start` / `docker stop` etc.
-    pub identifier: String,
-    /// Working directory that contains the `docker-compose.yml`.
-    ///
-    /// When set, Start/Stop/Restart run `docker compose up -d` /
-    /// `docker compose down` / `docker compose restart` in this directory
-    /// instead of the plain `docker start` / `docker stop` / `docker restart`
-    /// commands.
-    ///
-    /// Example config:
-    /// ```json
-    /// {
-    ///   "name": "My App",
-    ///   "identifier": "my_app",
-    ///   "path": "/home/user/my-app"
-    /// }
-    /// ```
-    #[serde(default)]
-    pub path: Option<String>,
-}
-
-/// A pre-defined script the Spotlight palette can invoke.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SpotlightScript {
-    /// Unique identifier used by the run endpoint.
-    pub id: String,
-    /// Human-readable name shown in the palette.
-    pub name: String,
-    /// Shell command to execute (passed to `sh -c` on Unix, `cmd /C` on Windows).
-    pub command: String,
-    /// Optional description shown as subtitle.
-    #[serde(default)]
-    pub description: Option<String>,
-    /// Working directory for the command. Defaults to the process cwd.
-    #[serde(default)]
-    pub cwd: Option<String>,
-    /// Optional 5-field cron schedule (`min hour dom month dow`, evaluated in
-    /// UTC). When set, a background scheduler runs the script automatically at
-    /// the matching times, in addition to on-demand runs from the Ctrl+K
-    /// palette. Supports `*`, lists (`1,15`), ranges (`9-17`), and steps
-    /// (`*/15`). Example: `"0 4 * * *"` runs daily at 04:00 UTC.
-    #[serde(default)]
-    pub schedule: Option<String>,
-}
-
-/// Off-site backup target. When set, every freshly created SQLite backup is
-/// also uploaded to an S3-compatible object store (AWS S3, Backblaze B2,
-/// Cloudflare R2, MinIO, …) so a dead local disk can't take the backups with
-/// it. Uses path-style addressing + AWS Signature V4, which all of the above
-/// accept — no extra binary required.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct BackupRemoteConfig {
-    /// Storage backend. Currently only `"s3"` is supported.
-    #[serde(default = "default_remote_kind")]
-    pub kind: String,
-    /// Endpoint base URL, e.g. `"https://s3.us-west-002.backblazeb2.com"`,
-    /// `"https://<account>.r2.cloudflarestorage.com"`, or for AWS
-    /// `"https://s3.us-east-1.amazonaws.com"`.
-    pub endpoint: String,
-    /// Signing region. AWS needs the real region; B2/R2/MinIO accept any value
-    /// (defaults to `us-east-1`).
-    #[serde(default = "default_remote_region")]
-    pub region: String,
-    /// Destination bucket name.
-    pub bucket: String,
-    /// Optional key prefix inside the bucket (e.g. `"klappstuhl/"`). A trailing
-    /// slash is added automatically if missing and the prefix is non-empty.
-    #[serde(default)]
-    pub prefix: String,
-    /// Access key id.
-    pub access_key_id: String,
-    /// Secret access key.
-    pub secret_access_key: String,
-}
-
-fn default_remote_kind() -> String {
-    "s3".to_string()
-}
-
-fn default_remote_region() -> String {
-    "us-east-1".to_string()
-}
-
-impl BackupRemoteConfig {
-    /// The key prefix normalised to either empty or ending in a single `/`.
-    pub fn normalized_prefix(&self) -> String {
-        let p = self.prefix.trim_matches('/');
-        if p.is_empty() {
-            String::new()
-        } else {
-            format!("{p}/")
-        }
-    }
-}
-
-/// Alert delivery sinks. A metric / health / secret / backup alert fans out to
-/// every one of these that is set.
+/// This was a fan-out across Discord / ntfy / a generic webhook / SMTP, driven by
+/// the admin control plane's metric, health, secret and backup alerts. Those left
+/// with Vantage (which has its own sinks), and the only caller remaining here is
+/// [`crate::AppState::send_alert`], which posts to Discord. The other three sinks
+/// were removed rather than left as config an operator could set and never see
+/// fire.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct AlertsConfig {
     /// Discord incoming-webhook URL.
     #[serde(default)]
     pub discord_webhook_url: Option<Webhook>,
-    /// ntfy topic URL (e.g. `https://ntfy.sh/my-topic`) — alerts are pushed as
-    /// plain text.
-    #[serde(default)]
-    pub ntfy_url: Option<String>,
-    /// Generic webhook URL — alerts are POSTed as a neutral JSON body
-    /// `{title, level, body, fields}`.
-    #[serde(default)]
-    pub webhook_url: Option<String>,
-    /// SMTP email sink — when set, alerts are also delivered as a plain-text
-    /// email to every recipient.
-    #[serde(default)]
-    pub email: Option<EmailConfig>,
-}
-
-/// SMTP delivery settings for the email alert sink. TLS is mandatory: port
-/// 465 uses implicit TLS, any other port (587, 25) upgrades via STARTTLS.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EmailConfig {
-    /// SMTP server hostname (e.g. `smtp.fastmail.com`).
-    pub host: String,
-    /// SMTP port. `465` → implicit TLS, otherwise STARTTLS. Defaults to 587.
-    #[serde(default = "default_smtp_port")]
-    pub port: u16,
-    /// AUTH LOGIN username. Omit (with `password`) for an unauthenticated relay.
-    #[serde(default)]
-    pub username: Option<String>,
-    /// AUTH LOGIN password / app-password.
-    #[serde(default)]
-    pub password: Option<String>,
-    /// Envelope sender / `From:` address.
-    pub from: String,
-    /// One or more recipient addresses.
-    pub to: Vec<String>,
-}
-
-fn default_smtp_port() -> u16 {
-    587
-}
-
-/// Cloudflare credentials and tunnel settings. The token + zone power the
-/// security dashboard's Cloudflare panels; the token + `account_id` +
-/// `tunnel_id` additionally let `/admin/proxy` manage a remotely-managed
-/// Cloudflare Tunnel's ingress over the API.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct CloudflareConfig {
-    /// API token. `Zone.Analytics:Read` for the security panels; for tunnel
-    /// management it also needs Account › Cloudflare Tunnel › Edit and
-    /// Zone › DNS › Edit.
-    #[serde(default)]
-    pub api_token: Option<String>,
-    /// Zone ID for the domain this app sits behind.
-    #[serde(default)]
-    pub zone_id: Option<String>,
-    /// Account ID — required for tunnel-API management.
-    #[serde(default)]
-    pub account_id: Option<String>,
-    /// UUID of the Cloudflare Tunnel to manage over the API (the right model
-    /// for a dashboard/remotely-managed tunnel with no local credentials file).
-    #[serde(default)]
-    pub tunnel_id: Option<String>,
-    /// Local-file mode only: tunnel id/name written as `tunnel:` into a
-    /// generated `config.yml`. Used when the tunnel API isn't configured.
-    #[serde(default)]
-    pub tunnel_name: Option<String>,
-    /// Local-file mode only: path written as `credentials-file:` into the
-    /// generated `config.yml`.
-    #[serde(default)]
-    pub tunnel_credentials_file: Option<String>,
-}
-
-/// Reverse-proxy / domain-manager settings for `/admin/proxy`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct ProxyConfig {
-    /// Config syntax to emit: `"nginx"` (default), `"caddy"`, or
-    /// `"cloudflared"`.
-    #[serde(default)]
-    pub kind: Option<String>,
-    /// Directory generated config is written into. Unset = DB-only (and unused
-    /// in cloudflared tunnel-API mode).
-    #[serde(default)]
-    pub config_dir: Option<PathBuf>,
-    /// Shell command run after config is regenerated, e.g. `"nginx -s reload"`.
-    /// Skipped when unset / in tunnel-API mode.
-    #[serde(default)]
-    pub reload_command: Option<String>,
-}
-
-/// SQLite backup settings.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct BackupConfig {
-    /// Hours between automatic `VACUUM INTO` backups. `0` disables; unset
-    /// defaults to 24.
-    #[serde(default)]
-    pub interval_hours: Option<u64>,
-    /// Number of automatic backups to retain. Unset defaults to 14.
-    #[serde(default)]
-    pub keep: Option<usize>,
-    /// Off-site backup target. Unset = local-only backups.
-    #[serde(default)]
-    pub remote: Option<BackupRemoteConfig>,
 }
 
 /// Discord OAuth2 settings for identity linking (login with Discord, link
@@ -246,44 +49,6 @@ impl DiscordConfig {
         self.client_id.as_deref().is_some_and(|s| !s.is_empty())
             && self.client_secret.as_deref().is_some_and(|s| !s.is_empty())
             && self.redirect_uri.as_deref().is_some_and(|s| !s.is_empty())
-    }
-}
-
-/// AI assistant settings powering the "Ask the AI" feature (admin Spotlight).
-/// Backed by the Groq API (free tier, available in the EU; OpenAI-compatible).
-/// Disabled (the endpoint returns 503) unless `api_key` is set.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct AiConfig {
-    /// Groq API key (`gsk_…`, free from <https://console.groq.com/keys>). The
-    /// key stays server-side; the browser only ever talks to this app's
-    /// `/api/ask` proxy. Unset = feature off.
-    #[serde(default)]
-    pub api_key: Option<String>,
-    /// Groq model id to use. Unset defaults to a free model with tool-calling
-    /// support (see [`AiConfig::model_id`]).
-    #[serde(default)]
-    pub model: Option<String>,
-    /// Default for "may anyone spend tokens?": `false` restricts `/api/ask` to
-    /// admin accounts, `true` lets any visitor use it (still rate-limited).
-    /// This is only the *initial* value — admins can flip it at runtime via
-    /// `POST /admin/ai/public` (persisted in the `storage` KV table), and the
-    /// stored value then takes precedence over this default.
-    #[serde(default)]
-    pub public: bool,
-}
-
-impl AiConfig {
-    /// Whether the ask-AI feature is enabled (an API key is configured).
-    pub fn enabled(&self) -> bool {
-        self.api_key.as_deref().map(|k| !k.is_empty()).unwrap_or(false)
-    }
-
-    /// The configured model, or a free default with reliable tool-calling.
-    pub fn model_id(&self) -> &str {
-        self.model
-            .as_deref()
-            .filter(|m| !m.is_empty())
-            .unwrap_or("llama-3.3-70b-versatile")
     }
 }
 
@@ -385,98 +150,19 @@ pub struct Config {
     ///
     /// Microbenching makes it evident that cloning this without an Arc is around ~4x faster.
     pub secret_key: SecretKey,
-    /// Alert delivery sinks (Discord / ntfy / generic webhook).
+    /// Where the site posts its own alerts (Discord only — see [`AlertsConfig`]).
     #[serde(default)]
     pub alerts: AlertsConfig,
-    /// Cloudflare credentials + tunnel settings.
-    #[serde(default)]
-    pub cloudflare: CloudflareConfig,
-    /// Reverse-proxy / domain-manager settings.
-    #[serde(default)]
-    pub proxy: ProxyConfig,
-    /// SQLite backup settings.
-    #[serde(default)]
-    pub backup: BackupConfig,
-    /// Services to monitor on the `/admin/docker` admin page.
-    #[serde(default)]
-    pub services: Vec<ServiceConfig>,
-    /// Path to a MaxMind GeoLite2-City `.mmdb` file used by `/admin/security`.
-    /// Defaults to `<data>/geoip/GeoLite2-City.mmdb` if unset. Optional — if
-    /// the file is missing, IP lookups quietly degrade to "Unknown".
-    #[serde(default)]
-    pub geoip_db_path: Option<PathBuf>,
-    /// Directories to scan for leaked secrets (API keys, tokens, private
-    /// keys, etc.).  When empty, the scheduled scanner is disabled — the
-    /// /admin/secrets page still loads and a manual scan can be triggered.
-    ///
-    /// Recursive: subdirectories are walked.  Binary files, files larger
-    /// than 1 MB, and common build directories (.git, node_modules, target,
-    /// dist) are skipped automatically.
-    ///
-    /// **Docker note:** paths are resolved from inside the container, so
-    /// host paths like `/home/alice/code` don't work directly. The default
-    /// compose file already bind-mounts `/home` and `/root` (for the SSH
-    /// admin page); reuse those by prefixing with `/host-home` or
-    /// `/host-root`, e.g. `"/host-home/alice/code"`. For paths elsewhere
-    /// on the host, add a corresponding `:ro` bind mount in
-    /// `docker-compose.yml` and reference the in-container path here.
-    #[serde(default)]
-    pub secret_scan_paths: Vec<PathBuf>,
-    /// PostgreSQL connection string for the `/admin/database` page.
-    ///
-    /// Format (libpq URL):
-    /// `postgresql://user:password@host:port/database`
-    ///
-    /// Leave unset to disable the page. The configured account should have
-    /// at least read access to `pg_catalog` and connection rights to every
-    /// database you want to browse — typically the `postgres` superuser
-    /// (or a dedicated read-only role with `pg_read_all_data`).
-    ///
-    /// Safe-mode queries are wrapped in `BEGIN READ ONLY` so even
-    /// privileged credentials can't accidentally mutate state through the
-    /// query runner unless the operator explicitly opts in to danger mode.
-    #[serde(default)]
-    pub postgres_url: Option<String>,
     /// ClamAV daemon address (e.g. `"127.0.0.1:3310"`).
-    /// When set, the file sanitizer page connects to clamd for virus scanning.
+    /// When set, uploaded images are scanned by clamd over INSTREAM. The admin
+    /// *sanitizer page* moved to Vantage; upload scanning stayed here, which is
+    /// why this key did too.
     #[serde(default)]
     pub clamav_addr: Option<String>,
     /// VirusTotal public API key.
-    /// When set, the file sanitizer checks each file's SHA-256 against VT.
+    /// When set, an uploaded file's SHA-256 is looked up on VirusTotal.
     #[serde(default)]
     pub virustotal_api_key: Option<String>,
-    /// Pre-defined scripts the Spotlight palette can run.
-    /// Each entry needs a unique `id`, a display `name`, and a shell `command`.
-    #[serde(default)]
-    pub spotlight_scripts: Vec<SpotlightScript>,
-    /// Optional path to an sshd auth log (typically `/var/log/auth.log` on
-    /// Debian/Ubuntu, or `/var/log/secure` on RHEL). When set, a background
-    /// task tails the file and updates `ssh_key.last_used_at` whenever a
-    /// successful publickey authentication line is observed whose
-    /// `SHA256:<fingerprint>` matches a stored key.
-    ///
-    /// Requires sshd to log fingerprints (default on modern OpenSSH; if your
-    /// logs only show the user/IP without `ssh2: <algo> SHA256:<fp>`, raise
-    /// `LogLevel` to `VERBOSE` in `/etc/ssh/sshd_config`).
-    ///
-    /// In the default Docker setup, bind-mount the host log read-only
-    /// (e.g. `- /var/log/auth.log:/host-log/auth.log:ro`) and set this to
-    /// `/host-log/auth.log`. When unset, `last_used_at` stays NULL.
-    #[serde(default)]
-    pub sshd_auth_log_path: Option<PathBuf>,
-    /// Forces a specific firewall backend at start-up. Valid values:
-    /// `"nftables"`, `"ufw"`, `"iptables"`, `"disabled"`. When unset, the
-    /// `/admin/firewall` page probes each backend in order and uses the
-    /// first one that responds.  Set to `"disabled"` to keep the UI but
-    /// stop the server from issuing real packet-filter commands (useful
-    /// in dev or when running without `NET_ADMIN`).
-    #[serde(default)]
-    pub firewall_backend: Option<String>,
-    /// Hours between background container image-update checks (queries each
-    /// configured service's registry for a newer digest). `0` disables the
-    /// checker. Defaults to 12 when unset.
-    #[serde(default)]
-    pub update_check_interval_hours: Option<u64>,
     /// Path to a Chromium/Chrome binary for the screenshot and Markdown→PDF
     /// render endpoints. When unset, common names on `PATH` are tried; if none
     /// is found those endpoints return 503.
@@ -493,10 +179,6 @@ pub struct Config {
     /// can never be buffered whole in memory.
     #[serde(default)]
     pub max_upload_bytes: Option<u64>,
-    /// AI assistant settings (Groq) for the "Ask the AI" feature.
-    /// Off unless `ai.api_key` is set.
-    #[serde(default)]
-    pub ai: AiConfig,
     /// Pastebin limits and the anonymous-paste switch.
     #[serde(default)]
     pub paste: PasteConfig,
@@ -504,14 +186,6 @@ pub struct Config {
     /// Off unless all three fields (`client_id`, `client_secret`, `redirect_uri`) are set.
     #[serde(default)]
     pub discord: DiscordConfig,
-    /// URL of a public status JSON (overall state + per-service up/down + 24h
-    /// uptime) that feeds the `/api/ask` `get_site_status` tool. Points at the
-    /// standalone admin app's status endpoint once host administration splits
-    /// out of this binary (see the admin-separation plan, Seam I); until it is
-    /// set the AI status tool is simply not offered. Fetched via the
-    /// SSRF-guarded fetcher, so it must be a public http(s) URL.
-    #[serde(default)]
-    pub status_url: Option<String>,
     /// Optional shared key for the cross-app SSO handoff to the Percy dashboard.
     /// Set to the **same** value as the dashboard's `sso_secret` to make the
     /// `/percy` link log a linked-Discord user straight into the dashboard.
@@ -541,26 +215,13 @@ impl Config {
             server: ServerConfig::default(),
             secret_key: SecretKey::random()?,
             alerts: AlertsConfig::default(),
-            cloudflare: CloudflareConfig::default(),
-            proxy: ProxyConfig::default(),
-            backup: BackupConfig::default(),
-            services: Vec::new(),
-            geoip_db_path: None,
-            secret_scan_paths: Vec::new(),
-            postgres_url: None,
             clamav_addr: None,
             virustotal_api_key: None,
-            spotlight_scripts: Vec::new(),
-            sshd_auth_log_path: None,
-            firewall_backend: None,
-            update_check_interval_hours: None,
             chromium_path: None,
             ffmpeg_path: None,
             max_upload_bytes: None,
-            ai: AiConfig::default(),
             paste: PasteConfig::default(),
             discord: DiscordConfig::default(),
-            status_url: None,
             sso_secret: None,
             gallery_provision_token: None,
         })
@@ -759,23 +420,13 @@ fn migrate_flat_to_grouped(value: &mut serde_json::Value) {
     };
 
     // (old flat key, group, new key within the group)
-    const MOVES: &[(&str, &str, &str)] = &[
-        ("discord_webhook_url", "alerts", "discord_webhook_url"),
-        ("ntfy_url", "alerts", "ntfy_url"),
-        ("alert_webhook_url", "alerts", "webhook_url"),
-        ("cloudflare_api_token", "cloudflare", "api_token"),
-        ("cloudflare_zone_id", "cloudflare", "zone_id"),
-        ("cloudflare_account_id", "cloudflare", "account_id"),
-        ("cloudflared_tunnel_id", "cloudflare", "tunnel_id"),
-        ("cloudflared_tunnel", "cloudflare", "tunnel_name"),
-        ("cloudflared_credentials_file", "cloudflare", "tunnel_credentials_file"),
-        ("proxy_kind", "proxy", "kind"),
-        ("proxy_config_dir", "proxy", "config_dir"),
-        ("proxy_reload_command", "proxy", "reload_command"),
-        ("backup_interval_hours", "backup", "interval_hours"),
-        ("backup_keep", "backup", "keep"),
-        ("backup_remote", "backup", "remote"),
-    ];
+    //
+    // Only keys that still land somewhere are worth moving. The table used to
+    // also regroup the flat `cloudflare_*`, `proxy_*`, `backup_*` and the other
+    // alert sinks; those groups left with the admin control plane, so a config
+    // still carrying them now falls through to the same place any unknown key
+    // does — ignored on load, dropped on the next re-normalise.
+    const MOVES: &[(&str, &str, &str)] = &[("discord_webhook_url", "alerts", "discord_webhook_url")];
 
     for (old, group, new) in MOVES {
         let Some(moved) = obj.remove(*old) else {
@@ -832,62 +483,59 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn migrates_legacy_flat_keys_into_groups() {
+    fn migrates_the_legacy_flat_webhook_key_into_the_alerts_group() {
+        let mut v = json!({
+            "production": true,
+            "discord_webhook_url": "https://discord/x",
+        });
+        migrate_flat_to_grouped(&mut v);
+
+        assert_eq!(v["alerts"]["discord_webhook_url"], "https://discord/x");
+        // Untouched, and the old flat key is gone.
+        assert_eq!(v["production"], true);
+        assert!(v.get("discord_webhook_url").is_none());
+    }
+
+    /// A config still carrying the admin control plane's keys loads fine — they
+    /// are simply not moved anywhere, and serde ignores them (there is no
+    /// `deny_unknown_fields`), so the next re-normalise drops them. An operator
+    /// upgrading past the Vantage split must not hit a parse error.
+    #[test]
+    fn legacy_admin_keys_are_left_alone_rather_than_regrouped() {
         let mut v = json!({
             "production": true,
             "cloudflare_api_token": "tok",
-            "cloudflare_zone_id": "zone",
-            "cloudflare_account_id": "acct",
-            "cloudflared_tunnel_id": "uuid",
-            "cloudflared_tunnel": "my-tunnel",
-            "cloudflared_credentials_file": "/etc/cf/x.json",
             "proxy_kind": "cloudflared",
-            "proxy_config_dir": "/etc/cf",
-            "proxy_reload_command": "true",
-            "backup_interval_hours": 12,
             "backup_keep": 7,
-            "discord_webhook_url": "https://discord/x",
-            "ntfy_url": "https://ntfy.sh/t",
             "alert_webhook_url": "https://hook",
         });
         migrate_flat_to_grouped(&mut v);
 
-        assert_eq!(v["cloudflare"]["api_token"], "tok");
-        assert_eq!(v["cloudflare"]["zone_id"], "zone");
-        assert_eq!(v["cloudflare"]["account_id"], "acct");
-        assert_eq!(v["cloudflare"]["tunnel_id"], "uuid");
-        assert_eq!(v["cloudflare"]["tunnel_name"], "my-tunnel");
-        assert_eq!(v["cloudflare"]["tunnel_credentials_file"], "/etc/cf/x.json");
-        assert_eq!(v["proxy"]["kind"], "cloudflared");
-        assert_eq!(v["proxy"]["config_dir"], "/etc/cf");
-        assert_eq!(v["proxy"]["reload_command"], "true");
-        assert_eq!(v["backup"]["interval_hours"], 12);
-        assert_eq!(v["backup"]["keep"], 7);
-        assert_eq!(v["alerts"]["discord_webhook_url"], "https://discord/x");
-        assert_eq!(v["alerts"]["ntfy_url"], "https://ntfy.sh/t");
-        assert_eq!(v["alerts"]["webhook_url"], "https://hook");
-
-        // Untouched + old flat keys removed.
+        // No group is conjured for a key nothing reads any more.
+        assert!(v.get("cloudflare").is_none());
+        assert!(v.get("proxy").is_none());
+        assert!(v.get("backup").is_none());
         assert_eq!(v["production"], true);
-        for old in ["cloudflare_api_token", "proxy_kind", "backup_keep", "alert_webhook_url"] {
-            assert!(v.get(old).is_none(), "{old} should have been moved");
-        }
+
+        // And the whole thing still deserializes into the trimmed Config.
+        v["secret_key"] = json!(SecretKey::random().unwrap());
+        serde_json::from_value::<Config>(v).expect("a config with stale admin keys must still load");
     }
 
     #[test]
     fn migration_preserves_an_already_grouped_value() {
         let mut v = json!({
-            "cloudflare": { "api_token": "new" },
-            "cloudflare_api_token": "old",
+            "alerts": { "discord_webhook_url": "new" },
+            "discord_webhook_url": "old",
         });
         migrate_flat_to_grouped(&mut v);
-        assert_eq!(v["cloudflare"]["api_token"], "new"); // grouped wins
-        assert!(v.get("cloudflare_api_token").is_none());
+        assert_eq!(v["alerts"]["discord_webhook_url"], "new"); // grouped wins
+        assert!(v.get("discord_webhook_url").is_none());
     }
 
     #[test]
     fn migration_is_noop_for_already_grouped_config() {
-        let mut v = json!({ "cloudflare": { "api_token": "x" }, "proxy": { "kind": "nginx" } });
+        let mut v = json!({ "alerts": { "discord_webhook_url": "x" }, "paste": { "anonymous": true } });
         let before = v.clone();
         migrate_flat_to_grouped(&mut v);
         assert_eq!(v, before);
@@ -899,30 +547,24 @@ mod tests {
     #[test]
     fn serialises_in_canonical_grouped_order() {
         let json = serde_json::to_string(&Config::new().unwrap()).unwrap();
+        // The full top-level list, in the order `docs/setup.md` shows it. Listing
+        // every key (not just the first few) is what makes this catch a *removed*
+        // one: the admin keys were still in the docs long after they were gone.
         let expected = [
             "production",
             "domains",
             "server",
             "secret_key",
             "alerts",
-            "cloudflare",
-            "proxy",
-            "backup",
-            "services",
-            "geoip_db_path",
-            "secret_scan_paths",
-            "postgres_url",
             "clamav_addr",
             "virustotal_api_key",
-            "spotlight_scripts",
-            "sshd_auth_log_path",
-            "firewall_backend",
-            "update_check_interval_hours",
             "chromium_path",
             "ffmpeg_path",
             "max_upload_bytes",
-            "ai",
             "paste",
+            "discord",
+            "sso_secret",
+            "gallery_provision_token",
         ];
         let mut last = 0usize;
         for key in expected {

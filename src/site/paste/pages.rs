@@ -630,7 +630,7 @@ pub async fn embed(
 }
 
 /// `GET /p/:id/og.svg` — the link-preview image: a code screenshot of the first
-/// few lines, rendered by the same `codeimage` the spotlight tool uses.
+/// few lines, rendered by the same `codeimage` the render API exposes.
 ///
 /// A paste whose body is gated (encrypted or burning) gets a *contentless* card:
 /// the whole point of §6.1 is that a crawler building an embed can neither read

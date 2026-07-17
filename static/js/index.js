@@ -1,6 +1,4 @@
-/* Homepage:
-   1. scroll-reveal of the projects / stack sections,
-   2. ambient drifting code + cursor-following spotlight.
+/* Homepage: scroll-reveal of the projects / stack sections.
    No dependencies. Honours prefers-reduced-motion. */
 (function () {
     "use strict";

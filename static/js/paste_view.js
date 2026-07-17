@@ -128,8 +128,8 @@
         copy(field ? field.value : window.location.href, event.currentTarget);
     });
 
-    // The QR comes from the site's existing /api/render/qr endpoint — the same one
-    // the spotlight palette uses. Fetched on first open, then cached in the DOM.
+    // The QR comes from the site's existing /api/render/qr endpoint.
+    // Fetched on first open, then cached in the DOM.
     const qrToggle = document.getElementById("share-qr-toggle");
     const qrBox = document.getElementById("share-qr");
     qrToggle?.addEventListener("click", async (event) => {

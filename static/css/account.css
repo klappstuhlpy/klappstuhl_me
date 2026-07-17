@@ -438,6 +438,10 @@
 
 .muted { color: var(--text-muted); }
 
+/* The insights range picker sits above the tiles rather than trailing a
+   paragraph, so it has to bring its own gap (see .section-actions). */
+.insights-controls { margin-bottom: 1.1rem; }
+
 /* ── Stat tiles ──────────────────────────────────────────────── */
 
 .stat-tiles {

@@ -86,6 +86,140 @@ mod tests {
         assert_eq!(user_version(&conn).unwrap(), target_version());
     }
 
+    fn table_exists(conn: &rusqlite::Connection, table: &str) -> bool {
+        conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?",
+            [table],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap()
+            > 0
+    }
+
+    /// Migrations 23–26 drop everything the extracted admin control plane owned,
+    /// plus the two Percy tables the dashboard took over and the `invite`
+    /// leftover — and touch nothing the site still reads.
+    ///
+    /// `foreign_keys = ON` matters here: the pool turns it on for every real
+    /// connection, and several of these tables reference each other
+    /// (`ssh_session_audit` → `ssh_key`, health samples → `health_target`), so a
+    /// wrong drop order would fail *only* under this pragma.
+    #[test]
+    fn migrations_23_to_26_drop_the_dead_tables_and_spare_the_live_ones() {
+        let mut conn = open_memory();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        migrate(&mut conn).expect("migrate fresh db");
+
+        // Earlier migrations create each of these; 23–26 must remove them again.
+        for table in [
+            "metric_sample",
+            "docker_stat",
+            "docker_snapshot",
+            "health_check_sample",
+            "health_incident",
+            "health_target",
+            "firewall_rule",
+            "firewall_lockout",
+            "proxy_route",
+            "secret_finding",
+            "file_scan",
+            "scan_run",
+            "ssh_session_audit",
+            "ssh_token",
+            "ssh_key",
+            "user_discord_admin_guilds",
+            "percy_leaderboard_vanity",
+            "invite",
+        ] {
+            assert!(!table_exists(&conn, table), "{table} should have been dropped");
+        }
+
+        // The site's own schema is untouched.
+        for table in [
+            "account",
+            "session",
+            "images",
+            "storage",
+            "paste",
+            "paste_revision",
+            "short_link",
+            "audit_log",
+            "totp_recovery_code",
+            "user_discord_links",
+            "username_change",
+            "guild_api_key",
+        ] {
+            assert!(table_exists(&conn, table), "{table} must survive");
+        }
+    }
+
+    /// Migration 26 drops an `invite` table that only *some* databases have.
+    ///
+    /// The feature was removed by commenting out the CREATE inside migration 2
+    /// after it had already been applied, so databases from before that edit still
+    /// carry the table while fresh ones never made it. A fresh migration proves
+    /// the no-op half; this proves the half that actually has something to drop.
+    #[test]
+    fn migration_26_drops_a_legacy_invite_table() {
+        let conn = open_memory();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        conn.execute_batch(
+            "CREATE TABLE account(id INTEGER PRIMARY KEY, name TEXT);
+             INSERT INTO account(id, name) VALUES (1, 'ferris');
+             CREATE TABLE invite (
+                 code       TEXT    PRIMARY KEY,
+                 created_by INTEGER NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+                 created_at TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                 used_at    TEXT
+             ) WITHOUT ROWID;
+             INSERT INTO invite(code, created_by) VALUES ('abc123', 1);",
+        )
+        .unwrap();
+        assert!(table_exists(&conn, "invite"));
+
+        let migration = EMBEDDED_MIGRATIONS
+            .iter()
+            .find(|m| m.version == 26)
+            .expect("migration 26 exists");
+        conn.execute_batch(migration.sql)
+            .expect("migration 26 applies to a database that still has the table");
+
+        assert!(!table_exists(&conn, "invite"));
+        // The accounts the invites pointed at are not collateral damage.
+        assert!(table_exists(&conn, "account"));
+    }
+
+    /// Migration 27 clears the removed assistant's runtime "Public AI" toggle.
+    ///
+    /// Unlike 23–26 this is a row delete, not a table drop: `storage` is a
+    /// general-purpose KV table the site still uses, so only the one key goes and
+    /// everything else in there has to survive.
+    #[test]
+    fn migration_27_clears_the_ai_toggle_and_leaves_other_storage_keys() {
+        let conn = open_memory();
+        conn.execute_batch(
+            "CREATE TABLE storage (name TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
+             INSERT INTO storage(name, value) VALUES ('ai_public', 'true');
+             INSERT INTO storage(name, value) VALUES ('something_else', 'keep me');",
+        )
+        .unwrap();
+
+        let migration = EMBEDDED_MIGRATIONS
+            .iter()
+            .find(|m| m.version == 27)
+            .expect("migration 27 exists");
+        conn.execute_batch(migration.sql).expect("migration 27 applies");
+
+        let remaining: Vec<String> = conn
+            .prepare("SELECT name FROM storage ORDER BY name")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .filter_map(Result::ok)
+            .collect();
+        assert_eq!(remaining, vec!["something_else".to_string()]);
+    }
+
     fn table_has_column(conn: &rusqlite::Connection, table: &str, column: &str) -> bool {
         conn.prepare(&format!("PRAGMA table_info({table})"))
             .unwrap()

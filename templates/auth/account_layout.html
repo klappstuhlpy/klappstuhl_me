@@ -51,6 +51,15 @@
         </nav>
         {% if user.flags.is_admin() %}
         <div class="account-sidebar-section">
+            <div class="account-sidebar-heading">Site</div>
+            <nav class="account-nav">
+                <a href="/account/insights" class="account-nav-item{% if active_page == "insights" %} active{% endif %}">
+                    <span>Insights</span>
+                </a>
+                <a href="https://admin.klappstuhl.me" class="account-nav-item external" rel="noopener"><span>Vantage</span></a>
+            </nav>
+        </div>
+        <div class="account-sidebar-section">
             <div class="account-sidebar-heading">Apps</div>
             <nav class="account-nav">
                 <a href="https://ssh.klappstuhl.me" class="account-nav-item external" rel="noopener"><span>SSH Terminal</span></a>

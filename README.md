@@ -4,7 +4,7 @@
 
 # Klappstuhl.me
 
-Personal website, image host, and homelab admin platform — built in Rust.
+Personal website, image host, and pastebin — built in Rust.
 
 [![Rust](https://img.shields.io/badge/Rust-1.74%2B-CE422B?logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![Axum](https://img.shields.io/badge/Axum-web-000000?logo=rust&logoColor=white)](https://github.com/tokio-rs/axum)
@@ -19,7 +19,7 @@ Personal website, image host, and homelab admin platform — built in Rust.
 - [Documentation](#documentation)
 - [Tech stack](#tech-stack)
 - [Setup](docs/setup.md) — [quick start (Docker)](docs/setup.md#quick-start-docker), [configuration](docs/setup.md#configuration), [building from source](docs/setup.md#building-from-source)
-- [Features](docs/features.md) — [admin dashboard](docs/features.md#admin-dashboard), [account](docs/features.md#account), [Discord login & the Percy dashboard](docs/features.md#discord-login--the-percy-dashboard), [data & log paths](docs/features.md#data--log-paths)
+- [Features](docs/features.md) — [insights](docs/features.md#insights), [account](docs/features.md#account), [Discord login & the Percy dashboard](docs/features.md#discord-login--the-percy-dashboard), [data & log paths](docs/features.md#data--log-paths)
 - [License](#license)
 
 ## Documentation
@@ -39,7 +39,7 @@ Keys are **scoped** (`images:*`, `links:*`, `pastes:*`) and minted on your
 Everything else lives in [`docs/`](docs):
 
 - **[Setup](docs/setup.md)** — running it under Docker, every `config.json` key, and building from source.
-- **[Features](docs/features.md)** — the admin dashboard, the account shell, Discord login and the Percy dashboard, and where data and logs land on disk.
+- **[Features](docs/features.md)** — the account shell, the site insights, Discord login and the Percy dashboard, and where data and logs land on disk.
 
 ## Tech stack
 
