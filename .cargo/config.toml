@@ -7,10 +7,6 @@
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 
-# Fetch git dependencies (the private klappstuhl_me-shared repo) with the git
-# CLI rather than the built-in libgit2. The CLI honours the user's SSH agent and
-# ~/.ssh config, so private-repo fetches over SSH work reliably (libgit2's SSH
-# auth is flaky, especially on Windows). CI must have an SSH key with read
-# access to klappstuhl_me-shared for this to resolve.
-[net]
-git-fetch-with-cli = true
+# kls-core is fetched over public HTTPS, so libgit2 handles it and no SSH agent,
+# credential helper, or `git-fetch-with-cli` escape hatch is needed. A clean
+# checkout builds with nothing but a Rust toolchain.
