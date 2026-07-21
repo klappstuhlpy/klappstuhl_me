@@ -142,7 +142,7 @@ Set the same **`sso_secret`** in both apps and a user logged in here with a link
 Discord account is signed straight into the dashboard via a short-lived signed
 handoff (no shared DB or session store); leave it unset and `/percy` is a plain
 redirect. Both apps share their design system, cookie crypto, and Percy API client
-through the [`klappstuhl_me-shared`](https://github.com/klappstuhlpy/klappstuhl_me-shared) crates.
+through the [`kls-core`](https://github.com/klappstuhlpy/kls-core) crates.
 
 > **Deployment:** add `percy.<domain>` to `domains` so the ACME cert covers it
 > (keep the apex first — it drives `canonical_url`, the cookie `Domain`, and the
