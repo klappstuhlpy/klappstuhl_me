@@ -6,13 +6,6 @@ services:
     image: klappstuhl_me:latest
     restart: unless-stopped
 
-    # Host networking: the container shares the host's network namespace so
-    # the firewall backend (ufw/iptables/nftables) sees and controls the
-    # real host rules rather than an isolated container namespace.
-    # Port mappings are ignored with host networking — the app binds
-    # directly to the host's ports (9510 in dev, 443 in production).
-    network_mode: host
-
     volumes:
       # Persistent data: config, database, logs, ACME cert cache.
       # On first run the app auto-creates the config file at:
@@ -99,6 +92,9 @@ services:
       HOST_SYS:  "/host/sys"
       # Optional: pass RUST_LOG to control log verbosity.
       # RUST_LOG: "info"
+
+    ports:
+      - "9510:9510"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # First-run setup
