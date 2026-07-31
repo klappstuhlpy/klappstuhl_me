@@ -93,9 +93,6 @@ services:
       # Optional: pass RUST_LOG to control log verbosity.
       # RUST_LOG: "info"
 
-    ports:
-      - "9510:9510"
-
 # ─────────────────────────────────────────────────────────────────────────────
 # First-run setup
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,3 +108,23 @@ services:
 #
 # 4. Start permanently:
 #      docker compose up -d
+
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:9510/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+    networks:
+      - homelab
+
+networks:
+  homelab:
+    external: true
