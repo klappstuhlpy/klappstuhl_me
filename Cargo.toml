@@ -10,8 +10,8 @@ description = "A custom information website about Klappstuhl and API support."
 # HTTPS. Bump the tag in lock-step across this repo, percy-dashboard, and
 # Vantage when cutting a new shared release; never move a published tag.
 [dependencies]
-kls-ui = { git = "https://github.com/klappstuhlpy/kls-core", tag = "v0.1.0" }
-kls-web-core = { git = "https://github.com/klappstuhlpy/kls-core", tag = "v0.1.0" }
+kls-ui = { git = "https://github.com/klappstuhlpy/kls-core", tag = "v0.3.0" }
+kls-web-core = { git = "https://github.com/klappstuhlpy/kls-core", tag = "v0.3.0" }
 anyhow = "1.0.80"
 argon2 = { version = "0.5.3", features = ["std"] }
 async-trait = "0.1.77"
