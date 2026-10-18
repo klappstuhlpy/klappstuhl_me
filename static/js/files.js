@@ -55,14 +55,12 @@ class TableSorter {
       el.addEventListener('click', e => this.sortBy(e, el.dataset.sortBy))
     });
     if(this.parent) {
-      let isAscending = initialSortOrder === 'ascending';
-      this.innerSortBy(`data-${initialSortBy}`, isAscending);
+      // Newest first, matching the order the server renders.
+      const initialSortBy = 'uploaded-at';
+      this.innerSortBy(`data-${initialSortBy}`, false);
       const headers = Array.from(this.parent.querySelectorAll('.table-headers > .table-header'));
       headers.forEach(node => node.classList.remove('sorting-ascending', 'sorting-descending'));
-      let element = headers.find(e => e.dataset.sortBy === initialSortBy);
-      if(element != null) {
-        element.classList.add(isAscending ? 'sorting-ascending' : 'sorting-descending');
-      }
+      headers.find(e => e.dataset.sortBy === initialSortBy)?.classList.add('sorting-descending');
     }
   }
 
@@ -73,17 +71,17 @@ class TableSorter {
     }
     let parent = entries[0].parentElement;
     entries.sort((a, b) => {
+      let result;
       if (attribute === 'data-name') {
-        let firstName = a.textContent;
-        let secondName = b.textContent;
-        return ascending ? firstName.localeCompare(secondName) : secondName.localeCompare(firstName);
+        // The filename lives in `data-id`; textContent would include size/date text.
+        result = (a.dataset.id ?? '').localeCompare(b.dataset.id ?? '', undefined, { numeric: true });
+      } else if (attribute === 'data-uploaded-at') {
+        // RFC 3339 strings: parseInt would only read the year.
+        result = Date.parse(a.getAttribute(attribute)) - Date.parse(b.getAttribute(attribute));
       } else {
-        // The last two remaining sort options are either e.g. file.size or entry.last_modified
-        // Both of these are numbers so they're simple to compare
-        let first = parseInt(a.getAttribute(attribute), 10);
-        let second = parseInt(b.getAttribute(attribute), 10);
-        return ascending ? first - second : second - first;
+        result = Number(a.getAttribute(attribute)) - Number(b.getAttribute(attribute));
       }
+      return ascending ? result : -result;
     });
 
     entries.forEach(obj => parent.appendChild(obj));

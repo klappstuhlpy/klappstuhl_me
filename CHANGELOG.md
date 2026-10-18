@@ -18,6 +18,10 @@ changelog was introduced in July 2026; changes between 1.0.0 (January 2025) and
 
 - Database migrations rebooted: the 28-file migration history (0–27) has been consolidated into 3 clean baseline files covering the same final schema — no tables, columns, or behavior changed.
 
+### Fixed
+
+- Sorting on the images page works again: Date sorts by actual upload time (it previously compared only the year, leaving the order effectively random), Name sorts by filename, and the page opens newest first. The search box, which a script error had silently disabled, filters again too.
+
 ## [1.7.0] - 2026-07-17
 
 ### Added
