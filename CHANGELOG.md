@@ -17,6 +17,7 @@ changelog was introduced in July 2026; changes between 1.0.0 (January 2025) and
 ### Changed
 
 - Database migrations rebooted: the 28-file migration history (0–27) has been consolidated into 3 clean baseline files covering the same final schema — no tables, columns, or behavior changed.
+- Updated sidebar headings and remove Vantage link from insights.
 
 ### Fixed
 
