@@ -1664,7 +1664,6 @@ dependencies = [
  "hyper",
  "hyper-util",
  "image",
- "kls-ui",
  "kls-web-core",
  "nanoid",
  "pin-project-lite",
@@ -1697,14 +1696,6 @@ dependencies = [
  "tree_magic",
  "utoipa",
  "zip",
-]
-
-[[package]]
-name = "kls-ui"
-version = "0.1.0"
-source = "git+https://github.com/klappstuhlpy/kls-core?tag=v0.3.0#0c0e92b6cfac1b26bcd9ff5e03afbf5b7e4eaf1b"
-dependencies = [
- "axum",
 ]
 
 [[package]]

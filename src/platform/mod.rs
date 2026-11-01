@@ -6,5 +6,6 @@ pub mod cached;
 pub mod cookies;
 pub mod flash;
 pub mod headers;
+pub mod kls_assets;
 pub mod ratelimit;
 pub mod scope;

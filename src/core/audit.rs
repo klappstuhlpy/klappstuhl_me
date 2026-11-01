@@ -30,7 +30,7 @@ use std::net::IpAddr;
 
 // Re-export the shared read models so `crate::audit::{AuditEntry, AuditCounts}`
 // (and `AuditRecord`, the wire the builder produces) keep resolving unchanged.
-pub use kls_web_core::audit::{AuditCounts, AuditEntry, AuditRecord};
+pub use super::audit_store::{AuditCounts, AuditEntry, AuditRecord};
 
 /// Fluent builder. Cheap to construct, finalised by `.fire()`.
 pub struct AuditBuilder<'a> {
@@ -102,7 +102,7 @@ impl<'a> AuditBuilder<'a> {
 
         let state = self.state.clone();
         tokio::spawn(async move {
-            kls_web_core::audit::write(state.database(), &record).await;
+            super::audit_store::write(state.database(), &record).await;
         });
     }
 }
@@ -110,7 +110,7 @@ impl<'a> AuditBuilder<'a> {
 // ─── Dashboard reads (delegate to the shared kernel over this app's DB) ──────
 
 pub async fn counts(state: &AppState) -> rusqlite::Result<AuditCounts> {
-    kls_web_core::audit::counts(state.database()).await
+    super::audit_store::counts(state.database()).await
 }
 
 pub async fn list_recent(
@@ -119,5 +119,5 @@ pub async fn list_recent(
     actor: Option<&str>,
     limit: i64,
 ) -> rusqlite::Result<Vec<AuditEntry>> {
-    kls_web_core::audit::list_recent(state.database(), action_prefix, actor, limit).await
+    super::audit_store::list_recent(state.database(), action_prefix, actor, limit).await
 }

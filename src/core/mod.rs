@@ -2,6 +2,7 @@
 //! data models, error types, logging, CLI entry points, and shared utilities.
 
 pub mod audit;
+pub mod audit_store;
 pub mod cli;
 pub mod config;
 pub mod database;
